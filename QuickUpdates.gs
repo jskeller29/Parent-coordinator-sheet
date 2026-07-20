@@ -57,10 +57,7 @@ function FIX_ALL_MISSING_FORMULAS_BATCH() {
   }
 
   sheet.getRange(startRow, 1, numRows, 1).setFormulas(colAFormulas);
-  sheet.getRange(startRow, 3, numRows, 2).setBorder(false, false, false, false, false, false);
-  sheet.getRange(startRow, 13, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
-  sheet.getRange(startRow, 15, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
-  sheet.getRange(startRow, 16, numRows, 1).insertCheckboxes().setFontColor("#000000");
+  formatContactLogRows_(sheet, startRow, numRows);
 
   ss.toast("Week formulas restored and borders fixed!", "Success", 3);
 }
@@ -230,19 +227,13 @@ function getExistingMasterTable_(ss) {
 function autoAddBlankRow_(sheet, editedRow, endRow) {
   if (editedRow === endRow - 1) {
     sheet.insertRowAfter(editedRow);
-    // 🛡️ FIX: Updated to formatting for 16 columns. Checkboxes sit firmly in Col P (16)
-    sheet.getRange(editedRow + 1, 16).insertCheckboxes().setValue(false).setFontColor("#000000"); 
-    sheet.getRange(editedRow + 1, 3, 1, 2).setBorder(false, false, false, false, false, false);
-    
-    // 🛡️ FIX: Divider lines shifted back to M (13) and O (15)
-    sheet.getRange(editedRow + 1, 13, 1, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
-    sheet.getRange(editedRow + 1, 15, 1, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
+    formatContactLogRows_(sheet, editedRow + 1, 1);
+    sheet.getRange(editedRow + 1, CL_COL_CHECKBOX).setValue(false);
 
     // The end bar's black border sticks to the edited row's bottom edge when
-    // the new row is inserted above it. Strip all horizontal borders from the
-    // edited row and the new blank row so only the dark brown end bar (re-drawn
-    // by the onEdit sweep) keeps its border.
-    sheet.getRange(editedRow, 1, 2, 16).setBorder(null, null, false, null, null, false);
+    // the new row is inserted above it. Strip its horizontal borders so only
+    // the dark brown end bar (re-drawn by the onEdit sweep) keeps a border.
+    sheet.getRange(editedRow, 1, 1, CL_WIDTH).setBorder(null, null, false, null, null, false);
   }
 }
 
@@ -442,9 +433,9 @@ function applyTypeDropdownColors() {
              }
           }
         }
-      } catch(e) {}
+      } catch(e) { console.error(e); }
     } else {
-      otherRules.push(rule); 
+      otherRules.push(rule);
     }
   });
   

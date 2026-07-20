@@ -50,8 +50,8 @@ function installedOnEdit(e) {
   let endRow = typeof findEndRowInColumnE_ === "function" ? findEndRowInColumnE_(sheet) : null;
 
   // --- NEW FILTER LOGIC ---
-  // The Master Toggle shifted from Col 18 to Col 15 (O)
-  if (endRow && row === endRow && col === 15) {
+  // The Master Toggle lives on the end bar row in Col O
+  if (endRow && row === endRow && col === CL_COL_FILTER_TOGGLE) {
     if (typeof toggleHideFilter_ === "function") toggleHideFilter_(sheet, endRow);
     return; 
   }
@@ -66,25 +66,10 @@ function installedOnEdit(e) {
   }
 
   if (safeNumRows > 0) {
-    // --- INSTANT ROW REPAIR (Shifted overall width to 16 / P) ---
-    sheet.getRange(row, 1, safeNumRows, 16).setBackground(null);
-
-    // Strip any stray horizontal borders from the edited rows — only the dark
-    // brown end bar should carry one (re-drawn by the sweep at the bottom).
-    sheet.getRange(row, 1, safeNumRows, 16).setBorder(false, null, false, null, null, false);
-
-    // Parent and Person Spoke With (Shifted to Col 3 and 4)
-    sheet.getRange(row, 3, safeNumRows, 2).setBorder(false, false, false, false, false, false);
-    sheet.getRange(row, 4, safeNumRows, 1).setFontFamily("Roboto");
-    
-    // Draw the divider line before Notes (Shifted to Column 13 / M)
-    sheet.getRange(row, 13, safeNumRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
-    
-    // Draw the divider line before Followup Notes (Shifted to Column 15 / O)
-    sheet.getRange(row, 15, safeNumRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
-    
-    // Checkboxes firmly planted in P (16)
-    sheet.getRange(row, 16, safeNumRows, 1).insertCheckboxes().setFontColor("#000000");
+    // --- INSTANT ROW REPAIR ---
+    sheet.getRange(row, 1, safeNumRows, CL_WIDTH).setBackground(null);
+    formatContactLogRows_(sheet, row, safeNumRows);
+    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily("Roboto");
   }
 
   if (typeof autoAddBlankRow_ === "function") autoAddBlankRow_(sheet, row, endRow);
@@ -94,14 +79,15 @@ function installedOnEdit(e) {
   // CONTACT LOG GHOST TYPIST (OSIS, Guardian, Student)
   // =======================================================
   if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
-    // Watch new columns: C (3, Guardian), E (5, OSIS), F (6, Student)
-    if ((col === 3 || col === 5 || col === 6) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
+    try {
+    // Watch columns: C (Guardian), E (OSIS), F (Student)
+    if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
       const masterSheet = e.source.getSheetByName("Master Table");
       if (masterSheet) {
         let searchRange;
-        if (col === 5) searchRange = masterSheet.getRange("A5:A"); // Typed OSIS
-        else if (col === 6) searchRange = masterSheet.getRange("B5:B"); // Typed Student
-        else if (col === 3) searchRange = masterSheet.getRange("C5:C"); // Typed Guardian
+        if (col === CL_COL_OSIS) searchRange = masterSheet.getRange("A5:A"); // Typed OSIS
+        else if (col === CL_COL_STUDENT) searchRange = masterSheet.getRange("B5:B"); // Typed Student
+        else if (col === CL_COL_GUARDIAN) searchRange = masterSheet.getRange("C5:C"); // Typed Guardian
 
         const found = searchRange.createTextFinder(editedValue).matchEntireCell(true).matchCase(false).findNext();
         if (found) {
@@ -166,10 +152,16 @@ function installedOnEdit(e) {
     if (typeof autofillContactLogDefaults_ === "function") {
       autofillContactLogDefaults_(sheet, row, col, endRow, editedValue);
     }
+    } catch (err) {
+      // Surface ghost-typist/auto-fill failures instead of dying silently
+      // mid-edit; the delta sync below still gets a chance to run.
+      console.error(err);
+      e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
+    }
   }
 
-  // --- LAG FIX: Only recalculate colors if you actually changed the Type (Shifted to Col 12 / L) ---
-  if (col === 12) {
+  // --- LAG FIX: Only recalculate colors if you actually changed the Type (Col L) ---
+  if (col === CL_COL_TYPE) {
     if (typeof applyTypeDropdownColors === "function") applyTypeDropdownColors(); 
   }
 
@@ -178,24 +170,24 @@ function installedOnEdit(e) {
   // ==================================================
   let finalEndRow = typeof findEndRowInColumnE_ === "function" ? findEndRowInColumnE_(sheet) : null;
   if (finalEndRow) {
-    sheet.getRange(finalEndRow, 1, 1, 16).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
-    
+    sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+
     let maxRows = sheet.getMaxRows();
     if (maxRows >= finalEndRow) {
       let rowsToClear = maxRows - finalEndRow + 1;
-      sheet.getRange(finalEndRow, 16, rowsToClear, 1).clearDataValidations().clearContent();
+      sheet.getRange(finalEndRow, CL_COL_CHECKBOX, rowsToClear, 1).clearDataValidations().clearContent();
     }
   }
 
   SpreadsheetApp.flush(); 
 
   // --- DYNAMIC DELTA SYNC TRIGGER ---
-  let targetOsis = String(sheet.getRange(row, 5).getDisplayValue()).trim();
+  let targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
 
   if (typeof isValidOsis_ === "function" && !isValidOsis_(targetOsis)) {
     Utilities.sleep(1000);
     SpreadsheetApp.flush();
-    targetOsis = String(sheet.getRange(row, 5).getDisplayValue()).trim();
+    targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
   }
 
   if (typeof isValidOsis_ === "function" && isValidOsis_(targetOsis)) {
@@ -223,7 +215,7 @@ function installedOnEdit(e) {
     }
 
   } else {
-    if (col === 5 && !editedValue) {
+    if (col === CL_COL_OSIS && !editedValue) {
       if (typeof updateContactAndPhoneOnly === "function") updateContactAndPhoneOnly();
     }
   }
