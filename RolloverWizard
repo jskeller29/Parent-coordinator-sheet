@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: 'Roboto', sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding: 20px; }
+      .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
+      h2 { color: #1a73e8; margin-top: 0; }
+      p { font-size: 14px; line-height: 1.5; color: #555; text-align: left; }
+      ul { text-align: left; font-size: 14px; color: #555; padding-left: 20px; }
+      .btn { display: inline-block; padding: 10px 20px; margin-top: 15px; border-radius: 4px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; text-decoration: none; transition: 0.2s; }
+      .btn-primary { background-color: #1a73e8; color: white; }
+      .btn-primary:hover { background-color: #1557b0; }
+      .btn-success { background-color: #188038; color: white; width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; }
+      .btn-success:hover { background-color: #115e27; }
+      .btn-outline { background-color: transparent; color: #1a73e8; border: 1px solid #1a73e8; margin-left: 10px; }
+      .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1a73e8; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .hidden { display: none; }
+      .success-icon { font-size: 40px; margin-bottom: 10px; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      
+      <!-- STEP 1: INITIAL WARNING -->
+      <div id="step1">
+        <h2>End of Year Rollover</h2>
+        <p>Ready to close out the school year? This wizard will safely archive your data and prepare you for next year.</p>
+        <p><strong>What this does:</strong></p>
+        <ul>
+          <li>Generates a permanent <strong>PDF Archive</strong> of your Contact Log & Combined Tracking.</li>
+          <li><strong>Freezes this sheet</strong> by turning off all Nightly Phone Syncs so it doesn't overwrite your new data next year.</li>
+          <li>Provides the link to download your fresh, blazing-fast template for September!</li>
+        </ul>
+        <button class="btn btn-primary" onclick="startRollover()">Start Archive Process</button>
+        <button class="btn btn-outline" onclick="google.script.host.close()">Cancel</button>
+      </div>
+
+      <!-- STEP 2: LOADING SCREEN -->
+      <div id="step2" class="hidden">
+        <h2>Archiving Data...</h2>
+        <div class="loader"></div>
+        <p style="text-align: center;">Packaging your logs into a PDF and freezing sync triggers.<br><br><em>This may take up to 30 seconds. Do not close this window.</em></p>
+      </div>
+
+      <!-- STEP 3: SUCCESS SCREEN -->
+      <div id="step3" class="hidden">
+        <div class="success-icon">✅</div>
+        <h2>Archive Complete!</h2>
+        <p style="text-align: center;">Your data has been successfully frozen and archived.</p>
+        
+        <a id="pdfLink" href="#" target="_blank" class="btn btn-outline" style="margin: 0 auto 20px auto; display: block; width: 80%;">📄 View Archived PDF</a>
+        
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <p style="text-align: center; font-weight: bold; color: #1a73e8;">Ready for next year?</p>
+        <a href="https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?tab=t.0" target="_blank" class="btn btn-success" onclick="closeAfterClick()">Get New 2026-2027 Template</a>
+      </div>
+
+    </div>
+
+    <script>
+      function startRollover() {
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('step2').classList.remove('hidden');
+        
+        // Call the backend script
+        google.script.run
+          .withSuccessHandler(showSuccess)
+          .withFailureHandler(showError)
+          .processRolloverBackend();
+      }
+
+      function showSuccess(response) {
+        document.getElementById('step2').classList.add('hidden');
+        document.getElementById('step3').classList.remove('hidden');
+        
+        if(response.success) {
+          document.getElementById('pdfLink').href = response.fileUrl;
+          if (response.isFallback) {
+             document.getElementById('pdfLink').innerHTML = "📄 View Archive Spreadsheet";
+          }
+        } else {
+          showError(response.error);
+        }
+      }
+
+      function showError(errorMsg) {
+        document.getElementById('step2').classList.add('hidden');
+        document.getElementById('step1').classList.remove('hidden');
+        alert("An error occurred: " + errorMsg);
+      }
+
+      function closeAfterClick() {
+        setTimeout(function() {
+          google.script.host.close();
+        }, 1000);
+      }
+    </script>
+  </body>
+</html>
