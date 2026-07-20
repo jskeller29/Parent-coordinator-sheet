@@ -286,9 +286,9 @@ function ma_finish() {
   // 💡 NEW: Instantly Unlock and Repaint the App Menu without requiring a refresh!
   PropertiesService.getDocumentProperties().setProperty('FULL_MENU_UNLOCKED', 'true');
   if (typeof onOpen === "function") {
-    try { 
-      onOpen(); 
-    } catch(e) {}
+    try {
+      onOpen();
+    } catch(e) { console.error(e); }
   }
   
   return { success: true };

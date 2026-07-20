@@ -71,7 +71,7 @@ function onOpen() {
 
   try {
     if (typeof applyQBlackTextFilter_ === "function") applyQBlackTextFilter_();
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 
   // CLONE DETECTOR
   const currentSheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
@@ -116,9 +116,9 @@ function onOpen() {
         "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing", 
         SpreadsheetApp.getUi().ButtonSet.OK
       );
-    } catch(e) {}
-    
-    return; 
+    } catch(e) { console.error(e); }
+
+    return;
   }
 
   // ==============================================================
@@ -150,7 +150,7 @@ function onOpen() {
     // from the Script Editor (see VersionCheck.gs).
     // =======================================================
     if (props.getProperty('AUTO_MIGRATE_POPUP') === 'true') {
-      try { openMigrationWizard(); } catch(e) {}
+      try { openMigrationWizard(); } catch(e) { console.error(e); }
     }
   } else {
     // ✅ FULLY POPULATED STATE: Data exists and is built, unlock all menus!
@@ -227,7 +227,7 @@ function onOpen() {
         );
       }
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 
@@ -397,7 +397,7 @@ function startResilientSync() {
   const props = PropertiesService.getDocumentProperties();
   if (props.getProperty('SETUP_COMPLETE') === 'true' && props.getProperty('FULL_MENU_UNLOCKED') !== 'true') {
     props.setProperty('FULL_MENU_UNLOCKED', 'true');
-    try { onOpen(); } catch(e) {} // Attempt silent UI refresh
+    try { onOpen(); } catch(e) { console.error(e); } // Attempt silent UI refresh
     
     // Send a long-lasting toast notification to refresh the page
     ss.toast("All sheets are built! Please refresh your webpage (Press F5) to explore and see your new menu options.", "🎉 Build Complete!", 15);

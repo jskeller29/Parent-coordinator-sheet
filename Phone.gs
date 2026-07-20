@@ -99,7 +99,7 @@ function syncToGoogleContacts() {
       props.setProperty('SYNC_CREATED_COUNT', createdCount.toString()); 
       props.setProperty('SYNC_EDITED_COUNT', editedCount.toString()); 
       cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600); 
-      try { saveStaleMap(staleMap); } catch(e){}
+      try { saveStaleMap(staleMap); } catch(e){ console.error(e); }
       
       cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'paused', progress: i, total: data.length - 1 }), 21600);
       
@@ -162,7 +162,7 @@ function syncToGoogleContacts() {
         props.setProperty('SYNC_CREATED_COUNT', createdCount.toString());
         props.setProperty('SYNC_EDITED_COUNT', editedCount.toString());
         cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600); 
-        try { saveStaleMap(staleMap); } catch(e){}
+        try { saveStaleMap(staleMap); } catch(e){ console.error(e); }
         
         cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'quota', progress: i, total: data.length - 1 }), 21600);
 

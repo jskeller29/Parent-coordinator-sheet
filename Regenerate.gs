@@ -5,6 +5,14 @@ MAIN EXECUTION FUNCTIONS
 function resetToDisplayMode() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.alert(
+    "⚠️ Wipe ALL data?",
+    "This permanently deletes Raw Data, the Contact Log, Events, and all derived sheets, leaving an empty display-mode template. This cannot be undone.\n\nAre you sure?",
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
   deleteLegacySheets_(ss); // NEW: Clean up old tabs
 
   resetRawData_(ss);
@@ -25,7 +33,15 @@ function resetToDisplayMode() {
 
 function resetAndLoadFakeData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
+
+  const ui = SpreadsheetApp.getUi();
+  const resp = ui.alert(
+    "⚠️ Wipe ALL data and load FAKE data?",
+    "This permanently deletes Raw Data, the Contact Log, Events, and all derived sheets, then loads fake demo data. This cannot be undone.\n\nAre you sure?",
+    ui.ButtonSet.YES_NO
+  );
+  if (resp !== ui.Button.YES) return;
+
   deleteLegacySheets_(ss); // NEW: Clean up old tabs
 
   const sheet = ss.getSheetByName("Raw Data");
@@ -98,11 +114,11 @@ function resetRawData_(ss) {
   if (!sheet) throw new Error('Sheet "Raw Data" not found.');
   
   sheet.clear();
-  
+
   // Remove all banding safely across the whole sheet first
   try {
     sheet.getBandings().forEach(b => b.remove());
-  } catch(e) {}
+  } catch(e) { console.error(e); }
   
   const maxCols = sheet.getMaxColumns();
   if (maxCols > 0) {
@@ -238,7 +254,7 @@ function applyBandingToRawData_(sheet) {
 
   try {
     sheet.getBandings().forEach(b => b.remove());
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 
   // Apply alternating colors starting at Row 7
   applyBandingSafe_(sheet.getRange(7, 1, dataRows, 31), SpreadsheetApp.BandingTheme.BLUE); // ATS
@@ -251,7 +267,7 @@ function applyBandingSafe_(range, theme) {
   try {
     range.getBandings().forEach(b => b.remove());
     range.applyRowBanding(theme, false, false);
-  } catch (e) { }
+  } catch (e) { console.error(e); }
 }
 
 /* =========================
@@ -540,9 +556,7 @@ function resetContactLog_(ss) {
   sheet.getRange(endRow, 15).insertCheckboxes().check().setFontColor("#000000"); // ⚡ SHIFTED Col 15
 
   // 4. Forcefully redraw the correct divider lines so the table looks perfect
-  sheet.getRange(2, 3, numRows, 2).setBorder(false, false, false, false, false, false); // Col C&D
-  sheet.getRange(2, 13, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID); // Col M
-  sheet.getRange(2, 15, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID); // Col O
+  formatContactLogRows_(sheet, 2, numRows);
 
   // NEW: 5. Delete rows 9 through 19 below the "END" row to wipe out old UI elements/overrides
   const startDeleteRow = endRow + 9;

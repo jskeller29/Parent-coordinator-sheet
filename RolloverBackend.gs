@@ -24,6 +24,10 @@ function openRolloverWizard() {
  * 6. Exports temp sheet to PDF (with native fallback).
  */
 function processRolloverBackend() {
+  // Declared outside the try so the catch block can clean up the temp
+  // spreadsheet if anything fails after it's created.
+  let tempSsId = null;
+  let usedFallback = false;
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const driveFile = DriveApp.getFileById(ss.getId());
@@ -63,7 +67,7 @@ function processRolloverBackend() {
     // 3. CREATE TEMPORARY SPREADSHEET FOR EXPORT
     // ---------------------------------------------------------
     const tempSs = SpreadsheetApp.create("TEMP_" + pdfName);
-    const tempSsId = tempSs.getId();
+    tempSsId = tempSs.getId();
     
     const contactLog = ss.getSheetByName("Contact Log");
     const combinedLog = ss.getSheetByName("Combined Contact Tracking");
@@ -142,6 +146,7 @@ function processRolloverBackend() {
       
     } catch (urlError) {
       // ATTEMPT 2: Fallback to Native Drive Conversion (Guaranteed to work)
+      usedFallback = true;
       pdfBlob = DriveApp.getFileById(tempSsId).getAs('application/pdf').setName(pdfName + ".pdf");
     }
 
@@ -151,11 +156,13 @@ function processRolloverBackend() {
     // Cleanup: Trash the temporary spreadsheet
     DriveApp.getFileById(tempSsId).setTrashed(true);
     
-    return { success: true, fileUrl: savedPdf.getUrl(), isFallback: false };
+    return { success: true, fileUrl: savedPdf.getUrl(), isFallback: usedFallback };
 
   } catch (e) {
     // Cleanup on fatal error so we don't leave mess behind
-    if (typeof tempSsId !== 'undefined') DriveApp.getFileById(tempSsId).setTrashed(true);
+    if (tempSsId) {
+      try { DriveApp.getFileById(tempSsId).setTrashed(true); } catch (cleanupErr) { console.error(cleanupErr); }
+    }
     return { success: false, error: e.message };
   }
 }
