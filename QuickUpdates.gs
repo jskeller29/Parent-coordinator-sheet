@@ -7,7 +7,11 @@
 // =========================================================
 
 function findEndRowInColumnE_(sheet) {
-  const values = sheet.getRange("E:E").getDisplayValues();
+  // Only read down to the last data row — this runs twice per edit, and
+  // "E:E" pulls every row in the sheet.
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return null;
+  const values = sheet.getRange(1, CL_COL_OSIS, lastRow, 1).getDisplayValues();
   for (let i = 0; i < values.length; i++) {
     if (values[i][0].trim().toUpperCase() === "END") return i + 1;
   }

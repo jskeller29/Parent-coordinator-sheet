@@ -59,10 +59,98 @@ function installedOnEdit(e) {
 
   if (endRow && row >= endRow) return;
 
+  // =======================================================
+  // CONTACT LOG GHOST TYPIST (OSIS, Guardian, Student)
+  // Runs FIRST so the auto-filled values land on screen before the
+  // cosmetic border/checkbox repair work below.
+  // =======================================================
+  if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
+    try {
+      // Watch columns: C (Guardian), E (OSIS), F (Student)
+      if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
+        const masterSheet = e.source.getSheetByName("Master Table");
+        const masterLastRow = masterSheet ? masterSheet.getLastRow() : 0;
+        if (masterSheet && masterLastRow >= 5) {
+          // ONE read of OSIS/Student/Guardian (A5:C) with an in-memory scan,
+          // instead of a TextFinder plus three single-cell reads.
+          const masterData = masterSheet.getRange(5, 1, masterLastRow - 4, 3).getValues();
+          const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
+          const needle = editedValue.toLowerCase();
+          let match = null;
+          for (let i = 0; i < masterData.length; i++) {
+            if (String(masterData[i][matchCol]).trim().toLowerCase() === needle) { match = masterData[i]; break; }
+          }
+
+          if (match) {
+            const correctOsis = match[0];
+            const correctStudent = match[1];
+            const correctGuardian = match[2];
+
+            // --- PULL SITE & CLASS FROM DIRECTORY (HANDLES SIBLINGS) ---
+            const sites = new Set();
+            const classes = new Set();
+
+            const dirSheet = e.source.getSheetByName("Directory");
+            if (dirSheet && correctOsis) {
+              const osisSet = new Set(String(correctOsis).split(',').map(o => o.trim()).filter(String));
+              // ONE read of OSIS/Site/Class (C:E) instead of a TextFinder
+              // round trip per sibling.
+              const dirLastRow = dirSheet.getLastRow();
+              if (dirLastRow > 0) {
+                const dirData = dirSheet.getRange(1, 3, dirLastRow, 3).getValues();
+                for (let i = 0; i < dirData.length; i++) {
+                  if (osisSet.has(String(dirData[i][0]).trim())) {
+                    const siteVal = String(dirData[i][1]).trim();
+                    const classVal = String(dirData[i][2]).trim();
+                    if (siteVal) sites.add(siteVal);
+                    if (classVal) classes.add(classVal);
+                  }
+                }
+              }
+            }
+
+            const correctSite = Array.from(sites).join(", ");
+            const correctClass = Array.from(classes).join(", ");
+
+            const updateRange = sheet.getRange(row, 3, 1, 7);
+            const rowData = updateRange.getValues();
+
+            if (col !== CL_COL_GUARDIAN) rowData[0][0] = correctGuardian; // Col 3
+            if (col !== CL_COL_OSIS) rowData[0][2] = correctOsis;         // Col 5
+            if (col !== CL_COL_STUDENT) rowData[0][3] = correctStudent;   // Col 6
+            rowData[0][5] = correctSite;                                  // Col 8
+            rowData[0][6] = correctClass;                                 // Col 9
+
+            updateRange.setValues(rowData);
+            SpreadsheetApp.flush(); // Paint the filled values immediately
+
+          } else {
+            e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
+          }
+        }
+      }
+
+      // =======================================================
+      // AUTO-FILL DATE / # INTERACTIONS / FOLLOW-UP STATUS
+      // Fires on the same single-cell edits. Fill-if-blank only, and skipped
+      // entirely when "Disable Contact Log Auto-Fill" is on in Settings. The
+      // identity lookup above always runs regardless of that setting.
+      // =======================================================
+      if (typeof autofillContactLogDefaults_ === "function") {
+        autofillContactLogDefaults_(sheet, row, col, endRow, editedValue);
+      }
+    } catch (err) {
+      // Surface ghost-typist/auto-fill failures instead of dying silently
+      // mid-edit; the repair and delta sync below still get a chance to run.
+      console.error(err);
+      e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
+    }
+  }
+
   // --- SAFE ROW CEILING ---
   let safeNumRows = numRows;
   if (endRow && (row + safeNumRows) > endRow) {
-    safeNumRows = endRow - row; 
+    safeNumRows = endRow - row;
   }
 
   if (safeNumRows > 0) {
@@ -74,91 +162,6 @@ function installedOnEdit(e) {
 
   if (typeof autoAddBlankRow_ === "function") autoAddBlankRow_(sheet, row, endRow);
   if (typeof patchMissingFormulasInRow_ === "function") patchMissingFormulasInRow_(sheet, row);
-
-  // =======================================================
-  // CONTACT LOG GHOST TYPIST (OSIS, Guardian, Student)
-  // =======================================================
-  if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
-    try {
-    // Watch columns: C (Guardian), E (OSIS), F (Student)
-    if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
-      const masterSheet = e.source.getSheetByName("Master Table");
-      if (masterSheet) {
-        let searchRange;
-        if (col === CL_COL_OSIS) searchRange = masterSheet.getRange("A5:A"); // Typed OSIS
-        else if (col === CL_COL_STUDENT) searchRange = masterSheet.getRange("B5:B"); // Typed Student
-        else if (col === CL_COL_GUARDIAN) searchRange = masterSheet.getRange("C5:C"); // Typed Guardian
-
-        const found = searchRange.createTextFinder(editedValue).matchEntireCell(true).matchCase(false).findNext();
-        if (found) {
-          const foundRow = found.getRow();
-          
-          // Pull core identifying data from the Master Table
-          const correctOsis = masterSheet.getRange(foundRow, 1).getValue();
-          const correctStudent = masterSheet.getRange(foundRow, 2).getValue();
-          const correctGuardian = masterSheet.getRange(foundRow, 3).getValue();
-          
-          // --- PULL SITE & CLASS FROM DIRECTORY (HANDLES SIBLINGS) ---
-          const sites = new Set();
-          const classes = new Set();
-          
-          const dirSheet = e.source.getSheetByName("Directory");
-          if (dirSheet && correctOsis) {
-            const osisArray = String(correctOsis).split(',').map(o => o.trim()).filter(String);
-            const dirSearchRange = dirSheet.getRange("C:C");
-            
-            osisArray.forEach(individualOsis => {
-              const dirFound = dirSearchRange.createTextFinder(individualOsis).matchEntireCell(true).findNext();
-              if (dirFound) {
-                const dirRow = dirFound.getRow();
-                const dirCol = dirFound.getColumn(); 
-                
-                const siteClassVals = dirSheet.getRange(dirRow, dirCol + 1, 1, 2).getValues()[0];
-                const siteVal = String(siteClassVals[0]).trim();
-                const classVal = String(siteClassVals[1]).trim();
-                
-                if (siteVal) sites.add(siteVal);
-                if (classVal) classes.add(classVal);
-              }
-            });
-          }
-          
-          const correctSite = Array.from(sites).join(", ");
-          const correctClass = Array.from(classes).join(", ");
-          
-          const updateRange = sheet.getRange(row, 3, 1, 7); 
-          const rowData = updateRange.getValues();
-          
-          if (col !== 3) rowData[0][0] = correctGuardian; // Col 3 
-          if (col !== 5) rowData[0][2] = correctOsis;     // Col 5 
-          if (col !== 6) rowData[0][3] = correctStudent;  // Col 6 
-          rowData[0][5] = correctSite;                    // Col 8 
-          rowData[0][6] = correctClass;                   // Col 9 
-          
-          updateRange.setValues(rowData); 
-          
-        } else {
-          e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
-        }
-      }
-    }
-
-    // =======================================================
-    // NEW: AUTO-FILL DATE / # INTERACTIONS / FOLLOW-UP STATUS
-    // Fires on the same single-cell edits. Fill-if-blank only, and skipped
-    // entirely when "Disable Contact Log Auto-Fill" is on in Settings. The
-    // identity lookup above always runs regardless of that setting.
-    // =======================================================
-    if (typeof autofillContactLogDefaults_ === "function") {
-      autofillContactLogDefaults_(sheet, row, col, endRow, editedValue);
-    }
-    } catch (err) {
-      // Surface ghost-typist/auto-fill failures instead of dying silently
-      // mid-edit; the delta sync below still gets a chance to run.
-      console.error(err);
-      e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
-    }
-  }
 
   // --- LAG FIX: Only recalculate colors if you actually changed the Type (Col L) ---
   if (col === CL_COL_TYPE) {
@@ -267,21 +270,21 @@ function autofillContactLogDefaults_(sheet, row, col, endRow, editedValue) {
   const val = String(editedValue == null ? "" : editedValue).trim().toUpperCase();
   if (val === "" || val === "TRUE" || val === "FALSE") return;
 
+  // ONE read covers B (date), G (count), and N (follow-up) instead of three.
+  const rowVals = sheet.getRange(row, 2, 1, 13).getDisplayValues()[0]; // B..N
+
   // B (2): Date — only if empty.
-  const dateCell = sheet.getRange(row, 2);
-  if (String(dateCell.getDisplayValue()).trim() === "") {
+  if (String(rowVals[0]).trim() === "") {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // midnight => $B2 = TODAY() and Col A week math both work
-    dateCell.setValue(today);
+    sheet.getRange(row, 2).setValue(today);
   }
 
   // G (7): # of interactions — only if empty.
-  const countCell = sheet.getRange(row, 7);
-  if (String(countCell.getDisplayValue()).trim() === "") countCell.setValue(1);
+  if (String(rowVals[5]).trim() === "") sheet.getRange(row, 7).setValue(1);
 
   // N (14): Follow-up status dropdown — only if empty (never flip a chosen value).
-  const followupCell = sheet.getRange(row, 14);
-  if (String(followupCell.getDisplayValue()).trim() === "") followupCell.setValue("No");
+  if (String(rowVals[12]).trim() === "") sheet.getRange(row, 14).setValue("No");
 }
 
 // =========================================================
