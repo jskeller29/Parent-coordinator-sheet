@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 15px; margin: 0; }
+      progress { width: 100%; height: 20px; margin-top: 5px; transition: accent-color 0.3s ease; }
+      .section { margin-bottom: 20px; }
+      .status { font-size: 13px; color: #555; margin-top: 3px; }
+      .safe-note { font-size: 11px; color: #0066cc; font-style: italic; margin-top: 3px;}
+      .success { color: green; font-weight: bold; }
+      
+      /* Summary Box Styling */
+      .summary { margin-top: 10px; font-size: 14px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+      .log-link { display: block; margin: 8px 0; cursor: pointer; text-decoration: none; color: #334155; padding: 6px; border-radius: 4px; transition: 0.2s;}
+      .log-link:hover { background-color: #e2e8f0; }
+      
+      progress.cancelled::-webkit-progress-value { background-color: #f44336 !important; }
+      progress.cancelled::-moz-progress-bar { background-color: #f44336 !important; }
+      progress.cancelled { accent-color: #f44336; }
+      
+      .control-panel { margin-top: 25px; text-align: center; border-top: 1px solid #ddd; padding-top: 15px; }
+      .action-btn { margin: 0 4px; padding: 10px 12px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; color: white; width: 45%; transition: 0.2s; }
+      .action-btn:hover { opacity: 0.8; }
+      .btn-restart { background-color: #ff9800; }
+      .btn-cancel { background-color: #f44336; }
+      .btn-start { background-color: #2196F3; width: 95%; } 
+
+      /* Details View Styling */
+      #detailsView { display: none; }
+      .back-btn { background: none; border: none; color: #2196F3; font-weight: bold; cursor: pointer; padding: 0; margin-bottom: 15px; font-size: 14px; }
+      .back-btn:hover { text-decoration: underline; }
+      .log-list { list-style-type: none; padding-left: 0; font-size: 13px; max-height: 400px; overflow-y: auto; }
+      .log-item { background: #f1f5f9; padding: 8px; margin-bottom: 6px; border-radius: 4px; border-left: 3px solid #94a3b8; }
+      .log-item.created { border-left-color: #22c55e; }
+      .log-item.edited { border-left-color: #f59e0b; }
+      .log-item.deleted { border-left-color: #ef4444; }
+      .log-item.upgrade { border-left-color: #3b82f6; }
+    </style>
+  </head>
+  <body>
+    
+    <div id="mainView">
+      <h3 id="mainTitle" style="margin-top: 0;">App Build & Sync</h3>
+      
+      <div class="section">
+        <strong>1. Building Sheets & Directory</strong>
+        <progress id="buildBar" value="0" max="1"></progress>
+        <div id="buildStatus" class="status">Waiting to start...</div>
+      </div>
+
+      <div class="section" id="syncSection">
+        <strong>2. Syncing Google Contacts</strong>
+        <progress id="syncBar" value="0" max="100"></progress>
+        <div id="syncStatus" class="status">Waiting for build to finish...</div>
+        <div id="etaText" style="margin-top: 6px; font-size: 13px; color: #0f172a; font-weight: bold;"></div>
+        <div class="safe-note">🛡️ Safe to close or refresh. Sync runs in background.</div>
+      </div>
+      
+      <div id="buildReport"></div>
+      <div id="summaryReport"></div>
+
+      <div id="controlPanel" class="control-panel" style="display: none;">
+        <button id="btnRestart" class="action-btn btn-restart" onclick="triggerRestart()">Restart Run</button>
+        <button id="btnCancel" class="action-btn btn-cancel" onclick="triggerCancel()">Cancel Run</button>
+        <button id="btnStart" class="action-btn btn-start" style="display: none;" onclick="triggerRestart()">Start New Build</button>
+      </div>
+    </div>
+
+    <div id="detailsView">
+      <button class="back-btn" onclick="showMainView()">← Back to Summary</button>
+      <h3 id="detailsTitle" style="margin-top: 0;">Log Details</h3>
+      <ul id="logList" class="log-list"></ul>
+    </div>
+
+    <script>
+      let poller;
+      let cachedLogData = null; 
+      let cachedBuildLogData = null;
+      let runMode = 'FULL_SYNC';
+      let buildReportShown = false; 
+      
+      // --- ETA VARIABLES ---
+      let syncStartTime = null;
+      let syncStartProgress = null;
+      let pauseStartTime = null;
+      let totalPauseTime = 0; 
+      let lastCalculatedProgress = null;
+      let estimatedMsRemaining = 0;
+      let lastUpdateTime = null;
+
+      window.onload = function() {
+        // Automatically fetch last known build log just in case they reopen the sidebar
+        google.script.run.withSuccessHandler(data => {
+            if (data && (data.newStudents.length > 0 || data.discharged.length > 0 || data.nycsaUpgrades.length > 0 || data.psUpgrades.length > 0)) {
+                cachedBuildLogData = data;
+                // Only show it if we aren't actively building a new one right now
+                if (document.getElementById('buildStatus').innerText !== 'Building sheets...') {
+                    showBuildReport();
+                    buildReportShown = true;
+                }
+            }
+        }).getBuildLogData();
+
+        google.script.run.withSuccessHandler(mode => {
+           runMode = mode;
+           if (runMode === 'BUILD_ONLY') {
+              document.getElementById('syncSection').style.display = 'none';
+              document.getElementById('mainTitle').innerText = 'App Build Manager';
+              google.script.run.withFailureHandler(onFailure).startBuildOnlyProcess();
+           } else {
+              google.script.run.withFailureHandler(onFailure).startResilientSync();
+           }
+           poller = setInterval(pollServer, 1500); 
+        }).getRunMode();
+      };
+
+      function pollServer() {
+        google.script.run.withSuccessHandler(updateUI).getSyncStatus();
+      }
+
+      function updateUI(state) {
+        if (!state || state.phase === 'idle') return;
+
+        const controls = document.getElementById('controlPanel');
+        const btnRestart = document.getElementById('btnRestart');
+        const btnCancel = document.getElementById('btnCancel');
+        const btnStart = document.getElementById('btnStart');
+
+        if (['building', 'syncing', 'paused', 'quota'].includes(state.phase)) {
+          controls.style.display = 'block';
+          btnRestart.style.display = 'inline-block';
+          btnCancel.style.display = 'inline-block';
+          btnStart.style.display = 'none';
+          document.getElementById('buildBar').classList.remove('cancelled');
+          document.getElementById('syncBar').classList.remove('cancelled');
+        }
+
+        if (state.phase === 'building') {
+          document.getElementById('buildBar').removeAttribute('value');
+          document.getElementById('buildStatus').innerText = 'Building sheets...';
+          // Ensure old reports are wiped off the screen while a new build happens
+          document.getElementById('buildReport').innerHTML = '';
+          buildReportShown = false; 
+        }
+        
+        if (state.phase === 'done_build_only') {
+          clearInterval(poller);
+          document.getElementById('buildBar').max = 1; 
+          document.getElementById('buildBar').value = 1;
+          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+          
+          if (!buildReportShown) { showBuildReport(); buildReportShown = true; }
+
+          controls.style.display = 'block';
+          btnRestart.style.display = 'none';
+          btnCancel.style.display = 'none';
+          btnStart.style.display = 'inline-block';
+          btnStart.innerText = "Start New Build";
+
+          google.script.run.resetSyncStatus();
+          return;
+        }
+
+        // ==============================================================
+        // ✨ THE MAGIC HAPPENS HERE: SHOW REPORT WHILE SYNC RUNS
+        // ==============================================================
+        if (['syncing', 'paused', 'quota'].includes(state.phase)) {
+          
+          document.getElementById('buildBar').max = 1; 
+          document.getElementById('buildBar').value = 1;
+          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+
+          // Instantly pop the build report onto the screen while phone sync works!
+          if (!buildReportShown) { 
+              showBuildReport(); 
+              buildReportShown = true; 
+          }
+
+          if (state.phase === 'syncing') {
+              document.getElementById('syncBar').max = state.total;
+              document.getElementById('syncBar').value = state.progress;
+              document.getElementById('syncStatus').innerText = `Syncing contact ${state.progress} of ${state.total}...`;
+
+              if (pauseStartTime) {
+                  totalPauseTime += (Date.now() - pauseStartTime);
+                  pauseStartTime = null; 
+              }
+
+              if (!syncStartTime || syncStartProgress === null || state.progress < syncStartProgress) {
+                  syncStartTime = Date.now();
+                  syncStartProgress = state.progress;
+                  totalPauseTime = 0;
+                  lastCalculatedProgress = state.progress;
+                  estimatedMsRemaining = 0;
+                  lastUpdateTime = Date.now();
+                  document.getElementById('etaText').innerText = "⏱️ Calculating ETA...";
+              } else {
+                  if (state.progress > lastCalculatedProgress) {
+                      let rowsDone = state.progress - syncStartProgress;
+                      let trueElapsedMs = (Date.now() - syncStartTime) - totalPauseTime;
+                      if (trueElapsedMs < 0) trueElapsedMs = 0;
+
+                      let msPerRow = trueElapsedMs / rowsDone;
+                      let rowsLeft = state.total - state.progress;
+                      
+                      estimatedMsRemaining = rowsLeft * msPerRow;
+                      lastCalculatedProgress = state.progress;
+                      lastUpdateTime = Date.now();
+                  }
+
+                  if (estimatedMsRemaining > 0) {
+                      let timeSinceLastUpdate = Date.now() - lastUpdateTime;
+                      let currentDisplayMs = estimatedMsRemaining - timeSinceLastUpdate;
+                      if (currentDisplayMs < 0) currentDisplayMs = 0;
+
+                      let totalSeconds = Math.floor(currentDisplayMs / 1000);
+                      let hours = Math.floor(totalSeconds / 3600);
+                      let minutes = Math.floor((totalSeconds % 3600) / 60);
+                      let seconds = totalSeconds % 60;
+                      
+                      let secStr = seconds < 10 ? "0" + seconds : seconds;
+                      let minStr = (hours > 0 && minutes < 10) ? "0" + minutes : minutes;
+
+                      let timeString = hours > 0 ? `${hours}h ${minStr}m ${secStr}s` : `${minutes}m ${secStr}s`;
+                      document.getElementById('etaText').innerText = `⏱️ Estimated Time Remaining: ${timeString}`;
+                  }
+              }
+          }
+
+          if (state.phase === 'paused') {
+            if (!pauseStartTime) pauseStartTime = Date.now(); 
+            document.getElementById('syncStatus').innerText = `Large batch: 60s cooldown to protect server. Resuming at ${state.progress}...`;
+            document.getElementById('etaText').innerText = "⏱️ Paused... (Timer suspended)"; 
+          }
+
+          if (state.phase === 'quota') {
+            if (!pauseStartTime) pauseStartTime = Date.now(); 
+            document.getElementById('syncStatus').innerText = `Google API Quota hit. Paused for 15 minutes. Resuming at ${state.progress}...`;
+            document.getElementById('etaText').innerText = "⏳ API Limit: Paused for 15 mins... (Timer suspended)"; 
+          }
+        }
+        
+        if (state.phase === 'killed') {
+          clearInterval(poller); 
+          document.getElementById('buildBar').classList.add('cancelled');
+          document.getElementById('syncBar').classList.add('cancelled');
+          
+          let cancelText = runMode === 'BUILD_ONLY' ? '🛑 Build Terminated by User' : '🛑 Sync Terminated by User';
+          
+          if (runMode === 'BUILD_ONLY') {
+             document.getElementById('buildStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;
+          } else {
+             document.getElementById('syncStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;
+          }
+          
+          document.getElementById('etaText').innerText = ""; 
+          
+          controls.style.display = 'block';
+          btnRestart.style.display = 'none';
+          btnCancel.style.display = 'none';
+          btnStart.style.display = 'inline-block';
+
+          google.script.run.resetSyncStatus(); 
+          return;
+        }
+        
+        if (state.phase === 'done') {
+          clearInterval(poller);
+          
+          document.getElementById('buildBar').max = 1; 
+          document.getElementById('buildBar').value = 1;
+          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+
+          document.getElementById('syncBar').max = state.total;
+          document.getElementById('syncBar').value = state.total;
+          document.getElementById('syncStatus').innerHTML = '<span class="success">✓ Sync Complete!</span>';
+          document.getElementById('etaText').innerText = ""; 
+          
+          if (!buildReportShown) { showBuildReport(); buildReportShown = true; } 
+          
+          showFinalReport(state.created, state.deleted, state.edited);
+
+          controls.style.display = 'block';
+          btnRestart.style.display = 'none';
+          btnCancel.style.display = 'none';
+          btnStart.style.display = 'inline-block';
+
+          google.script.run.resetSyncStatus();
+        }
+      }
+
+      function showBuildReport() {
+        document.getElementById('buildReport').innerHTML = `
+          <div class="summary" id="buildSummaryBox">
+            <strong style="color: #2563eb;">🏗️ Build Report</strong><br><br>
+            <div id="buildReportLinks">Loading...</div>
+          </div>
+        `;
+        
+        // If we already loaded data from cache, render it instantly. If not, fetch it.
+        if (cachedBuildLogData) {
+            renderBuildLinks(cachedBuildLogData);
+        } else {
+            google.script.run.withSuccessHandler(data => {
+                cachedBuildLogData = data;
+                renderBuildLinks(data);
+            }).getBuildLogData();
+        }
+      }
+
+      function renderBuildLinks(data) {
+          document.getElementById('buildReportLinks').innerHTML = `
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">Click an item below to view details:</div>
+              <a class="log-link" onclick="openBuildDetails('newStudents')">👶 New Students: <b>${data.newStudents ? data.newStudents.length : 0}</b> 🔍</a>
+              <a class="log-link" onclick="openBuildDetails('discharged')">👋 Discharged: <b>${data.discharged ? data.discharged.length : 0}</b> 🔍</a>
+              <a class="log-link" onclick="openBuildDetails('nycsaUpgrades')">🗽 NYCSA Upgrades: <b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b> 🔍</a>
+              <a class="log-link" onclick="openBuildDetails('psUpgrades')">📱 Parent Square Upgrades: <b>${data.psUpgrades ? data.psUpgrades.length : 0}</b> 🔍</a>
+          `;
+      }
+
+      function triggerCancel() {
+        document.getElementById('syncStatus').innerText = 'Cancelling background tasks...';
+        google.script.run.EMERGENCY_STOP_SYNC();
+      }
+
+      function triggerRestart() {
+        document.getElementById('controlPanel').style.display = 'none';
+        document.getElementById('buildBar').removeAttribute('value');
+        document.getElementById('syncBar').removeAttribute('value');
+        document.getElementById('buildBar').classList.remove('cancelled');
+        document.getElementById('syncBar').classList.remove('cancelled');
+        document.getElementById('buildStatus').innerText = 'Starting engine...';
+        document.getElementById('syncStatus').innerText = 'Initializing...';
+        document.getElementById('summaryReport').innerHTML = ''; 
+        document.getElementById('buildReport').innerHTML = ''; 
+        
+        document.getElementById('etaText').innerText = "";
+        syncStartTime = null;
+        syncStartProgress = null;
+        pauseStartTime = null;
+        totalPauseTime = 0;
+        lastCalculatedProgress = null;
+        estimatedMsRemaining = 0;
+        lastUpdateTime = null;
+        cachedLogData = null;
+        cachedBuildLogData = null;
+        
+        buildReportShown = false; 
+
+        clearInterval(poller);
+        poller = setInterval(pollServer, 1500);
+
+        if (runMode === 'BUILD_ONLY') {
+            google.script.run.startBuildOnlyProcess();
+        } else {
+            google.script.run.RESTART_SYNC();
+        }
+      }
+
+      function onFailure(error) {
+        document.getElementById('buildStatus').innerHTML = `<span style="color:red;">Error: ${error.message}</span>`;
+      }
+
+      function showFinalReport(created, deleted, edited) {
+        document.getElementById('summaryReport').innerHTML = `
+          <div class="summary">
+            <strong style="color: green;">☎️ Phone Sync Complete!</strong><br><br>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">Click an item below to view details:</div>
+            <a class="log-link" onclick="openDetails('created')">✅ New Contacts: <b>${created || 0}</b> 🔍</a>
+            <a class="log-link" onclick="openDetails('edited')">✏️ Edited Contacts: <b>${edited || 0}</b> 🔍</a>
+            <a class="log-link" onclick="openDetails('deleted')">❌ Stale Removed: <b>${deleted || 0}</b> 🔍</a>
+          </div>
+        `;
+      }
+
+      function openBuildDetails(type) {
+        document.getElementById('mainView').style.display = 'none';
+        document.getElementById('detailsView').style.display = 'block';
+        renderBuildLogList(type);
+      }
+
+      function openDetails(type) {
+        document.getElementById('mainView').style.display = 'none';
+        document.getElementById('detailsView').style.display = 'block';
+        
+        if (!cachedLogData) {
+           document.getElementById('detailsTitle').innerText = "Loading data...";
+           document.getElementById('logList').innerHTML = "<li class='log-item'>Fetching logs from server...</li>";
+           
+           google.script.run.withSuccessHandler(data => { 
+               cachedLogData = data; 
+               renderLogList(type); 
+           }).getSyncLogData();
+        } else {
+           renderLogList(type);
+        }
+      }
+
+      function renderBuildLogList(type) {
+        const titleEl = document.getElementById('detailsTitle');
+        const listEl = document.getElementById('logList');
+        
+        let arr = cachedBuildLogData ? (cachedBuildLogData[type] || []) : [];
+        let titleStr = "";
+        let cssClass = "upgrade";
+        
+        if (type === 'newStudents') { titleStr = "👶 New Students"; cssClass = "created"; }
+        if (type === 'discharged') { titleStr = "👋 Discharged Students"; cssClass = "deleted"; }
+        if (type === 'nycsaUpgrades') { titleStr = "🗽 NYCSA Upgrades"; }
+        if (type === 'psUpgrades') { titleStr = "📱 Parent Square Upgrades"; }
+
+        titleEl.innerText = titleStr;
+        listEl.innerHTML = "";
+
+        if (arr.length === 0) {
+            listEl.innerHTML = "<li class='log-item'>No items in this category.</li>";
+            return;
+        }
+
+        arr.forEach(item => {
+           let li = document.createElement('li');
+           li.className = `log-item ${cssClass}`;
+           li.innerHTML = item; 
+           listEl.appendChild(li);
+        });
+      }
+
+      function renderLogList(type) {
+        const titleEl = document.getElementById('detailsTitle');
+        const listEl = document.getElementById('logList');
+        
+        let arr = cachedLogData[type] || [];
+        let titleStr = "";
+        let cssClass = "";
+        
+        if (type === 'created') { titleStr = "✅ New Contacts"; cssClass = "created"; }
+        if (type === 'edited') { titleStr = "✏️ Edited Contacts"; cssClass = "edited"; }
+        if (type === 'deleted') { titleStr = "❌ Stale Removed"; cssClass = "deleted"; }
+
+        titleEl.innerText = titleStr;
+        listEl.innerHTML = "";
+
+        if (arr.length === 0) {
+            listEl.innerHTML = "<li class='log-item'>No items in this category.</li>";
+            return;
+        }
+
+        arr.forEach(item => {
+           let li = document.createElement('li');
+           li.className = `log-item ${cssClass}`;
+           li.innerHTML = item; 
+           listEl.appendChild(li);
+        });
+      }
+
+      function showMainView() {
+        document.getElementById('detailsView').style.display = 'none';
+        document.getElementById('mainView').style.display = 'block';
+      }
+    </script>
+  </body>
+</html>
