@@ -237,6 +237,12 @@ function autoAddBlankRow_(sheet, editedRow, endRow) {
     // 🛡️ FIX: Divider lines shifted back to M (13) and O (15)
     sheet.getRange(editedRow + 1, 13, 1, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(editedRow + 1, 15, 1, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
+
+    // The end bar's black border sticks to the edited row's bottom edge when
+    // the new row is inserted above it. Strip all horizontal borders from the
+    // edited row and the new blank row so only the dark brown end bar (re-drawn
+    // by the onEdit sweep) keeps its border.
+    sheet.getRange(editedRow, 1, 2, 16).setBorder(null, null, false, null, null, false);
   }
 }
 
