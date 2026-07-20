@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #333; background-color: #f8fafc; margin: 0; }
+    h2 { font-size: 18px; margin-top: 0; margin-bottom: 20px; color: #0f172a; }
+    
+    /* Section Headers */
+    .section-header { font-size: 14px; font-weight: bold; margin-top: 20px; margin-bottom: 10px; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+    
+    .toggle-container { margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #ffffff; padding: 12px 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .toggle-label { font-size: 14px; font-weight: 500; color: #334155; }
+    .toggle-desc { display: block; font-size: 11px; font-weight: 400; color: #64748b; margin-top: 3px; line-height: 1.35; }
+    
+    /* Smooth Toggle Switch CSS */
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    input:checked + .slider { background-color: #2563eb; }
+    input:checked + .slider:before { transform: translateX(20px); }
+    
+    .date-input { width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; }
+    .date-label { font-size: 11px; color: #64748b; margin-bottom: 2px; display: block; }
+    
+    /* Preset Date Buttons */
+    .preset-btn-group { display: flex; gap: 6px; margin-top: 5px; width: 100%; flex-wrap: wrap; }
+    .preset-btn { padding: 4px 8px; font-size: 11px; background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; color: #475569; cursor: pointer; transition: all 0.2s; }
+    .preset-btn:hover { background-color: #e2e8f0; color: #0f172a; }
+    
+    .btn { width: 100%; padding: 12px; background-color: #073763; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: background 0.2s; }
+    .btn:hover { background-color: #0a4f8f; }
+    .btn:disabled { background-color: #94a3b8; cursor: not-allowed; }
+    
+    .btn-outline { width: 100%; padding: 10px; background-color: transparent; color: #dc2626; border: 1px solid #dc2626; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+    .btn-outline:hover { background-color: #fef2f2; }
+    .btn-outline:disabled { color: #f87171; border-color: #fca5a5; cursor: not-allowed; background-color: transparent; }
+
+    #loading { display: none; text-align: center; margin-top: 15px; font-size: 13px; color: #64748b; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <h2>Dashboard Settings</h2>
+  
+  <div class="toggle-container">
+    <div class="toggle-label">Sync Contacts to Phones (Nightly)<span class="toggle-desc">Pushes the school directory into your Google Contacts on the nightly run.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="syncToPhones">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="section-header">Show Tabs</div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show "Phone Contacts"<span class="toggle-desc">Shows or hides the Phone Contacts tab.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showPhoneContacts">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show "Parents Divided"<span class="toggle-desc">Shows or hides the Parents Divided tab (one row per guardian).</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showParentsDivided">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show "Notes"<span class="toggle-desc">Shows or hides the manual Notes tab.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showNotes">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show "Send Out"<span class="toggle-desc">Shows or hides the Send Out tab and its PCAR rows.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showSendOut">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="section-header">Show Contact Log Columns</div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show Site &amp; Class<span class="toggle-desc">Shows or hides the Site &amp; Class columns in the Contact Log.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showSiteClass">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Show "Type"<span class="toggle-desc">Shows or hides the Type column in the Contact Log.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="showTypeCol">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="section-header">Live Update Settings</div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Rebuilds: Manual / Nightly Sync Only<span class="toggle-desc">Skips live rebuilds on every edit — sheets refresh on manual Build or the nightly sync.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="disableRebuilds">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Disable Nightly Sync Entirely<span class="toggle-desc">Turns off the automatic nightly rebuild and phone sync completely.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="disableNightlySync">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Update Contact Log only on Build<span class="toggle-desc">Notes stop syncing on every edit and update only when you run Build.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="updateNotesOnBuild">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Disable Contact Log Auto-Fill<span class="toggle-desc">Stops auto-stamping Date, #, and Follow-up. Parent, student &amp; OSIS lookup still fills in.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="disableContactAutofill">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="section-header">Notes Filters</div>
+
+  <div class="toggle-container" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+    <div class="toggle-label">Date Range for Compiled Notes</div>
+    <div style="display: flex; gap: 10px; width: 100%;">
+      <div style="flex: 1;">
+        <label class="date-label">Start Date</label>
+        <input type="date" id="notesStartDate" class="date-input">
+      </div>
+      <div style="flex: 1;">
+        <label class="date-label">End Date</label>
+        <input type="date" id="notesEndDate" class="date-input">
+      </div>
+    </div>
+    
+    <div class="preset-btn-group">
+      <button type="button" class="preset-btn" onclick="setPresetDates('1m')">Last Month</button>
+      <button type="button" class="preset-btn" onclick="setPresetDates('6m')">Last 6 Months</button>
+      <button type="button" class="preset-btn" onclick="setPresetDates('1y')">Last Year</button>
+      <button type="button" class="preset-btn" onclick="setPresetDates('clear')">Clear</button>
+    </div>
+    
+    <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">Leave blank to include notes from all time.</div>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">Disable Hidden Notes (Show All)<span class="toggle-desc">Includes notes you've hidden with the row checkbox in the compiled output.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="disableHiddenNotes">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="section-header">Data Management</div>
+  
+  <div class="toggle-container">
+    <div class="toggle-label">Hide "Discharged" in Master Table<span class="toggle-desc">Visual only. Turn off to show them again.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="hideDischarged">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <button type="button" class="btn-outline" id="purgeBtn" onclick="purgeDischarged()">Purge Discharged Students</button>
+  <div style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 4px; margin-bottom: 15px;">Permanently deletes non-current students from the Master Table.</div>
+
+  <button class="btn" id="saveBtn" onclick="saveSettings()">Save & Apply Settings</button>
+  <button class="btn-outline" id="resetBtn" onclick="resetToDefaults()" style="margin-top: 10px; color: #475569; border-color: #cbd5e1;">Reset to Default Settings</button>
+  <div id="loading">Working...</div>
+
+  <script>
+    // Utility function to format dates as YYYY-MM-DD for the input fields
+    function formatLocalDate(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Function to apply preset dates
+    function setPresetDates(preset) {
+      if (preset === 'clear') {
+        document.getElementById('notesStartDate').value = '';
+        document.getElementById('notesEndDate').value = '';
+        return;
+      }
+
+      const endDate = new Date();
+      const startDate = new Date();
+
+      if (preset === '1m') {
+        startDate.setMonth(startDate.getMonth() - 1);
+      } else if (preset === '6m') {
+        startDate.setMonth(startDate.getMonth() - 6);
+      } else if (preset === '1y') {
+        startDate.setFullYear(startDate.getFullYear() - 1);
+      }
+
+      document.getElementById('notesEndDate').value = formatLocalDate(endDate);
+      document.getElementById('notesStartDate').value = formatLocalDate(startDate);
+    }
+
+    // 1. Ask the backend what the current settings are when popup opens
+    if (typeof google !== 'undefined') {
+      google.script.run.withSuccessHandler(function(settings) {
+        document.getElementById('syncToPhones').checked = settings.syncToPhones;
+        
+        // Direct Logic: Check the box if the setting is true (Show)
+        document.getElementById('showPhoneContacts').checked = settings.phoneContacts; 
+        document.getElementById('showParentsDivided').checked = settings.parentsDivided;
+        document.getElementById('showNotes').checked = settings.notesTab;
+        document.getElementById('showSendOut').checked = settings.sendOut;
+        
+        // Direct Logic for Columns too
+        document.getElementById('showSiteClass').checked = settings.siteClass;
+        document.getElementById('showTypeCol').checked = settings.typeCol;
+        
+        document.getElementById('disableRebuilds').checked = settings.disableRebuilds === true;
+        document.getElementById('disableNightlySync').checked = settings.disableNightlySync === true;
+        
+        document.getElementById('updateNotesOnBuild').checked = settings.autoNotes === false;
+        document.getElementById('disableContactAutofill').checked = settings.disableContactAutofill === true;
+        
+        document.getElementById('disableHiddenNotes').checked = settings.disableHiddenNotes;
+        document.getElementById('hideDischarged').checked = settings.hideDischarged === true;
+        
+        // Load Custom Dates
+        document.getElementById('notesStartDate').value = settings.notesStartDate || '';
+        document.getElementById('notesEndDate').value = settings.notesEndDate || '';
+      }).getSettings();
+    } else {
+      console.warn("Not running in Google Apps Script environment. Preview mode active.");
+    }
+
+    // 2. Reset settings to default state
+    function resetToDefaults() {
+      if (!confirm("Are you sure you want to reset all settings to their default values?")) {
+        return;
+      }
+      
+      // Since all our toggles are now framed as "Show" (and we want them hidden by default)
+      // or "Disable" (and we want features enabled by default), 
+      // the defaults are universally FALSE (unchecked) across the board!
+      document.getElementById('syncToPhones').checked = false;
+      document.getElementById('showPhoneContacts').checked = false; 
+      document.getElementById('showParentsDivided').checked = false;
+      document.getElementById('showNotes').checked = false;
+      document.getElementById('showSendOut').checked = false; 
+      
+      // CHANGED: These now properly snap to false (hidden) when reset!
+      document.getElementById('showSiteClass').checked = false;
+      document.getElementById('showTypeCol').checked = false;
+      
+      document.getElementById('disableRebuilds').checked = false;
+      document.getElementById('disableNightlySync').checked = false;
+      document.getElementById('updateNotesOnBuild').checked = false;
+      document.getElementById('disableContactAutofill').checked = false;
+      document.getElementById('disableHiddenNotes').checked = false;
+      document.getElementById('hideDischarged').checked = false;
+      document.getElementById('notesStartDate').value = '';
+      document.getElementById('notesEndDate').value = '';
+
+      // Auto-save the defaults
+      saveSettings();
+    }
+
+    // 3. Purge Discharged Students permanently
+    function purgeDischarged() {
+      if (!confirm("⚠️ WARNING: This will permanently delete all 'Discharged' students from your Master Table memory. This action cannot be undone.\n\nAre you sure you want to proceed?")) {
+        return;
+      }
+      
+      document.getElementById('purgeBtn').disabled = true;
+      document.getElementById('saveBtn').disabled = true;
+      document.getElementById('resetBtn').disabled = true;
+      document.getElementById('purgeBtn').innerText = "Purging...";
+      document.getElementById('loading').style.display = 'block';
+      
+      if (typeof google !== 'undefined') {
+        google.script.run.withSuccessHandler(function(count) {
+          if (count > 0) {
+            alert("Successfully purged " + count + " discharged student(s).");
+            google.script.run.runBuildOnly();
+          } else {
+            alert("No discharged students found to purge.");
+          }
+          
+          document.getElementById('purgeBtn').disabled = false;
+          document.getElementById('purgeBtn').innerText = "Purge Discharged Students";
+          document.getElementById('loading').style.display = 'none';
+          
+          setTimeout(function() {
+            google.script.host.close();
+          }, 300);
+
+        }).purgeDischargedStudents();
+      } else {
+        alert("Preview mode: Purge triggered. (No actual data was deleted)");
+        document.getElementById('purgeBtn').disabled = false;
+        document.getElementById('saveBtn').disabled = false;
+        document.getElementById('resetBtn').disabled = false;
+        document.getElementById('purgeBtn').innerText = "Purge Discharged Students";
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    // 4. Send the new settings back to the sheet
+    function saveSettings() {
+      document.getElementById('saveBtn').disabled = true;
+      document.getElementById('resetBtn').disabled = true;
+      document.getElementById('purgeBtn').disabled = true;
+      document.getElementById('saveBtn').innerText = "Saving...";
+      document.getElementById('loading').style.display = 'block';
+
+      const settings = {
+        syncToPhones: document.getElementById('syncToPhones').checked,
+        
+        // Direct Logic: Send true if checked, false if unchecked
+        phoneContacts: document.getElementById('showPhoneContacts').checked, 
+        parentsDivided: document.getElementById('showParentsDivided').checked, 
+        notesTab: document.getElementById('showNotes').checked,
+        sendOut: document.getElementById('showSendOut').checked,
+        
+        siteClass: document.getElementById('showSiteClass').checked,
+        typeCol: document.getElementById('showTypeCol').checked,
+        
+        disableRebuilds: document.getElementById('disableRebuilds').checked,
+        disableNightlySync: document.getElementById('disableNightlySync').checked,
+        autoNotes: !document.getElementById('updateNotesOnBuild').checked,
+        disableContactAutofill: document.getElementById('disableContactAutofill').checked,
+        disableHiddenNotes: document.getElementById('disableHiddenNotes').checked,
+        hideDischarged: document.getElementById('hideDischarged').checked,
+        notesStartDate: document.getElementById('notesStartDate').value,
+        notesEndDate: document.getElementById('notesEndDate').value
+      };
+
+      // 5. Fast-Save, then close, then build
+      if (typeof google !== 'undefined') {
+        google.script.run
+          .withSuccessHandler(function(needRebuild) {
+            if (needRebuild) {
+              // Tell the server to start the heavy build since note logic changed
+              google.script.run.runBuildOnly();
+            }
+            
+            // Close the dialog instantly
+            setTimeout(function() {
+              google.script.host.close();
+            }, 100);
+          })
+          .withFailureHandler(function(error) {
+            alert("Error saving settings: " + error.message);
+            document.getElementById('saveBtn').disabled = false;
+            document.getElementById('resetBtn').disabled = false;
+            document.getElementById('purgeBtn').disabled = false;
+            document.getElementById('saveBtn').innerText = "Save & Apply Settings";
+            document.getElementById('loading').style.display = 'none';
+          })
+          .applySettings(settings);
+      } else {
+        setTimeout(function() {
+          console.log("Preview mode: Settings saved.", settings);
+          document.getElementById('saveBtn').disabled = false;
+          document.getElementById('resetBtn').disabled = false;
+          document.getElementById('purgeBtn').disabled = false;
+          document.getElementById('saveBtn').innerText = "Save & Apply Settings";
+          document.getElementById('loading').style.display = 'none';
+        }, 800);
+      }
+    }
+  </script>
+</body>
+</html>
