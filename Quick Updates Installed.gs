@@ -67,8 +67,12 @@ function installedOnEdit(e) {
 
   if (safeNumRows > 0) {
     // --- INSTANT ROW REPAIR (Shifted overall width to 16 / P) ---
-    sheet.getRange(row, 1, safeNumRows, 16).setBackground(null); 
-    
+    sheet.getRange(row, 1, safeNumRows, 16).setBackground(null);
+
+    // Strip any stray horizontal borders from the edited rows — only the dark
+    // brown end bar should carry one (re-drawn by the sweep at the bottom).
+    sheet.getRange(row, 1, safeNumRows, 16).setBorder(false, null, false, null, null, false);
+
     // Parent and Person Spoke With (Shifted to Col 3 and 4)
     sheet.getRange(row, 3, safeNumRows, 2).setBorder(false, false, false, false, false, false);
     sheet.getRange(row, 4, safeNumRows, 1).setFontFamily("Roboto");
