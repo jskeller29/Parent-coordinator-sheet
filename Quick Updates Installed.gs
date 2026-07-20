@@ -439,4 +439,4 @@ function watchNotesSheet_(e) {
       }
     }
   }
-}Quick Updates Installed
+}
