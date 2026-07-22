@@ -86,10 +86,11 @@ function refreshTemplateLinks() {
     "BLANK  (" + (links.blankName || "not found") + "):\n" + (links.blankCopyUrl || "(unresolved)") +
     "\n\nMIGRATE (" + (links.migrateName || "not found") + "):\n" + (links.migrateCopyUrl || "(unresolved)") +
     "\n\nGUIDE:\n" + (r.guide || "(unresolved)");
+  console.log("Resolved links:\n" + msg); // Always in the execution log for testing.
   try {
     SpreadsheetApp.getUi().alert("🔗 Resolved Links", msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
-    console.log(msg); // No UI context (pure editor run) — the log still has it.
+    // No UI context (pure editor run) — the console.log above already has it.
   }
   return r;
 }
