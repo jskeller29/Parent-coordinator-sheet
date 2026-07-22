@@ -34,6 +34,12 @@
   .jumpbar{ display:flex; gap:8px; margin:10px 0 16px; flex-wrap:wrap; }
   .jumpbar a{ flex:1 1 0; min-width:110px; text-align:center; background:var(--blue);
     color:#fff; font-weight:700; font-size:10pt; padding:9px 6px; border-radius:7px; }
+  /* get-your-copy buttons */
+  .copybtns{ display:flex; flex-direction:column; gap:12px; margin:18px 0; }
+  .copybtn{ display:block; text-align:center; color:#fff; font-weight:700; font-size:14pt;
+    padding:16px; border-radius:9px; }
+  .copybtn.blank{ background:#0f9d58; }
+  .copybtn.migrate{ background:#7c3aed; }
   /* toc */
   .toc{ margin:6px 0 0; }
   .toc a{ display:block; padding:4px 0; border-bottom:1px dotted var(--line); color:var(--slate); }
@@ -74,6 +80,30 @@
   <div class="made">Made by a fellow Parent Coordinator — this is NOT an official DOE sheet. · jacob.keller@p94m.org</div>
 </section>
 
+<!-- GET YOUR COPY (page 2) -->
+<section class="part">
+  <h1 id="getcopy">Get Your Copy</h1>
+  <p>Start from one of the two templates below. Each opens a <b>"Make a copy"</b> prompt, so you get
+    your own private sheet in your own Google Drive.</p>
+  <div class="copybtns">
+    <a class="copybtn blank" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank">📄 New Coordinator — Make a Blank Copy</a>
+    <a class="copybtn migrate" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank">🔄 Upgrading — Make a Migrate Copy</a>
+  </div>
+  <table>
+    <thead><tr><th style="width:28%">Template</th><th>Who it's for</th></tr></thead>
+    <tbody>
+      <tr><td>📄 Blank Copy</td><td>Brand-new coordinators starting fresh — paste your ATS export and go.</td></tr>
+      <tr><td>🔄 Migrate Copy</td><td>Coordinators upgrading from an older version — it auto-opens the Migration Wizard to bring last year's data and settings forward.</td></tr>
+    </tbody>
+  </table>
+  <div class="box info"><span class="t">Coordinator note — update these two links each release</span>
+    Both templates live in this Drive folder:
+    <a href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2">drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2</a>.
+    Replace the two buttons above with the current (BLANK) and (MIGRATE) "make a copy" links whenever you
+    ship a new version. Inside the sheet, the Welcome dialog and End-of-Year Rollover resolve these
+    automatically from the folder — this printable guide is the one place you swap them by hand.</div>
+</section>
+
 <!-- CONTENTS -->
 <section class="part">
   <h1 id="contents">Contents</h1>
@@ -86,6 +116,7 @@
     <a href="#part5">⑤ Tips &amp; FAQ</a>
   </nav>
   <div class="toc">
+    <a href="#getcopy"><b>Get Your Copy</b> · the Blank and Migrate "make a copy" links</a>
     <a href="#intro"><b>What this tool is</b></a>
     <a href="#part1"><b>Part 1 — Setting Up Your Sheet</b> · make a copy, Initial Setup, authorization &amp; permissions, loading data, Build</a>
     <a href="#part2"><b>Part 2 — Buttons &amp; Features</b> · the three menus, every tab, the Contact Log, Settings, Build vs. Full Sync</a>

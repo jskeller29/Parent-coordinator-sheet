@@ -21,6 +21,7 @@
 
 ## Contents
 
+- [Get Your Copy](#get-your-copy)
 - [What this tool is](#what-this-tool-is)
 - [Part 1 — Setting Up Your Sheet](#part-1--setting-up-your-sheet)
 - [Part 2 — Buttons & Features](#part-2--buttons--features)
@@ -28,6 +29,29 @@
 - [Part 4 — Security & Privacy](#part-4--security--privacy)
 - [Tips, Workflow & Troubleshooting](#tips-workflow--troubleshooting)
 - [Getting this into Google Drive](#getting-this-into-google-drive)
+
+---
+
+## Get Your Copy
+
+Start from one of the two templates below. Each opens a **"Make a copy"** prompt, so you
+get your own private sheet in your own Google Drive.
+
+- 📄 **New Coordinator — Make a Blank Copy** → *(paste the current (BLANK) copy link)*
+- 🔄 **Upgrading — Make a Migrate Copy** → *(paste the current (MIGRATE) copy link)*
+
+| Template | Who it's for |
+|---|---|
+| 📄 Blank Copy | Brand-new coordinators starting fresh — paste your ATS export and go. |
+| 🔄 Migrate Copy | Coordinators upgrading from an older version — it auto-opens the Migration Wizard to bring last year's data and settings forward. |
+
+> **Coordinator note — update these two links each release.** Both templates live in this
+> Drive folder:
+> <https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2>. Replace the
+> two links above with the current **(BLANK)** and **(MIGRATE)** "make a copy" links
+> whenever you ship a new version. Inside the sheet, the Welcome dialog and End-of-Year
+> Rollover resolve these automatically from the folder (see `LinkResolver.gs`) — this
+> guide is the one place you swap them by hand.
 
 ---
 

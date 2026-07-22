@@ -15,8 +15,16 @@ const fs = require("fs");
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
-  PageBreak, LevelFormat, TableOfContents, Bookmark, InternalHyperlink,
+  PageBreak, LevelFormat, TableOfContents, Bookmark, InternalHyperlink, ExternalHyperlink,
 } = require("docx");
+
+// The Drive folder that holds the shareable template files. Both buttons on the
+// "Get Your Copy" page default to this folder; replace them with the exact
+// (BLANK) and (MIGRATE) "make a copy" links each release. (Inside the sheet,
+// LinkResolver.gs resolves these automatically — this doc is static.)
+const TEMPLATE_FOLDER_URL = "https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
+const BLANK_COPY_URL = TEMPLATE_FOLDER_URL;   // ← paste the (BLANK) copy link here
+const MIGRATE_COPY_URL = TEMPLATE_FOLDER_URL; // ← paste the (MIGRATE) copy link here
 
 // ---------- palette ----------
 const NAVY = "0F172A";
@@ -165,6 +173,31 @@ function jumpBar() {
   });
 }
 
+// ---------- big external-link "buttons" (Get Your Copy page) ----------
+function linkButtonRow(label, url, fill) {
+  return new TableRow({ children: [new TableCell({
+    width: { size: 9360, type: WidthType.DXA },
+    shading: { type: ShadingType.CLEAR, fill, color: "auto" },
+    margins: { top: 150, bottom: 150, left: 60, right: 60 },
+    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
+      new ExternalHyperlink({ link: url, children: [new TextRun({ text: label, bold: true, color: "FFFFFF", size: 24, font: "Calibri" })] }),
+    ]})],
+  })] });
+}
+function templateButtons(blankUrl, migrateUrl) {
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA }, columnWidths: [9360],
+    borders: {
+      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 16, color: "FFFFFF" }, insideVertical: { style: BorderStyle.NONE },
+    },
+    rows: [
+      linkButtonRow("📄  New Coordinator — Make a Blank Copy", blankUrl, "0F9D58"),
+      linkButtonRow("🔄  Upgrading — Make a Migrate Copy", migrateUrl, "7C3AED"),
+    ],
+  });
+}
+
 // ============================================================
 // CONTENT
 // ============================================================
@@ -184,6 +217,26 @@ P(
   new Paragraph({ spacing: { before: 20, after: 0 }, alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Questions or errors? jacob.keller@p94m.org", color: MUTE, size: 18, font: "Calibri" })] }),
   new Paragraph({ children: [new PageBreak()] }),
 );
+
+// ---------- GET YOUR COPY (page 2) ----------
+P(h1("Get Your Copy"));
+P(p([t("Start from one of the two templates below. Each opens a "), t("“Make a copy”", { bold: true }), t(" prompt, so you get your own private sheet in your own Google Drive.")]));
+P(spacer(60));
+P(templateButtons(BLANK_COPY_URL, MIGRATE_COPY_URL));
+P(spacer(100));
+P(table(
+  ["Template", "Who it's for"],
+  [
+    ["📄 Blank Copy", "Brand-new coordinators starting fresh — paste your ATS export and go."],
+    ["🔄 Migrate Copy", "Coordinators upgrading from an older version — it auto-opens the Migration Wizard to bring last year's data and settings forward."],
+  ],
+  [2700, 6660],
+));
+P(spacer(60));
+P(callout("Coordinator note — update these two links each release",
+  "Both templates live in this Drive folder: " + TEMPLATE_FOLDER_URL + ". Replace the two buttons above with the current (BLANK) and (MIGRATE) “make a copy” links whenever you ship a new version. Inside the sheet, the Welcome dialog and End-of-Year Rollover resolve these automatically from the folder (see LinkResolver.gs) — this printable guide is the one place you swap them by hand.",
+  BLUE, "EEF4FF"));
+P(new Paragraph({ children: [new PageBreak()] }));
 
 // ---------- CONTENTS ----------
 P(h1("Contents"));
