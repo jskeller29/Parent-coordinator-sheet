@@ -42,8 +42,6 @@
     button { border: none; border-radius: 6px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background-color .15s; }
     #dismissBtn { background: #2563eb; color: #ffffff; flex: 1; }
     #dismissBtn:hover { background: #1d4ed8; }
-    #foreverBtn { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-    #foreverBtn:hover { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
     button:disabled { opacity: .5; cursor: not-allowed; }
     .hint { font-size: 11px; color: #94a3b8; margin: 9px 0 0 0; text-align: center; }
   </style>
@@ -62,14 +60,18 @@
   <div class="footer">
     <label class="pref">
       <input type="checkbox" id="majorsOnly" onchange="savePref()">
-      <span>🔕 Only notify me about <b>Major</b> updates</span>
-      <span class="saved" id="savedTag">Saved ✓</span>
+      <span>🔕 Only auto-notify me about <b>Major</b> updates</span>
+      <span class="saved" id="savedMajors">Saved ✓</span>
+    </label>
+    <label class="pref">
+      <input type="checkbox" id="dismissForever" onchange="saveForever()">
+      <span>🚫 Stop <b>automatic</b> update checks</span>
+      <span class="saved" id="savedForever">Saved ✓</span>
     </label>
     <div class="btn-row">
       <button id="dismissBtn" onclick="dismiss()">Dismiss</button>
-      <button id="foreverBtn" onclick="dismissForever()">Dismiss Forever</button>
     </div>
-    <p class="hint">You can always check manually: 🚀 App Menu → 🔔 Check for Updates</p>
+    <p class="hint">You can always check manually: 🚀 App Menu → 🔔 Check for Updates (shows all updates)</p>
   </div>
 
   <script>
@@ -78,7 +80,6 @@
     // makes it immune to copy/paste template mangling, and any failure
     // shows a readable error instead of a blank panel.
     let DATA = null;
-    let foreverArmed = false;
 
     // ==========================================
     // HELPERS
@@ -120,6 +121,7 @@
       document.getElementById('subtitle').textContent =
         "Your version is dated " + DATA.installedDateStr + " — here's everything you've missed:";
       document.getElementById('majorsOnly').checked = !!DATA.majorsOnly;
+      document.getElementById('dismissForever').checked = !!DATA.dismissForever;
 
       const list = document.getElementById('changelog');
       list.innerHTML = '';
@@ -186,7 +188,12 @@
     // ==========================================
     function lockButtons(locked) {
       document.getElementById('dismissBtn').disabled = locked;
-      document.getElementById('foreverBtn').disabled = locked;
+    }
+
+    function flashSaved(tagId) {
+      const tag = document.getElementById(tagId);
+      tag.classList.add('show');
+      setTimeout(function() { tag.classList.remove('show'); }, 1500);
     }
 
     // Marks the newest version as "seen" — won't pop again until something newer ships
@@ -199,36 +206,20 @@
         .vc_dismiss(DATA.newestDateMs);
     }
 
-    // Two-click confirm, then permanently disables automatic checks
-    function dismissForever() {
-      if (!DATA) { google.script.host.close(); return; }
-      const btn = document.getElementById('foreverBtn');
-      if (!foreverArmed) {
-        foreverArmed = true;
-        btn.textContent = 'Click again to confirm 🔒';
-        setTimeout(function() {
-          foreverArmed = false;
-          btn.textContent = 'Dismiss Forever';
-        }, 4000);
-        return;
-      }
-      lockButtons(true);
-      google.script.run
-        .withSuccessHandler(function() { google.script.host.close(); })
-        .withFailureHandler(function() { lockButtons(false); })
-        .vc_dismissForever(DATA.newestDateMs);
-    }
-
-    // Saves the Majors-only preference instantly on toggle
+    // Saves the Majors-only (auto-notify) preference instantly on toggle
     function savePref() {
       const on = document.getElementById('majorsOnly').checked;
       google.script.run
-        .withSuccessHandler(function() {
-          const tag = document.getElementById('savedTag');
-          tag.classList.add('show');
-          setTimeout(function() { tag.classList.remove('show'); }, 1500);
-        })
+        .withSuccessHandler(function() { flashSaved('savedMajors'); })
         .vc_setMajorsOnly(on);
+    }
+
+    // Toggles automatic (on-open) update checks. Manual checks always work.
+    function saveForever() {
+      const on = document.getElementById('dismissForever').checked;
+      google.script.run
+        .withSuccessHandler(function() { flashSaved('savedForever'); })
+        .vc_setDismissForever(on);
     }
 
     // ==========================================
