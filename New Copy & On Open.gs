@@ -162,7 +162,7 @@ function onOpen() {
       } else {
         SpreadsheetApp.getUi().alert(
           "👋 Welcome to the PC Tracker!",
-          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing",
+          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\n" + GUIDE_FOLDER_URL,
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       }
@@ -286,11 +286,14 @@ function onOpen() {
 // WELCOME / TUTORIAL DIALOG HTML
 // ==========================================
 function showWelcomeDialog() {
-  // Resolve the shareable template links from the Drive folder (see
-  // LinkResolver.gs). Never throws; falls back to the folder URL.
+  // Resolve the shareable template links + the User Guide link from their Drive
+  // folders (see LinkResolver.gs). Never throws; falls back to folder URLs.
   const links = (typeof getTemplateLinks_ === "function")
     ? getTemplateLinks_()
     : { blankCopyUrl: "#", migrateCopyUrl: "#" };
+  const guideUrl = (typeof getGuideLink_ === "function")
+    ? getGuideLink_()
+    : "https://drive.google.com/drive/folders/1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
 
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
@@ -300,7 +303,7 @@ function showWelcomeDialog() {
         <br><br><b>Next Steps:</b> Click <b>🚀 App Menu</b> at the top of your screen to safely <b>Import Old Data</b> from a previous version, or close this window and paste your new student data directly into the <b>RAW Data</b> tab!
       </p>
 
-      <a href="https://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <a href="${guideUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         📖 Read the User Guide
       </a>
 

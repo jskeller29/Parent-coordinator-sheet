@@ -29,12 +29,18 @@
 // The Drive folder that holds the labeled template files.
 const TEMPLATE_FOLDER_ID = "1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
 
+// The Drive folder that holds the User Guide. Whatever the NEWEST file in here
+// is (a PDF or a Google Doc) becomes the "Open User Guide" link — just replace
+// the file to publish a new guide; no code edits.
+const GUIDE_FOLDER_ID = "1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
+
 // How long a successful folder scan is cached (script cache) before re-scanning.
 const TEMPLATE_LINKS_CACHE_SECONDS = 6 * 60 * 60; // 6 hours
 
-// Fallback link if a specific label can't be resolved — lands the user in the
-// folder rather than on a dead link.
+// Fallback links if a folder can't be resolved — land the user in the folder
+// rather than on a dead link.
 const TEMPLATE_FOLDER_URL = "https://drive.google.com/drive/folders/" + TEMPLATE_FOLDER_ID;
+const GUIDE_FOLDER_URL = "https://drive.google.com/drive/folders/" + GUIDE_FOLDER_ID;
 
 
 /**
@@ -47,31 +53,45 @@ function getTemplateLinks() {
 }
 
 /**
- * Force a fresh folder scan (bypassing the cache) and re-store the links.
- * No UI — safe to call from time-based triggers (e.g. the nightly sync).
- * Returns the freshly resolved links.
+ * Public entry point for the User Guide link (called via google.script.run).
+ * Returns the URL of the newest file in the guide folder (PDF or Doc), or the
+ * guide-folder URL as a fallback. Never throws.
  */
-function refreshTemplateLinks_() {
-  try { CacheService.getScriptCache().remove('TEMPLATE_LINKS_V1'); } catch (e) {}
-  return getTemplateLinks_();
+function getGuideLink() {
+  return getGuideLink_();
 }
 
 /**
- * Editor helper: force a fresh scan and show the resolved links in an alert.
+ * Force a fresh scan of BOTH folders (bypassing the cache) and re-store the
+ * results. No UI — safe to call from time-based triggers (the nightly sync).
+ */
+function refreshResolvedLinks_() {
+  const cache = CacheService.getScriptCache();
+  try { cache.remove('TEMPLATE_LINKS_V1'); } catch (e) {}
+  try { cache.remove('GUIDE_LINK_V1'); } catch (e) {}
+  const links = getTemplateLinks_();
+  const guide = getGuideLink_();
+  return { links: links, guide: guide };
+}
+
+/**
+ * Editor helper: force a fresh scan and show every resolved link in an alert.
  * (Not needed for normal use — the dialogs resolve on open and the nightly
- * sync refreshes the stored copy. Handy to verify links after swapping files.)
+ * sync refreshes the stored copies. Handy to verify links after swapping files.)
  */
 function refreshTemplateLinks() {
-  const links = refreshTemplateLinks_();
+  const r = refreshResolvedLinks_();
+  const links = r.links;
   const msg =
     "BLANK  (" + (links.blankName || "not found") + "):\n" + (links.blankCopyUrl || "(unresolved)") +
-    "\n\nMIGRATE (" + (links.migrateName || "not found") + "):\n" + (links.migrateCopyUrl || "(unresolved)");
+    "\n\nMIGRATE (" + (links.migrateName || "not found") + "):\n" + (links.migrateCopyUrl || "(unresolved)") +
+    "\n\nGUIDE:\n" + (r.guide || "(unresolved)");
   try {
-    SpreadsheetApp.getUi().alert("🔗 Template Links", msg, SpreadsheetApp.getUi().ButtonSet.OK);
+    SpreadsheetApp.getUi().alert("🔗 Resolved Links", msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } catch (e) {
     console.log(msg); // No UI context (pure editor run) — the log still has it.
   }
-  return links;
+  return r;
 }
 
 
@@ -211,5 +231,80 @@ function loadTemplateLinksFromVersionSheet_() {
   } catch (e) {
     console.error(e);
     return null;
+  }
+}
+
+
+// ==========================================
+// USER GUIDE LINK (newest file in the guide folder)
+// ==========================================
+
+/**
+ * Cached, resilient resolver for the User Guide link. Tries a live scan of the
+ * guide folder (newest file wins, PDF or Doc); caches it and mirrors it into
+ * the Version tab (E4) so plain copies inherit it. Falls back to the inherited
+ * value, then the guide-folder URL, so the link is never dead. Never throws —
+ * safe even in the limited-auth simple onOpen (the scan just no-ops there and
+ * the inherited/fallback value is used).
+ */
+function getGuideLink_() {
+  const cache = CacheService.getScriptCache();
+  try {
+    const cached = cache.get('GUIDE_LINK_V1');
+    if (cached) return cached;
+  } catch (e) { console.error(e); }
+
+  let url = scanGuideFolder_();
+  if (url) {
+    try { saveGuideLinkToVersionSheet_(url); } catch (e) { console.error(e); }
+  } else {
+    url = loadGuideLinkFromVersionSheet_() || GUIDE_FOLDER_URL;
+  }
+
+  try { cache.put('GUIDE_LINK_V1', url, TEMPLATE_LINKS_CACHE_SECONDS); } catch (e) {}
+  return url;
+}
+
+/**
+ * Live-scans the guide folder and returns the open URL of the newest file
+ * (a PDF's Drive view URL or a Doc's edit URL, whatever Drive reports). Returns
+ * "" on any failure (no access / offline / empty folder).
+ */
+function scanGuideFolder_() {
+  try {
+    const folder = DriveApp.getFolderById(GUIDE_FOLDER_ID);
+    const files = folder.getFiles();
+    let newest = null, newestKey = -1;
+    while (files.hasNext()) {
+      const f = files.next();
+      const key = fileSortKey_(f.getName(), f);
+      if (key >= newestKey) { newest = f; newestKey = key; }
+    }
+    return newest ? newest.getUrl() : "";
+  } catch (e) {
+    console.error("scanGuideFolder_ failed (folder access?): " + e.message);
+    return "";
+  }
+}
+
+/** Mirrors the guide link into the Version tab (D4 label / E4 value). */
+function saveGuideLinkToVersionSheet_(url) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = (typeof getOrCreateVersionSheet_ === "function")
+    ? getOrCreateVersionSheet_(ss) : ss.getSheetByName("Version");
+  if (!sheet) return;
+  sheet.getRange(4, 4, 1, 2).setValues([["GUIDE link", url || ""]]);
+}
+
+/** Reads the inherited guide link back out of the Version tab (E4). */
+function loadGuideLinkFromVersionSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Version");
+  if (!sheet) return "";
+  try {
+    return String(sheet.getRange(4, 5).getValue() || "").trim(); // E4
+  } catch (e) {
+    console.error(e);
+    return "";
   }
 }
