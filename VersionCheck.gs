@@ -291,15 +291,22 @@ function isMajor_(size) {
 //   OFF = fresh copies get the normal Welcome guide
 //         (use for the link you give BRAND NEW users)
 //
-// Because it's a Document Property, the setting travels with every copy.
-// To offer BOTH links at once, keep two template files: your master
-// (toggle OFF) and a copy of it with the toggle flipped ON.
+// The setting lives in the hidden "Version" tab, cell B2 ("Yes"/"No"), so it
+// travels with every copy and can also be edited by hand. To offer BOTH links
+// at once, keep two template files: your master (B2 = No) and a copy with
+// B2 = Yes.
 // ======================================================================
 function toggleAutoMigratePopup() {
-  const props = PropertiesService.getDocumentProperties();
-  const isOn = props.getProperty('AUTO_MIGRATE_POPUP') === 'true';
-  props.setProperty('AUTO_MIGRATE_POPUP', String(!isOn));
-  SpreadsheetApp.getActiveSpreadsheet().toast(
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("Version");
+  if (!sheet) {
+    sheet = ss.insertSheet("Version");
+    sheet.hideSheet();
+  }
+  const cell = sheet.getRange("B2");
+  const isOn = String(cell.getValue()).trim().toLowerCase() === "yes";
+  cell.setValue(isOn ? "No" : "Yes");
+  ss.toast(
     "Auto-Migrate Popup is now " + (!isOn ? "ON ✅ (upgrade template)" : "OFF ❌ (new-user template)"),
     "Dev Setting Updated", 8
   );
