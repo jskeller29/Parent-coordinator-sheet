@@ -365,11 +365,7 @@ function debugVersionCheck() {
 // ======================================================================
 function toggleAutoMigratePopup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName("Version");
-  if (!sheet) {
-    sheet = ss.insertSheet("Version");
-    sheet.hideSheet();
-  }
+  const sheet = getOrCreateVersionSheet_(ss);
   const cell = sheet.getRange("B2");
   const isOn = String(cell.getValue()).trim().toLowerCase() === "yes";
   cell.setValue(isOn ? "No" : "Yes");

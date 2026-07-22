@@ -5,6 +5,18 @@
 // single synchronous call. onOpen's block still fires on genuine reopens.
 var IS_RUNNING_SETUP = false;
 
+// The tabs shown by default. Everything else starts hidden; the user's saved
+// settings reveal the optional tabs later via updateVisualSettings_.
+var DEFAULT_VISIBLE_SHEETS = ["RAW Data", "Raw Data", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory"];
+
+/** Shows only the default-visible tabs and hides every other sheet. */
+function applyDefaultSheetVisibility_(ss) {
+  ss.getSheets().forEach(function(sheet) {
+    if (DEFAULT_VISIBLE_SHEETS.indexOf(sheet.getName()) !== -1) sheet.showSheet();
+    else sheet.hideSheet();
+  });
+}
+
 /**
  * Auto-Migrate mode is controlled by the hidden "Version" tab, cell B2:
  * "Yes" turns it on (upgrade-template copies), anything else is off
@@ -329,43 +341,46 @@ function runInitialSetupWrapper() {
   props.setProperty('ORIGINAL_SHEET_ID', SpreadsheetApp.getActiveSpreadsheet().getId());
   
 // =======================================================
-  // NEW: FORCE DEFAULT SETTINGS DIRECTLY (Bypasses backend functions!)
+  // SETTINGS: inherit the template's saved settings, fall back to defaults.
+  // A fresh copy carries its settings in the "Version" tab (cell values
+  // survive copying; document properties do not), so we read those here and
+  // only use the hardcoded defaults for anything not saved.
   // =======================================================
   const defaultSettings = {
-    syncToPhones: 'false',   
+    syncToPhones: 'false',
     phoneContacts: 'false',  // FALSE: Hidden by default
     parentsDivided: 'false', // FALSE: Hidden by default
     notesTab: 'false',       // FALSE: Hidden by default
     sendOut: 'false',        // FALSE: Hidden by default
     siteClass: 'false',      // FALSE: Hidden by default
     typeCol: 'false',        // FALSE: Hidden by default
-    autoOverride: 'true',    
+    autoOverride: 'true',
     autoNotes: 'true',
     disableHiddenNotes: 'false',
     ignoreHideCheckboxes: 'false',
     emailNotifications: 'false'
   };
-  
+
+  const savedSettings = (typeof loadSettingsFromVersionSheet_ === "function")
+    ? loadSettingsFromVersionSheet_() : null;
+  const finalSettings = Object.assign({}, defaultSettings, savedSettings || {});
+
   // Write variables straight into memory to eliminate any TypeError possibilities.
-  for (const [key, value] of Object.entries(defaultSettings)) {
-    props.setProperty(key, value);
+  for (const [key, value] of Object.entries(finalSettings)) {
+    props.setProperty(key, String(value));
   }
 
   // =======================================================
-  // NEW: HIDE UNNECESSARY SHEETS
+  // HIDE UNNECESSARY SHEETS — start from the default-visible set...
   // =======================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // Included both "RAW Data" and "Raw Data" to be safe against case variations
-  const visibleSheets = ["RAW Data", "Raw Data", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory"];
-  
-  ss.getSheets().forEach(sheet => {
-    if (visibleSheets.includes(sheet.getName())) {
-      sheet.showSheet();
-    } else {
-      sheet.hideSheet();
-    }
-  });
-  
+  applyDefaultSheetVisibility_(ss);
+
+  // ...then reveal the optional tabs/columns the inherited settings ask for.
+  if (typeof updateVisualSettings_ === "function" && typeof getSettings === "function") {
+    try { updateVisualSettings_(getSettings()); } catch (e) { console.error(e); }
+  }
+
   // Instant UI swap without refresh! Suppress onOpen's own auto-migrate open
   // for this synchronous call so the wizard isn't opened twice — the
   // authoritative open happens in the if/else right below.
