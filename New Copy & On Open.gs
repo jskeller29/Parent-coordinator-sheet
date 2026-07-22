@@ -292,7 +292,7 @@ function showWelcomeDialog() {
         <br><br><b>Next Steps:</b> Click <b>🚀 App Menu</b> at the top of your screen to safely <b>Import Old Data</b> from a previous version, or close this window and paste your new student data directly into the <b>RAW Data</b> tab!
       </p>
       
-      <a href="https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+      <a href="https://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         📖 Read the User Guide
       </a>
       
