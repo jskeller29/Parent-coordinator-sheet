@@ -162,7 +162,7 @@ function onOpen() {
       } else {
         SpreadsheetApp.getUi().alert(
           "👋 Welcome to the PC Tracker!",
-          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing",
+          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing",
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       }
