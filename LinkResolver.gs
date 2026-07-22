@@ -47,13 +47,22 @@ function getTemplateLinks() {
 }
 
 /**
- * Menu/editor helper: force a fresh folder scan and show the resolved links.
- * Run this on your MASTER template after swapping the folder files so copies
- * inherit the newest links (it also writes them into the Version tab).
+ * Force a fresh folder scan (bypassing the cache) and re-store the links.
+ * No UI — safe to call from time-based triggers (e.g. the nightly sync).
+ * Returns the freshly resolved links.
+ */
+function refreshTemplateLinks_() {
+  try { CacheService.getScriptCache().remove('TEMPLATE_LINKS_V1'); } catch (e) {}
+  return getTemplateLinks_();
+}
+
+/**
+ * Editor helper: force a fresh scan and show the resolved links in an alert.
+ * (Not needed for normal use — the dialogs resolve on open and the nightly
+ * sync refreshes the stored copy. Handy to verify links after swapping files.)
  */
 function refreshTemplateLinks() {
-  try { CacheService.getScriptCache().remove('TEMPLATE_LINKS_V1'); } catch (e) {}
-  const links = getTemplateLinks_();
+  const links = refreshTemplateLinks_();
   const msg =
     "BLANK  (" + (links.blankName || "not found") + "):\n" + (links.blankCopyUrl || "(unresolved)") +
     "\n\nMIGRATE (" + (links.migrateName || "not found") + "):\n" + (links.migrateCopyUrl || "(unresolved)");
@@ -112,14 +121,15 @@ function scanTemplateFolder_() {
   try {
     const folder = DriveApp.getFolderById(TEMPLATE_FOLDER_ID);
     const files = folder.getFiles();
-    let blank = null, migrate = null, blankTime = 0, migrateTime = 0;
+    let blank = null, migrate = null, blankKey = -1, migrateKey = -1;
 
     while (files.hasNext()) {
       const f = files.next();
-      const upper = String(f.getName()).toUpperCase();
-      const updated = f.getLastUpdated().getTime();
-      if (upper.indexOf('(BLANK)') !== -1 && updated >= blankTime) { blank = f; blankTime = updated; }
-      if (upper.indexOf('(MIGRATE)') !== -1 && updated >= migrateTime) { migrate = f; migrateTime = updated; }
+      const name = f.getName();
+      const upper = String(name).toUpperCase();
+      const key = fileSortKey_(name, f); // newest-dated (or newest-updated) wins
+      if (upper.indexOf('(BLANK)') !== -1 && key >= blankKey) { blank = f; blankKey = key; }
+      if (upper.indexOf('(MIGRATE)') !== -1 && key >= migrateKey) { migrate = f; migrateKey = key; }
     }
 
     if (blank)   { out.blankCopyUrl   = copyUrlFor_(blank);   out.blankName   = blank.getName(); }
@@ -128,6 +138,23 @@ function scanTemplateFolder_() {
     console.error("scanTemplateFolder_ failed (folder access?): " + e.message);
   }
   return out;
+}
+
+/**
+ * Ranking key used to pick the newest template when several share a label.
+ * Files are named like "Parent Coordinator Tracker 7/22/26 (BLANK)", so prefer
+ * a MM/DD/YY (or M/D/YYYY) date parsed from the NAME; fall back to the file's
+ * last-updated time when the name has no date.
+ */
+function fileSortKey_(name, file) {
+  const m = String(name).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    let y = parseInt(m[3], 10);
+    if (y < 100) y += 2000;
+    const ms = new Date(y, parseInt(m[1], 10) - 1, parseInt(m[2], 10)).getTime();
+    if (!isNaN(ms)) return ms;
+  }
+  try { return file.getLastUpdated().getTime(); } catch (e) { return 0; }
 }
 
 /**

@@ -156,7 +156,14 @@ function nightlyMasterSync() {
     } else {
        console.log("Nightly Rebuild finished. Phone sync skipped (Opted Out).");
     }
-    
+
+    // Refresh the shareable template links from the Drive folder so the
+    // stored/inherited (BLANK)/(MIGRATE) copy links stay current with no
+    // manual step (see LinkResolver.gs). Safe/no-UI; never blocks the sync.
+    try {
+      if (typeof refreshTemplateLinks_ === "function") refreshTemplateLinks_();
+    } catch (e) { console.error("Template link refresh failed: " + e.message); }
+
   } catch(e) {
     console.error("Nightly Master Sync failed: " + e.message);
   }
