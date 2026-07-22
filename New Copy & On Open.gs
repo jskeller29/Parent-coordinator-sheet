@@ -188,6 +188,7 @@ function onOpen() {
     const getStartedMenu = ui.createMenu("🚀 App Menu"); 
     getStartedMenu.addItem("🔄 Import Old Data", "openMigrationWizard");
     getStartedMenu.addItem("📖 Open User Guide", "showWelcomeDialog");
+    getStartedMenu.addItem("🐞 Report a Bug", "reportABug");
     getStartedMenu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
     getStartedMenu.addSeparator();
     getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
@@ -216,6 +217,7 @@ function onOpen() {
     menu.addSeparator(); 
     menu.addItem("⚙️ Settings", "openSettingsDialog"); 
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");
+    menu.addItem("🐞 Report a Bug", "reportABug");
     menu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
     
     // --- NEW: END OF YEAR ROLLOVER ---
@@ -305,8 +307,39 @@ function showWelcomeDialog() {
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
     .setWidth(420)
     .setHeight(290);
-    
+
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "📖 PC Tracker User Guide");
+}
+
+// ==========================================
+// 🐞 REPORT A BUG
+// A menu click can't open a URL directly, so we pop a tiny dialog that
+// auto-opens the bug-report form (with a clickable button as a fallback
+// for browsers that block the automatic pop-up).
+// ==========================================
+function reportABug() {
+  const formUrl = "https://forms.gle/5dXR2me3jt37aGhQ9";
+  const htmlContent = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
+      <h2 style="color: #0F172A; margin-top: 0;">🐞 Report a Bug</h2>
+      <p style="color: #334155; font-size: 14px; margin-bottom: 25px; line-height: 1.5;">
+        Found something broken or confusing? The report form should open in a new tab automatically. If it didn't, click below.
+      </p>
+      <a href="${formUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #EF4444; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        🐞 Open the Bug Report Form
+      </a>
+    </div>
+    <script>
+      // Try to open the form immediately; the button above covers pop-up blockers.
+      window.open(${JSON.stringify(formUrl)}, '_blank');
+    </script>
+  `;
+
+  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
+    .setWidth(400)
+    .setHeight(220);
+
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "🐞 Report a Bug");
 }
 
 // ==========================================
