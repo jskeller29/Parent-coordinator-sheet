@@ -28,7 +28,28 @@ function resetToDisplayMode() {
   resetMasterTable_(ss);
   fillContactLogHstackFormulas_(ss);
 
+  // Stamp this template's build date so the Version Checker knows how old
+  // this copy is (see VersionCheck.gs — comparison is now date-based).
+  stampVersionDate_(ss);
+
   SpreadsheetApp.getUi().alert("Display Mode Reset complete.");
+}
+
+/**
+ * Writes today's date into the hidden "Version" tab, cell A1. This is the
+ * build date of this template copy; the Version Checker compares it against
+ * the dated rows in the master tracker. Creates (and hides) the tab if it
+ * doesn't exist yet. The value travels with every copy of the sheet.
+ */
+function stampVersionDate_(ss) {
+  let sheet = ss.getSheetByName("Version");
+  if (!sheet) {
+    sheet = ss.insertSheet("Version");
+    sheet.hideSheet();
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // midnight, so date-only comparisons are clean
+  sheet.getRange("A1").setValue(today).setNumberFormat("MM/dd/yy");
 }
 
 function resetAndLoadFakeData() {
