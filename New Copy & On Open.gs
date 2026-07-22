@@ -1,3 +1,10 @@
+// When runInitialSetupWrapper() calls onOpen() to refresh the menu, we don't
+// want onOpen's own "auto-open Migration Wizard" block to fire too — the
+// wrapper opens it authoritatively right after. This global (shared across all
+// .gs files in the one Apps Script scope) suppresses the duplicate for that
+// single synchronous call. onOpen's block still fires on genuine reopens.
+var IS_RUNNING_SETUP = false;
+
 /**
  * Automatically creates the necessary installable triggers.
  * It deletes old triggers first to prevent duplicate firings.
@@ -85,6 +92,7 @@ function onOpen() {
     // 🆕 Fresh copies start with clean version-check memory so any
     // dismissals/preferences from the template never leak into copies.
     props.deleteProperty('VERSION_LAST_SEEN');
+    props.deleteProperty('VERSION_LAST_SEEN_DATE');
     props.deleteProperty('VERSION_DISMISS_FOREVER');
     props.deleteProperty('VERSION_MAJORS_ONLY');
     props.deleteProperty('VERSION_LAST_CHECK');
@@ -149,7 +157,7 @@ function onOpen() {
     // on/off per template by running toggleAutoMigratePopup()
     // from the Script Editor (see VersionCheck.gs).
     // =======================================================
-    if (props.getProperty('AUTO_MIGRATE_POPUP') === 'true') {
+    if (props.getProperty('AUTO_MIGRATE_POPUP') === 'true' && !IS_RUNNING_SETUP) {
       try { openMigrationWizard(); } catch(e) { console.error(e); }
     }
   } else {
@@ -329,9 +337,13 @@ function runInitialSetupWrapper() {
     }
   });
   
-  // Instant UI swap without refresh!
-  onOpen(); 
-  
+  // Instant UI swap without refresh! Suppress onOpen's own auto-migrate open
+  // for this synchronous call so the wizard isn't opened twice — the
+  // authoritative open happens in the if/else right below.
+  IS_RUNNING_SETUP = true;
+  onOpen();
+  IS_RUNNING_SETUP = false;
+
   // =======================================================
   // 🆕 UPGRADE TEMPLATE vs NEW-USER TEMPLATE
   // Only one modal can be open at a time, so we pick the right one:

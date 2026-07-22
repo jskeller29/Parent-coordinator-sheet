@@ -51,7 +51,7 @@
 <body>
 
   <div class="header">
-    <h2>🚀 New Version Available!</h2>
+    <h2 id="mainTitle">🚀 New Version Available!</h2>
     <p class="sub" id="subtitle">Checking the Version Tracker…</p>
   </div>
 
@@ -118,14 +118,16 @@
     // ==========================================
     function render() {
       document.getElementById('subtitle').textContent =
-        "You're on v" + DATA.installedVersion + " — here's everything you've missed:";
+        "Your version is dated " + DATA.installedDateStr + " — here's everything you've missed:";
       document.getElementById('majorsOnly').checked = !!DATA.majorsOnly;
 
       const list = document.getElementById('changelog');
       list.innerHTML = '';
 
       if (!DATA.entries || DATA.entries.length === 0) {
-        document.getElementById('subtitle').textContent = "You're already caught up!";
+        document.getElementById('mainTitle').textContent = '✅ You are Up to Date';
+        document.getElementById('subtitle').textContent =
+          "You're already caught up! Change your notification preference below anytime.";
         const card = document.createElement('div');
         card.className = 'entry';
         card.appendChild(makeNotes('No new updates to show — you can close this window.'));
@@ -142,7 +144,7 @@
       top.className = 'entry-top';
       const ver = document.createElement('span');
       ver.className = 'ver';
-      ver.textContent = 'Version ' + newest.version;
+      ver.textContent = 'Update ' + newest.dateStr;
       top.appendChild(ver);
       top.appendChild(makeBadge(newest.size));
       card.appendChild(top);
@@ -169,7 +171,7 @@
         head.className = 'older-head';
         const title = document.createElement('span');
         title.className = 'older-title';
-        title.textContent = 'Version ' + e.version + ' Changelog';
+        title.textContent = 'Update ' + e.dateStr + ' Changelog';
         head.appendChild(title);
         head.appendChild(makeBadge(e.size));
         sec.appendChild(head);
@@ -194,7 +196,7 @@
       google.script.run
         .withSuccessHandler(function() { google.script.host.close(); })
         .withFailureHandler(function() { lockButtons(false); })
-        .vc_dismiss(DATA.newestVersion);
+        .vc_dismiss(DATA.newestDateMs);
     }
 
     // Two-click confirm, then permanently disables automatic checks
@@ -214,7 +216,7 @@
       google.script.run
         .withSuccessHandler(function() { google.script.host.close(); })
         .withFailureHandler(function() { lockButtons(false); })
-        .vc_dismissForever(DATA.newestVersion);
+        .vc_dismissForever(DATA.newestDateMs);
     }
 
     // Saves the Majors-only preference instantly on toggle

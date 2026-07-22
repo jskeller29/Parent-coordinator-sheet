@@ -1,22 +1,27 @@
 // ======================================================================
 // FILE: VersionCheck.gs
 // PURPOSE: On open, checks the master "Parent Coordinator Version Tracker"
-// sheet and pops a changelog dialog when a newer template version exists.
+// sheet and pops a changelog dialog when a NEWER-DATED template exists.
+//
+// HOW THE BASELINE WORKS (date-based):
+//   • Each template copy carries its own build date in the hidden "Version"
+//     tab, cell A1. That date is stamped by resetToDisplayMode() in
+//     Regenerate.gs and travels with every copy of the sheet.
+//   • The checker collects every tracker row DATED AFTER that build date
+//     (or after the newest date the user has already dismissed).
 //
 // TRACKER LAYOUT (first tab, newest release ALWAYS inserted at Row 2):
-//   Row 1 Headers:  Version | Size | Notes | Link
-//   Row 2+:         5.1     | Small | Fixed XYZ bug | https://.../copy
+//   Row 1 Headers:  Date | Size | Notes | Link
+//   Row 2+:         07/22/26 | Small | Fixed XYZ bug | https://.../copy
 //
 // RELEASE CHECKLIST (every time you ship a new template):
 //   1. Make your code changes in the template.
-//   2. Bump SCRIPT_VERSION below (e.g. "5.0" -> "5.1").
-//   3. Insert a new row at the TOP of the tracker (Row 2) with the SAME
-//      version number, its Size (Major/Small), Notes, and the /copy link.
+//   2. Run resetToDisplayMode() so the template's "Version"!A1 build date is
+//      stamped to today (or set it by hand).
+//   3. Insert a new row at the TOP of the tracker (Row 2) with today's Date,
+//      its Size (Major/Small), Notes, and the /copy link.
 //      (Only the newest filled-in Link matters — older links are ignored.)
 // ======================================================================
-
-// 🚨 BUMP THIS EVERY RELEASE — must match the tracker row you add!
-const SCRIPT_VERSION = "5.1"; // Format: MAJOR.SMALL  (5 major, 0 small)
 
 // The master tracker spreadsheet (shared: Anyone with the link -> Viewer)
 const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
@@ -44,7 +49,9 @@ function checkVersionOnOpen() {
 
 /**
  * Menu item: 🚀 App Menu -> 🔔 Check for Updates
- * Manual checks bypass the throttle AND "Dismiss Forever".
+ * Manual checks bypass the throttle AND "Dismiss Forever", and ALWAYS open
+ * the dialog (even when caught up) so the Major-only / all-updates toggle is
+ * always reachable.
  */
 function manualCheckForUpdates() {
   checkForUpdates_(true);
@@ -86,22 +93,23 @@ function checkForUpdates_(isManual) {
     return;
   }
 
-  if (payload.entries.length === 0) {
-    if (isManual) showUpToDateAlert_(payload.hiddenSmallCount);
-    return; // Nothing new (for this user's preference) — stay quiet
-  }
+  // Auto checks stay quiet when there's nothing new. A MANUAL check always
+  // opens the dialog so the user can flip Major-only / all updates even when
+  // already caught up (the dialog renders a friendly "caught up" state).
+  if (!isManual && payload.entries.length === 0) return;
 
   // Stash the payload so the dialog can grab it instantly when it loads.
   // (5 minute lifetime; the dialog recomputes automatically if it expires.)
   try {
     CacheService.getUserCache().put('VC_PAYLOAD', JSON.stringify(payload), 300);
-  } catch (e) {}
+  } catch (e) { console.error(e); }
 
   // Plain static HTML — the dialog fetches its data via google.script.run
+  const title = payload.entries.length ? "🚀 New Version Available!" : "🔔 Update Preferences";
   const html = HtmlService.createHtmlOutputFromFile('VersionDialog')
     .setWidth(540)
     .setHeight(600);
-  SpreadsheetApp.getUi().showModalDialog(html, "🚀 New Version Available!");
+  SpreadsheetApp.getUi().showModalDialog(html, title);
 }
 
 /**
@@ -116,31 +124,32 @@ function computeUpdatePayload_() {
     const trackerSS = SpreadsheetApp.openById(VERSION_TRACKER_ID);
     const tab = trackerSS.getSheets()[0]; // Changelog must stay the FIRST tab
     const lastRow = tab.getLastRow();
-    rows = (lastRow < 2) ? [] : tab.getRange(2, 1, lastRow - 1, 4).getDisplayValues();
+    // getValues (not display) so date-formatted cells come back as real Dates.
+    rows = (lastRow < 2) ? [] : tab.getRange(2, 1, lastRow - 1, 4).getValues();
   } catch (e) {
     console.error("Could not read Version Tracker: " + e.message);
     return null;
   }
 
-  const localVersion = normVersion_(props.getProperty('VERSION_LAST_SEEN') || SCRIPT_VERSION);
-  const majorsOnly   = props.getProperty('VERSION_MAJORS_ONLY') === 'true';
+  const baselineMs = getLocalBaselineDateMs_();
+  const majorsOnly = props.getProperty('VERSION_MAJORS_ONLY') === 'true';
 
-  // WALK DOWN the tracker (newest on top), collecting every release
-  // ABOVE the version this sheet has already seen.
+  // Collect every tracker row DATED AFTER our baseline. Order-independent, so
+  // a deleted/rearranged tracker row never breaks the walk.
   const missed = [];
   for (let i = 0; i < rows.length; i++) {
-    const ver = normVersion_(rows[i][0]);
-    if (!ver) continue;                 // Skip blank / junk rows
-    if (ver === localVersion) break;    // Reached what we already have — stop walking
+    const ms = toDateMs_(rows[i][0]);
+    if (isNaN(ms)) continue;        // Skip blank / junk / header-ish rows
+    if (ms <= baselineMs) continue; // Already have it / already dismissed it
     missed.push({
-      version: ver,
+      dateMs: ms,
+      dateStr: formatTrackerDate_(rows[i][0]),
       size:  String(rows[i][1] || "").trim(),
       notes: String(rows[i][2] || "").trim(),
       link:  String(rows[i][3] || "").trim()
     });
   }
-  // Safety net: if the local version's row was ever deleted from the
-  // tracker, the loop simply collects everything instead of crashing.
+  missed.sort((a, b) => b.dateMs - a.dateMs); // Newest first
 
   // "Majors only" still walks the full list, then surfaces ONLY Major rows
   const entries = majorsOnly ? missed.filter(e => isMajor_(e.size)) : missed;
@@ -157,13 +166,32 @@ function computeUpdatePayload_() {
   }
 
   return {
-    entries: entries,
+    entries: entries.map(e => ({ dateStr: e.dateStr, size: e.size, notes: e.notes, link: e.link })),
     latestLink: latestLink,
-    newestVersion: entries.length ? entries[0].version : "",
-    installedVersion: normVersion_(SCRIPT_VERSION),
-    majorsOnly: majorsOnly,
-    hiddenSmallCount: missed.length - entries.length
+    newestDateMs: entries.length ? entries[0].dateMs : baselineMs,
+    newestDateStr: entries.length ? entries[0].dateStr : "",
+    installedDateStr: formatMsDate_(baselineMs),
+    majorsOnly: majorsOnly
   };
+}
+
+/**
+ * The baseline the tracker is compared against: the LATER of this copy's
+ * build date ("Version"!A1) and the newest date the user has dismissed.
+ * Returns 0 (compare against epoch => surface everything) when neither is set,
+ * so an un-stamped sheet still discovers updates instead of going dark.
+ */
+function getLocalBaselineDateMs_() {
+  let buildMs = NaN;
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
+    if (sheet) buildMs = toDateMs_(sheet.getRange("A1").getValue());
+  } catch (e) { console.error(e); }
+
+  const seenMs = Number(PropertiesService.getDocumentProperties().getProperty('VERSION_LAST_SEEN_DATE') || NaN);
+
+  const candidates = [buildMs, seenMs].filter(n => !isNaN(n));
+  return candidates.length ? Math.max.apply(null, candidates) : 0;
 }
 
 
@@ -179,24 +207,26 @@ function vc_getPayload() {
   try {
     const cached = CacheService.getUserCache().get('VC_PAYLOAD');
     if (cached) return cached;
-  } catch (e) {}
+  } catch (e) { console.error(e); }
 
   const payload = computeUpdatePayload_();
   return payload ? JSON.stringify(payload) : null;
 }
 
-/** "Dismiss": remember the newest version shown so it won't pop again until something newer ships. */
-function vc_dismiss(newestVersion) {
-  const v = normVersion_(newestVersion);
-  if (v) PropertiesService.getDocumentProperties().setProperty('VERSION_LAST_SEEN', v);
+/** "Dismiss": remember the newest date shown so it won't pop again until something newer ships. */
+function vc_dismiss(newestDateMs) {
+  const ms = Number(newestDateMs);
+  if (!isNaN(ms) && ms > 0) {
+    PropertiesService.getDocumentProperties().setProperty('VERSION_LAST_SEEN_DATE', String(ms));
+  }
   return true;
 }
 
 /** "Dismiss Forever": stop all automatic checks. (The manual menu check still works.) */
-function vc_dismissForever(newestVersion) {
+function vc_dismissForever(newestDateMs) {
   const props = PropertiesService.getDocumentProperties();
-  const v = normVersion_(newestVersion);
-  if (v) props.setProperty('VERSION_LAST_SEEN', v);
+  const ms = Number(newestDateMs);
+  if (!isNaN(ms) && ms > 0) props.setProperty('VERSION_LAST_SEEN_DATE', String(ms));
   props.setProperty('VERSION_DISMISS_FOREVER', 'true');
   return true;
 }
@@ -214,35 +244,41 @@ function vc_setMajorsOnly(enabled) {
 // ==========================================
 
 /**
- * Normalizes versions so "5", "5.0", and " 5.0 " all compare as "5.0".
- * (Sheets displays a numeric 5.0 cell as just "5", so this is required.)
- * Returns "" for junk that isn't a version at all.
+ * Converts a tracker/Version cell into a comparable date timestamp (midnight).
+ * Handles real Date objects (from getValues) and common typed strings like
+ * "7/22/26", "2026-07-22", and "Monday, 7/20/26". Returns NaN for non-dates.
  */
-function normVersion_(v) {
-  const parts = String(v == null ? "" : v).trim().split(".");
-  const major = parseInt(parts[0], 10);
-  if (isNaN(major)) return "";
-  const small = parseInt(parts[1], 10);
-  return major + "." + (isNaN(small) ? 0 : small);
+function toDateMs_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  }
+  const s = String(value == null ? "" : value).trim();
+  if (!s) return NaN;
+  const cleaned = s.replace(/^[A-Za-z]+,\s*/, ""); // drop a leading "Monday, "
+  const parsed = new Date(cleaned);
+  if (!isNaN(parsed.getTime())) {
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
+  }
+  return NaN;
+}
+
+/** Formats a timestamp as MM/dd/yy (or "unknown" for an unset baseline). */
+function formatMsDate_(ms) {
+  if (!ms || isNaN(ms)) return "unknown";
+  return Utilities.formatDate(new Date(ms), Session.getScriptTimeZone(), "MM/dd/yy");
+}
+
+/** Formats a raw tracker cell for display: real Dates -> MM/dd/yy, else as-typed. */
+function formatTrackerDate_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "MM/dd/yy");
+  }
+  return String(value == null ? "" : value).trim();
 }
 
 /** "Major", "MAJOR", "major update" all count as Major. Everything else = Small. */
 function isMajor_(size) {
   return String(size || "").trim().toLowerCase().indexOf("major") === 0;
-}
-
-/** Friendly alert for manual checks when there's nothing (visible) to show. */
-function showUpToDateAlert_(hiddenCount) {
-  const props = PropertiesService.getDocumentProperties();
-  const seen = normVersion_(props.getProperty('VERSION_LAST_SEEN') || SCRIPT_VERSION);
-
-  let msg = "You're caught up! Latest version you've reviewed: v" + seen + ".";
-  if (hiddenCount > 0) {
-    msg += "\n\nHeads up: there " +
-      (hiddenCount === 1 ? "is 1 Small update" : "are " + hiddenCount + " Small updates") +
-      " you haven't seen, hidden by your 'Major updates only' setting.";
-  }
-  SpreadsheetApp.getUi().alert("✅ Up to Date", msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 
@@ -278,8 +314,8 @@ function toggleAutoMigratePopup() {
 // ======================================================================
 function resetVersionCheckState() {
   const props = PropertiesService.getDocumentProperties();
-  ['VERSION_LAST_SEEN', 'VERSION_DISMISS_FOREVER', 'VERSION_MAJORS_ONLY', 'VERSION_LAST_CHECK']
+  ['VERSION_LAST_SEEN', 'VERSION_LAST_SEEN_DATE', 'VERSION_DISMISS_FOREVER', 'VERSION_MAJORS_ONLY', 'VERSION_LAST_CHECK']
     .forEach(k => props.deleteProperty(k));
-  try { CacheService.getUserCache().remove('VC_PAYLOAD'); } catch (e) {}
+  try { CacheService.getUserCache().remove('VC_PAYLOAD'); } catch (e) { console.error(e); }
   SpreadsheetApp.getActiveSpreadsheet().toast("Version check memory wiped for this sheet.", "Dev Reset", 5);
 }
