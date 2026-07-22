@@ -79,7 +79,8 @@ function checkForUpdates_(isManual) {
   // Stamp the attempt FIRST so a broken tracker doesn't retry on every open
   props.setProperty('VERSION_LAST_CHECK', String(Date.now()));
 
-  const payload = computeUpdatePayload_();
+  // Manual checks show BOTH Major and Small updates (showAll = true).
+  const payload = computeUpdatePayload_(isManual);
 
   if (!payload) {
     // Tracker unreachable — stay silent on auto-checks
@@ -115,8 +116,12 @@ function checkForUpdates_(isManual) {
 /**
  * Reads the tracker and builds everything the dialog needs.
  * Returns null only if the tracker can't be reached at all.
+ *
+ * @param {boolean} showAll  When true (manual checks), surface BOTH Major and
+ *   Small updates regardless of the "Major only" preference. Automatic checks
+ *   pass false so that preference still governs the pop-up.
  */
-function computeUpdatePayload_() {
+function computeUpdatePayload_(showAll) {
   const props = PropertiesService.getDocumentProperties();
 
   let rows;
@@ -151,8 +156,9 @@ function computeUpdatePayload_() {
   }
   missed.sort((a, b) => b.dateMs - a.dateMs); // Newest first
 
-  // "Majors only" still walks the full list, then surfaces ONLY Major rows
-  const entries = majorsOnly ? missed.filter(e => isMajor_(e.size)) : missed;
+  // "Majors only" still walks the full list, then surfaces ONLY Major rows —
+  // but a manual check (showAll) always shows everything, Major and Small.
+  const entries = (majorsOnly && !showAll) ? missed.filter(e => isMajor_(e.size)) : missed;
 
   // The ONE link shown in the dialog: the newest filled-in Link among ALL
   // missed releases (scans the unfiltered list, so even a Majors-only user
@@ -171,7 +177,8 @@ function computeUpdatePayload_() {
     newestDateMs: entries.length ? entries[0].dateMs : baselineMs,
     newestDateStr: entries.length ? entries[0].dateStr : "",
     installedDateStr: formatMsDate_(baselineMs),
-    majorsOnly: majorsOnly
+    majorsOnly: majorsOnly,
+    dismissForever: props.getProperty('VERSION_DISMISS_FOREVER') === 'true'
   };
 }
 
@@ -222,16 +229,17 @@ function vc_dismiss(newestDateMs) {
   return true;
 }
 
-/** "Dismiss Forever": stop all automatic checks. (The manual menu check still works.) */
-function vc_dismissForever(newestDateMs) {
-  const props = PropertiesService.getDocumentProperties();
-  const ms = Number(newestDateMs);
-  if (!isNaN(ms) && ms > 0) props.setProperty('VERSION_LAST_SEEN_DATE', String(ms));
-  props.setProperty('VERSION_DISMISS_FOREVER', 'true');
+/**
+ * "Stop automatic update checks" toggle in the dialog. When ON, automatic
+ * (on-open) checks are suppressed; the manual menu check always still works.
+ */
+function vc_setDismissForever(enabled) {
+  PropertiesService.getDocumentProperties()
+    .setProperty('VERSION_DISMISS_FOREVER', String(enabled === true));
   return true;
 }
 
-/** "Major updates only" checkbox in the dialog. */
+/** "Major updates only" checkbox in the dialog. Governs AUTOMATIC checks only. */
 function vc_setMajorsOnly(enabled) {
   PropertiesService.getDocumentProperties()
     .setProperty('VERSION_MAJORS_ONLY', String(enabled === true));
