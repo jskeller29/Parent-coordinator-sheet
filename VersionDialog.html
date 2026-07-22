@@ -42,6 +42,8 @@
     button { border: none; border-radius: 6px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background-color .15s; }
     #dismissBtn { background: #2563eb; color: #ffffff; flex: 1; }
     #dismissBtn:hover { background: #1d4ed8; }
+    #dismissNowBtn { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; flex: 1; }
+    #dismissNowBtn:hover { background: #e2e8f0; }
     button:disabled { opacity: .5; cursor: not-allowed; }
     .hint { font-size: 11px; color: #94a3b8; margin: 9px 0 0 0; text-align: center; }
   </style>
@@ -69,7 +71,8 @@
       <span class="saved" id="savedForever">Saved ✓</span>
     </label>
     <div class="btn-row">
-      <button id="dismissBtn" onclick="dismiss()">Dismiss</button>
+      <button id="dismissNowBtn" onclick="dismissForNow()">Dismiss for now</button>
+      <button id="dismissBtn" onclick="dismissUpdate()">Dismiss this update</button>
     </div>
     <p class="hint">You can always check manually: 🚀 App Menu → 🔔 Check for Updates (shows all updates)</p>
   </div>
@@ -188,6 +191,7 @@
     // ==========================================
     function lockButtons(locked) {
       document.getElementById('dismissBtn').disabled = locked;
+      document.getElementById('dismissNowBtn').disabled = locked;
     }
 
     function flashSaved(tagId) {
@@ -196,8 +200,14 @@
       setTimeout(function() { tag.classList.remove('show'); }, 1500);
     }
 
-    // Marks the newest version as "seen" — won't pop again until something newer ships
-    function dismiss() {
+    // "Dismiss for now": just closes — the update pops again on the next check.
+    function dismissForNow() {
+      google.script.host.close();
+    }
+
+    // "Dismiss this update": marks the newest version as "seen" so it won't pop
+    // again until something newer ships, then closes.
+    function dismissUpdate() {
       if (!DATA) { google.script.host.close(); return; }
       lockButtons(true);
       google.script.run
