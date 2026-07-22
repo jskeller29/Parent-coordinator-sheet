@@ -50,6 +50,14 @@ function stampVersionDate_(ss) {
   const today = new Date();
   today.setHours(0, 0, 0, 0); // midnight, so date-only comparisons are clean
   sheet.getRange("A1").setValue(today).setNumberFormat("MM/dd/yy");
+
+  // B2 = Auto-Migrate toggle ("Yes"/"No"). Label it (A2, pointing right at
+  // B2), and default it to "No" only when blank so we never overwrite a
+  // template author's existing choice.
+  sheet.getRange("A1").setNote("Build date — set automatically on Reset to Display Mode.");
+  sheet.getRange("A2").setValue("Auto-Migrate on upgrade? (Yes/No) →");
+  const toggleCell = sheet.getRange("B2");
+  if (String(toggleCell.getValue()).trim() === "") toggleCell.setValue("No");
 }
 
 function resetAndLoadFakeData() {

@@ -6,6 +6,25 @@
 var IS_RUNNING_SETUP = false;
 
 /**
+ * Auto-Migrate mode is controlled by the hidden "Version" tab, cell B2:
+ * "Yes" turns it on (upgrade-template copies), anything else is off
+ * (new-user copies). The cell travels with every copy of the sheet, and
+ * reading the bound spreadsheet's own cell is allowed even in the simple
+ * onOpen trigger. Set it with the toggleAutoMigratePopup() dev tool or by
+ * typing directly into B2.
+ */
+function isAutoMigrateOn_() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
+    if (!sheet) return false;
+    return String(sheet.getRange("B2").getValue()).trim().toLowerCase() === "yes";
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+}
+
+/**
  * Automatically creates the necessary installable triggers.
  * It deletes old triggers first to prevent duplicate firings.
  */
@@ -96,8 +115,9 @@ function onOpen() {
     props.deleteProperty('VERSION_DISMISS_FOREVER');
     props.deleteProperty('VERSION_MAJORS_ONLY');
     props.deleteProperty('VERSION_LAST_CHECK');
-    // ⚠️ AUTO_MIGRATE_POPUP is intentionally KEPT — it must travel into
-    // copies so the "upgrade template" auto-opens the Migration Wizard!
+    // ℹ️ The Auto-Migrate toggle now lives in the "Version" tab cell B2, not
+    // a document property, so it travels with copies automatically — nothing
+    // to preserve here.
   }
 
   // OFFLINE SYNC DETECTOR
@@ -119,11 +139,21 @@ function onOpen() {
     initMenu.addToUi(); 
     
     try {
-      SpreadsheetApp.getUi().alert(
-        "👋 Welcome to the PC Tracker!", 
-        "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing", 
-        SpreadsheetApp.getUi().ButtonSet.OK
-      );
+      if (isAutoMigrateOn_()) {
+        // Upgrade-template copy: point the user at Initial Setup, which kicks
+        // off the migration flow (see runInitialSetupWrapper).
+        SpreadsheetApp.getUi().alert(
+          "🎉 Welcome to the newest version!",
+          "Click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)' to start the migration process.",
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+      } else {
+        SpreadsheetApp.getUi().alert(
+          "👋 Welcome to the PC Tracker!",
+          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing",
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+      }
     } catch(e) { console.error(e); }
 
     return;
@@ -153,11 +183,10 @@ function onOpen() {
 
     // =======================================================
     // 🆕 AUTO-OPEN MIGRATION WIZARD (Upgrade-template copies)
-    // Fires on every open until the sheets are built. Toggle this
-    // on/off per template by running toggleAutoMigratePopup()
-    // from the Script Editor (see VersionCheck.gs).
+    // Fires on every open until the sheets are built. Controlled by the
+    // hidden "Version" tab, cell B2 = "Yes" (see isAutoMigrateOn_).
     // =======================================================
-    if (props.getProperty('AUTO_MIGRATE_POPUP') === 'true' && !IS_RUNNING_SETUP) {
+    if (isAutoMigrateOn_() && !IS_RUNNING_SETUP) {
       try { openMigrationWizard(); } catch(e) { console.error(e); }
     }
   } else {
@@ -347,10 +376,10 @@ function runInitialSetupWrapper() {
   // =======================================================
   // 🆕 UPGRADE TEMPLATE vs NEW-USER TEMPLATE
   // Only one modal can be open at a time, so we pick the right one:
-  //   AUTO_MIGRATE_POPUP on  -> jump straight into the Migration Wizard
-  //   AUTO_MIGRATE_POPUP off -> show the normal Welcome guide
+  //   Version!B2 = "Yes" -> jump straight into the Migration Wizard
+  //   Version!B2 = "No"  -> show the normal Welcome guide
   // =======================================================
-  if (props.getProperty('AUTO_MIGRATE_POPUP') === 'true') {
+  if (isAutoMigrateOn_()) {
     openMigrationWizard();
   } else {
     // POP UP THE WELCOME DIALOG NOW THAT THE USER HAS CLICKED!
