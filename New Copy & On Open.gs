@@ -162,7 +162,7 @@ function onOpen() {
       } else {
         SpreadsheetApp.getUi().alert(
           "👋 Welcome to the PC Tracker!",
-          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\nhttps://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing",
+          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\n" + GUIDE_FOLDER_URL,
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       }
@@ -286,27 +286,46 @@ function onOpen() {
 // WELCOME / TUTORIAL DIALOG HTML
 // ==========================================
 function showWelcomeDialog() {
+  // Resolve the shareable template links + the User Guide link from their Drive
+  // folders (see LinkResolver.gs). Never throws; falls back to folder URLs.
+  const links = (typeof getTemplateLinks_ === "function")
+    ? getTemplateLinks_()
+    : { blankCopyUrl: "#", migrateCopyUrl: "#" };
+  const guideUrl = (typeof getGuideLink_ === "function")
+    ? getGuideLink_()
+    : "https://drive.google.com/drive/folders/1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
+
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
       <h2 style="color: #0F172A; margin-top: 0;">Welcome to the PC Tracker!</h2>
-      <p style="color: #334155; font-size: 14px; margin-bottom: 25px; line-height: 1.5; text-align: left;">
-        This system is designed to automate your directory, track your parent interactions, and easily compile your PCAR data. 
+      <p style="color: #334155; font-size: 14px; margin-bottom: 20px; line-height: 1.5; text-align: left;">
+        This system is designed to automate your directory, track your parent interactions, and easily compile your PCAR data.
         <br><br><b>Next Steps:</b> Click <b>🚀 App Menu</b> at the top of your screen to safely <b>Import Old Data</b> from a previous version, or close this window and paste your new student data directly into the <b>RAW Data</b> tab!
       </p>
-      
-      <a href="https://docs.google.com/document/d/1iJH-72Kshb9B9j8nqYUF0Nb4yLumc-ldYQybV2P7p-g/edit?usp=sharing" target="_blank" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+      <a href="${guideUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         📖 Read the User Guide
       </a>
-      
-      <p style="margin-top: 30px; font-size: 12px; color: #94a3b8;">
+
+      <div style="margin-top: 22px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+        <p style="color: #475569; font-size: 12px; margin: 0 0 10px;">Need to share a fresh copy?</p>
+        <a href="${links.blankCopyUrl}" target="_blank" rel="noopener" style="display: inline-block; margin: 4px; padding: 10px 18px; background-color: #0F9D58; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">
+          📄 New Copy (Blank)
+        </a>
+        <a href="${links.migrateCopyUrl}" target="_blank" rel="noopener" style="display: inline-block; margin: 4px; padding: 10px 18px; background-color: #7C3AED; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">
+          🔄 Upgrade Copy (Migrate)
+        </a>
+      </div>
+
+      <p style="margin-top: 22px; font-size: 12px; color: #94a3b8;">
         You can always access this guide later by clicking<br><b>🚀 App Menu ➔ 📖 Open User Guide</b> at the top of the screen.
       </p>
     </div>
   `;
-  
+
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
     .setWidth(420)
-    .setHeight(290);
+    .setHeight(400);
 
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "📖 PC Tracker User Guide");
 }

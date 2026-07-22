@@ -53,14 +53,28 @@
         <a id="pdfLink" href="#" target="_blank" class="btn btn-outline" style="margin: 0 auto 20px auto; display: block; width: 80%;">📄 View Archived PDF</a>
         
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        
+
         <p style="text-align: center; font-weight: bold; color: #1a73e8;">Ready for next year?</p>
-        <a href="https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?tab=t.0" target="_blank" class="btn btn-success" onclick="closeAfterClick()">Get New 2026-2027 Template</a>
+        <a id="blankBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn btn-success" onclick="closeAfterClick()">📄 Get New Blank Template</a>
+        <a id="migrateBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn btn-outline" style="display: block; width: 80%; margin: 10px auto 0; box-sizing: border-box;" onclick="closeAfterClick()">🔄 Upgrade &amp; Migrate Last Year's Data</a>
       </div>
 
     </div>
 
     <script>
+      // Resolve the current template links up front (see LinkResolver.gs) so the
+      // success screen's buttons point at the right copies with no hardcoded IDs.
+      (function loadTemplateLinks() {
+        if (typeof google === 'undefined') return;
+        google.script.run.withSuccessHandler(function(links) {
+          if (!links) return;
+          var blank = document.getElementById('blankBtn');
+          var migrate = document.getElementById('migrateBtn');
+          if (blank && links.blankCopyUrl) blank.href = links.blankCopyUrl;
+          if (migrate && links.migrateCopyUrl) migrate.href = links.migrateCopyUrl;
+        }).getTemplateLinks();
+      })();
+
       function startRollover() {
         document.getElementById('step1').classList.add('hidden');
         document.getElementById('step2').classList.remove('hidden');
