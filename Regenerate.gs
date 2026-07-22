@@ -32,21 +32,38 @@ function resetToDisplayMode() {
   // this copy is (see VersionCheck.gs — comparison is now date-based).
   stampVersionDate_(ss);
 
+  // Snapshot the current settings into the Version tab so a fresh copy of
+  // this template inherits them (see Settings Backend.gs).
+  if (typeof saveSettingsToVersionSheet_ === "function") saveSettingsToVersionSheet_();
+
+  // Reset the view to only the default-shown tabs (hide everything else).
+  if (typeof applyDefaultSheetVisibility_ === "function") applyDefaultSheetVisibility_(ss);
+
   SpreadsheetApp.getUi().alert("Display Mode Reset complete.");
 }
 
 /**
- * Writes today's date into the hidden "Version" tab, cell A1. This is the
- * build date of this template copy; the Version Checker compares it against
- * the dated rows in the master tracker. Creates (and hides) the tab if it
- * doesn't exist yet. The value travels with every copy of the sheet.
+ * Returns the hidden "Version" tab, creating (and hiding) it if missing.
+ * This tab is the durable, copy-surviving store: the build date (A1), the
+ * Auto-Migrate toggle (B2), and the saved-settings block (rows 4+). Cell
+ * values travel with every copy of the sheet; document properties do not.
  */
-function stampVersionDate_(ss) {
+function getOrCreateVersionSheet_(ss) {
   let sheet = ss.getSheetByName("Version");
   if (!sheet) {
     sheet = ss.insertSheet("Version");
     sheet.hideSheet();
   }
+  return sheet;
+}
+
+/**
+ * Writes today's date into the hidden "Version" tab, cell A1. This is the
+ * build date of this template copy; the Version Checker compares it against
+ * the dated rows in the master tracker. The value travels with every copy.
+ */
+function stampVersionDate_(ss) {
+  const sheet = getOrCreateVersionSheet_(ss);
   const today = new Date();
   today.setHours(0, 0, 0, 0); // midnight, so date-only comparisons are clean
   sheet.getRange("A1").setValue(today).setNumberFormat("MM/dd/yy");
@@ -129,13 +146,16 @@ function resetAndLoadFakeData() {
 RESET & HEADER FUNCTIONS
 ========================= */
 
-// NEW: Helper function to delete legacy override sheets
+// Deletes legacy / leftover tabs that should never ship in a clean template.
 function deleteLegacySheets_(ss) {
-  const oldPhone = ss.getSheetByName("Old Phone Contacts");
-  if (oldPhone) ss.deleteSheet(oldPhone);
-
-  const oldMaster = ss.getSheetByName("Old Master Table");
-  if (oldMaster) ss.deleteSheet(oldMaster);
+  const legacy = [
+    "Old Phone Contacts", "Old Master Table",
+    "Regular year site info", "Families", "FollowUps", "Site Info"
+  ];
+  legacy.forEach(function(name) {
+    const sheet = ss.getSheetByName(name);
+    if (sheet) ss.deleteSheet(sheet);
+  });
 }
 
 function resetRawData_(ss) {

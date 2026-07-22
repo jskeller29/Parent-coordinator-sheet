@@ -10,8 +10,65 @@ function openSettingsDialog() {
 }
 
 // =========================================
-//  MAIN SETTINGS MEMORY 
+//  MAIN SETTINGS MEMORY
 // =========================================
+
+// Every setting key that should survive into a fresh copy. Persisted as
+// key/value rows in the hidden "Version" tab (rows 5+), because document
+// properties do NOT travel when a spreadsheet is copied but cell values do.
+const SETTING_KEYS = [
+  'syncToPhones', 'phoneContacts', 'parentsDivided', 'notesTab', 'sendOut',
+  'siteClass', 'typeCol', 'autoOverride', 'autoNotes', 'disableHiddenNotes',
+  'ignoreHideCheckboxes', 'emailNotifications', 'disableRebuilds',
+  'disableNightlySync', 'disableContactAutofill', 'notesStartDate',
+  'notesEndDate', 'hideDischarged'
+];
+
+/**
+ * Snapshots the current settings (from document properties) into the hidden
+ * "Version" tab so a future copy of this template inherits them. Writes a
+ * header at row 4 and key/value pairs from row 5 down, leaving A1/A2/B2
+ * (build date + Auto-Migrate toggle) untouched.
+ */
+function saveSettingsToVersionSheet_() {
+  const props = PropertiesService.getDocumentProperties();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = (typeof getOrCreateVersionSheet_ === "function")
+    ? getOrCreateVersionSheet_(ss) : ss.getSheetByName("Version");
+  if (!sheet) return;
+
+  const rows = SETTING_KEYS.map(function(k) {
+    const v = props.getProperty(k);
+    return [k, v == null ? '' : v];
+  });
+
+  // Clear the old settings block (rows 4+ in cols A:B) before rewriting.
+  const clearCount = Math.max(sheet.getMaxRows() - 3, rows.length + 2);
+  sheet.getRange(4, 1, clearCount, 2).clearContent();
+  sheet.getRange(4, 1, 1, 2).setValues([['SAVED SETTINGS (auto-managed — do not edit)', '']]);
+  sheet.getRange(5, 1, rows.length, 2).setValues(rows);
+}
+
+/**
+ * Reads the saved settings block back out of the "Version" tab into a plain
+ * {key: "value"} object (string values, matching document-property storage).
+ * Returns null when there's nothing saved. Only recognized keys are returned.
+ */
+function loadSettingsFromVersionSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Version");
+  if (!sheet) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 5) return null;
+
+  const data = sheet.getRange(5, 1, lastRow - 4, 2).getValues();
+  const out = {};
+  data.forEach(function(r) {
+    const key = String(r[0]).trim();
+    if (key && SETTING_KEYS.indexOf(key) !== -1) out[key] = String(r[1]);
+  });
+  return Object.keys(out).length ? out : null;
+}
 
 function getSettings() {
   const props = PropertiesService.getDocumentProperties();
@@ -223,7 +280,10 @@ function applySettings(settings) {
   props.setProperty('notesStartDate', settings.notesStartDate || '');
   props.setProperty('notesEndDate', settings.notesEndDate || '');
   props.setProperty('hideDischarged', String(settings.hideDischarged));
-  
+
+  // 2b. Persist to the Version tab so a future copy inherits these settings.
+  try { saveSettingsToVersionSheet_(); } catch (e) { console.error(e); }
+
   // 3. Update Visuals & Master Table Filter safely
   if (typeof updateVisualSettings_ === "function") {
     updateVisualSettings_(settings);
