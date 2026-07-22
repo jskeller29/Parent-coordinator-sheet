@@ -291,6 +291,65 @@ function isMajor_(size) {
 
 
 // ======================================================================
+// 🩺 DIAGNOSTIC: WHY IS IT SAYING "UP TO DATE"?
+// Run this from the Script Editor (or add it to a menu) when the checker
+// shows the wrong result. It pops an alert showing the local build date,
+// the stored baseline, and exactly how each tracker row's Date cell parses —
+// so you can see whether a row is being skipped (NaN) or judged "not newer".
+// ======================================================================
+function debugVersionCheck() {
+  const props = PropertiesService.getDocumentProperties();
+  const lines = [];
+
+  // --- Local build date (Version!A1) ---
+  const vsheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
+  if (!vsheet) {
+    lines.push("Version tab: MISSING (build date unknown → baseline falls back to epoch).");
+  } else {
+    const v = vsheet.getRange("A1").getValue();
+    lines.push("Version!A1 = \"" + v + "\"  [" + ((v instanceof Date) ? "Date" : typeof v) +
+               "] → " + formatMsDate_(toDateMs_(v)));
+  }
+
+  const seenRaw = props.getProperty('VERSION_LAST_SEEN_DATE');
+  lines.push("Dismissed-date memory = " + (seenRaw || "(none)") +
+             (seenRaw ? " → " + formatMsDate_(Number(seenRaw)) : ""));
+
+  const baseline = getLocalBaselineDateMs_();
+  lines.push("BASELINE compared against = " + formatMsDate_(baseline) +
+             "  (later of the two above)");
+  lines.push("majorsOnly=" + (props.getProperty('VERSION_MAJORS_ONLY') === 'true') +
+             ", autoChecksOff=" + (props.getProperty('VERSION_DISMISS_FOREVER') === 'true'));
+  lines.push("");
+
+  // --- Tracker rows ---
+  try {
+    const tab = SpreadsheetApp.openById(VERSION_TRACKER_ID).getSheets()[0];
+    const lastRow = tab.getLastRow();
+    lines.push("Tracker tab read = \"" + tab.getName() + "\"  (lastRow " + lastRow + ")");
+    const rows = (lastRow < 2) ? [] : tab.getRange(2, 1, lastRow - 1, 4).getValues();
+    if (!rows.length) lines.push("  (no data rows below the header)");
+    rows.slice(0, 10).forEach(function (r, i) {
+      const ms = toDateMs_(r[0]);
+      const tag = isNaN(ms) ? "⚠️ NOT A DATE (skipped)" : (ms > baseline ? "✅ NEWER (would show)" : "— not newer");
+      lines.push("  Row " + (i + 2) + ": \"" + r[0] + "\" [" +
+                 ((r[0] instanceof Date) ? "Date" : typeof r[0]) + "] → " + formatMsDate_(ms) + "  " + tag);
+    });
+  } catch (e) {
+    lines.push("TRACKER READ ERROR: " + e.message);
+  }
+
+  const report = lines.join("\n");
+  console.log(report); // Also in the execution log as a backup
+  try {
+    SpreadsheetApp.getUi().alert("🩺 Version Check Diagnostic", report, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    // No UI context (pure Script Editor run) — the console.log above still has it.
+  }
+}
+
+
+// ======================================================================
 // 🛠️ DEV TOOL #1: AUTO-MIGRATE POPUP TOGGLE
 // Run this from the Script Editor on a TEMPLATE before sharing its link.
 //
