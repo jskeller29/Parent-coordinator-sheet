@@ -13,9 +13,6 @@
 > Google Drive to open it as a Google Doc. `docs/PC_Tracker_User_Guide.pdf` is a
 > read-only copy with clickable "Jump to" buttons. `docs/guide.html` renders the PDF,
 > and `docs/build_guide.js` regenerates the .docx. Keep all four in sync when editing.
->
-> 📷 Screenshot placeholders are marked throughout as `📷 Screenshot: …` — drop in
-> real images at those spots.
 
 ---
 
@@ -107,9 +104,6 @@ behind-the-scenes wiring:
   (~11 PM), and a periodic update check.
 - Records this copy as your original (a clone-detector so a later copy starts clean).
 - Applies the default tab layout and opens this User Guide.
-
-> 📷 Screenshot: The 🚀 App Menu open, showing "🚨 Initial Setup (Run Once)."
-
 > 🔒 **Until setup is done, the sheet is intentionally locked.** If you type before
 > running Initial Setup, you'll see "🔒 Action Blocked — Initialization process needs to
 > occur first." That's expected.
@@ -123,10 +117,6 @@ like *"Google hasn't verified this app."* To continue, click **Advanced → Go t
 "Unverified" means Google hasn't done a formal brand review — *not* that anything is
 wrong. You are granting permission to a script that runs entirely inside **your own**
 account.
-
-> 📷 Screenshot: The Google consent screen — "Google hasn't verified this app" →
-> Advanced → Go to … (unsafe) → Allow.
-
 #### What each authorization actually does
 
 On the Allow screen, Google lists the permissions below. The tool asks only for what it
@@ -177,9 +167,6 @@ your standard systems and paste it into the brightly-colored "PASTE" boxes on th
 2. Open Family Access Management.
 3. Export the "Students with Non-NYCSA Account" report.
 4. Copy the data and paste it into **cell AP2**.
-
-> 📷 Screenshot: The RAW Data tab showing the colored PASTE boxes (Blue A5 / Orange AG6 / Green AP2).
-
 **Missing or wrong data? Use the New/Edit Student override.** District databases like
 ATS can lag behind real enrollment. If you need to add a student or fix contact info
 before it hits ATS, use **👤 Student Overrides → New / Edit Student**. When you build,
@@ -293,9 +280,6 @@ Three things the Contact Log does for you automatically:
 - **Auto-adding rows + the master hide filter.** A fresh blank row is always kept above
   the dark "END" bar, and the checkbox on the END-bar row toggles hiding of your hidden
   rows.
-
-> 📷 Screenshot: The Contact Log — the pre-call search bar up top and a row being auto-filled by the Ghost Typist.
-
 > **If the Ghost Typist says "Could not find … in the Master Table":** That family isn't
 > compiled yet. Run **🏗️ Build Sheets Only** once, then try again.
 
@@ -316,9 +300,6 @@ Three things the Contact Log does for you automatically:
 | **Hide "Discharged" in Master Table** | Visual only — filters discharged students out of view. |
 | **Purge Discharged Students** | **Permanently** deletes discharged students from the Master Table. Cannot be undone. |
 | **Reset to Default Settings** | Returns every toggle to its default (optional tabs/columns hidden, features on). |
-
-> 📷 Screenshot: The ⚙️ Settings dialog with its toggle switches.
-
 > ✅ **Settings travel with your copy.** Your choices are saved into the hidden Version
 > tab, so a future upgrade copy inherits them automatically.
 
@@ -351,9 +332,6 @@ runs six steps:
 5. Smart-map the Contact Log — it matches columns by their headers, so it still works
    even if the layout changed, and strips blank/"ghost" rows.
 6. Finalize and rebuild all directories.
-
-> 📷 Screenshot: The System Upgrade Wizard with the old-sheet URL box and the six-step checklist.
-
 > ✅ **Migration is one-directional and non-destructive.** It reads your old sheet and
 > writes into the new one. Nothing is deleted from the old sheet — keep it as a backup.
 
@@ -386,9 +364,6 @@ When the year ends, run **🚀 App Menu → 🔄 End of Year Rollover**. It:
 - Freezes the sheet — turns off nightly and phone sync so it won't overwrite next year's
   data — and renames it "… – Retired on [date]."
 - Hands you the link to next year's fresh, fast template.
-
-> 📷 Screenshot: The End of Year Rollover wizard — archive summary and the "Get New Template" button.
-
 > **Rollover is safe to run once you're done for the year.** It archives and freezes the
 > OLD sheet; you then set up a brand-new copy for the new year. Keep the retired sheet
 > and its PDF as your record.

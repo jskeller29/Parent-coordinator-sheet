@@ -36,7 +36,6 @@ const HEADSHADE = "0F2A4A";
 const ROWSHADE = "F1F5F9";
 const GREEN = "166534";
 const RED = "B91C1C";
-const SHOTSHADE = "F1F5F9";
 
 // ---------- inline helpers ----------
 function t(text, o = {}) {
@@ -98,23 +97,6 @@ function callout(title, bodyText, color = BLUE, shade = "EEF4FF") {
   });
 }
 
-// ---------- screenshot placeholder ----------
-function screenshot(caption) {
-  const dashed = { style: BorderStyle.DASHED, size: 6, color: "94A3B8" };
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: [9360],
-    borders: { top: dashed, bottom: dashed, left: dashed, right: dashed, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-    rows: [new TableRow({ children: [new TableCell({
-      width: { size: 9360, type: WidthType.DXA },
-      shading: { type: ShadingType.CLEAR, fill: SHOTSHADE, color: "auto" },
-      margins: { top: 200, bottom: 200, left: 160, right: 160 },
-      children: [
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: "📷  SCREENSHOT PLACEHOLDER", bold: true, color: "64748B", size: 20, font: "Calibri" })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: caption, italics: true, color: "64748B", size: 19, font: "Calibri" })] }),
-      ],
-    })] })],
-  });
-}
 
 // ---------- data tables ----------
 function cell(content, { header = false, width, shade, bold = false, color, align } = {}) {
@@ -292,13 +274,11 @@ P(
   bullet("Records this copy as your original (a clone-detector so a later copy starts clean)."),
   bullet("Applies the default tab layout and opens this User Guide."),
 );
-P(screenshot("The 🚀 App Menu open, showing “🚨 Initial Setup (Run Once).”"));
 P(callout("Until setup is done, the sheet is intentionally locked.", "If you try to type before running Initial Setup, you'll see “🔒 Action Blocked — Initialization process needs to occur first.” That's expected — just run Initial Setup.", RED, "FEF2F2"));
 
 P(h2("Step 3 — The authorization screen"));
 P(p([t("Because this is a personal tool and not a paid Marketplace app, Google shows a warning like "), t("“Google hasn't verified this app.”", { italics: true }), t(" To continue, click "), t("Advanced", { bold: true }), t(" → "), t("Go to … (unsafe)", { bold: true }), t(" → choose your account → "), t("Allow", { bold: true }), t(".")]));
 P(p([t("“Unverified” means Google hasn't done a formal brand review — "), t("not", { italics: true }), t(" that anything is wrong. You are granting permission to a script that runs entirely inside "), t("your own", { bold: true }), t(" account.")]));
-P(screenshot("The Google consent screen: “Google hasn't verified this app” → Advanced → Go to … (unsafe) → Allow."));
 
 P(h3("What each authorization actually does"));
 P(p("On the Allow screen, Google lists the permissions below. The tool asks only for what it needs — and everything runs inside your own account, so approving it does not give the developer any access."));
@@ -341,7 +321,6 @@ P(
   numbered("Export the “Students with Non-NYCSA Account” report."),
   numbered([t("Copy the data and paste it into "), t("cell AP2", { bold: true }), t(".")]),
 );
-P(screenshot("The RAW Data tab showing the colored PASTE boxes (Blue A5 / Orange AG6 / Green AP2)."));
 P(h3("Missing or wrong data? Use the New/Edit Student override"));
 P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, the script checks your overrides first and applies them across the entire directory. (More in Part 2.)")]));
 P(h3("Customizing dropdowns — the Type List tab"));
@@ -442,7 +421,6 @@ P(
   bullet([t("Smart auto-fill. ", { bold: true }), t("Entering real content stamps today's Date, sets # to 1, and Follow-up to “No” — but only where you left them blank. Anything you typed yourself is never overwritten.")]),
   bullet([t("Auto-adding rows + the master hide filter. ", { bold: true }), t("A fresh blank row is always kept above the dark “END” bar, and the checkbox on the END-bar row toggles hiding of your hidden rows so you can focus on active ones.")]),
 );
-P(screenshot("The Contact Log: the pre-call search bar up top and a row being auto-filled by the Ghost Typist."));
 P(callout("If the Ghost Typist says “Could not find … in the Master Table”", "That family isn't compiled yet. Run 🏗️ Build Sheets Only once so your latest RAW Data / overrides are included, then try again.", BLUE, "EEF4FF"));
 
 P(spacer(80));
@@ -466,7 +444,6 @@ P(table(
   ],
   [3560, 5800],
 ));
-P(screenshot("The ⚙️ Settings dialog with its toggle switches."));
 P(callout("Settings travel with your copy.", "Your choices are quietly saved into the hidden Version tab, so if you upgrade to a newer template later, a fresh copy inherits your settings automatically.", GREEN, "F0FDF4"));
 
 P(spacer(80));
@@ -497,7 +474,6 @@ P(
   numbered("Smart-map the Contact Log — it matches columns by their headers, so it still works even if the layout changed between versions, and it strips blank/“ghost” rows automatically."),
   numbered("Finalize and rebuild all directories."),
 );
-P(screenshot("The System Upgrade Wizard with the old-sheet URL box and the six-step checklist."));
 P(callout("Migration is one-directional and non-destructive.", "It reads your old sheet (which you already own) and writes into the new one. Nothing is deleted or changed in your old sheet — keep it as a backup until you're happy with the new copy.", GREEN, "F0FDF4"));
 
 P(h2("Staying current (the update checker)"));
@@ -518,7 +494,6 @@ P(
   bullet("Freezes the sheet — turns off nightly and phone sync so it won't overwrite next year's data — and renames it “… – Retired on [date].”"),
   bullet("Hands you the link to next year's fresh, fast template."),
 );
-P(screenshot("The End of Year Rollover wizard: archive summary and the “Get New Template” button."));
 P(callout("Rollover is safe to run once you're done for the year.", "It archives and freezes the OLD sheet; you then set up a brand-new copy for the new year (and can migrate anything you need). Keep the retired sheet and its PDF as your record.", BLUE, "EEF4FF"));
 
 // ============================================================
