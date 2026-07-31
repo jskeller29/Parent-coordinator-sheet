@@ -88,69 +88,21 @@ function saveStudentOverrides(payloads) {
   }
   SpreadsheetApp.flush();
 
- // 4. CHECK SETTINGS & TRIGGER ASYNC REBUILD
-  const settings = typeof getSettings === "function" ? getSettings() : {}; 
+ // 4. CHECK SETTINGS & REBUILD
+  const settings = typeof getSettings === "function" ? getSettings() : {};
   const isPaused = (settings.disableRebuilds === true || settings.disableRebuilds === 'true');
 
   if (!isPaused) {
-      createAsyncOverrideTrigger(Array.from(osisSet));
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        "Student data saved! The spreadsheet will begin rebuilding in the background in ~1 minute.", 
-        "⏳ Update Queued", 8
-      );
-      return "Rebuilding in background...";
+      // Build is ON: open the same progress sidebar the "Build Sheets Only"
+      // menu item uses. Its build-only process runs the full rebuild, which
+      // integrates the new/edited override. The dialog closes on success
+      // (see NewStudentDialog.html), revealing the sidebar behind it.
+      if (typeof runBuildOnly === "function") runBuildOnly();
+      return "Rebuilding via sidebar...";
   } else {
       SpreadsheetApp.getActiveSpreadsheet().toast("Overrides saved locally. Background sync is paused via Settings.", "⚡ Fast Entry Mode", 4);
       return "Saved locally.";
   }
-}
-
-function createAsyncOverrideTrigger(osisArray) {
-   const cache = CacheService.getScriptCache();
-   const batchId = "OVERRIDE_BATCH_" + Date.now();
-   cache.put(batchId, JSON.stringify(osisArray), 600); 
-   PropertiesService.getDocumentProperties().setProperty('PENDING_OVERRIDE_BATCH', batchId);
-
-   const triggers = ScriptApp.getProjectTriggers();
-   triggers.forEach(t => {
-     if (t.getHandlerFunction() === "processAsyncOverrides") ScriptApp.deleteTrigger(t);
-   });
-
-   ScriptApp.newTrigger("processAsyncOverrides").timeBased().after(500).create();
-}
-
-function processAsyncOverrides() {
-   const triggers = ScriptApp.getProjectTriggers();
-   triggers.forEach(t => {
-     if (t.getHandlerFunction() === "processAsyncOverrides") ScriptApp.deleteTrigger(t);
-   });
-
-   const batchId = PropertiesService.getDocumentProperties().getProperty('PENDING_OVERRIDE_BATCH');
-   if (!batchId) return;
-
-   const cache = CacheService.getScriptCache();
-   const dataStr = cache.get(batchId);
-   PropertiesService.getDocumentProperties().deleteProperty('PENDING_OVERRIDE_BATCH');
-   
-   if (!dataStr) return;
-
-   try {
-       const ss = SpreadsheetApp.getActiveSpreadsheet();
-       if (ss) ss.toast("Background rebuild is starting now...", "⚙️ Building Sheets", 5);
-
-       if (typeof buildAllDerivedSheets === "function") buildAllDerivedSheets();
-       
-       const osisArray = JSON.parse(dataStr);
-       if (osisArray && osisArray.length > 0 && typeof updateSingleOsisDelta_ === "function") {
-           osisArray.forEach(osis => updateSingleOsisDelta_(osis));
-       }
-
-       if (ss) ss.toast("Background build complete! Your new student overrides are fully integrated.", "✅ Success", 8);
-   } catch (e) {
-       console.error("Background Rebuild Error: " + e.message);
-       const ss = SpreadsheetApp.getActiveSpreadsheet();
-       if (ss) ss.toast("Background rebuild failed. Please run a manual build.", "❌ Error", 10);
-   }
 }
 
 // =========================================
@@ -304,8 +256,10 @@ function deleteOverride(osis) {
     const isPaused = (settings.disableRebuilds === true || settings.disableRebuilds === 'true');
 
     if (!isPaused) {
-      createAsyncOverrideTrigger([osis]);
-      SpreadsheetApp.getActiveSpreadsheet().toast("Override removed! The spreadsheet will begin rebuilding in the background in ~1 minute.", "⏳ Update Queued", 8);
+      // Build is ON: open the build progress sidebar (same as the menu build).
+      // The Manage Overrides dialog stays open and refreshes its list, so the
+      // sidebar runs behind it and is visible once that dialog is closed.
+      if (typeof runBuildOnly === "function") runBuildOnly();
     } else {
       SpreadsheetApp.getActiveSpreadsheet().toast("Override deleted locally. Sheets will update on next manual build.", "⚡ Fast Mode", 4);
     }
