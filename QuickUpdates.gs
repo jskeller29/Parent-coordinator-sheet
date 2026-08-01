@@ -551,8 +551,11 @@ function updateSingleOsisDelta_(targetOsis) {
 
       const methodLabel = nVal !== "" ? nVal : mVal;
       const dateText = typeof formatDateFull_ === "function" ? formatDateFull_(dateVal) : dateVal;
-      
-      let line = `• ${dateText} - {${methodLabel} - ${eVal}} ${pVal}`;
+
+      // Only append the "- Person Spoke With" when Col D was actually filled;
+      // a blank D should read "{Method}", not "{Method - }".
+      const spokeWith = String(eVal).trim() ? ` - ${eVal}` : "";
+      let line = `• ${dateText} - {${methodLabel}${spokeWith}} ${pVal}`;
       if (rVal !== "") line += ` [${rVal}]`;
 
       let dObj = new Date(dateVal); 
