@@ -41,9 +41,14 @@ const VERSION_CHECK_HOURS = 6;
  */
 function checkVersionOnOpen() {
   try {
-    checkForUpdates_(false);
+    const shownVersionDialog = checkForUpdates_(false);
+    // Only nag about stale ATS data when we didn't just open the version
+    // dialog — a spreadsheet can show only one modal at a time.
+    if (!shownVersionDialog && typeof checkRawDataFreshness_ === "function") {
+      checkRawDataFreshness_();
+    }
   } catch (e) {
-    console.error("Version check failed: " + e.message);
+    console.error("On-open checks failed: " + e.message);
   }
 }
 
@@ -59,21 +64,78 @@ function manualCheckForUpdates() {
 
 
 // ==========================================
+// 📅 ATS DATA FRESHNESS REMINDER
+// The "Raw Data" tab stamps cell A1 with "ATS - DATE UPDATED: MM/dd/yy" every
+// time ATS data is pasted (see updateRawDataTimestamp_ in QuickUpdates.gs), so
+// that cell IS the "last updated" clock and it resets itself on every paste.
+// If that date is more than ATS_STALE_DAYS old, we remind the user on open
+// (throttled to once per day) and point them at the guide.
+// ==========================================
+const ATS_STALE_DAYS = 30;
+const DATA_GUIDE_URL = "https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing";
+
+function checkRawDataFreshness_() {
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty('SETUP_COMPLETE') !== 'true') return;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
+  if (!rawSheet) return;
+
+  // A1 looks like "ATS - DATE UPDATED: 07/23/26"; pull the date out of it.
+  const a1 = String(rawSheet.getRange("A1").getValue());
+  const match = a1.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+  const lastMs = match ? toDateMs_(match[1]) : NaN;
+  if (isNaN(lastMs)) return; // No ATS date stamped yet — nothing to remind about.
+
+  const days = Math.floor((Date.now() - lastMs) / 86400000);
+  if (days < ATS_STALE_DAYS) return;
+
+  // Throttle to once per calendar day so we don't nag on every open.
+  const todayKey = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  if (props.getProperty('ATS_REMINDER_LAST_SHOWN') === todayKey) return;
+  props.setProperty('ATS_REMINDER_LAST_SHOWN', todayKey);
+
+  showAtsReminderDialog_(days);
+}
+
+function showAtsReminderDialog_(days) {
+  const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
+      <h2 style="color: #0F172A; margin-top: 0;">⏰ Time to Refresh Your Roster</h2>
+      <p style="color: #334155; font-size: 14px; line-height: 1.5; text-align: left;">
+        Your <b>ATS</b> student data hasn't been updated in <b>${days} days</b>. To keep your directory,
+        contacts, and reports accurate, paste a fresh ATS export into the <b>RAW Data</b> tab.
+      </p>
+      <a href="${DATA_GUIDE_URL}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; margin-top: 8px;">
+        📖 How to Update Your Data
+      </a>
+      <p style="margin-top: 22px; font-size: 12px; color: #94a3b8;">
+        This reminder appears once a day until your ATS data is refreshed.
+      </p>
+    </div>
+  `;
+  const out = HtmlService.createHtmlOutput(html).setWidth(430).setHeight(280);
+  SpreadsheetApp.getUi().showModalDialog(out, "⏰ Update Your ATS Data");
+}
+
+
+// ==========================================
 // CORE FLOW
 // ==========================================
 function checkForUpdates_(isManual) {
   const props = PropertiesService.getDocumentProperties();
 
   // Never run before the user has authorized / completed setup
-  if (props.getProperty('SETUP_COMPLETE') !== 'true') return;
+  if (props.getProperty('SETUP_COMPLETE') !== 'true') return false;
 
   if (!isManual) {
     // Respect "Dismiss Forever"
-    if (props.getProperty('VERSION_DISMISS_FOREVER') === 'true') return;
+    if (props.getProperty('VERSION_DISMISS_FOREVER') === 'true') return false;
 
     // Throttle: only actually contact the tracker every VERSION_CHECK_HOURS
     const lastCheck = Number(props.getProperty('VERSION_LAST_CHECK') || 0);
-    if (Date.now() - lastCheck < VERSION_CHECK_HOURS * 60 * 60 * 1000) return;
+    if (Date.now() - lastCheck < VERSION_CHECK_HOURS * 60 * 60 * 1000) return false;
   }
 
   // Stamp the attempt FIRST so a broken tracker doesn't retry on every open
@@ -91,13 +153,13 @@ function checkForUpdates_(isManual) {
         SpreadsheetApp.getUi().ButtonSet.OK
       );
     }
-    return;
+    return false;
   }
 
   // Auto checks stay quiet when there's nothing new. A MANUAL check always
   // opens the dialog so the user can flip Major-only / all updates even when
   // already caught up (the dialog renders a friendly "caught up" state).
-  if (!isManual && payload.entries.length === 0) return;
+  if (!isManual && payload.entries.length === 0) return false;
 
   // Stash the payload so the dialog can grab it instantly when it loads.
   // (5 minute lifetime; the dialog recomputes automatically if it expires.)
@@ -111,6 +173,7 @@ function checkForUpdates_(isManual) {
     .setWidth(540)
     .setHeight(600);
   SpreadsheetApp.getUi().showModalDialog(html, title);
+  return true;
 }
 
 /**
