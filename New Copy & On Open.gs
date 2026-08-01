@@ -238,6 +238,10 @@ function onOpen() {
     ui.createMenu('📆 Events')
       .addItem('📋 New Event', 'createNewEventTable')
       .addToUi();
+
+    // 3. Contact Log menu — optional module (ContactLog.gs). Guarded so the
+    //    app works unchanged if that file isn't included.
+    if (typeof buildContactLogMenu_ === "function") buildContactLogMenu_();
   }
 
   // --- NEW: AUTO-REPAIR CONTACT LOG FILTER CHECKBOX ---
