@@ -10,4 +10,5 @@ Owner-only files (in the repo, but deployed ONLY to the owner's own sheet):
 - Shared code must not depend on them. Owner-only behavior (e.g. pulling from "Old Master Table" /
   "Old Phone Contacts") belongs in those files, never in the shared .gs files.
 - Shared Directory rule: draws only from Raw Data (no overrides, no discharged students).
-  The owner's sheet may add Old Master Table / Old Phone Contacts students, but still excludes discharged.
+  The owner's sheet (z_PhoneOverride 4+) overrides the build: Raw Data base + Old Phone Contacts merge, and
+  adds non-Raw-Data students from Old Master Table ONLY when its column F (Status) is "MASTER".

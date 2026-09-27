@@ -557,7 +557,6 @@ function injectHistoricalDirectory_(ss, directory) {
   const guardianCol = h("Guardian") !== -1 ? h("Guardian") : 2;
   const siteCol = h("Site") !== -1 ? h("Site") : 3;
   const classCol = h("Class") !== -1 ? h("Class") : (h("Teacher") !== -1 ? h("Teacher") : 4);
-  const statusCol = h("Status") !== -1 ? h("Status") : 5;
 
   for (let i = headerIdx + 1; i < oldMasterData.length; i++) {
     let osisVal = oldMasterData[i][osisCol];
@@ -566,9 +565,10 @@ function injectHistoricalDirectory_(ss, directory) {
     
     if (/^\d+$/.test(osisStr)) osisVal = Number(osisStr); // Prevent VLOOKUP mismatches
 
-    const rawStatus = String(oldMasterData[i][statusCol]).trim();
-    // 🛑 GATEKEEPER: Discharged (and similar no-longer-here statuses) stay out of the Directory
-    if (rawStatus === "#N/A" || isInactiveStatus_(rawStatus)) continue; 
+    // 🛑 GATEKEEPER: Non-Raw-Data students only join the Directory when Old Master Table
+    // column F (Status) is "MASTER"; Discharged, blank, etc. stay out
+    const rawStatus = String(oldMasterData[i][5]).trim();
+    if (rawStatus.toUpperCase() !== "MASTER") continue; 
 
     const studentName = String(oldMasterData[i][studentCol]).trim() === "#N/A" || !String(oldMasterData[i][studentCol]).trim() ? "Unknown" : String(oldMasterData[i][studentCol]).trim();
     const parsedStudent = splitFullName_(studentName);
@@ -629,11 +629,6 @@ function injectHistoricalDirectory_(ss, directory) {
   });
 
   return [dirHeaders, ...body];
-}
-
-/** Helper: True for statuses meaning the student is no longer enrolled (Discharged, Graduated, etc.) */
-function isInactiveStatus_(status) {
-  return /discharg|graduat|transfer|withdr|moved|inactive|left school/i.test(String(status || ""));
 }
 
 /**
