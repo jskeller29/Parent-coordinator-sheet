@@ -274,6 +274,13 @@ function cleanRedundantOverrides() {
 
     if (!rawMap.has(osis)) continue; 
 
+    // "New Student" rows exist only until ATS has the student; once they're in Raw Data, drop them
+    if (String(oRow[1]).trim() === "New Student") {
+      overrideSheet.deleteRow(i + 1);
+      deletedOsisList.push(osis);
+      continue;
+    }
+
     const rRow = rawMap.get(osis);
 
     const newStudentName = `${String(oRow[4] || "").trim()} ${String(oRow[3] || "").trim()}`.trim();

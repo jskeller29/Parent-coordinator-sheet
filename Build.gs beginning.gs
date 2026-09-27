@@ -39,6 +39,9 @@ function buildAllDerivedSheets() {
   }
 
   // --- Step 0: Pre-read the Override Sheet --- 
+  // Remove New Student overrides that ATS has caught up with (and exact duplicates of Raw Data)
+  // Cleanup must never block the build, so failures are only logged
+  try { if (typeof cleanRedundantOverrides === "function") cleanRedundantOverrides(); } catch (e) { console.warn("Override cleanup skipped: " + e.message); }
   const overrides = getOverrideData_(ss);
 
   // --- Step 1: Build Core Data Maps in Memory --- 
