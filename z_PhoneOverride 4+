@@ -228,7 +228,8 @@ function buildAllDerivedSheets() {
   // =========================================================
   // --- INJECT HISTORICAL DATA INTO DIRECTORY ---
   // =========================================================
-  let directory = buildDirectoryOverride_(ss, studentMap, guardianRows); 
+  // Directory base is Raw Data only (no New/Edit Student overrides); history is layered on below
+  let directory = buildDirectoryOverride_(ss, buildStudentMap_(rawData, new Map()), buildGuardianObjects_(rawData, new Map())); 
   directory = injectHistoricalDirectory_(ss, directory);
   writeSheet_(ss, "Directory", directory);
 
@@ -556,7 +557,6 @@ function injectHistoricalDirectory_(ss, directory) {
   const guardianCol = h("Guardian") !== -1 ? h("Guardian") : 2;
   const siteCol = h("Site") !== -1 ? h("Site") : 3;
   const classCol = h("Class") !== -1 ? h("Class") : (h("Teacher") !== -1 ? h("Teacher") : 4);
-  const statusCol = h("Status") !== -1 ? h("Status") : 5;
 
   for (let i = headerIdx + 1; i < oldMasterData.length; i++) {
     let osisVal = oldMasterData[i][osisCol];
@@ -565,9 +565,10 @@ function injectHistoricalDirectory_(ss, directory) {
     
     if (/^\d+$/.test(osisStr)) osisVal = Number(osisStr); // Prevent VLOOKUP mismatches
 
-    const rawStatus = String(oldMasterData[i][statusCol]).trim();
-    // 🛑 GATEKEEPER REMOVED: We no longer skip "Discharged" students so they map into the Directory too!
-    if (rawStatus === "#N/A") continue; 
+    // 🛑 GATEKEEPER: Non-Raw-Data students only join the Directory when Old Master Table
+    // column F (Status) is "MASTER"; Discharged, blank, etc. stay out
+    const rawStatus = String(oldMasterData[i][5]).trim();
+    if (rawStatus.toUpperCase() !== "MASTER") continue; 
 
     const studentName = String(oldMasterData[i][studentCol]).trim() === "#N/A" || !String(oldMasterData[i][studentCol]).trim() ? "Unknown" : String(oldMasterData[i][studentCol]).trim();
     const parsedStudent = splitFullName_(studentName);
