@@ -21,7 +21,7 @@ const SETTING_KEYS = [
   'siteClass', 'typeCol', 'autoOverride', 'autoNotes', 'disableHiddenNotes',
   'ignoreHideCheckboxes', 'emailNotifications', 'disableRebuilds',
   'disableNightlySync', 'disableContactAutofill', 'notesStartDate',
-  'notesEndDate', 'hideDischarged'
+  'notesEndDate', 'hideDischarged', 'contactLogTodayOnly'
 ];
 
 /**
@@ -93,6 +93,9 @@ function getSettings() {
     // Contact Log auto-fill of Date / # / Follow-up (default OFF = auto-fill ON).
     // Does NOT affect the parent/student/OSIS lookup.
     disableContactAutofill: props.getProperty('disableContactAutofill') === 'true',
+
+    // Contact Log filter window: today's notes only (true) or this/last week's (default)
+    contactLogTodayOnly: props.getProperty('contactLogTodayOnly') === 'true',
     
     // --- BYPASS SWITCH & DATES ---
     disableHiddenNotes: props.getProperty('disableHiddenNotes') === 'true', 
@@ -263,6 +266,8 @@ function applySettings(settings) {
   const oldEndDate = props.getProperty('notesEndDate') || '';
 
   const newDisableHidden = settings.disableHiddenNotes === true;
+  const oldTodayOnly = props.getProperty('contactLogTodayOnly') === 'true';
+  const newTodayOnly = settings.contactLogTodayOnly === true;
 
   // 2. Save settings - Using String() safely handles undefined payload data instead of crashing!
   props.setProperty('syncToPhones', String(settings.syncToPhones));
@@ -280,6 +285,7 @@ function applySettings(settings) {
   props.setProperty('notesStartDate', settings.notesStartDate || '');
   props.setProperty('notesEndDate', settings.notesEndDate || '');
   props.setProperty('hideDischarged', String(settings.hideDischarged));
+  props.setProperty('contactLogTodayOnly', String(newTodayOnly));
 
   // 2b. Persist to the Version tab so a future copy inherits these settings.
   try { saveSettingsToVersionSheet_(); } catch (e) { console.error(e); }
@@ -289,6 +295,11 @@ function applySettings(settings) {
     updateVisualSettings_(settings);
   }
   
+  // 3b. Contact Log filter window changed: rewrite the Column P rule and refresh the filter
+  if (oldTodayOnly !== newTodayOnly) {
+    try { refreshContactLogFilter_(); } catch (e) { console.warn("Could not refresh Contact Log filter: " + e.message); }
+  }
+
   // 4. Update Triggers Programmatically safely
   manageNightlyTrigger_(settings.disableNightlySync);
   
@@ -325,4 +336,17 @@ function applySettings(settings) {
   }
 
   return needRebuild; 
+}
+
+/**
+ * Re-applies the Contact Log conditional formatting (which reads the filter-window
+ * setting) and re-sets the Column P filter so rows re-hide/re-show right away.
+ */
+function refreshContactLogFilter_() {
+  if (typeof resetContactLogFormatting === "function") resetContactLogFormatting();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
+  const filter = sheet ? sheet.getFilter() : null;
+  if (!filter) return;
+  const criteria = filter.getColumnFilterCriteria(16);
+  if (criteria) filter.setColumnFilterCriteria(16, criteria);
 }

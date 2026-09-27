@@ -139,6 +139,14 @@
 
   <div class="section-header">Notes Filters</div>
 
+  <div class="toggle-container">
+    <div class="toggle-label">Contact Log: Show Today Only<span class="toggle-desc">Off shows this and last week's notes; on shows only today's. Important and open follow-ups always show.</span></div>
+    <label class="switch">
+      <input type="checkbox" id="contactLogTodayOnly">
+      <span class="slider"></span>
+    </label>
+  </div>
+
   <div class="toggle-container" style="flex-direction: column; align-items: flex-start; gap: 10px;">
     <div class="toggle-label">Date Range for Compiled Notes</div>
     <div style="display: flex; gap: 10px; width: 100%;">
@@ -239,6 +247,7 @@
         
         document.getElementById('updateNotesOnBuild').checked = settings.autoNotes === false;
         document.getElementById('disableContactAutofill').checked = settings.disableContactAutofill === true;
+        document.getElementById('contactLogTodayOnly').checked = settings.contactLogTodayOnly === true;
         
         document.getElementById('disableHiddenNotes').checked = settings.disableHiddenNotes;
         document.getElementById('hideDischarged').checked = settings.hideDischarged === true;
@@ -274,6 +283,7 @@
       document.getElementById('disableNightlySync').checked = false;
       document.getElementById('updateNotesOnBuild').checked = false;
       document.getElementById('disableContactAutofill').checked = false;
+      document.getElementById('contactLogTodayOnly').checked = false;
       document.getElementById('disableHiddenNotes').checked = false;
       document.getElementById('hideDischarged').checked = false;
       document.getElementById('notesStartDate').value = '';
@@ -347,6 +357,7 @@
         disableNightlySync: document.getElementById('disableNightlySync').checked,
         autoNotes: !document.getElementById('updateNotesOnBuild').checked,
         disableContactAutofill: document.getElementById('disableContactAutofill').checked,
+        contactLogTodayOnly: document.getElementById('contactLogTodayOnly').checked,
         disableHiddenNotes: document.getElementById('disableHiddenNotes').checked,
         hideDischarged: document.getElementById('hideDischarged').checked,
         notesStartDate: document.getElementById('notesStartDate').value,

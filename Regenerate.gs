@@ -749,6 +749,21 @@ function resetDerivedSheets_(ss) {
   }
 }
 
+/**
+ * Formula that greys out (and so filters away) Contact Log rows via Column P.
+ * Rows stay visible when they fall in the chosen date window (Settings: "Show Today Only"
+ * = today's notes, otherwise this/last week's), or when Follow-up (N) marks them
+ * Important or still needing action, regardless of date.
+ */
+function getContactLogHideFormula_() {
+  const todayOnly = PropertiesService.getDocumentProperties().getProperty('contactLogTodayOnly') === 'true';
+  const dateCheck = todayOnly ? '$B2 = TODAY()' : 'AND($A2 >= TODAY() - 7, $A2 <= TODAY())';
+  return '=NOT(OR(' + dateCheck + ', $B2 = "", ' +
+    'REGEXMATCH($N2, "(?i)\\bYes\\b(\\s*-\\s*Important)?"), ' +
+    '$N2 = "Need To Follow Up", $N2 = "Followup ASAP", $N2 = "Need to respond", ' +
+    '$N2 = "Waiting For Response", $N2 = "Waiting - Check Up"))';
+}
+
 function resetContactLogFormatting() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Contact Log");
@@ -805,7 +820,7 @@ function resetContactLogFormatting() {
 
  // 6. Grey Checkboxes (P2:P) -> ⚡ Regex checks Col N
   rules.push(SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=NOT(OR(AND($A2 >= TODAY() - 7, $A2 <= TODAY()), $B2 = "", REGEXMATCH($N2, "(?i)\\bYes\\b(\\s*-\\s*Important)?")))')
+    .whenFormulaSatisfied(getContactLogHideFormula_())
     .setFontColor("#999999")
     .setRanges([rangeP2P]).build());
 
