@@ -235,12 +235,10 @@ function buildBackendEventLogData_(ss) {
 function cleanRedundantOverrides() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName("RAW Data") || ss.getSheetByName("Raw Data");
-  const overrideSheet = ss.getSheetByName("New/Edit Student");
-  
-  if (!rawSheet || !overrideSheet) return;
+  if (!rawSheet) return;
 
   const rawData = rawSheet.getDataRange().getValues();
-  const overrideData = overrideSheet.getDataRange().getValues();
+  const overrideData = backendReadBlock_(ss, "OVERRIDES");
 
   const rawMap = new Map();
   for (let i = 6; i < rawData.length; i++) {
@@ -276,7 +274,7 @@ function cleanRedundantOverrides() {
 
     // "New Student" rows exist only until ATS has the student; once they're in Raw Data, drop them
     if (String(oRow[1]).trim() === "New Student") {
-      overrideSheet.deleteRow(i + 1);
+      backendDeleteRows_(ss, "OVERRIDES", [i]);
       deletedOsisList.push(osis);
       continue;
     }
@@ -311,7 +309,7 @@ function cleanRedundantOverrides() {
     
     if (contactChanged) continue; 
 
-    overrideSheet.deleteRow(i + 1); 
+    backendDeleteRows_(ss, "OVERRIDES", [i]); 
     deletedOsisList.push(osis); 
   }
 

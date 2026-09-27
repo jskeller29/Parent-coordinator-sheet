@@ -14,7 +14,7 @@ function openSettingsDialog() {
 // =========================================
 
 // Every setting key that should survive into a fresh copy. Persisted as
-// key/value rows in the hidden "Version" tab (rows 5+), because document
+// key/value rows in the Backend Version section (A6:B), because document
 // properties do NOT travel when a spreadsheet is copied but cell values do.
 const SETTING_KEYS = [
   'syncToPhones', 'phoneContacts', 'parentsDivided', 'notesTab', 'sendOut',
@@ -25,16 +25,15 @@ const SETTING_KEYS = [
 ];
 
 /**
- * Snapshots the current settings (from document properties) into the hidden
- * "Version" tab so a future copy of this template inherits them. Writes a
- * header at row 4 and key/value pairs from row 5 down, leaving A1/A2/B2
- * (build date + Auto-Migrate toggle) untouched.
+ * Snapshots the current settings (from document properties) into the Backend
+ * Version section so a future copy of this template inherits them. Writes a
+ * header at A5 and key/value pairs from row 6 down (cols A:B only), leaving
+ * A2/A3/B3 (build date + Auto-Migrate toggle) untouched.
  */
 function saveSettingsToVersionSheet_() {
   const props = PropertiesService.getDocumentProperties();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = (typeof getOrCreateVersionSheet_ === "function")
-    ? getOrCreateVersionSheet_(ss) : ss.getSheetByName("Version");
+  const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
 
   const rows = SETTING_KEYS.map(function(k) {
@@ -42,26 +41,28 @@ function saveSettingsToVersionSheet_() {
     return [k, v == null ? '' : v];
   });
 
-  // Clear the old settings block (rows 4+ in cols A:B) before rewriting.
-  const clearCount = Math.max(sheet.getMaxRows() - 3, rows.length + 2);
-  sheet.getRange(4, 1, clearCount, 2).clearContent();
-  sheet.getRange(4, 1, 1, 2).setValues([['SAVED SETTINGS (auto-managed — do not edit)', '']]);
-  sheet.getRange(5, 1, rows.length, 2).setValues(rows);
+  // Clear the old settings block (rows 5+ in cols A:B) before rewriting.
+  const headerRow = BACKEND_VERSION.SETTINGS_HEADER_ROW;
+  ensureBackendRows_(sheet, BACKEND_VERSION.SETTINGS_FIRST_ROW + rows.length);
+  sheet.getRange(headerRow, 1, sheet.getMaxRows() - headerRow + 1, 2).clearContent();
+  sheet.getRange(headerRow, 1, 1, 2).setValues([['SAVED SETTINGS (auto-managed — do not edit)', '']]);
+  sheet.getRange(BACKEND_VERSION.SETTINGS_FIRST_ROW, 1, rows.length, 2).setValues(rows);
 }
 
 /**
- * Reads the saved settings block back out of the "Version" tab into a plain
+ * Reads the saved settings block back out of the Backend Version section into a plain
  * {key: "value"} object (string values, matching document-property storage).
  * Returns null when there's nothing saved. Only recognized keys are returned.
  */
 function loadSettingsFromVersionSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Version");
+  const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return null;
+  const firstRow = BACKEND_VERSION.SETTINGS_FIRST_ROW;
   const lastRow = sheet.getLastRow();
-  if (lastRow < 5) return null;
+  if (lastRow < firstRow) return null;
 
-  const data = sheet.getRange(5, 1, lastRow - 4, 2).getValues();
+  const data = sheet.getRange(firstRow, 1, lastRow - firstRow + 1, 2).getValues();
   const out = {};
   data.forEach(function(r) {
     const key = String(r[0]).trim();

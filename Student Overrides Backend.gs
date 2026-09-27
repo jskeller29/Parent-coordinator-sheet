@@ -32,19 +32,19 @@ function safeStr_(val) {
  */
 function saveStudentOverrides(payloads) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName("New/Edit Student");
-
-  if (!sheet) throw new Error("Could not find the 'New/Edit Student' tab! Please ensure it is created.");
 
   const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
-  const existingData = sheet.getDataRange().getValues();
+  // New/Edit Student section of the Backend tab (index 0 = header row)
+  const existingData = backendReadBlock_(ss, "OVERRIDES");
   const osisSet = new Set(payloads.map(p => safeStr_(p.osis)));
 
-  // 1. DUPLICATE REMOVAL
+  // 1. DUPLICATE REMOVAL (only this section's cells shift up; other Backend sections stay put)
+  const dupIdxs = [];
   for (let i = existingData.length - 1; i > 0; i--) {
     const rowOsis = safeStr_(existingData[i][2]); 
-    if (rowOsis !== "" && osisSet.has(rowOsis)) sheet.deleteRow(i + 1);
+    if (rowOsis !== "" && osisSet.has(rowOsis)) dupIdxs.push(i);
   }
+  backendDeleteRows_(ss, "OVERRIDES", dupIdxs);
 
   // 2. COMPILE ALL NEW ROWS IN MEMORY
   const rowsToAppend = payloads.map(data => {
@@ -83,9 +83,7 @@ function saveStudentOverrides(payloads) {
   });
 
   // 3. BULK PASTE INSTANTLY
-  if (rowsToAppend.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, 42).setValues(rowsToAppend);
-  }
+  backendAppendRows_(ss, "OVERRIDES", rowsToAppend);
   SpreadsheetApp.flush();
 
  // 4. CHECK SETTINGS & REBUILD
@@ -112,7 +110,6 @@ function saveStudentOverrides(payloads) {
 function getAllStudentsForEdit() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName("Raw Data");
-  const overrideSheet = ss.getSheetByName("New/Edit Student");
   const masterSheet = ss.getSheetByName("Master Table");
 
   // Dynamically map current Statuses from the Master Table
@@ -165,8 +162,8 @@ function getAllStudentsForEdit() {
   }
 
   // 2. Pull Overrides (And overwrite any base data)
-  if (overrideSheet) {
-    const overData = overrideSheet.getDataRange().getValues();
+  {
+    const overData = backendReadBlock_(ss, "OVERRIDES");
     for (let i = 1; i < overData.length; i++) {
       const r = overData[i];
       const osis = safeStr_(r[2]);
@@ -210,10 +207,7 @@ function getAllStudentsForEdit() {
 
 function getOverridesList() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("New/Edit Student");
-  if (!sheet) return [];
-
-  const data = sheet.getDataRange().getValues();
+  const data = backendReadBlock_(ss, "OVERRIDES");
   const list = [];
 
   for (let i = 1; i < data.length; i++) {
@@ -240,18 +234,14 @@ function getOverridesList() {
 
 function deleteOverride(osis) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("New/Edit Student");
-  if (!sheet) throw new Error("Sheet not found");
-
-  const data = sheet.getDataRange().getValues();
-  let deleted = false;
+  const data = backendReadBlock_(ss, "OVERRIDES");
+  const idxs = [];
 
   for (let i = data.length - 1; i > 0; i--) {
-    if (safeStr_(data[i][2]) === safeStr_(osis)) {
-      sheet.deleteRow(i + 1);
-      deleted = true;
-    }
+    if (safeStr_(data[i][2]) === safeStr_(osis)) idxs.push(i);
   }
+  backendDeleteRows_(ss, "OVERRIDES", idxs);
+  const deleted = idxs.length > 0;
 
   if (deleted) {
     const settings = typeof getSettings === "function" ? getSettings() : {};

@@ -207,8 +207,7 @@ function updateContactAndPhoneOnly() {
   const contactLogSheet = ss.getSheetByName("Contact Log");
   const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getDisplayValues() : [];
   
-  const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
-  const eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+  const eventLogData = backendReadBlock_(ss, "EVENT_LOG");
 
   const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTableData, contactLogData, eventLogData);
   writeSheet_(ss, "Combined Contact Tracking", combinedContactTracking);
@@ -401,9 +400,8 @@ function cleanRawDataPasteZone_(sheet, range) {
 function applyTypeDropdownColors() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const contactLog = ss.getSheetByName('Contact Log');
-  const typeList = ss.getSheetByName('Type List');
-  
-  const typeValues = typeList.getRange('A1:A').getDisplayValues().flat().filter(String);
+  // Type List section of the Backend tab (BL2:BL)
+  const typeValues = backendReadBlock_(ss, "TYPES", true).flat().filter(String);
   const typeColumnRange = contactLog.getRange('L2:L'); 
   let existingRules = contactLog.getConditionalFormatRules();
   
@@ -565,9 +563,8 @@ function updateSingleOsisDelta_(targetOsis) {
     }
   }
 
-  const eventSheet = ss.getSheetByName("Backend_Event_Log");
-  if (eventSheet) {
-    const eventData = eventSheet.getDataRange().getDisplayValues();
+  {
+    const eventData = backendReadBlock_(ss, "EVENT_LOG", true);
     for (let i = 1; i < eventData.length; i++) {
       const row = eventData[i];
       if (!osisCellIncludes_(row[3], targetOsis)) continue;

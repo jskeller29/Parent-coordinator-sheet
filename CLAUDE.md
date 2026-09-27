@@ -12,3 +12,11 @@ Owner-only files (in the repo, but deployed ONLY to the owner's own sheet):
 - Shared Directory rule: draws only from Raw Data (no overrides, no discharged students).
   The owner's sheet (z_PhoneOverride 4+) overrides the build: Raw Data base + Old Phone Contacts merge, and
   adds non-Raw-Data students from Old Master Table ONLY when its column F (Status) is "MASTER".
+
+Backend tab (see Backend.gs):
+- One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
+  Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
+  AX:BF Event Log, BH:BJ Send Out list (not used by code; cleared on reset), BL Type List.
+- Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
+  Use the backend* helpers in Backend.gs, which only touch one section's columns.
+- Old copies migrate automatically the first time getBackendSheet_ runs.

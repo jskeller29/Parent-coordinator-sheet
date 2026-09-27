@@ -4,8 +4,8 @@
 // sheet and pops a changelog dialog when a NEWER-DATED template exists.
 //
 // HOW THE BASELINE WORKS (date-based):
-//   • Each template copy carries its own build date in the hidden "Version"
-//     tab, cell A1. That date is stamped by resetToDisplayMode() in
+//   • Each template copy carries its own build date in the hidden Backend
+//     tab, cell A2. That date is stamped by resetToDisplayMode() in
 //     Regenerate.gs and travels with every copy of the sheet.
 //   • The checker collects every tracker row DATED AFTER that build date
 //     (or after the newest date the user has already dismissed).
@@ -16,7 +16,7 @@
 //
 // RELEASE CHECKLIST (every time you ship a new template):
 //   1. Make your code changes in the template.
-//   2. Run resetToDisplayMode() so the template's "Version"!A1 build date is
+//   2. Run resetToDisplayMode() so the template's Backend!A2 build date is
 //      stamped to today (or set it by hand).
 //   3. Insert a new row at the TOP of the tracker (Row 2) with today's Date,
 //      its Size (Major/Small), Notes, and the /copy link.
@@ -247,15 +247,18 @@ function computeUpdatePayload_(showAll) {
 
 /**
  * The baseline the tracker is compared against: the LATER of this copy's
- * build date ("Version"!A1) and the newest date the user has dismissed.
+ * build date (Backend!A2) and the newest date the user has dismissed.
  * Returns 0 (compare against epoch => surface everything) when neither is set,
  * so an un-stamped sheet still discovers updates instead of going dark.
  */
 function getLocalBaselineDateMs_() {
   let buildMs = NaN;
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
-    if (sheet) buildMs = toDateMs_(sheet.getRange("A1").getValue());
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
+    const legacy = ss.getSheetByName("Version");
+    if (backend) buildMs = toDateMs_(backend.getRange(BACKEND_VERSION.BUILD_DATE).getValue());
+    else if (legacy) buildMs = toDateMs_(legacy.getRange("A1").getValue());
   } catch (e) { console.error(e); }
 
   const seenMs = Number(PropertiesService.getDocumentProperties().getProperty('VERSION_LAST_SEEN_DATE') || NaN);
@@ -364,13 +367,13 @@ function debugVersionCheck() {
   const props = PropertiesService.getDocumentProperties();
   const lines = [];
 
-  // --- Local build date (Version!A1) ---
-  const vsheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
+  // --- Local build date (Backend!A2) ---
+  const vsheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BACKEND_SHEET_NAME);
   if (!vsheet) {
-    lines.push("Version tab: MISSING (build date unknown → baseline falls back to epoch).");
+    lines.push("Backend tab: MISSING (build date unknown → baseline falls back to epoch).");
   } else {
-    const v = vsheet.getRange("A1").getValue();
-    lines.push("Version!A1 = \"" + v + "\"  [" + ((v instanceof Date) ? "Date" : typeof v) +
+    const v = vsheet.getRange(BACKEND_VERSION.BUILD_DATE).getValue();
+    lines.push("Backend!A2 = \"" + v + "\"  [" + ((v instanceof Date) ? "Date" : typeof v) +
                "] → " + formatMsDate_(toDateMs_(v)));
   }
 
@@ -421,15 +424,15 @@ function debugVersionCheck() {
 //   OFF = fresh copies get the normal Welcome guide
 //         (use for the link you give BRAND NEW users)
 //
-// The setting lives in the hidden "Version" tab, cell B2 ("Yes"/"No"), so it
+// The setting lives in the hidden Backend tab, cell B3 ("Yes"/"No"), so it
 // travels with every copy and can also be edited by hand. To offer BOTH links
-// at once, keep two template files: your master (B2 = No) and a copy with
-// B2 = Yes.
+// at once, keep two template files: your master (B3 = No) and a copy with
+// B3 = Yes.
 // ======================================================================
 function toggleAutoMigratePopup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateVersionSheet_(ss);
-  const cell = sheet.getRange("B2");
+  const cell = sheet.getRange(BACKEND_VERSION.MIGRATE_TOGGLE);
   const isOn = String(cell.getValue()).trim().toLowerCase() === "yes";
   cell.setValue(isOn ? "No" : "Yes");
   ss.toast(

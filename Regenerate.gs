@@ -43,22 +43,18 @@ function resetToDisplayMode() {
 }
 
 /**
- * Returns the hidden "Version" tab, creating (and hiding) it if missing.
- * This tab is the durable, copy-surviving store: the build date (A1), the
- * Auto-Migrate toggle (B2), and the saved-settings block (rows 4+). Cell
- * values travel with every copy of the sheet; document properties do not.
+ * Returns the hidden Backend tab, whose Version section (A:E) is the durable,
+ * copy-surviving store: the build date (A2), the Auto-Migrate toggle (B3),
+ * template links (D2:E5) and the saved-settings block (rows 5+). Cell values
+ * travel with every copy of the sheet; document properties do not.
+ * (Name kept from when this was a separate "Version" tab; see Backend.gs.)
  */
 function getOrCreateVersionSheet_(ss) {
-  let sheet = ss.getSheetByName("Version");
-  if (!sheet) {
-    sheet = ss.insertSheet("Version");
-    sheet.hideSheet();
-  }
-  return sheet;
+  return getBackendSheet_(ss);
 }
 
 /**
- * Writes today's date into the hidden "Version" tab, cell A1. This is the
+ * Writes today's date into the Backend Version section, cell A2. This is the
  * build date of this template copy; the Version Checker compares it against
  * the dated rows in the master tracker. The value travels with every copy.
  */
@@ -66,14 +62,14 @@ function stampVersionDate_(ss) {
   const sheet = getOrCreateVersionSheet_(ss);
   const today = new Date();
   today.setHours(0, 0, 0, 0); // midnight, so date-only comparisons are clean
-  sheet.getRange("A1").setValue(today).setNumberFormat("MM/dd/yy");
+  sheet.getRange(BACKEND_VERSION.BUILD_DATE).setValue(today).setNumberFormat("MM/dd/yy");
 
-  // B2 = Auto-Migrate toggle ("Yes"/"No"). Label it (A2, pointing right at
-  // B2), and default it to "No" only when blank so we never overwrite a
+  // B3 = Auto-Migrate toggle ("Yes"/"No"). Label it (A3, pointing right at
+  // B3), and default it to "No" only when blank so we never overwrite a
   // template author's existing choice.
-  sheet.getRange("A1").setNote("Build date — set automatically on Reset to Display Mode.");
-  sheet.getRange("A2").setValue("Auto-Migrate on upgrade? (Yes/No) →");
-  const toggleCell = sheet.getRange("B2");
+  sheet.getRange(BACKEND_VERSION.BUILD_DATE).setNote("Build date — set automatically on Reset to Display Mode.");
+  sheet.getRange(BACKEND_VERSION.MIGRATE_LABEL).setValue("Auto-Migrate on upgrade? (Yes/No) →");
+  const toggleCell = sheet.getRange(BACKEND_VERSION.MIGRATE_TOGGLE);
   if (String(toggleCell.getValue()).trim() === "") toggleCell.setValue("No");
 }
 
@@ -528,11 +524,8 @@ function resetEventsSystem_(ss) {
     }
   }
 
-  // 2. Safely clear Backend Data but keep headers
-  let backendSheet = ss.getSheetByName("Backend_Event_Log");
-  if (backendSheet && backendSheet.getLastRow() > 1) {
-    backendSheet.getRange(2, 1, backendSheet.getLastRow() - 1, backendSheet.getLastColumn()).clearContent();
-  }
+  // 2. Safely clear the Backend tab's Event Log rows but keep its header
+  backendClearBlock_(ss, "EVENT_LOG", BACKEND_HEADER_ROW + 1);
 }
 
 function loadFakeEvents_(ss) {
@@ -554,7 +547,6 @@ function loadFakeEvents_(ss) {
   buildEventTable("Spring Festival", "School Gym", dateStr2, "Other");
 
   const eventsSheet = ss.getSheetByName("Events");
-  const backendSheet = ss.getSheetByName("Backend_Event_Log");
   
   // --- INJECT SPRING FESTIVAL DATA (Cols 1-6) ---
   const springData = [
@@ -564,9 +556,8 @@ function loadFakeEvents_(ss) {
   ];
   eventsSheet.getRange(3, 1, springData.length, 6).setValues(springData);
 
-  springData.forEach(row => {
-    backendSheet.appendRow([d2, "Spring Festival", "Other", row[0], row[1], row[2], row[3], row[4], row[5]]);
-  });
+  backendAppendRows_(ss, "EVENT_LOG", springData.map(row =>
+    [d2, "Spring Festival", "Other", row[0], row[1], row[2], row[3], row[4], row[5]]));
 
   // --- INJECT GRADUATION WORKSHOP DATA (Cols 8-13) ---
   const gradData = [
@@ -576,9 +567,8 @@ function loadFakeEvents_(ss) {
   ];
   eventsSheet.getRange(3, 8, gradData.length, 6).setValues(gradData);
 
-  gradData.forEach(row => {
-    backendSheet.appendRow([d1, "Graduation Workshop", "Workshop", row[0], row[1], row[2], row[3], row[4], row[5]]);
-  });
+  backendAppendRows_(ss, "EVENT_LOG", gradData.map(row =>
+    [d1, "Graduation Workshop", "Workshop", row[0], row[1], row[2], row[3], row[4], row[5]]));
 }
 
 // --------------------------------------------------------------------------------------
@@ -736,7 +726,11 @@ function clearTypeDropdownColors_(ss) {
 }
 
 function resetDerivedSheets_(ss) {
-  ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","New/Edit Student","Students Override Report"].forEach(name => {
+  // Backend tab sections: clear New/Edit Student and the Send Out list rows (keep their headers)
+  backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
+  backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
+
+  ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report"].forEach(name => {
     const sheet = ss.getSheetByName(name);
     if (sheet && sheet.getLastRow() > 1) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();

@@ -65,7 +65,7 @@ your phone through Google Contacts.
 
 It's organized into three kinds of sheets:
 
-- **The Engine** — RAW Data and Type List, where you paste your system exports and
+- **The Engine** — RAW Data and the Backend tab's Type List, where you paste your system exports and
   customize your dropdowns.
 - **The Workspaces** — Contact Log and Events, where you'll spend most of your day
   logging calls and workshops.
@@ -186,8 +186,8 @@ before it hits ATS, use **👤 Student Overrides → New / Edit Student**. When 
 the script checks your overrides first and applies them across the entire directory.
 (More in Part 2.)
 
-**Customizing dropdowns — the Type List tab.** The optional **Type** column in the
-Contact Log is driven by the **Type List** tab. Edit that tab to set your own
+**Customizing dropdowns — the Type List.** The optional **Type** column in the
+Contact Log is driven by the Type List in the hidden **Backend** tab (column BL). Unhide Backend and edit that column to set your own
 conversation-topic categories (for example: Attendance, Behavior, Enrollment, IEP).
 
 ### Step 5 — Build the sheets
@@ -244,7 +244,6 @@ automatically in PCAR.
 | Tab | Purpose | Visible by default? |
 |---|---|---|
 | **RAW Data** | Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA). | Yes |
-| **Type List** | Drives the optional Type dropdown in the Contact Log. Edit it to set your own categories. | Yes |
 | **Contact Log** | The heart of the tool. Log every guardian contact here (deep dive below). | Yes |
 | **Master Table** | The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5. | Yes (generated) |
 | **Directory** | A clean, printable class directory merging ATS, ParentSquare, and NYCSA data. | Yes (generated) |
@@ -254,7 +253,7 @@ automatically in PCAR.
 | **Parents Divided** | One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges. | Hidden (optional) |
 | **Notes** | An optional manual notes tab with its own auto-fill and duplicate protection. | Hidden (optional) |
 | **Send Out** | Optional tab tied to extra PCAR rows. | Hidden (optional) |
-| **Version / Backend_Event_Log** | Behind-the-scenes tabs (build date, saved settings, event data). Leave them alone. | Hidden (system) |
+| **Backend** | Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ) and the Type List that drives the Contact Log Type dropdown (BL). Only edit the Type List. | Hidden (system) |
 
 ### The Contact Log, in depth
 
@@ -276,7 +275,7 @@ interaction with them — so you walk into the call with context.
 | Site & Class | (Optional) Auto-fills from the student's profile; can be hidden in Settings. |
 | 📱🚶 Category | Categorize for PCAR — e.g., Phone, Walk-In, Parent-Teacher. |
 | Method | The exact method — Call, Email, In School, etc. |
-| Type | (Optional) A custom topic dropdown driven by the Type List tab; can be hidden in Settings. |
+| Type | (Optional) A custom topic dropdown driven by the Backend tab's Type List; can be hidden in Settings. |
 | Notes | Detailed notes about the conversation. |
 | ⁉️ Follow-Up Needed | A visual flag: Yes · Yes – Important · No · Waiting on Someone · Completed. Auto-fills to "No" if blank. |
 | Followup Notes | Next steps or what you did after the initial contact (e.g., "Teacher will reach out"). |
@@ -475,7 +474,7 @@ does"** in Part 1.
 |---|---|
 | Paste raw data only into RAW Data — as Values Only. | Type into Master Table, Directory, or other generated tabs — they're overwritten on build. |
 | Use Overrides to fix names, phones, or add students. | Rename or delete the generated / hidden tabs (including Version). |
-| Run Build after big changes. | Hand-edit the hidden Version tab's saved settings. |
+| Run Build after big changes. | Hand-edit the hidden Backend tab's saved settings. |
 | Keep your old / retired sheet as a backup until the new one is verified. | Purge discharged students unless you're certain. |
 
 ### Glossary

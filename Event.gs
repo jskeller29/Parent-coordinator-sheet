@@ -123,20 +123,9 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
     sheet.getRange("D3:D").setDataValidation(studentRule);
   }
 
-  // Ensure Backend exists and has updated headers
-  let backendSheet = ss.getSheetByName("Backend_Event_Log");
-  if (!backendSheet) {
-    backendSheet = ss.insertSheet("Backend_Event_Log");
-    backendSheet.hideSheet();
-    backendSheet.getRange("A1:H1").setValues([["Date", "Event Name", "Category", "OSIS", "Guardian(s)", "Parent Attendee", "# of Indv", "Notes"]]).setFontWeight("bold");
-  } else {
-    // Migration: Update existing backend sheet if missing new columns
-    const currentHeaders = backendSheet.getRange("A1:H1").getValues()[0];
-    if (currentHeaders[5] !== "Parent Attendee") {
-       backendSheet.insertColumnAfter(4);
-       backendSheet.getRange("E1").setValue("Guardian(s)").setFontWeight("bold");
-       backendSheet.getRange("F1").setValue("Parent Attendee").setFontWeight("bold");
-    }
+  // Ensure the Backend tab's Event Log section has its header row
+  if (backendReadBlock_(ss, "EVENT_LOG").length === 0) {
+    backendWriteBlock_(ss, "EVENT_LOG", [["Date", "Event Name", "Category", "OSIS", "Student Name", "Guardian(s)", "Parent Attendee", "# of Indv", "Notes"]]);
   }
 }
 
@@ -321,13 +310,9 @@ function watchEventsSheet_(e) {
         sheet.deleteColumns(tableStartCol, 7);
         SpreadsheetApp.flush();
         
-        const backendSheet = e.source.getSheetByName("Backend_Event_Log");
-        if (backendSheet && typeof buildBackendEventLogData_ === "function") {
+        if (typeof buildBackendEventLogData_ === "function") {
            const freshData = buildBackendEventLogData_(e.source);
-           backendSheet.clearContents();
-           if (freshData && freshData.length > 0) {
-              backendSheet.getRange(1, 1, freshData.length, freshData[0].length).setValues(freshData);
-           }
+           backendWriteBlock_(e.source, "EVENT_LOG", freshData);
         }
         ui.alert("✅ Event Removed", "The event has been deleted. To push this deletion to the Contact Tracker, click 'Build Sheets Only' in your App Menu.", ui.ButtonSet.OK);
         return; 
@@ -347,13 +332,9 @@ function watchEventsSheet_(e) {
       const oldValue = String(e.oldValue || "").trim();
       if (oldValue && oldValue !== "undefined") {
           e.source.toast("Rebuilding event data...", "⚙️ Syncing", 3);
-          const backendSheet = e.source.getSheetByName("Backend_Event_Log");
-          if (backendSheet && typeof buildBackendEventLogData_ === "function") {
+          if (typeof buildBackendEventLogData_ === "function") {
               const freshData = buildBackendEventLogData_(e.source);
-              backendSheet.clearContents();
-              if (freshData && freshData.length > 0) {
-                 backendSheet.getRange(1, 1, freshData.length, freshData[0].length).setValues(freshData);
-              }
+              backendWriteBlock_(e.source, "EVENT_LOG", freshData);
               let affected = new Set();
               for(let r = 1; r < freshData.length; r++) {
                  if (String(freshData[r][1]).trim() === eventName) affected.add(String(freshData[r][3]).trim());
@@ -431,9 +412,8 @@ function watchEventsSheet_(e) {
       rowsToClear.forEach(target => sheet.getRange(target.row, target.col, 1, 6).clearContent());
   }
 
-  const backendSheet = e.source.getSheetByName("Backend_Event_Log");
-  if (!backendSheet) return;
-  const backendData = backendSheet.getDataRange().getValues();
+  // Backend tab's Event Log section (index 0 = header row)
+  const backendData = backendReadBlock_(e.source, "EVENT_LOG");
   const affectedOsisNumbers = new Set(); 
 
   for (let i = backendData.length - 1; i > 0; i--) {
@@ -455,29 +435,27 @@ function watchEventsSheet_(e) {
            let fData = frontendRecords.get(bOsis);
            
            if (backendData[i][4] != fData.student || backendData[i][5] != fData.guardian || backendData[i][6] != fData.attendee || backendData[i][7] != fData.numIndv || backendData[i][8] != fData.notes) {
-              backendSheet.getRange(i + 1, 5, 1, 5).setValues([[fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]]);
+              backendBlockRange_(e.source, "EVENT_LOG", i, 4, 1, 5).setValues([[fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]]);
               affectedOsisNumbers.add(bOsis);
            }
            fData.synced = true; 
          } else {
-           backendSheet.deleteRow(i + 1);
+           backendDeleteRows_(e.source, "EVENT_LOG", [i]);
            affectedOsisNumbers.add(bOsis);
          }
       }
   }
 
+  const newRows = [];
   for (let [fOsis, fData] of frontendRecords.entries()) {
      if (!fData.synced) {
-        backendSheet.appendRow([eventDate, eventName, category, fOsis, fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]);
+        newRows.push([eventDate, eventName, category, fOsis, fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]);
         affectedOsisNumbers.add(fOsis);
      }
   }
+  backendAppendRows_(e.source, "EVENT_LOG", newRows);
   
-  const lastRow = backendSheet.getLastRow();
-  if (lastRow > 1) {
-    const rangeToSort = backendSheet.getRange(2, 1, lastRow - 1, backendSheet.getLastColumn());
-    rangeToSort.sort([{column: 1, ascending: false}, {column: 2, ascending: true}]);
-  }
+  backendSortBlock_(e.source, "EVENT_LOG", [{col: 0, ascending: false}, {col: 1, ascending: true}]);
 
   SpreadsheetApp.flush(); 
   if (typeof updateSingleOsisDelta_ === "function") {
