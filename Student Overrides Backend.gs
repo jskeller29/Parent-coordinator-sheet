@@ -187,6 +187,8 @@ function getAllStudentsForEdit() {
         }
       }
 
+      // Keep the current Raw Data class (matches buildStudentMap_); fall back to the override's
+      const rawBase = studentMap.get(osis);
       studentMap.set(osis, {
         osis: osis,
         lastName: safeStr_(r[3]),
@@ -194,7 +196,7 @@ function getAllStudentsForEdit() {
         gender: safeStr_(r[5]),
         age: safeStr_(r[6]),
         grade: safeStr_(r[7]),
-        classCode: safeStr_(r[8]),
+        classCode: (rawBase && rawBase.classCode) || safeStr_(r[8]),
         homeLanguage: safeStr_(r[9]),
         guardians: guardians,
         label: safeStr_(r[40]) || statusMap.get(osis) || "Current",
