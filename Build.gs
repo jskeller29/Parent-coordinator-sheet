@@ -1025,16 +1025,20 @@ function getOverrideData_(ss) {
 function buildStudentMap_(rawData, overrideStudents) {
   const map = new Map();
   const classRefMap = buildClassReferenceMap_(rawData);
+  // Raw Data's Official Class is the source of truth for where a student is now
+  const rawClassById = new Map();
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
     const id = toText_(r[2]);
     if (!isRealStudentId_(id)) continue;
 
+    const classCode = toText_(r[17]).toUpperCase();
+    if (classCode && !rawClassById.has(id)) rawClassById.set(id, classCode);
+
     if (overrideStudents.has(id)) continue; 
 
     const studentName = properCase_(`${toText_(r[4])} ${toText_(r[3])}`.trim());
-    const classCode = toText_(r[17]).toUpperCase();
 
     let assignedSite = "";
     let assignedTeacher = "";
@@ -1056,6 +1060,9 @@ function buildStudentMap_(rawData, overrideStudents) {
   }
 
   for (const [id, studentObj] of overrideStudents.entries()) {
+    // An override's class goes stale when ATS moves the student (e.g. Site 276 -> 188),
+    // so prefer the current Raw Data class; override-only students keep their own.
+    if (rawClassById.has(id)) studentObj.classCode = rawClassById.get(id);
     if (classRefMap.has(studentObj.classCode)) {
       const ref = classRefMap.get(studentObj.classCode);
       studentObj.site = ref.site;
