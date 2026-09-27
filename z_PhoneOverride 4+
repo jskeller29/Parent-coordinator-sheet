@@ -228,7 +228,8 @@ function buildAllDerivedSheets() {
   // =========================================================
   // --- INJECT HISTORICAL DATA INTO DIRECTORY ---
   // =========================================================
-  let directory = buildDirectoryOverride_(ss, studentMap, guardianRows); 
+  // Directory base is Raw Data only (no New/Edit Student overrides); history is layered on below
+  let directory = buildDirectoryOverride_(ss, buildStudentMap_(rawData, new Map()), buildGuardianObjects_(rawData, new Map())); 
   directory = injectHistoricalDirectory_(ss, directory);
   writeSheet_(ss, "Directory", directory);
 
@@ -566,8 +567,8 @@ function injectHistoricalDirectory_(ss, directory) {
     if (/^\d+$/.test(osisStr)) osisVal = Number(osisStr); // Prevent VLOOKUP mismatches
 
     const rawStatus = String(oldMasterData[i][statusCol]).trim();
-    // 🛑 GATEKEEPER REMOVED: We no longer skip "Discharged" students so they map into the Directory too!
-    if (rawStatus === "#N/A") continue; 
+    // 🛑 GATEKEEPER: Discharged (and similar no-longer-here statuses) stay out of the Directory
+    if (rawStatus === "#N/A" || isInactiveStatus_(rawStatus)) continue; 
 
     const studentName = String(oldMasterData[i][studentCol]).trim() === "#N/A" || !String(oldMasterData[i][studentCol]).trim() ? "Unknown" : String(oldMasterData[i][studentCol]).trim();
     const parsedStudent = splitFullName_(studentName);
@@ -628,6 +629,11 @@ function injectHistoricalDirectory_(ss, directory) {
   });
 
   return [dirHeaders, ...body];
+}
+
+/** Helper: True for statuses meaning the student is no longer enrolled (Discharged, Graduated, etc.) */
+function isInactiveStatus_(status) {
+  return /discharg|graduat|transfer|withdr|moved|inactive|left school/i.test(String(status || ""));
 }
 
 /**
