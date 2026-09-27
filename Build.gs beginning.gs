@@ -79,7 +79,8 @@ function buildAllDerivedSheets() {
   const parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
   writeSheet_(ss, "Parents Divided", parentsDivided);
 
-  const directory = buildDirectoryData_(studentMap, guardianRows);
+  // Directory draws only from Raw Data: no New/Edit Student overrides, no discharged students
+  const directory = buildDirectoryData_(buildStudentMap_(rawData, new Map()), buildGuardianObjects_(rawData, new Map()));
   writeSheet_(ss, "Directory", directory);
 
   if (typeof formatDirectoryAuto_ === "function") formatDirectoryAuto_(ss.getSheetByName("Directory"));
