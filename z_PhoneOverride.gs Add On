@@ -1,0 +1,227 @@
+/**
+ * Generates fake data for testing BOTH 'Old Master Table' and 'Old Phone Contacts'.
+ * Perfectly mimics current live RAW data, keeps Kirk Van Houten as a legacy test, 
+ * and strictly enforces the 《§COL§》 and 《§ROW§》 string templates.
+ */
+function generateFakeLegacyData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // =====================================================================
+  // 1. BUILD "OLD PHONE CONTACTS"
+  // =====================================================================
+  const contactsSheetName = "Old Phone Contacts";
+  let contactsSheet = ss.getSheetByName(contactsSheetName);
+  if (!contactsSheet) {
+    contactsSheet = ss.insertSheet(contactsSheetName);
+  } else {
+    contactsSheet.clear().clearFormats().clearConditionalFormatRules();
+    if (contactsSheet.getFilter()) contactsSheet.getFilter().remove();
+    contactsSheet.getBandings().forEach(b => b.remove());
+  }
+
+  const contactHeaders = [
+    "OSIS", "Name Prefix", "First Name", "Middle Name", "Last Name", "Name Suffix", 
+    "Phonetic First Name", "Phonetic Middle Name", "Phonetic Last Name", "Nickname", 
+    "File As", "E-mail 1 - Label", "E-mail 1 - Value", "E-mail 2 - Label", "E-mail 2 - Value", 
+    "E-mail 3 - Label", "E-mail 3 - Value", "Phone 1 - Label", "Phone 1 - Value", 
+    "Phone 2 - Label", "Phone 2 - Value", "Phone 3 - Label", "Phone 3 - Value", 
+    "Phone 4 - Label", "Phone 4 - Value", "Address 1 - Label", "Address 1 - Country", 
+    "Address 1 - Street", "Address 1 - Extended Address", "Address 1 - City", 
+    "Address 1 - Region", "Address 1 - Postal Code", "Address 1 - PO Box", 
+    "Organization Name", "Organization Title", "Organization Department", "Birthday", 
+    "Event 1 - Label", "Event 1 - Value", "Relation 1 - Label", "Relation 1 - Value", 
+    "Website 1 - Label", "Website 1 - Value", "Custom Field 1 - Label", 
+    "Custom Field 1 - Value", "Notes", "Labels"
+  ];
+  
+  contactsSheet.getRange(1, 1, 1, contactHeaders.length).setValues([contactHeaders]);
+
+  // HELPER 1: Easily map data into the 47 columns
+  function buildContactRow(osis, firstName, lastName, emails, phones) {
+    let row = new Array(47).fill("");
+    row[0] = osis;                                    
+    row[2] = firstName;                               
+    row[4] = "Student: " + lastName;                  
+    row[46] = "Master Copy";                          
+    
+    emails.forEach((email, i) => {
+      if (i < 3) {
+        row[11 + (i * 2)] = firstName.split("(")[0].trim(); 
+        row[12 + (i * 2)] = email;                          
+      }
+    });
+
+    phones.forEach((phone, i) => {
+      if (i < 4) {
+        row[17 + (i * 2)] = firstName.split("(")[0].trim(); 
+        row[18 + (i * 2)] = phone;                          
+      }
+    });
+    return row;
+  }
+
+  // Generate Phone Contact Data 
+  const fakeContacts = [
+    buildContactRow(123456789, "Homer Simpson (Father)", "Bart Simpson", ["HOMERSIMPSON@gmail.com", "HOMERSIMPSON2@gmail.com"], ["(111) 111-1111", "(111) 111-1112"]),
+    buildContactRow(123456789, "Marge Simpson (Mother)", "Bart Simpson", ["MARGE.SIMPSON@gmail.com"], ["(222) 222-2222"]),
+    buildContactRow(234567891, "Morticia Addams (Mother)", "Wednesday Addams", ["MORTICIA.ADDAMS@gmail.com"], ["(333) 333-3333"]),
+    buildContactRow(234567891, "Gomez Addams (Father)", "Wednesday Addams", ["GOMEZ.ADDAMS@gmail.com"], ["(333) 333-4444"]),
+    buildContactRow(345678912, "Mr. Incredible (Father)", "Dash Incredible", ["MR.INCREDIBLE@gmail.com"], ["(444) 444-4444"]),
+    buildContactRow(345678912, "Mrs. Incredible (Mother)", "Dash Incredible", [], ["(555) 555-5555"]),
+    buildContactRow(789123456, "Rio Morales (Mother)", "Miles Morales", ["RIO.MORALES@gmail.com"], ["(777) 777-7777"]),
+    buildContactRow(789123456, "Jefferson Morales (Father)", "Miles Morales", ["JEFFERSON.MORALES@gmail.com"], ["(888) 888-8888"]),
+    buildContactRow(222222222, "Kirk Van Houten (Father)", "Milhouse Van Houten", ["KIRK@yahoo.com"], ["(222) 222-2222"]),
+    buildContactRow(222222222, "Luann Van Houten (Mother)", "Milhouse Van Houten", [], ["(222) 222-2223", "(222) 222-2224"])
+  ];
+
+  contactsSheet.getRange(2, 1, fakeContacts.length, contactHeaders.length).setValues(fakeContacts);
+  const fullContactsTableRange = contactsSheet.getRange(1, 1, fakeContacts.length + 1, contactHeaders.length);
+  fullContactsTableRange.createFilter();
+  fullContactsTableRange.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
+  contactsSheet.setFrozenRows(1);
+
+
+  // =====================================================================
+  // 2. BUILD "OLD MASTER TABLE"
+  // =====================================================================
+  const masterSheetName = "Old Master Table";
+  let masterSheet = ss.getSheetByName(masterSheetName);
+  if (!masterSheet) {
+    masterSheet = ss.insertSheet(masterSheetName);
+  } else {
+    masterSheet.clear().clearFormats().clearConditionalFormatRules();
+    if (masterSheet.getFilter()) masterSheet.getFilter().remove();
+    masterSheet.getBandings().forEach(b => b.remove());
+  }
+
+  const masterHeaders = ["OSIS", "Student", "Guardian", "Site", "Teacher", "Status", "Code"];
+  masterSheet.getRange("A4:G4").setValues([masterHeaders]);
+
+  // HELPER 2: Strictly enforces the 《§COL§》 and 《§ROW§》 template
+  // If email or phone is passed as "", it perfectly leaves a blank gap between delimiters
+  function buildMasterCode(guardianList) {
+    let codeStr = "NameName《§COL§》Relationship《§COL§》Language《§COL§》Email《§COL§》Phone《§COL§》Primary";
+    guardianList.forEach(g => {
+      codeStr += `《§ROW§》${g.name}《§COL§》${g.rel}《§COL§》${g.lang}《§COL§》${g.email}《§COL§》${g.phone}《§COL§》${g.primary}`;
+    });
+    return codeStr;
+  }
+
+  // The actual injection array using the Template Builder
+  const fakeMasterData = [
+    [
+      123456789, "Bart Simpson", "Homer Simpson (Father) and Marge Simpson (Mother)", 15, "Y41: Tessa", "Master",
+      buildMasterCode([
+        { name: "Homer Simpson", rel: "Father", lang: "English", email: "HOMERSIMPSON@gmail.com\nHOMERSIMPSON2@gmail.com", phone: "(111) 111-1111\n(111) 111-1112", primary: "Yes" },
+        { name: "Marge Simpson", rel: "Mother", lang: "English", email: "MARGE.SIMPSON@gmail.com", phone: "(222) 222-2222", primary: "No" }
+      ])
+    ],
+    [
+      234567891, "Wednesday Addams", "Morticia Addams (Mother) and Gomez Addams (Father)", 51, "Y66: Carl", "Master",
+      buildMasterCode([
+        { name: "Morticia Addams", rel: "Mother", lang: "Spanish", email: "MORTICIA.ADDAMS@gmail.com", phone: "(333) 333-3333", primary: "Yes" },
+        { name: "Gomez Addams", rel: "Father", lang: "English", email: "GOMEZ.ADDAMS@gmail.com", phone: "(333) 333-4444", primary: "No" }
+      ])
+    ],
+    [
+      345678912, "Dash Incredible", "Mr. Incredible (Father) and Mrs. Incredible (Mother)", 188, "X30: Ham", "Master",
+      buildMasterCode([
+        { name: "Mr. Incredible", rel: "Father", lang: "English", email: "MR.INCREDIBLE@gmail.com", phone: "(444) 444-4444", primary: "Yes" },
+        { name: "Mrs. Incredible", rel: "Mother", lang: "English", email: "", phone: "(555) 555-5555", primary: "No" } // Intentionally blank email
+      ])
+    ],
+    [
+      789123456, "Miles Morales", "Rio Morales (Mother) and Jefferson Morales (Father)", 75, "Y24", "Master",
+      buildMasterCode([
+        { name: "Rio Morales", rel: "Mother", lang: "Spanish", email: "RIO.MORALES@gmail.com", phone: "(777) 777-7777", primary: "Yes" },
+        { name: "Jefferson Morales", rel: "Father", lang: "English", email: "JEFFERSON.MORALES@gmail.com", phone: "(888) 888-8888", primary: "No" }
+      ])
+    ],
+    [
+      222222222, "Milhouse Van Houten", "Kirk Van Houten (Father) and Luann Van Houten (Mother)", 15, "Y42: Hoover", "Master",
+      buildMasterCode([
+        { name: "Kirk Van Houten", rel: "Father", lang: "English", email: "KIRK@yahoo.com", phone: "(222) 222-2222", primary: "Yes" },
+        { name: "Luann Van Houten", rel: "Mother", lang: "English", email: "", phone: "(222) 222-2223\n(222) 222-2224", primary: "No" } // Intentionally blank email
+      ])
+    ]
+  ];
+
+  masterSheet.getRange(5, 1, fakeMasterData.length, masterHeaders.length).setValues(fakeMasterData);
+  const fullMasterTableRange = masterSheet.getRange(4, 1, fakeMasterData.length + 1, masterHeaders.length);
+  fullMasterTableRange.createFilter();
+  fullMasterTableRange.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREEN, true, false);
+  
+  masterSheet.setFrozenRows(4);
+  masterSheet.autoResizeColumns(1, 6);
+  masterSheet.setColumnWidth(7, 400); 
+
+  // Map Master_2 Named Range
+  const rangeName = "Master_2";
+  const masterDataRange = masterSheet.getRange("A5:G");
+  const existingNamedRanges = ss.getNamedRanges();
+  existingNamedRanges.forEach(nr => { if (nr.getName() === rangeName) nr.remove(); });
+  ss.setNamedRange(rangeName, masterDataRange);
+
+  ss.toast("✅ Old Master Table & Old Phone Contacts fully generated!", "Success", 8);
+}
+
+/**
+ * Instantly builds the Legacy Phone Override Data UI into the Contact Log.
+ * Injects a dynamic BYROW/LAMBDA formula to unpack the legacy data payload.
+ */
+function formatting() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const contactLog = ss.getSheetByName("Contact Log");
+  
+  if (!contactLog) {
+    ss.toast("Contact Log sheet not found!", "Error");
+    return;
+  }
+
+  // 1. Find the "END" row in Column E
+  const searchRange = contactLog.getRange("E1:E");
+  const textFinder = searchRange.createTextFinder("^END$").matchEntireCell(true).useRegularExpression(true);
+  const endCell = textFinder.findNext();
+  
+  if (!endCell) {
+    ss.toast("Could not find the 'END' row in Contact Log.", "Error");
+    return;
+  }
+
+  const endRow = endCell.getRow();
+  const startRow = endRow + 9; // The UI block starts exactly 9 rows below "END"
+  const osisCell = `$G$${endRow + 2}`; // The specific [INPUT] cell you requested
+
+  // 2. Clear out any old text so the new dynamic array formula has room to #SPILL
+  contactLog.getRange(startRow, 5, 6, 12).clearContent().clearFormat();
+
+  // 3. Format the block (Allows room for headers + up to 3 parent rows)
+  const uiRange = contactLog.getRange(startRow, 5, 4, 12); 
+  uiRange.setBackground("#b45f06") // Your signature dark orange / brown
+         .setFontColor("#ffffff")
+         .setFontWeight("bold")
+         .setVerticalAlignment("middle")
+         .setWrap(true);
+
+  // 4. Construct your master BYROW/LAMBDA array formula
+  // Wrapped in an IFERROR so it remains completely blank/clean if no OSIS is searched
+  const customFormula = 
+    `=IFERROR(BYROW(` +
+      `WRAPROWS(` +
+        `SPLIT(` +
+          `SUBSTITUTE(` +
+            `VLOOKUP(${osisCell},'Old Master Table'!$A$5:$G,7,FALSE),` +
+            `"《§ROW§》","《§COL§》"` +
+          `),` +
+          `"《§COL§》", FALSE, FALSE` +
+        `),` +
+        `6` +
+      `),` +
+      `LAMBDA(r, HSTACK(INDEX(r,,1), "", INDEX(r,,2),"", INDEX(r,,4),"","",INDEX(r,,5), "",INDEX(r,,3),"",INDEX(r,,6)))` +
+    `), "")`;
+
+  // 5. Inject the formula into Column E (Col 5), exactly 9 rows below END
+  contactLog.getRange(startRow, 5).setFormula(customFormula);
+
+  ss.toast("✅ Dynamic Legacy Data Formula successfully injected!", "Success", 5);
+}

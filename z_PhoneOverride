@@ -1,0 +1,616 @@
+// ======================================================================
+// FILE: z_PhoneOverride_Part1.gs
+// PURPOSE: Upgrades the Build & Sync engine to merge historical data
+// from "Old Phone Contacts" and pivots to a "Tall" one-row-per-phone structure.
+// ======================================================================
+
+/**
+ * OVERRIDE 1: The Builder. 
+ * Replaces the original buildPhoneContactsData_ in Build.gs.
+ * GENERATES A "TALL" DATASET: One row per phone number to prevent Apple Contacts merging.
+ * NEW: Now includes historical parents and unlisted ATS parents.
+ */
+function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, combinedContactTrackingArray, parentSquareIndex, nycsaIndex) {
+  const headers = [
+    "Name Prefix", "First Name", "Middle Name", "Last Name", "Name Suffix", 
+    "Phonetic First Name", "Phonetic Middle Name", "Phonetic Last Name", "Nickname", "File As", 
+    "E-mail 1 - Label", "E-mail 1 - Value", "E-mail 2 - Label", "E-mail 2 - Value", "E-mail 3 - Label", "E-mail 3 - Value",
+    "Phone 1 - Type", "Phone 1 - Value", "Phone 2 - Type", "Phone 2 - Value", "Phone 3 - Type", "Phone 3 - Value", "Phone 4 - Type", "Phone 4 - Value",
+    "Address 1 - Label", "Address 1 - Country", "Address 1 - Street", "Address 1 - Extended Address", "Address 1 - City", "Address 1 - Region", 
+    "Address 1 - Postal Code", "Address 1 - PO Box", "Organization Name", "Organization Department", "Birthday", 
+    "Event 1 - Label", "Event 1 - Value", "Relation 1 - Label", "Relation 1 - Value", "Website 1 - Label", 
+    "Website 1 - Value", "Custom Field 1 - Label", "Custom Field 1 - Value", "Notes", "Labels", "OSIS"
+  ];
+  
+  const out = [headers];
+  const h = (colName) => headers.indexOf(colName); 
+
+  const masterMap = new Map(masterTable.slice(1).filter(r => isRealStudentId_(r[0])).map(r => [toText_(r[0]), r]));
+  const tracking = buildTrackingNotesMap_(ss, combinedContactTrackingArray); 
+  
+  const oldContactsMap = getOldContactsMap_(ss);
+
+  // 🔥 FIX: Build Old Master Guardians map to rescue any "Unknown" ATS parents
+  const oldMasterGuardians = new Map();
+  const oldMasterSheet = ss.getSheetByName("Old Master Table");
+  if (oldMasterSheet) {
+    const oldData = oldMasterSheet.getDataRange().getValues();
+    let headerIdx = 0, headersArr = [];
+    for (let i = 0; i < Math.min(10, oldData.length); i++) {
+      if (String(oldData[i][0]).toUpperCase().includes("OSIS")) {
+        headerIdx = i; headersArr = oldData[i]; break;
+      }
+    }
+    const oCol = headersArr.findIndex(c => String(c).trim().toLowerCase().includes("osis"));
+    const gCol = headersArr.findIndex(c => String(c).trim().toLowerCase().includes("guardian") || String(c).trim().toLowerCase().includes("parent"));
+    
+    if (oCol !== -1 && gCol !== -1) {
+      for (let i = headerIdx + 1; i < oldData.length; i++) {
+        const oStr = String(oldData[i][oCol]).trim();
+        const gVal = String(oldData[i][gCol]).trim();
+        if (oStr && gVal && gVal.toLowerCase() !== "unknown" && gVal !== "#N/A") {
+          oldMasterGuardians.set(oStr, gVal);
+        }
+      }
+    }
+  }
+
+  const groupedGuardians = new Map();
+  const matchedOldKeys = new Set(); // TRACKS WHICH OLD RECORDS WERE MERGED
+
+  // Group by identical guardian to combine notes and student details
+  for (const g of guardianRows) {
+    const id = g.student_id;
+    const master = masterMap.get(id) || [];
+    const student = studentMap.get(id) || { student: "", classCode: "", site: "", teachers: "" };
+    
+    // 🔥 OVERRIDE: Rescue Unknown Guardians using Old Master Table
+    let rawGuardianName = toText_(g.guardianOutput);
+    let currentRel = toText_(g.relationship);
+    
+    if (!rawGuardianName || rawGuardianName.toLowerCase() === "unknown" || rawGuardianName === "#N/A") {
+      if (oldMasterGuardians.has(id)) {
+         const oldG = oldMasterGuardians.get(id); // e.g. "Homer Simpson (Father)"
+         
+         // Remove parentheticals for the base name
+         rawGuardianName = oldG.replace(/\([^)]+\)/g, '').replace(/\s+/g, ' ').trim();
+         
+         // Extract the relationship if present
+         const match = oldG.match(/\(([^)]+)\)/);
+         if (match) currentRel = match[1];
+         else currentRel = "Guardian";
+         
+         // Overwrite the object so it propagates properly downstream
+         g.guardianOutput = rawGuardianName;
+         g.relationship = currentRel;
+      }
+    }
+
+    const guardianName = stripTrailingParenthetical_(g.guardianOutput);
+
+    const key = `${guardianName.toLowerCase()}|${toText_(g.email).toLowerCase()}|${toText_(g.mobile)}`;
+
+    if (!groupedGuardians.has(key)) {
+      groupedGuardians.set(key, {
+        guardianName: guardianName,
+        relationship: toText_(g.relationship),
+        email: toText_(g.email),
+        phone: toText_(g.mobile),
+        students: []
+      });
+    }
+
+    const group = groupedGuardians.get(key);
+
+    let classDisplay = toText_(student.classCode); 
+    if (student.teachers && toText_(student.teachers).trim() !== "") classDisplay += ` - ${toText_(student.teachers)}`;
+    else if (master[4] && toText_(master[4]).trim() !== "") classDisplay = toText_(master[4]);
+
+    const otherGuardian = guardianRows.filter(row => row.student_id === id).find(row => row !== g) || null;
+    const psStatus = getParentsSquareStatus_(g, parentSquareIndex);
+    const nycsaStatus = getNYCSAStatus_(g, otherGuardian, nycsaIndex); 
+
+    // FALLBACK OVERRIDE: If Master Table gave us "Unknown", use the Raw ATS Data (or the rescued data!)
+    let pName = toText_(master[2] || guardianName);
+    if (!pName || pName.toLowerCase() === "unknown" || pName === "#N/A") pName = guardianName;
+
+    let studentBlock = `STUDENT NAME: ${toText_(student.student)}\nRELATIONSHIP: ${toText_(g.relationship)}\nLANGUAGE: ${toText_(g.language)}\nOSIS: ${id}\nParent Name: ${pName}\nClass: ${classDisplay}`;
+    if (student.site && toText_(student.site) !== "") studentBlock += `\nSite: ${toText_(student.site)}`;
+    studentBlock += `\nParents Square: ${psStatus || "No"}\nNYCSA: ${nycsaStatus || "No"}`;
+
+    const studentNotes = tracking.get(id);
+    if (studentNotes && studentNotes.trim() !== "") studentBlock += `\n\nNote:\n${studentNotes}`;
+
+    group.students.push({ studentName: toText_(student.student), osis: id, block: studentBlock, site: toText_(student.site), classCode: classDisplay });
+  }
+
+  // Build output rows for ACTIVE ATS Parents
+  for (const group of groupedGuardians.values()) {
+    const studentNames = group.students.map(s => s.studentName).join(", ");
+    const osisList = group.students.map(s => s.osis).join(", ");
+    const finalNotes = group.students.map(s => s.block).join("\n\n---\n");
+    const hasSiblings = group.students.length > 1;
+
+    const basePhoneLabel = group.students.map(s => {
+      let label = hasSiblings ? `{${String(s.studentName).split(" ")[0]}} ` : "";
+      if (s.site && s.site !== "") label += `Site: ${s.site}, `;
+      return (label + `Class: ${s.classCode}`).trim();
+    }).join(" & ");
+
+    const orgNames = group.students.map(s => hasSiblings ? `{${String(s.studentName).split(" ")[0]}} OSIS: ${s.osis}` : `OSIS: ${s.osis}`).join(", ");
+
+    let allPhones = [];
+    let extraEmails = [];
+    
+    // 1. Add Primary Phone
+    const primaryPhoneClean = normalizePhoneForMerge_(group.phone);
+    if (primaryPhoneClean) allPhones.push({ val: group.phone, clean: primaryPhoneClean });
+    
+    const primaryEmailClean = String(group.email).toLowerCase().trim();
+    
+    // 2. Add Old Matched Phones/Emails for ALL SIBLINGS
+    group.students.forEach(studentObj => {
+      const sOsis = String(studentObj.osis).trim();
+      const oldRecords = oldContactsMap.get(sOsis) || [];
+      
+      // Find all matching old records for this specific sibling's OSIS
+      const matchedOldRecords = oldRecords.filter(old => isFuzzyMatch_(group.guardianName, old.firstName));
+      
+      matchedOldRecords.forEach(matchedOldRecord => {
+        // MARK AS MERGED SO WE DON'T DUPLICATE THEM LATER (Trimmed to prevent mismatch)
+        matchedOldKeys.add(`${sOsis}_${String(matchedOldRecord.firstName).trim()}`); 
+
+        // Merge phones
+        matchedOldRecord.phones.forEach(oldP => {
+          const cleanOldP = normalizePhoneForMerge_(oldP.val);
+          if (cleanOldP && !allPhones.some(p => p.clean === cleanOldP)) {
+            allPhones.push({ val: oldP.val, clean: cleanOldP });
+          }
+        });
+        
+        // Merge emails
+        matchedOldRecord.emails.forEach(oldE => {
+          const cleanOldE = String(oldE.val).toLowerCase().trim();
+          if (cleanOldE && cleanOldE !== primaryEmailClean && !extraEmails.some(ee => ee.clean === cleanOldE)) {
+            extraEmails.push({ label: `Old Email ${extraEmails.length + 1}`, val: oldE.val, clean: cleanOldE });
+          }
+        });
+      });
+    });
+
+    // Safety fallback: if no phones exist, output at least one row for emails/notes
+    if (allPhones.length === 0) allPhones.push({ val: "", clean: "" });
+
+    // 3. THE PIVOT: Create a distinct row for EVERY phone number
+    allPhones.forEach((phoneObj, index) => {
+      const row = new Array(headers.length).fill("");
+      
+      row[h("First Name")] = `(${group.relationship}) ${group.guardianName}`.trim(); 
+      row[h("Last Name")] = `| Student: ${studentNames} |`;                         
+      row[h("Organization Name")] = orgNames;                                       
+      row[h("Notes")] = finalNotes;                                                 
+      row[h("Labels")] = "School Directory";                                     
+      row[h("OSIS")] = osisList;                                                
+      
+      row[h("E-mail 1 - Value")] = group.email; 
+      if (extraEmails.length > 0) { row[h("E-mail 2 - Label")] = extraEmails[0].label; row[h("E-mail 2 - Value")] = extraEmails[0].val; }
+      if (extraEmails.length > 1) { row[h("E-mail 3 - Label")] = extraEmails[1].label; row[h("E-mail 3 - Value")] = extraEmails[1].val; }
+      
+      let typeLabel = basePhoneLabel;
+      if (allPhones.length > 1) typeLabel = `Contact ${index + 1}`; 
+      
+      row[h("Phone 1 - Type")] = typeLabel;                                         
+      row[h("Phone 1 - Value")] = phoneObj.val;  
+
+      out.push(row);
+    });
+  }
+
+  // 4. ADD HISTORICAL OR UNLISTED ATS PARENTS
+  for (const [oldOsis, oldRecords] of oldContactsMap.entries()) {
+    for (const old of oldRecords) {
+      if (!matchedOldKeys.has(`${String(oldOsis).trim()}_${String(old.firstName).trim()}`)) {
+        
+        let allPhones = old.phones;
+        if (allPhones.length === 0) allPhones.push({ val: "", label: "Historical" });
+
+        // Grab student data (From Active raw data or Injected Master Table)
+        const sOsisStr = String(oldOsis).trim();
+        const activeStudent = studentMap.get(sOsisStr);
+        const isActive = !!activeStudent && !!activeStudent.student; 
+        const masterRow = masterMap.get(sOsisStr);
+
+        // ✨ FIX: Fully generate the normal Notes profile block for these parents with strict "Unknown" bypass
+        let sNameVal = masterRow ? toText_(masterRow[1]) : `Historical OSIS: ${sOsisStr}`;
+        if (sNameVal.toLowerCase() === "unknown" || sNameVal === "#N/A") sNameVal = `Historical OSIS: ${sOsisStr}`;
+        let sName = isActive ? toText_(activeStudent.student) : sNameVal;
+
+        let sRel = "Guardian";
+        if (old.originalFirstName && old.originalFirstName.includes("(")) {
+            const match = old.originalFirstName.match(/\(([^)]+)\)/);
+            if (match) sRel = match[1];
+        }
+        
+        let sClassVal = masterRow ? toText_(masterRow[4]) : "";
+        if (sClassVal.toLowerCase() === "unknown" || sClassVal === "#N/A") sClassVal = "";
+        let sClass = isActive ? toText_(activeStudent.classCode) : sClassVal;
+        if (isActive && activeStudent.teachers && toText_(activeStudent.teachers).trim() !== "") {
+            sClass += ` - ${toText_(activeStudent.teachers)}`;
+        }
+        
+        let sSiteVal = masterRow ? toText_(masterRow[3]) : "";
+        if (sSiteVal.toLowerCase() === "unknown" || sSiteVal === "#N/A") sSiteVal = "";
+        let sSite = isActive ? toText_(activeStudent.site) : sSiteVal;
+
+        let sParentNameVal = masterRow ? toText_(masterRow[2]) : old.firstName;
+        if (!sParentNameVal || sParentNameVal.toLowerCase() === "unknown" || sParentNameVal === "#N/A") sParentNameVal = old.firstName;
+        let sParentName = sParentNameVal;
+        
+        let finalNotes = `STUDENT NAME: ${sName}\nRELATIONSHIP: ${sRel}\nLANGUAGE: Unknown\nOSIS: ${sOsisStr}\nParent Name: ${sParentName}\nClass: ${sClass}`;
+        if (sSite) finalNotes += `\nSite: ${sSite}`;
+        finalNotes += `\nParents Square: Unknown\nNYCSA: Unknown`;
+        
+        const studentNotes = tracking.get(sOsisStr);
+        if (studentNotes && studentNotes.trim() !== "") finalNotes += `\n\nNote:\n${studentNotes}`;
+        
+        // Append the original historical notes underneath if they had any
+        if (old.notes && old.notes.trim() !== "") {
+            finalNotes += `\n\n[Historical Record Notes]:\n${old.notes}`;
+        }
+
+        allPhones.forEach((phoneObj, index) => {
+          const row = new Array(headers.length).fill("");
+          
+          row[h("First Name")] = old.firstName;
+          row[h("Labels")] = "School Directory";
+          row[h("OSIS")] = oldOsis;
+          row[h("Last Name")] = `| Student: ${sName} |`;
+          row[h("Organization Name")] = old.orgName || `OSIS: ${oldOsis}`;
+          row[h("Notes")] = finalNotes;
+          
+          if (old.emails.length > 0) { row[h("E-mail 1 - Label")] = old.emails[0].label || "home"; row[h("E-mail 1 - Value")] = old.emails[0].val; }
+          if (old.emails.length > 1) { row[h("E-mail 2 - Label")] = old.emails[1].label; row[h("E-mail 2 - Value")] = old.emails[1].val; }
+          if (old.emails.length > 2) { row[h("E-mail 3 - Label")] = old.emails[2].label; row[h("E-mail 3 - Value")] = old.emails[2].val; }
+          
+          let typeLabel = phoneObj.label;
+          if (!typeLabel) typeLabel = allPhones.length > 1 ? `Contact ${index + 1}` : "Contact";
+          
+          row[h("Phone 1 - Type")] = typeLabel;
+          row[h("Phone 1 - Value")] = phoneObj.val;
+          
+          out.push(row);
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+/**
+ * OVERRIDE 2: The API Pusher.
+ * STRICT MATCHING: Searches Google Contacts by Name, Phone, and Email without making assumptions.
+ */
+function searchAndUpsertSingleContact(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, directoryResourceName = null) {
+  try {
+    const fullName = String(parentName || "").trim();
+    const fNameStr = String(studentNames || "").trim(); 
+    if (!fullName) return null;
+
+    const cache = CacheService.getScriptCache();
+    
+    // 1. STRICT CACHE KEY: Stop assuming blanks are matches. Extract exact identifiers.
+    const primaryEmail = emailsArr.length > 0 ? String(emailsArr[0].val).toLowerCase().trim() : "";
+    const primaryPhoneRaw = phonesArr.length > 0 ? String(phonesArr[0].val).trim() : "";
+    const primaryPhoneClean = normalizePhoneForMerge_(primaryPhoneRaw);
+    
+    // Fallback to raw text if no digits (e.g. they typed "discharge") so it stays perfectly unique
+    const searchPhone = primaryPhoneClean || primaryPhoneRaw.toLowerCase(); 
+    
+    const rowIdentity = fullName.toLowerCase() + "|" + fNameStr.toLowerCase() + "|" + searchPhone + "|" + primaryEmail;
+    
+    let hash = 0;
+    for (let i = 0; i < rowIdentity.length; i++) hash = ((hash << 5) - hash) + rowIdentity.charCodeAt(i) | 0; 
+    const cacheKey = "CONTACT_V7_" + Math.abs(hash); // Bumping to V7 to clear old buggy cached identities
+
+    let existingContact = null;
+    let cachedResourceName = cache.get(cacheKey);
+
+    if (cachedResourceName) {
+      try { existingContact = People.People.get(cachedResourceName, { personFields: 'names,phoneNumbers,emailAddresses,memberships,organizations,biographies' }); } 
+      catch (e) { cache.remove(cacheKey); }
+    }
+
+    if (!existingContact) {
+      let pageToken;
+      do {
+        const response = People.People.Connections.list('people/me', { pageSize: 1000, personFields: 'names,phoneNumbers,emailAddresses,memberships,organizations,biographies', pageToken: pageToken });
+        if (response.connections) {
+          for (const person of response.connections) {
+            if (person.names && person.names.length > 0) {
+              const apiGiven = String(person.names[0].givenName || "").toLowerCase().trim();
+              const apiFamily = String(person.names[0].familyName || "").toLowerCase().trim();
+              
+              if (apiGiven === fullName.toLowerCase() && apiFamily === fNameStr.toLowerCase()) {
+                
+                // NO ASSUMPTIONS: Strictly evaluate exact strings to prevent false overwriting
+                const apiPhonesClean = person.phoneNumbers ? person.phoneNumbers.map(p => normalizePhoneForMerge_(p.value)) : [];
+                const apiPhonesRaw = person.phoneNumbers ? person.phoneNumbers.map(p => String(p.value).toLowerCase().trim()) : [];
+                const apiEmails = person.emailAddresses ? person.emailAddresses.map(e => String(e.value).toLowerCase().trim()) : [];
+                
+                let hasMatchingPhone = false;
+                
+                if (searchPhone === "") {
+                   // If the row on the sheet literally has no phone, check the email
+                   if (primaryEmail !== "") {
+                       hasMatchingPhone = apiEmails.includes(primaryEmail);
+                   } else {
+                       // If the row has NO phone and NO email, only match if the API contact also has neither
+                       hasMatchingPhone = (apiPhonesRaw.length === 0 && apiEmails.length === 0);
+                   }
+                } else {
+                   // Match by exact digit sequence OR exact raw text (e.g. "discharge")
+                   hasMatchingPhone = (primaryPhoneClean !== "" && apiPhonesClean.includes(primaryPhoneClean)) || apiPhonesRaw.includes(searchPhone);
+                }
+                
+                if (hasMatchingPhone) {
+                  existingContact = person; 
+                  break; 
+                }
+              }
+            }
+          }
+        }
+        if (existingContact) break;
+        pageToken = response.nextPageToken;
+      } while (pageToken);
+    }
+
+    // Build the payload
+    const contactData = {
+      names: [{ givenName: fullName, familyName: fNameStr }],
+      organizations: [], phoneNumbers: [], emailAddresses: [], biographies: notes ? [{ value: String(notes) }] : []
+    };
+
+    if (String(orgName || "").trim() !== "" || String(orgTitle || "").trim() !== "") {
+      contactData.organizations.push({ name: String(orgName || "").trim(), title: String(orgTitle || "").trim() });
+    }
+    
+    emailsArr.forEach(e => { if (String(e.val).trim() !== "") contactData.emailAddresses.push({ value: String(e.val), type: String(e.label || "home") }); });
+    phonesArr.forEach(p => { if (String(p.val).trim() !== "") contactData.phoneNumbers.push({ value: String(p.val), type: String(p.label || "mobile") }); });
+    
+    let attempts = 0;
+    while (attempts < 3) {
+      attempts++;
+      try {
+        if (directoryResourceName) contactData.memberships = [{ contactGroupMembership: { contactGroupResourceName: directoryResourceName } }];
+
+        if (existingContact) {
+          contactData.etag = existingContact.etag;
+          if (existingContact.memberships && directoryResourceName) {
+            const others = existingContact.memberships.filter(m => m.contactGroupMembership?.contactGroupResourceName !== directoryResourceName);
+            contactData.memberships = contactData.memberships.concat(others);
+          }
+          const updated = People.People.updateContact(contactData, existingContact.resourceName, { updatePersonFields: 'names,phoneNumbers,emailAddresses,biographies,memberships,organizations' });
+          cache.put(cacheKey, updated.resourceName, 21600);
+          return { resourceName: updated.resourceName, isNew: false, isEdited: true, name: fullName, logStr: "Strict Update" }; 
+        } else {
+          const created = People.People.createContact(contactData);
+          cache.put(cacheKey, created.resourceName, 21600);
+          return { resourceName: created.resourceName, isNew: true, isEdited: false, name: fullName }; 
+        }
+      } catch (e) {
+        if (String(e).includes("404")) throw e;
+        if (attempts >= 3) throw e; 
+        Utilities.sleep(2000 * attempts); 
+      }
+    }
+  } catch (err) { return null; }
+}
+
+/**
+ * OVERRIDE 3: The Bulk Sync Loop.
+ */
+function syncToGoogleContacts() {
+  const startTime = Date.now();
+  const MAX_RUN_TIME = 4.5 * 60 * 1000; 
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.getActive();
+  if (!ss) return;   
+  
+  const sheet = ss.getSheetByName("Phone Contacts");
+  if (!sheet) return;
+  
+  const data = sheet.getDataRange().getValues();
+  const props = PropertiesService.getScriptProperties();
+  const cache = CacheService.getScriptCache();
+  
+  let startRow = parseInt(props.getProperty('SYNC_START_ROW')) || 1;
+  let createdCount = parseInt(props.getProperty('SYNC_CREATED_COUNT')) || 0; 
+  let editedCount = parseInt(props.getProperty('SYNC_EDITED_COUNT')) || 0; 
+  
+  let syncLog = JSON.parse(cache.get('SYNC_LOG') || '{"created":[], "edited":[], "deleted":[]}');
+  
+  function saveStaleMap(map) {
+    const entries = Object.entries(map);
+    const chunkCount = Math.ceil(entries.length / 1000);
+    cache.put('STALE_CHUNKS_COUNT', chunkCount.toString(), 21600);
+    for (let c = 0; c < chunkCount; c++) {
+      cache.put('STALE_CHUNK_' + c, JSON.stringify(entries.slice(c * 1000, (c + 1) * 1000)), 21600);
+    }
+  }
+
+  let resourceName = "";
+  const groups = People.ContactGroups.list().contactGroups || [];
+  const existingGroup = groups.find(g => g.name === "School Directory");
+  
+  if (existingGroup) resourceName = existingGroup.resourceName;
+  else {
+    const newGroup = People.ContactGroups.create({ contactGroup: { name: "School Directory" } });
+    resourceName = newGroup.resourceName;
+  }
+  
+  let staleMap = {}; 
+  if (startRow === 1) {
+    ss.toast("Phase 1/3: Checking existing Google contacts...", "Syncing", 10);
+    
+    syncLog = { "created": [], "edited": [], "deleted": [] };
+    cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600);
+
+    if (existingGroup) {
+      try {
+        let pageToken;
+        do {
+          const response = People.People.Connections.list('people/me', { pageSize: 1000, personFields: 'names,memberships', pageToken: pageToken });
+          if (response.connections) {
+            response.connections.forEach(p => {
+              if (p.memberships && p.memberships.some(m => m.contactGroupMembership?.contactGroupResourceName === resourceName)) {
+                const displayName = (p.names && p.names.length > 0) ? p.names[0].displayName : "Unknown Contact";
+                staleMap[p.resourceName] = displayName; 
+              }
+            });
+          }
+          pageToken = response.nextPageToken;
+        } while (pageToken);
+        try { saveStaleMap(staleMap); } catch(e) {}
+      } catch (e) {}
+    }
+  } else {
+    const chunkCount = parseInt(cache.get('STALE_CHUNKS_COUNT')) || 0;
+    for (let c = 0; c < chunkCount; c++) {
+      const chunkData = cache.get('STALE_CHUNK_' + c);
+      if (chunkData) JSON.parse(chunkData).forEach(([id, name]) => staleMap[id] = name);
+    }
+  }
+  
+  ss.toast("Phase 2/3: Syncing spreadsheet rows... Safe to close sidebar.", "Syncing", 10);
+  for (let i = startRow; i < data.length; i++) {
+    
+    if (Date.now() - startTime > MAX_RUN_TIME) {
+      props.setProperty('SYNC_START_ROW', i.toString());
+      props.setProperty('SYNC_CREATED_COUNT', createdCount.toString()); 
+      props.setProperty('SYNC_EDITED_COUNT', editedCount.toString()); 
+      cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600); 
+      try { saveStaleMap(staleMap); } catch(e){}
+      cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'paused', progress: i, total: data.length - 1 }), 21600);
+      
+      ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === "syncToGoogleContacts") ScriptApp.deleteTrigger(t); });
+      ScriptApp.newTrigger("syncToGoogleContacts").timeBased().after(60 * 1000).create();
+      ss.toast("Timer reset. Resuming at row " + i, "Auto-Resume Active", 30);
+      return; 
+    }
+    
+    if (i % 5 === 0) {
+      const currentStateStr = cache.get('SYNC_UI_STATE');
+      if (currentStateStr && JSON.parse(currentStateStr).phase === 'killed') return; 
+      cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'syncing', progress: i, total: data.length - 1 }), 21600);
+    }
+    
+    const headers = data[0];
+    const parentName = data[i][headers.indexOf("First Name")];
+    const studentNames = data[i][headers.indexOf("Last Name")];
+    const notes = data[i][headers.indexOf("Notes")];
+    const orgName = data[i][headers.indexOf("Organization Name")];
+    const orgTitle = data[i][headers.indexOf("Organization Department")];
+
+    let emailsArr = [];
+    let phonesArr = [];
+    
+    [1, 2, 3].forEach(num => {
+      const vIdx = headers.indexOf(`E-mail ${num} - Value`);
+      const lIdx = headers.indexOf(`E-mail ${num} - Label`);
+      if (vIdx !== -1 && data[i][vIdx]) emailsArr.push({ val: data[i][vIdx], label: lIdx !== -1 ? data[i][lIdx] : "home" });
+    });
+    
+    [1, 2, 3, 4].forEach(num => {
+      const vIdx = headers.indexOf(num === 1 ? `Phone 1 - Value` : `Phone ${num} - Value`);
+      const lIdx = headers.indexOf(num === 1 ? `Phone 1 - Type` : `Phone ${num} - Type`);
+      if (vIdx !== -1 && data[i][vIdx]) phonesArr.push({ val: data[i][vIdx], label: lIdx !== -1 ? data[i][lIdx] : "mobile" });
+    });
+
+    if (!parentName || String(parentName).trim() === "") continue;
+    
+    try {
+      const result = searchAndUpsertSingleContact(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, resourceName);
+      
+      if (result) {
+        delete staleMap[result.resourceName]; 
+        
+        if (result.isNew) {
+          createdCount++; 
+          if (syncLog.created.length < 150) syncLog.created.push(result.name);
+          else if (syncLog.created.length === 150) syncLog.created.push("...and more.");
+        } else if (result.isEdited) {
+          editedCount++; 
+          if (syncLog.edited.length < 150) syncLog.edited.push(`<b>${result.name}</b><br><span style="color:#555; font-size:11px;">${result.logStr}</span>`);
+          else if (syncLog.edited.length === 150) syncLog.edited.push("...and more.");
+        }
+      }
+    } catch (e) {
+      if (e.message.toLowerCase().includes("quota") || e.message.includes("429")) {
+        props.setProperty('SYNC_START_ROW', i.toString());
+        props.setProperty('SYNC_CREATED_COUNT', createdCount.toString());
+        props.setProperty('SYNC_EDITED_COUNT', editedCount.toString());
+        cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600); 
+        try { saveStaleMap(staleMap); } catch(e){}
+        cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'quota', progress: i, total: data.length - 1 }), 21600);
+        ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === "syncToGoogleContacts") ScriptApp.deleteTrigger(t); });
+        ScriptApp.newTrigger("syncToGoogleContacts").timeBased().after(15 * 60 * 1000).create();
+        ss.toast("API Limit reached. Pausing 15 mins.", "Quota Pause", 60);
+        return; 
+      }
+    }
+    Utilities.sleep(750); 
+  }
+  
+  ss.toast("Phase 3/3: Removing old contacts...", "Final Cleanup", 10);
+  const staleEntries = Object.entries(staleMap);
+  const deletedCount = staleEntries.length; 
+
+  props.deleteProperty('SYNC_START_ROW');
+  props.deleteProperty('SYNC_CREATED_COUNT'); 
+  props.deleteProperty('SYNC_EDITED_COUNT'); 
+  cache.remove('STALE_CHUNKS_COUNT'); 
+  ScriptApp.getProjectTriggers().forEach(t => { if(t.getHandlerFunction() === "syncToGoogleContacts") ScriptApp.deleteTrigger(t); });
+  
+  if (deletedCount > 0) {
+    let deletedLogCount = 0;
+    staleEntries.forEach(([id, name]) => {
+       if (deletedLogCount < 150) syncLog.deleted.push(name);
+       else if (deletedLogCount === 150) syncLog.deleted.push("...and more.");
+       deletedLogCount++;
+    });
+
+    for (let i = 0; i < deletedCount; i += 500) {
+      const chunk = staleEntries.slice(i, i + 500).map(x => x[0]);
+      try {
+        People.People.batchDeleteContacts({ resourceNames: chunk });
+        Utilities.sleep(500); 
+      } catch (err) {
+        chunk.forEach(res => { try { People.People.deleteContact(res); } catch(e) {} });
+      }
+    }
+  }
+  
+  cache.put('SYNC_LOG', JSON.stringify(syncLog), 21600);
+  cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'done', progress: data.length - 1, total: data.length - 1, deleted: deletedCount, created: createdCount, edited: editedCount }), 21600);
+
+  const toastMessage = `🗑️ Del: ${deletedCount} | ☎️ New: ${createdCount} | ✏️ Edited: ${editedCount}`;
+  ss.toast(toastMessage, "🎉 Sync Complete!", 15);
+  PropertiesService.getDocumentProperties().setProperty('MISSED_SYNC_MSG', toastMessage);
+
+  // --- NEW: EMAIL NOTIFICATION LOGIC ---
+  const emailEnabled = PropertiesService.getDocumentProperties().getProperty('EMAIL_NOTIFICATIONS_ENABLED');
+  
+  if (emailEnabled === 'true') {
+    const userEmail = Session.getActiveUser().getEmail(); 
+    const subject = "🔄 Nightly Sync Complete";
+    const body = `Your Google Contacts sync has finished!\n\nResults:\nDeleted: ${deletedCount}\nCreated: ${createdCount}\nEdited: ${editedCount}\n\nCheck your spreadsheet for full logs.`;
+    
+    try {
+      MailApp.sendEmail(userEmail, subject, body);
+    } catch(e) {
+      // Fails silently if email quota is reached or permissions are missing
+    }
+  }
+}

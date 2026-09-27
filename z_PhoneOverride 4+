@@ -1,0 +1,713 @@
+/**
+ * OVERRIDE 4: Quick Updates
+ */
+function updateSingleOsisDelta_(targetOsis) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try {
+    const rawSheet = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
+    if (!rawSheet) return;
+
+    const rawData = rawSheet.getDataRange().getValues();
+    if (rawData.length < 4) return;
+
+    const overrides = getOverrideData_(ss);
+    const studentMap = buildStudentMap_(rawData, overrides.students);
+    const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+    
+    const parentSquareIndex = buildParentSquareIndex_(rawData);
+    const nycsaIndex = buildNYCSAIndex_(rawData);
+    
+    const masterTableData = getExistingMasterTable_(ss);
+
+    // ✨ THE FIX: Fetch the Contact Log and Event Log data here so the builder doesn't crash!
+    const contactLogSheet = ss.getSheetByName("Contact Log");
+    const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getValues() : [];
+    
+    const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
+    const eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+
+    // Pass ALL 4 arguments into the builder
+    const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTableData, contactLogData, eventLogData);
+    
+    // UPDATED call to match the new signature
+    const phoneContacts = buildPhoneContactsData_(ss, studentMap, guardianRows, masterTableData, combinedContactTracking, parentSquareIndex, nycsaIndex);
+
+    writeSingleRowDelta_(ss, "Combined Contact Tracking", combinedContactTracking, targetOsis, 0);
+    
+    const phoneHeaders = phoneContacts[0];
+    const osisIndex = phoneHeaders.indexOf("OSIS") !== -1 ? phoneHeaders.indexOf("OSIS") : 5;
+    
+    writeMultipleRowDeltas_(ss, "Phone Contacts", phoneContacts, targetOsis, osisIndex);
+
+  } catch (err) {
+    // If it fails, log it so it doesn't fail completely silently
+    console.error("Delta update failed: " + err.message);
+  }
+}
+// ======================================================================
+// HELPER FUNCTIONS 
+// ======================================================================
+
+function getOldContactsMap_(ss) {
+  const map = new Map();
+  const sheet = ss.getSheetByName("Old Phone Contacts");
+  if (!sheet) return map;
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length < 2) return map;
+  
+  const headers = data[0];
+  const h = (name) => headers.indexOf(name);
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const osis = toText_(row[h("OSIS")]);
+    if (!osis) continue;
+    
+    if (!map.has(osis)) map.set(osis, []);
+    
+    map.get(osis).push({
+      firstName: row[h("First Name")],
+      lastName: row[h("Last Name")],
+      orgName: row[h("Organization Name")],
+      notes: row[h("Notes")],
+      emails: [
+        { label: row[h("E-mail 1 - Label")], val: row[h("E-mail 1 - Value")] },
+        { label: row[h("E-mail 2 - Label")], val: row[h("E-mail 2 - Value")] },
+        { label: row[h("E-mail 3 - Label")], val: row[h("E-mail 3 - Value")] }
+      ].filter(e => e.val),
+      phones: [
+        { label: row[h("Phone 1 - Label")], val: row[h("Phone 1 - Value")] },
+        { label: row[h("Phone 2 - Label")], val: row[h("Phone 2 - Value")] },
+        { label: row[h("Phone 3 - Label")], val: row[h("Phone 3 - Value")] },
+        { label: row[h("Phone 4 - Label")], val: row[h("Phone 4 - Value")] }
+      ].filter(p => p.val)
+    });
+  }
+  return map;
+}
+
+/** * CRITICAL FIX: Strips all parentheticals prior to distance checking.
+ * This guarantees "Homer Simpson" and "Homer Simpson (Father)" will perfectly match.
+ */
+function isFuzzyMatch_(newName, oldName) {
+  if (!newName || !oldName) return false;
+  
+  // Clean names by removing anything wrapped in parentheses before comparing
+  const cleanNew = String(newName).replace(/\([^)]+\)/g, '').trim();
+  const cleanOld = String(oldName).replace(/\([^)]+\)/g, '').trim();
+  
+  const n1 = cleanNew.toLowerCase().replace(/[^a-z]/g, '');
+  const n2 = cleanOld.toLowerCase().replace(/[^a-z]/g, '');
+  
+  if (n1 === '' || n2 === '') return false;
+  
+  if (n1.includes(n2) || n2.includes(n1)) return true; 
+  
+  const track = Array(n2.length + 1).fill(null).map(() => Array(n1.length + 1).fill(null));
+  for (let i = 0; i <= n1.length; i += 1) track[0][i] = i;
+  for (let j = 0; j <= n2.length; j += 1) track[j][0] = j;
+  for (let j = 1; j <= n2.length; j += 1) {
+    for (let i = 1; i <= n1.length; i += 1) {
+      const ind = n1[i - 1] === n2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(track[j][i - 1] + 1, track[j - 1][i] + 1, track[j - 1][i - 1] + ind);
+    }
+  }
+  return track[n2.length][n1.length] <= 2; 
+}
+
+function normalizePhoneForMerge_(value) {
+  const digits = toText_(value).replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
+function TOGGLE_EMAIL_NOTIFICATIONS() {
+  const props = PropertiesService.getDocumentProperties();
+  const currentState = props.getProperty('EMAIL_NOTIFICATIONS_ENABLED');
+  const newState = (currentState === 'false') ? 'true' : 'false';
+  props.setProperty('EMAIL_NOTIFICATIONS_ENABLED', newState);
+  
+  const status = (newState === 'true') ? "ENABLED ✅" : "DISABLED ❌";
+  SpreadsheetApp.getUi().alert("📧 Email Preference", `Notifications are now: ${status}`, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function DEBUG_TEST_EMAIL() {
+  const userEmail = "jkeller7@schools.nyc.gov"; // <--- UPDATE THIS TO YOUR REAL EMAIL
+  try {
+    MailApp.sendEmail(userEmail, "🧪 TEST EMAIL", "This confirms your @p94m.org account allows script emails.");
+    SpreadsheetApp.getUi().alert("🚀 Success", "Check your inbox: " + userEmail, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert("❌ Error", "Mail service failed: " + e.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  }
+}
+
+/**
+ * ======================================================================
+ * OVERRIDE 5: The Master Orchestrator (Intercepts Build.gs)
+ * ======================================================================
+ */
+function buildAllDerivedSheets() { 
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rawSheet = ss.getSheetByName("Raw Data");
+  if (!rawSheet) throw new Error('Sheet "Raw Data" not found.');
+  const rawData = rawSheet.getDataRange().getValues();
+  if (rawData.length < 2) throw new Error('"Raw Data" does not have enough rows.');
+
+  // V3 SPEED UPGRADE: Pre-read Contact Log and Event Log ONCE
+  const contactLogSheet = ss.getSheetByName("Contact Log");
+  const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getDisplayValues() : [];
+  
+  const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
+  // ⚡ FIX 1: Changed to "let" so the script can update it after rebuilding the backend!
+  let eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+
+  // =========================================================
+  // --- PRE-FETCH OLD DATA SNAPSHOT FOR REPORTS ---
+  // =========================================================
+  const oldPdMap = new Map();
+  const oldPdSheet = ss.getSheetByName("Parents Divided");
+  if (oldPdSheet) {
+    const oldPdData = oldPdSheet.getDataRange().getValues();
+    for (let i = 1; i < oldPdData.length; i++) {
+      oldPdMap.set(String(oldPdData[i][1]).trim(), { ps: oldPdData[i][8], nycsa: oldPdData[i][9] });
+    }
+  }
+
+  const oldMasterStatusMap = new Map();
+  const oldMasterSheetForReport = ss.getSheetByName("Master Table");
+  if (oldMasterSheetForReport) {
+    const oldMasterData = oldMasterSheetForReport.getDataRange().getValues();
+    
+    // Dynamically find the Status column to prevent breaking when transitioning to the new 7-column format!
+    let statusIndex = 5; 
+    const headerRow = oldMasterData.find(r => String(r[0]).trim().toUpperCase() === "OSIS") || oldMasterData[3];
+    if (headerRow) {
+      const foundIdx = headerRow.indexOf("Status");
+      if (foundIdx !== -1) statusIndex = foundIdx;
+    }
+    
+    for (let i = 4; i < oldMasterData.length; i++) {
+      const osis = String(oldMasterData[i][0]).trim();
+      if (osis && !osis.includes(",")) oldMasterStatusMap.set(osis, oldMasterData[i][statusIndex]);
+    }
+  }
+
+  // --- Step 0 & 1: Build Core Data Maps --- 
+  const overrides = getOverrideData_(ss);
+  const studentMap = buildStudentMap_(rawData, overrides.students);
+  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+  const siblingMap = buildSiblingMap_(studentMap, guardianRows);
+  const parentSquareIndex = buildParentSquareIndex_(rawData);
+  const nycsaIndex = buildNYCSAIndex_(rawData);
+
+  // =========================================================
+  // --- INJECT HISTORICAL DATA INTO MASTER TABLE ---
+  // =========================================================
+  let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
+  masterTable = injectHistoricalMasterTable_(ss, masterTable);
+  writeSheet_(ss, "Master Table", masterTable, 4, 1);
+
+  // ⚡ FIX 2: REBUILD BACKEND EVENT LOG 
+  // We use your "writeSheet_" helper because if you delete the tab or delete rows, this automatically recreates them!
+  // ==========================================
+  const freshEventData = buildBackendEventLogData_(ss);
+  if (freshEventData && freshEventData.length > 0) {
+    writeSheet_(ss, "Backend_Event_Log", freshEventData);
+    eventLogData = freshEventData; // Overwrite memory with the newly regenerated data
+  }
+  // ==========================================
+
+  // V3 SPEED UPGRADE: Pass arrays down to avoid re-reading sheets
+  const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTable, contactLogData, eventLogData);
+  writeSheet_(ss, "Combined Contact Tracking", combinedContactTracking);
+
+  const parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
+  writeSheet_(ss, "Parents Divided", parentsDivided);
+
+  // =========================================================
+  // --- INJECT HISTORICAL DATA INTO DIRECTORY ---
+  // =========================================================
+  let directory = buildDirectoryOverride_(ss, studentMap, guardianRows); 
+  directory = injectHistoricalDirectory_(ss, directory);
+  writeSheet_(ss, "Directory", directory);
+
+  if (typeof formatDirectoryAuto_ === "function") formatDirectoryAuto_(ss.getSheetByName("Directory"));
+
+  // V3 SPEED UPGRADE: Pass indices down to prevent re-reading Raw Data
+  const phoneContacts = buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, combinedContactTracking, parentSquareIndex, nycsaIndex);
+  writeSheet_(ss, "Phone Contacts", phoneContacts);
+
+  if (typeof fillContactLogHstackFormulas_ === "function") {
+    fillContactLogHstackFormulas_(ss);
+  }
+
+  const dirSheet = ss.getSheetByName("Directory");
+  let hasSite = false;
+  for (const student of studentMap.values()) {
+    if (student.site && String(student.site).trim() !== "") {
+      hasSite = true;
+      break;
+    }
+  }
+
+  if (dirSheet) {
+    if (hasSite) dirSheet.showColumns(4); 
+    else dirSheet.hideColumns(4);
+  }
+  if (contactLogSheet) {
+    if (hasSite) contactLogSheet.showColumns(11); 
+    else contactLogSheet.hideColumns(11);
+  }
+
+  // =========================================================
+  // --- GENERATE BUILD REPORT ---
+  // =========================================================
+  const newStudentsLog = [];
+  const dischargedLog = [];
+  const nycsaLog = [];
+  const psLog = [];
+
+  for (let i = 1; i < masterTable.length; i++) {
+    const osis = String(masterTable[i][0]).trim();
+    const name = masterTable[i][1];
+    const status = String(masterTable[i][6]).trim();
+    if (osis && !osis.includes(",")) {
+      const oldStatus = oldMasterStatusMap.get(osis);
+      if (status === "Discharged" && oldStatus !== "Discharged" && oldMasterStatusMap.size > 0) dischargedLog.push(`${name} (${osis})`);
+      if (status !== "Discharged" && oldStatus === "Discharged" && oldMasterStatusMap.size > 0) newStudentsLog.push(`${name} (${osis})`);
+      if (status !== "Discharged" && !oldMasterStatusMap.has(osis) && oldMasterStatusMap.size > 0) newStudentsLog.push(`${name} (${osis})`);
+    }
+  }
+
+  if (oldPdMap.size > 0) {
+    for (let i = 1; i < parentsDivided.length; i++) {
+      const gName = String(parentsDivided[i][1]).trim();
+      const student = parentsDivided[i][2];
+      const newPs = String(parentsDivided[i][8]).trim();
+      const newNycsa = String(parentsDivided[i][9]).trim();
+
+      if (oldPdMap.has(gName)) {
+        const old = oldPdMap.get(gName);
+        const oldPs = String(old.ps).trim();
+        const oldNycsa = String(old.nycsa).trim();
+
+        if (oldNycsa.startsWith("No") && (newNycsa.startsWith("Yes") || newNycsa === "Yes/Unknown")) {
+          nycsaLog.push(`${gName} (Student: ${student})`);
+        }
+        if (oldPs === "No" && newPs === "Yes") {
+          psLog.push(`${gName} (Student: ${student})`);
+        }
+      }
+    }
+  }
+
+  CacheService.getScriptCache().put('BUILD_REPORT_LOGS', JSON.stringify({
+    newStudents: newStudentsLog,
+    discharged: dischargedLog,
+    nycsaUpgrades: nycsaLog,
+    psUpgrades: psLog
+  }), 21600);
+
+  // V3 SPEED UPGRADE: Apply Montserrat font strictly once at the end
+  ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"]
+    .forEach(name => {
+      const sh = ss.getSheetByName(name);
+      if (sh) sh.getDataRange().setFontFamily("Montserrat");
+    });
+}
+
+/**
+ * ======================================================================
+ * OVERRIDE 6: Hijacks Active Directory to merge Old Phone Contacts 
+ * ======================================================================
+ * FIX: Safely splits multi-parent homes, matches them using clean names, 
+ * appends to the current parent, and reformats historical tags perfectly!
+ */
+function buildDirectoryOverride_(ss, studentMap, guardianRows) {
+  // 1. Build standard active directory first
+  const directory = buildDirectoryData_(studentMap, guardianRows); 
+  
+  const oldPhoneSheet = ss.getSheetByName("Old Phone Contacts");
+  if (!oldPhoneSheet) return directory;
+  const oldPhoneMap = buildOldPhoneMap_(oldPhoneSheet);
+
+  // 2. Loop through the active directory and append extra phones to ATS parents
+  for (let i = 1; i < directory.length; i++) {
+    const row = directory[i];
+    const osis = String(row[2]).trim();
+    const parentContactRaw = String(row[5]); 
+    
+    if (!oldPhoneMap.has(osis)) continue;
+    
+    const contacts = oldPhoneMap.get(osis);
+    const matchedOldContacts = new Set();
+    
+    // Split the cell by newlines in case there are multiple Active ATS parents
+    const activeLines = parentContactRaw.split("\n");
+    const newParentLines = [];
+    
+    activeLines.forEach(line => {
+        const parentNameWithRel = line.split(" - ")[0].trim(); // e.g. "Jane Doe (Mother)"
+        
+        // Strip the relationship temporarily just so we can match "Jane Doe" perfectly
+        let searchName = parentNameWithRel;
+        if (searchName.includes("(")) {
+            searchName = searchName.substring(0, searchName.lastIndexOf("(")).trim();
+        }
+        
+        const match = contacts.find(c => isFuzzyMatch_(c.name, searchName));
+        
+        if (match) {
+            matchedOldContacts.add(match);
+            
+            // Extract existing parts to avoid duplicating phones/emails ATS already gave us
+            const existingPartsStr = line.includes(" - ") ? line.substring(line.indexOf(" - ") + 3) : "";
+            const existingParts = existingPartsStr ? existingPartsStr.split(", ").map(s => s.trim()) : [];
+            
+            if (match.emails.length > 0) match.emails.forEach(e => { if (!existingParts.includes(e)) existingParts.push(e); });
+            if (match.phones.length > 0) match.phones.forEach(p => { if (!existingParts.includes(p)) existingParts.push(p); });
+            
+            if (existingParts.length > 0) {
+                // APPENDS to the current parent keeping the relationship tag
+                newParentLines.push(`${parentNameWithRel} - ${existingParts.join(", ")}`);
+            } else {
+                newParentLines.push(parentNameWithRel);
+            }
+        } else {
+            newParentLines.push(line); // No match found, leave it alone
+        }
+    });
+    
+    // 3. Append un-matched "other contacts" from historical data
+    contacts.forEach(old => {
+        if (!matchedOldContacts.has(old)) {
+            const parts = [];
+            if (old.emails.length > 0) parts.push(old.emails.join(", "));
+            if (old.phones.length > 0) parts.push(old.phones.join(", "));
+            
+            // If historical, the Old Contacts sheet has "(Mother) Jane Doe". 
+            // We flip it back to "Jane Doe (Mother)" to match the ATS format standard!
+            let displayName = old.originalFirstName || old.name;
+            if (displayName.startsWith("(")) {
+                const closeParen = displayName.indexOf(")");
+                if (closeParen !== -1) {
+                    const rel = displayName.substring(0, closeParen + 1); // "(Mother)"
+                    const namePart = displayName.substring(closeParen + 1).trim(); // "Jane Doe"
+                    displayName = `${namePart} ${rel}`; // "Jane Doe (Mother)"
+                }
+            }
+            
+            if (parts.length > 0) {
+                newParentLines.push(`${displayName} - ${parts.join(", ")}`);
+            } else {
+                newParentLines.push(displayName);
+            }
+        }
+    });
+    
+    // Save the beautifully merged rich-text back into the directory cell
+    directory[i][5] = newParentLines.join("\n");
+  }
+  return directory;
+}
+
+/**
+ * Helper 1: Injects Historical Master Table into Master Table.
+ * CRITICAL FIX: Proactively scans the Master Table array. If any names are "Unknown",
+ * or if they are non-ATS ("Discharged"), it aggressively patches the rows with 
+ * legacy data so the user never has to delete the Master Table!
+ */
+function injectHistoricalMasterTable_(ss, masterTable) {
+  const oldSheet = ss.getSheetByName("Old Master Table");
+  if (!oldSheet) return masterTable;
+
+  const oldData = oldSheet.getDataRange().getValues();
+
+  // Dynamically find header indices so it grabs the real columns
+  let headerIdx = 0;
+  let headers = [];
+  for (let i = 0; i < Math.min(10, oldData.length); i++) {
+      if (String(oldData[i][0]).toUpperCase().includes("OSIS")) {
+          headerIdx = i;
+          headers = oldData[i];
+          break;
+      }
+  }
+  
+  const h = (colName) => {
+      const idx = headers.findIndex(col => String(col).trim().toLowerCase().includes(colName.toLowerCase()));
+      return idx !== -1 ? idx : -1;
+  };
+
+  const osisCol = h("OSIS") !== -1 ? h("OSIS") : 0;
+  const studentCol = h("Student") !== -1 ? h("Student") : 1;
+  const guardianCol = h("Guardian") !== -1 ? h("Guardian") : 2;
+  const siteCol = h("Site") !== -1 ? h("Site") : 3;
+  const classCol = h("Class") !== -1 ? h("Class") : (h("Teacher") !== -1 ? h("Teacher") : 4);
+  const statusCol = h("Status") !== -1 ? h("Status") : 5;
+
+  // Create a map of existing Master Table rows so we know exactly which row to overwrite
+  const existingOsisMap = new Map();
+  for (let r = 1; r < masterTable.length; r++) {
+     existingOsisMap.set(String(masterTable[r][0]).trim(), r);
+  }
+
+  // Start reading AFTER the discovered header row
+  for (let i = headerIdx + 1; i < oldData.length; i++) {
+    // Retain numeric types to prevent #N/A lookups elsewhere
+    let osisVal = oldData[i][osisCol];
+    const osisStr = String(osisVal).trim();
+    if (!osisStr || osisStr === "#N/A") continue;
+    
+    if (/^\d+$/.test(osisStr)) osisVal = Number(osisStr);
+
+    const rawStatus = String(oldData[i][statusCol]).trim();
+    let finalStatus = rawStatus;
+    if (finalStatus === "" || finalStatus === "#N/A") finalStatus = "Unknown";
+
+    const studentName = String(oldData[i][studentCol]).trim() === "#N/A" || !String(oldData[i][studentCol]).trim() ? "Unknown" : String(oldData[i][studentCol]).trim();
+    
+    // Safely pull Guardian dynamically, strip tags
+    let rawGuardian = String(oldData[i][guardianCol]).trim();
+    if (rawGuardian === "#N/A" || !rawGuardian) rawGuardian = "Unknown";
+    let cleanGuardian = rawGuardian.replace(/\([^)]+\)/g, '').replace(/\s+/g, ' ').trim();
+    if (!cleanGuardian) cleanGuardian = "Unknown";
+    
+    const site = String(oldData[i][siteCol]).trim() === "#N/A" ? "" : String(oldData[i][siteCol]).trim();
+    const classCode = String(oldData[i][classCol]).trim() === "#N/A" ? "" : String(oldData[i][classCol]).trim();
+
+    if (existingOsisMap.has(osisStr)) {
+        const rowIndex = existingOsisMap.get(osisStr);
+        const currentStudent = String(masterTable[rowIndex][1]).trim();
+        const currentGuardian = String(masterTable[rowIndex][2]).trim();
+        const currentSite = String(masterTable[rowIndex][3]).trim();
+        const currentClass = String(masterTable[rowIndex][4]).trim();
+        const currentStatus = String(masterTable[rowIndex][6]).trim().toLowerCase();
+
+        // 🎯 THE OVERRIDE: Aggressively rescue ANY "Unknown" or blank names using Old Master Table
+        if (currentStudent.toLowerCase() === "unknown" || currentStudent === "") {
+            masterTable[rowIndex][1] = studentName;
+        }
+        if (currentGuardian.toLowerCase() === "unknown" || currentGuardian === "") {
+            masterTable[rowIndex][2] = cleanGuardian;
+        }
+
+        // 🎯 Rescue non-ATS students: If current status includes Discharge/Unknown, forcefully apply legacy Status/Class/Site
+        if (currentStatus.includes("discharge") || currentStatus.includes("unknown") || currentStatus === "") {
+            masterTable[rowIndex][6] = finalStatus;
+            
+            if (currentSite === "" || currentSite.toLowerCase() === "unknown") {
+                masterTable[rowIndex][3] = site;
+            }
+            if (currentClass === "" || currentClass.toLowerCase() === "unknown") {
+                masterTable[rowIndex][4] = classCode;
+            }
+        }
+    } else {
+        // Student wasn't in the Master Table at all, append them to the bottom!
+        masterTable.push([
+          osisVal,
+          studentName,
+          cleanGuardian,
+          site,
+          classCode,
+          "",           // Placeholder for Sibling
+          finalStatus
+        ]);
+        existingOsisMap.set(osisStr, masterTable.length - 1); // Track in case of duplicates
+    }
+  }
+
+  return masterTable;
+}
+
+/**
+ * Helper 2: Injects Historical Master Table into Directory.
+ * UPGRADED: Allows all historical non-ATS students to safely port into the Directory.
+ */
+function injectHistoricalDirectory_(ss, directory) {
+  const oldMaster = ss.getSheetByName("Old Master Table");
+  const oldPhone = ss.getSheetByName("Old Phone Contacts");
+  if (!oldMaster) return directory;
+
+  const currentOsis = new Set(directory.map(row => String(row[2]).trim()));
+  const oldPhoneMap = buildOldPhoneMap_(oldPhone);
+  const oldMasterData = oldMaster.getDataRange().getValues();
+
+  // Dynamically find headers here as well
+  let headerIdx = 0;
+  let headers = [];
+  for (let i = 0; i < Math.min(10, oldMasterData.length); i++) {
+      if (String(oldMasterData[i][0]).toUpperCase().includes("OSIS")) {
+          headerIdx = i;
+          headers = oldMasterData[i];
+          break;
+      }
+  }
+  
+  const h = (colName) => {
+      const idx = headers.findIndex(col => String(col).trim().toLowerCase().includes(colName.toLowerCase()));
+      return idx !== -1 ? idx : -1;
+  };
+
+  const osisCol = h("OSIS") !== -1 ? h("OSIS") : 0;
+  const studentCol = h("Student") !== -1 ? h("Student") : 1;
+  const guardianCol = h("Guardian") !== -1 ? h("Guardian") : 2;
+  const siteCol = h("Site") !== -1 ? h("Site") : 3;
+  const classCol = h("Class") !== -1 ? h("Class") : (h("Teacher") !== -1 ? h("Teacher") : 4);
+  const statusCol = h("Status") !== -1 ? h("Status") : 5;
+
+  for (let i = headerIdx + 1; i < oldMasterData.length; i++) {
+    let osisVal = oldMasterData[i][osisCol];
+    const osisStr = String(osisVal).trim();
+    if (!osisStr || osisStr === "#N/A" || currentOsis.has(osisStr)) continue;
+    
+    if (/^\d+$/.test(osisStr)) osisVal = Number(osisStr); // Prevent VLOOKUP mismatches
+
+    const rawStatus = String(oldMasterData[i][statusCol]).trim();
+    // 🛑 GATEKEEPER REMOVED: We no longer skip "Discharged" students so they map into the Directory too!
+    if (rawStatus === "#N/A") continue; 
+
+    const studentName = String(oldMasterData[i][studentCol]).trim() === "#N/A" || !String(oldMasterData[i][studentCol]).trim() ? "Unknown" : String(oldMasterData[i][studentCol]).trim();
+    const parsedStudent = splitFullName_(studentName);
+    
+    let rawGuardian = String(oldMasterData[i][guardianCol]).trim();
+    if (rawGuardian === "#N/A" || !rawGuardian) rawGuardian = "Unknown";
+    const cleanGuardian = rawGuardian.replace(/\([^)]+\)/g, '').replace(/\s+/g, ' ').trim();
+    
+    const site = String(oldMasterData[i][siteCol]).trim() === "#N/A" ? "" : String(oldMasterData[i][siteCol]).trim();
+    const classCode = String(oldMasterData[i][classCol]).trim() === "#N/A" ? "" : String(oldMasterData[i][classCol]).trim();
+
+    let contactStr = cleanGuardian;
+    
+    if (oldPhoneMap.has(osisStr)) {
+      const contacts = oldPhoneMap.get(osisStr);
+      const lines = [];
+      
+      contacts.forEach(c => {
+          const parts = [];
+          if (c.emails.length > 0) parts.push(c.emails.join(", "));
+          if (c.phones.length > 0) parts.push(c.phones.join(", "));
+          
+          let displayName = c.originalFirstName || c.name;
+          if (displayName.startsWith("(")) {
+              const closeParen = displayName.indexOf(")");
+              if (closeParen !== -1) {
+                  const rel = displayName.substring(0, closeParen + 1); 
+                  const namePart = displayName.substring(closeParen + 1).trim(); 
+                  displayName = `${namePart} ${rel}`; 
+              }
+          }
+
+          lines.push(parts.length > 0 ? `${displayName} - ${parts.join(", ")}` : displayName);
+      });
+      
+      if (lines.length > 0) contactStr = lines.join("\n");
+    }
+
+    directory.push([parsedStudent.last, parsedStudent.first, osisVal, site, classCode, contactStr]);
+  }
+
+  // Final Directory Sort
+  const dirHeaders = directory[0];
+  const body = directory.slice(1).sort((a, b) => {
+    const siteA = String(a[3] || "").trim();
+    const siteB = String(b[3] || "").trim();
+    const primarySort = siteA.localeCompare(siteB, undefined, { numeric: true, sensitivity: "base" });
+    if (primarySort !== 0) return primarySort;
+
+    const classA = String(a[4] || "").trim();
+    const classB = String(b[4] || "").trim();
+    const secondarySort = classA.localeCompare(classB, undefined, { numeric: true, sensitivity: "base" });
+    if (secondarySort !== 0) return secondarySort;
+
+    const lastNameA = String(a[0] || "").trim();
+    const lastNameB = String(b[0] || "").trim();
+    return lastNameA.localeCompare(lastNameB, undefined, { numeric: true, sensitivity: "base" });
+  });
+
+  return [dirHeaders, ...body];
+}
+
+/**
+ * Shared Helper: Builds the fast memory map of Old Phone Contacts
+ * FIX: Strips out the "(Mother)" and "| Student: Bobby |" bloat so the names match!
+ */
+function buildOldPhoneMap_(oldPhoneSheet) {
+  const oldPhoneMap = new Map();
+  if (!oldPhoneSheet) return oldPhoneMap;
+
+  const phoneData = oldPhoneSheet.getDataRange().getValues();
+  if (phoneData.length < 2) return oldPhoneMap;
+  const headers = phoneData[0];
+  const h = (name) => headers.indexOf(name);
+
+  const osisIdx = h("OSIS");
+  const fNameIdx = h("First Name");
+  const lNameIdx = h("Last Name");
+  
+  const p1Idx = h("Phone 1 - Value");
+  const p2Idx = h("Phone 2 - Value");
+  const p3Idx = h("Phone 3 - Value");
+  const p4Idx = h("Phone 4 - Value");
+  
+  const e1Idx = h("E-mail 1 - Value");
+  const e2Idx = h("E-mail 2 - Value");
+  const e3Idx = h("E-mail 3 - Value");
+
+  if (osisIdx === -1) return oldPhoneMap;
+
+  for (let i = 1; i < phoneData.length; i++) {
+    const osis = String(phoneData[i][osisIdx]).trim();
+    if (!osis) continue;
+
+    const rawFName = fNameIdx > -1 ? String(phoneData[i][fNameIdx] || "") : "";
+    const rawLName = lNameIdx > -1 ? String(phoneData[i][lNameIdx] || "") : "";
+    
+    let fNameClean = rawFName;
+    let lNameClean = rawLName;
+    
+    // Remove "(Relationship)" from the start of the name so we can match it later
+    if (fNameClean.startsWith("(")) {
+        const closeParen = fNameClean.indexOf(")");
+        if (closeParen !== -1) {
+            fNameClean = fNameClean.substring(closeParen + 1).trim();
+        }
+    }
+    
+    // Ignore the "| Student: Bobby |" block placed in the Last Name column
+    if (lNameClean.startsWith("|")) lNameClean = "";
+    
+    const cleanFullName = `${fNameClean} ${lNameClean}`.trim();
+
+    const emails = [];
+    [e1Idx, e2Idx, e3Idx].forEach(idx => {
+        if (idx > -1 && phoneData[i][idx]) emails.push(String(phoneData[i][idx]).trim());
+    });
+
+    const phones = [];
+    [p1Idx, p2Idx, p3Idx, p4Idx].forEach(idx => {
+        if (idx > -1 && phoneData[i][idx]) phones.push(String(phoneData[i][idx]).trim());
+    });
+
+    if (!oldPhoneMap.has(osis)) oldPhoneMap.set(osis, []);
+    
+    oldPhoneMap.get(osis).push({
+        name: cleanFullName,          // Just "Jane Doe" (Allows a perfect match!)
+        originalFirstName: rawFName,  // Preserves "(Mother) Jane Doe" so we can flip it later
+        emails: [...new Set(emails)],
+        phones: [...new Set(phones)]
+    });
+  }
+  return oldPhoneMap;
+}
+
+/** Helper: Splits a full name strictly for Directory output */
+function splitFullName_(fullName) {
+  const parts = String(fullName).trim().split(" ");
+  if (parts.length === 1) return { first: parts[0], last: "" };
+  const last = parts.pop();
+  const first = parts.join(" ");
+  return { first: first, last: last };
+}
