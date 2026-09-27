@@ -74,8 +74,13 @@ function ma_migrateRawData(url) {
 function ma_migrateSimpleSheets(url) {
   const oldSS = SpreadsheetApp.openByUrl(url);
   const newSS = SpreadsheetApp.getActiveSpreadsheet();
+
+  // New/Edit Student lives in the Backend tab now; the old copy may still have
+  // it as its own tab, and the reader handles both.
+  const overrides = readBackendBlockFromOtherSpreadsheet_(oldSS, "OVERRIDES");
+  if (overrides.length > 1) backendWriteBlock_(newSS, "OVERRIDES", overrides);
   
-  const sheetsToCopy = ["New/Edit Student", "Send Out", "Events"];
+  const sheetsToCopy = ["Send Out", "Events"];
   
   sheetsToCopy.forEach(sheetName => {
     const oldSheet = oldSS.getSheetByName(sheetName);

@@ -7,16 +7,15 @@ function buildOverrideReport() {
   const reportSheetName = "Students Override Report";
   
   const rawSheet = ss.getSheetByName("RAW Data") || ss.getSheetByName("Raw Data");
-  const overrideSheet = ss.getSheetByName("New/Edit Student");
   
-  if (!rawSheet || !overrideSheet) {
-    SpreadsheetApp.getUi().alert("Error: Could not find 'Raw Data' or 'New/Edit Student' sheets.");
+  if (!rawSheet) {
+    SpreadsheetApp.getUi().alert("Error: Could not find the 'Raw Data' sheet.");
     return;
   }
 
-  // 1. Read Data
+  // 1. Read Data (overrides live in the Backend tab's New/Edit Student section)
   const rawData = rawSheet.getDataRange().getValues().slice(6); 
-  const overrideData = overrideSheet.getDataRange().getValues().slice(1);
+  const overrideData = backendReadBlock_(ss, "OVERRIDES").slice(1);
 
   // 2. Map RAW Data by OSIS
   const rawMap = new Map();

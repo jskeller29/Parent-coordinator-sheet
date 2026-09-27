@@ -14,7 +14,7 @@
 //
 // RESILIENCE (why copies still work)
 //   getTemplateLinks_() tries a live Drive scan first. On success it mirrors
-//   the result into the hidden "Version" tab (cols D:E), which travels with
+//   the result into the Backend Version section (cols D:E), which travels with
 //   every copy of the sheet — so a plain copy that can't reach the folder
 //   still inherits the last-known links, exactly like saved settings do.
 //
@@ -199,16 +199,15 @@ function copyUrlFor_(file) {
 // ==========================================
 
 /**
- * Mirrors the resolved links into the hidden "Version" tab, cells D1:E3.
- * Uses columns D:E so it never collides with the build date (A1), the
- * Auto-Migrate toggle (B2), or the saved-settings block (rows 4+, cols A:B).
+ * Mirrors the resolved links into the Backend Version section, cells D2:E4.
+ * Uses columns D:E so it never collides with the build date (A2), the
+ * Auto-Migrate toggle (B3), or the saved-settings block (rows 5+, cols A:B).
  */
 function saveTemplateLinksToVersionSheet_(links) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = (typeof getOrCreateVersionSheet_ === "function")
-    ? getOrCreateVersionSheet_(ss) : ss.getSheetByName("Version");
+  const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
-  sheet.getRange(1, 4, 3, 2).setValues([
+  sheet.getRange(BACKEND_VERSION.LINKS_ROW, 4, 3, 2).setValues([
     ["TEMPLATE LINKS (auto-managed — do not edit)", ""],
     ["BLANK copy",   links.blankCopyUrl   || ""],
     ["MIGRATE copy", links.migrateCopyUrl || ""]
@@ -216,15 +215,14 @@ function saveTemplateLinksToVersionSheet_(links) {
 }
 
 /**
- * Reads the inherited links back out of the Version tab (E2/E3). Returns null
- * when nothing usable is stored.
+ * Reads the inherited links back out of the Backend Version section (E3/E4).
+ * Returns null when nothing usable is stored.
  */
 function loadTemplateLinksFromVersionSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Version");
-  if (!sheet) return null;
   try {
-    const vals = sheet.getRange(2, 5, 2, 1).getValues(); // E2:E3
+    const sheet = getOrCreateVersionSheet_(ss);
+    const vals = sheet.getRange(BACKEND_VERSION.LINKS_ROW + 1, 5, 2, 1).getValues(); // E3:E4
     const blank = String(vals[0][0] || "").trim();
     const migrate = String(vals[1][0] || "").trim();
     if (!blank && !migrate) return null;
@@ -243,7 +241,7 @@ function loadTemplateLinksFromVersionSheet_() {
 /**
  * Cached, resilient resolver for the User Guide link. Tries a live scan of the
  * guide folder (newest file wins, PDF or Doc); caches it and mirrors it into
- * the Version tab (E4) so plain copies inherit it. Falls back to the inherited
+ * the Backend Version section (E5) so plain copies inherit it. Falls back to the inherited
  * value, then the guide-folder URL, so the link is never dead. Never throws —
  * safe even in the limited-auth simple onOpen (the scan just no-ops there and
  * the inherited/fallback value is used).
@@ -288,22 +286,20 @@ function scanGuideFolder_() {
   }
 }
 
-/** Mirrors the guide link into the Version tab (D4 label / E4 value). */
+/** Mirrors the guide link into the Backend Version section (D5 label / E5 value). */
 function saveGuideLinkToVersionSheet_(url) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = (typeof getOrCreateVersionSheet_ === "function")
-    ? getOrCreateVersionSheet_(ss) : ss.getSheetByName("Version");
+  const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
-  sheet.getRange(4, 4, 1, 2).setValues([["GUIDE link", url || ""]]);
+  sheet.getRange(BACKEND_VERSION.GUIDE_ROW, 4, 1, 2).setValues([["GUIDE link", url || ""]]);
 }
 
-/** Reads the inherited guide link back out of the Version tab (E4). */
+/** Reads the inherited guide link back out of the Backend Version section (E5). */
 function loadGuideLinkFromVersionSheet_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Version");
-  if (!sheet) return "";
   try {
-    return String(sheet.getRange(4, 5).getValue() || "").trim(); // E4
+    const sheet = getOrCreateVersionSheet_(ss);
+    return String(sheet.getRange(BACKEND_VERSION.GUIDE_ROW, 5).getValue() || "").trim(); // E5
   } catch (e) {
     console.error(e);
     return "";

@@ -13,8 +13,7 @@ function buildAllDerivedSheets() {
   // FIX 3: Pre-read logs ONCE. Uses getDisplayValues() for perfectly formatted string dates.
   const contactLogSheet = ss.getSheetByName("Contact Log");
   const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getDisplayValues() : [];
-  const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
-  let eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+  let eventLogData = backendReadBlock_(ss, "EVENT_LOG");
 
   // =========================================================
   // --- PRE-FETCH OLD DATA SNAPSHOT FOR REPORTS ---
@@ -58,17 +57,14 @@ function buildAllDerivedSheets() {
 // ==========================================
   // REBUILD BACKEND EVENT LOG
   // ==========================================
-  const backendEventSheet = ss.getSheetByName("Backend_Event_Log");
-  if (backendEventSheet) {
+  {
     // 1. Call our updated helper function to scrape and split the Events sheet
     const freshEventData = buildBackendEventLogData_(ss);
     
-    // 2. Clear out any old, dead, or ghost data from the backend
-    backendEventSheet.clearContents();
-    
-    // 3. Paste the perfectly parsed, chronologically sorted data back in
+    // 2+3. Replace the Backend tab's Event Log section (clears old/ghost rows;
+    // only its own columns, so the other Backend sections are untouched)
     if (freshEventData && freshEventData.length > 0) {
-      backendEventSheet.getRange(1, 1, freshEventData.length, freshEventData[0].length).setValues(freshEventData);
+      backendWriteBlock_(ss, "EVENT_LOG", freshEventData);
       
       // ⚡ THE FIX: Overwrite the old memory array with the perfectly formatted new data!
       eventLogData = freshEventData; 

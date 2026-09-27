@@ -971,13 +971,11 @@ function buildTrackingNotesMap_(ss, combinedContactTrackingArray) {
 ========================= */
 
 function getOverrideData_(ss) {
-  const sheet = ss.getSheetByName("New/Edit Student");
   const overrideStudents = new Map();
   const overrideGuardians = new Map();
 
-  if (!sheet) return { students: overrideStudents, guardians: overrideGuardians };
-
-  const data = sheet.getDataRange().getValues();
+  // New/Edit Student section of the Backend tab (index 0 = header row)
+  const data = backendReadBlock_(ss, "OVERRIDES");
   
   for (let i = 1; i < data.length; i++) {
     const r = data[i];

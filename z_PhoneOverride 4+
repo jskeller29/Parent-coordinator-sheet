@@ -23,8 +23,7 @@ function updateSingleOsisDelta_(targetOsis) {
     const contactLogSheet = ss.getSheetByName("Contact Log");
     const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getValues() : [];
     
-    const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
-    const eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+    const eventLogData = backendReadBlock_(ss, "EVENT_LOG");
 
     // Pass ALL 4 arguments into the builder
     const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTableData, contactLogData, eventLogData);
@@ -158,9 +157,8 @@ function buildAllDerivedSheets() {
   const contactLogSheet = ss.getSheetByName("Contact Log");
   const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getDisplayValues() : [];
   
-  const eventLogSheet = ss.getSheetByName("Backend_Event_Log");
   // ⚡ FIX 1: Changed to "let" so the script can update it after rebuilding the backend!
-  let eventLogData = eventLogSheet ? eventLogSheet.getDataRange().getValues() : [];
+  let eventLogData = backendReadBlock_(ss, "EVENT_LOG");
 
   // =========================================================
   // --- PRE-FETCH OLD DATA SNAPSHOT FOR REPORTS ---
@@ -212,11 +210,11 @@ function buildAllDerivedSheets() {
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
   // ⚡ FIX 2: REBUILD BACKEND EVENT LOG 
-  // We use your "writeSheet_" helper because if you delete the tab or delete rows, this automatically recreates them!
+  // Writes only the Backend tab's Event Log section (AX:BF); writeSheet_ would wipe the other sections
   // ==========================================
   const freshEventData = buildBackendEventLogData_(ss);
   if (freshEventData && freshEventData.length > 0) {
-    writeSheet_(ss, "Backend_Event_Log", freshEventData);
+    backendWriteBlock_(ss, "EVENT_LOG", freshEventData);
     eventLogData = freshEventData; // Overwrite memory with the newly regenerated data
   }
   // ==========================================

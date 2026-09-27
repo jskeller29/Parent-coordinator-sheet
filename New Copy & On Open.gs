@@ -18,18 +18,23 @@ function applyDefaultSheetVisibility_(ss) {
 }
 
 /**
- * Auto-Migrate mode is controlled by the hidden "Version" tab, cell B2:
+ * Auto-Migrate mode is controlled by the hidden Backend tab, cell B3:
  * "Yes" turns it on (upgrade-template copies), anything else is off
  * (new-user copies). The cell travels with every copy of the sheet, and
  * reading the bound spreadsheet's own cell is allowed even in the simple
  * onOpen trigger. Set it with the toggleAutoMigratePopup() dev tool or by
- * typing directly into B2.
+ * typing directly into B3. Read-only (runs in the simple onOpen): falls back to
+ * an older copy's separate "Version" tab (B2) without migrating anything.
  */
 function isAutoMigrateOn_() {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Version");
-    if (!sheet) return false;
-    return String(sheet.getRange("B2").getValue()).trim().toLowerCase() === "yes";
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
+    const legacy = ss.getSheetByName("Version");
+    const cell = backend ? backend.getRange(BACKEND_VERSION.MIGRATE_TOGGLE)
+               : legacy ? legacy.getRange("B2") : null;
+    if (!cell) return false;
+    return String(cell.getValue()).trim().toLowerCase() === "yes";
   } catch (e) {
     console.error(e);
     return false;
@@ -127,7 +132,7 @@ function onOpen() {
     props.deleteProperty('VERSION_DISMISS_FOREVER');
     props.deleteProperty('VERSION_MAJORS_ONLY');
     props.deleteProperty('VERSION_LAST_CHECK');
-    // ℹ️ The Auto-Migrate toggle now lives in the "Version" tab cell B2, not
+    // ℹ️ The Auto-Migrate toggle now lives in the Backend tab cell B3, not
     // a document property, so it travels with copies automatically — nothing
     // to preserve here.
   }
@@ -197,7 +202,7 @@ function onOpen() {
     // =======================================================
     // 🆕 AUTO-OPEN MIGRATION WIZARD (Upgrade-template copies)
     // Fires on every open until the sheets are built. Controlled by the
-    // hidden "Version" tab, cell B2 = "Yes" (see isAutoMigrateOn_).
+    // hidden Backend tab, cell B3 = "Yes" (see isAutoMigrateOn_).
     // =======================================================
     if (isAutoMigrateOn_() && !IS_RUNNING_SETUP) {
       try { openMigrationWizard(); } catch(e) { console.error(e); }
@@ -398,7 +403,7 @@ function runInitialSetupWrapper() {
   
 // =======================================================
   // SETTINGS: inherit the template's saved settings, fall back to defaults.
-  // A fresh copy carries its settings in the "Version" tab (cell values
+  // A fresh copy carries its settings in the Backend Version section (cell values
   // survive copying; document properties do not), so we read those here and
   // only use the hardcoded defaults for anything not saved.
   // =======================================================
@@ -447,8 +452,8 @@ function runInitialSetupWrapper() {
   // =======================================================
   // 🆕 UPGRADE TEMPLATE vs NEW-USER TEMPLATE
   // Only one modal can be open at a time, so we pick the right one:
-  //   Version!B2 = "Yes" -> jump straight into the Migration Wizard
-  //   Version!B2 = "No"  -> show the normal Welcome guide
+  //   Backend!B3 = "Yes" -> jump straight into the Migration Wizard
+  //   Backend!B3 = "No"  -> show the normal Welcome guide
   // =======================================================
   if (isAutoMigrateOn_()) {
     openMigrationWizard();
