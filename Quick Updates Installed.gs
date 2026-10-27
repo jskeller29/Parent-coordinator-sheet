@@ -272,7 +272,7 @@ function buildGhostLookup_(ss) {
     for (let c = 0; c < 3; c++) add(c, key(r[c]), rec);
     String(r[0]).split(",").forEach(o => add(0, key(o), rec));
     String(r[1]).split(",").forEach(n => add(1, key(n), rec));
-    String(r[2]).split(",").forEach(n => add(2, key(stripTrailingParenthetical_(n)), rec));
+    String(r[2]).split(/,|\s+and\s+/i).forEach(n => add(2, key(stripTrailingParenthetical_(n)), rec)); // "Homer Simpson and Marge Simpson"
   });
 
   return (value, col) => byCol[col].get(key(value)) || byCol[col].get(key(stripTrailingParenthetical_(value))) || null;

@@ -246,7 +246,12 @@
           document.getElementById('buildBar').classList.add('cancelled');
           document.getElementById('syncBar').classList.add('cancelled');
           
+          // A crash is reported as 'killed' with the error attached; only a real Cancel has no error
           let cancelText = runMode === 'BUILD_ONLY' ? '🛑 Build Terminated by User' : '🛑 Sync Terminated by User';
+          if (state.error) {
+            const safeError = String(state.error).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+            cancelText = (runMode === 'BUILD_ONLY' ? '❌ Build failed: ' : '❌ Sync failed: ') + safeError;
+          }
           
           if (runMode === 'BUILD_ONLY') {
              document.getElementById('buildStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;

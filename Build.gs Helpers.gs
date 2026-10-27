@@ -355,6 +355,7 @@ function startBuildOnlyProcess() {
     
     cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'done_build_only' }), 21600); 
   } catch(e) { 
-    cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed', error: e.message }), 21600); 
+    console.error("Build failed: " + (e.stack || e.message));
+    cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed', error: e.message || String(e) }), 21600); 
   } 
 }

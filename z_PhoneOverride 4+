@@ -213,7 +213,7 @@ function buildAllDerivedSheets() {
   try {
     const directoryOsis = getOldMasterOsisSet_(ss);
     for (const id of overrides.students.keys()) directoryOsis.add(id);
-    logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows);
+    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows);
   } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
   // ⚡ FIX 2: REBUILD BACKEND EVENT LOG 

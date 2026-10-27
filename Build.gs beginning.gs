@@ -28,7 +28,7 @@ function buildAllDerivedSheets() {
   }
 
   // OSIS -> Status from the Master Table before it is rewritten (build report + New Students log)
-  const oldMasterStatusMap = readMasterStatusSnapshot_(ss);
+  const oldMasterStatusMap = typeof readMasterStatusSnapshot_ === "function" ? readMasterStatusSnapshot_(ss) : new Map();
 
   // --- Step 0: Pre-read the Override Sheet --- 
   // Remove New Student overrides that ATS has caught up with (and exact duplicates of Raw Data)
@@ -49,7 +49,7 @@ function buildAllDerivedSheets() {
 
   // Log students who just appeared (ATS or New/Edit Student) to the "New Students" tab
   try {
-    logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, new Set(overrides.students.keys()), guardianRows);
+    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, new Set(overrides.students.keys()), guardianRows);
   } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
 // ==========================================
@@ -159,7 +159,7 @@ function buildAllDerivedSheets() {
   }), 21600);
 
   // FIX 4: Set Montserrat font ONCE at the very end instead of inside writeSheet_
-  ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", NEW_STUDENTS_SHEET]
+  ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"]
     .forEach(name => {
       const sh = ss.getSheetByName(name);
       if (sh) sh.getDataRange().setFontFamily("Montserrat");
