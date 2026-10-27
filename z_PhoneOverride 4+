@@ -209,12 +209,6 @@ function buildAllDerivedSheets() {
   masterTable = injectHistoricalMasterTable_(ss, masterTable);
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
-  // Log new students to the "New Students" tab; Old Master Table and New/Edit Student count as "Directory"
-  try {
-    const directoryOsis = getOldMasterOsisSet_(ss);
-    for (const id of overrides.students.keys()) directoryOsis.add(id);
-    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows);
-  } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
   // ⚡ FIX 2: REBUILD BACKEND EVENT LOG 
   // Writes only the Backend tab's Event Log section (AX:BF); writeSheet_ would wipe the other sections
@@ -239,7 +233,21 @@ function buildAllDerivedSheets() {
   // Directory base is Raw Data only (no New/Edit Student overrides); history is layered on below
   let directory = buildDirectoryOverride_(ss, buildStudentMap_(rawData, new Map()), buildGuardianObjects_(rawData, new Map())); 
   directory = injectHistoricalDirectory_(ss, directory);
+  const oldDirectoryOsis = getDirectoryOsisSet_(ss.getSheetByName("Directory") ? ss.getSheetByName("Directory").getDataRange().getValues() : []);
   writeSheet_(ss, "Directory", directory);
+
+  // Log new students to the "New Students" tab; Old Master Table and New/Edit Student count as "Directory".
+  // Old Master students are always in the Master Table, so also log anyone who just joined the Directory
+  // (e.g. their Old Master Table status became MASTER).
+  try {
+    const directoryOsis = getOldMasterOsisSet_(ss);
+    for (const id of overrides.students.keys()) directoryOsis.add(id);
+    const newInDirectory = new Set();
+    if (oldDirectoryOsis.size > 0) {
+      getDirectoryOsisSet_(directory).forEach(id => { if (!oldDirectoryOsis.has(id)) newInDirectory.add(id); });
+    }
+    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows, newInDirectory);
+  } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
   if (typeof formatDirectoryAuto_ === "function") formatDirectoryAuto_(ss.getSheetByName("Directory"));
 
@@ -529,6 +537,18 @@ function injectHistoricalMasterTable_(ss, masterTable) {
   }
 
   return masterTable;
+}
+
+/** Every OSIS in a Directory array/sheet (column found by its "OSIS" header; sibling groups split). */
+function getDirectoryOsisSet_(directoryValues) {
+  const set = new Set();
+  if (!directoryValues || !directoryValues.length) return set;
+  let col = directoryValues[0].findIndex(h => String(h).trim().toUpperCase() === "OSIS");
+  if (col === -1) col = 2;
+  for (let i = 1; i < directoryValues.length; i++) {
+    String(directoryValues[i][col]).split(",").map(o => o.trim()).filter(o => /^\d{6,}$/.test(o)).forEach(o => set.add(o));
+  }
+  return set;
 }
 
 /** Every OSIS listed in the Old Master Table (header row found by its "OSIS" column). */

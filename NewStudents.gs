@@ -47,8 +47,9 @@ function readMasterStatusSnapshot_(ss) {
  * @param {Array[]} rawData            Raw Data values
  * @param {Set}     directoryOsis      OSIS that come from a non-ATS source (New/Edit Student, Old Master Table, ...)
  * @param {Array}   guardianRows       Guardian objects (for Language)
+ * @param {Set}     [alsoNewOsis]      Optional: OSIS to log even though they were already in the Master Table
  */
-function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows) {
+function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows, alsoNewOsis) {
   let sheet = ss.getSheetByName(NEW_STUDENTS_SHEET);
   if (!sheet) sheet = ss.insertSheet(NEW_STUDENTS_SHEET);
   if (!toText_(sheet.getRange(1, 1).getValue())) {
@@ -103,7 +104,8 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
     const wasListed = oldMasterStatusMap.has(osis);
     const reEntered = wasListed && /discharge/i.test(oldMasterStatusMap.get(osis));
     const prior = logged.get(osis);
-    if (wasListed && !reEntered && !(prior && prior.source !== source)) continue;
+    const forcedNew = !!(alsoNewOsis && alsoNewOsis.has(osis));
+    if (wasListed && !reEntered && !forcedNew && !(prior && prior.source !== source)) continue;
 
     const language = (languagesById.get(osis) || []).join(", ") || homeLanguage.get(osis) || "";
     const row = [today, source, m[0], m[1], m[2], m[3], m[4], language];
