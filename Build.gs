@@ -1,25 +1,81 @@
 /* =========================
+   NAME MATCHING (shared by Parent Square + NYCSA)
+   Names are compared as sets of lowercase parts, so accents, punctuation,
+   commas and word order never block a match ("SIMPSON, Homer" = "Homer Simpson").
+========================= */
+
+function nameTokens_(text) {
+  const s = stripTrailingParenthetical_(text)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/['’`.]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return s ? s.split(" ") : [];
+}
+
+function sameNameExactly_(a, b) {
+  const A = new Set(a), B = new Set(b);
+  return A.size > 0 && A.size === B.size && [...A].every(t => B.has(t));
+}
+
+// Same name, or the shorter name (2+ parts) is fully inside the longer one:
+// ATS "Maria Del Carmen Lopez" matches NYCSA "Maria" + "Lopez".
+function namesMatch_(a, b) {
+  const A = new Set(a), B = new Set(b);
+  if (!A.size || !B.size) return false;
+  const small = A.size <= B.size ? A : B;
+  const big = small === A ? B : A;
+  for (const t of small) if (!big.has(t)) return false;
+  return small.size >= 2 || A.size === B.size;
+}
+
+function shareNameToken_(a, b) {
+  const B = new Set(b);
+  return a.some(t => B.has(t));
+}
+
+// Digits only, padded to 9 so an OSIS stored as a number (lost leading zero) still matches
+function normalizeOsis_(value) {
+  const digits = toText_(value).replace(/\D/g, "");
+  return digits && digits.length < 9 ? digits.padStart(9, "0") : digits;
+}
+
+/* =========================
    PARENT SQUARE INDEX
 ========================= */
 
 function buildParentSquareIndex_(rawData) {
   const emailStatus = new Map();
   const phoneStatus = new Map();
+  const rowsByStudentToken = new Map(); // student-name part -> PS rows listing that student
+  const studentTokensByOsis = new Map(); // OSIS -> [first name, last name] from ATS
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
 
+    if (isRealStudentId_(r[2])) {
+      const studentTokens = [nameTokens_(r[4])[0], nameTokens_(r[3])[0]].filter(Boolean);
+      studentTokensByOsis.set(normalizeOsis_(r[2]), studentTokens);
+    }
+
     const email = normalizeEmail_(r[34]);
-    const phone = normalizePhoneForMatch_(r[35]);
-    const secondary = normalizePhoneForMatch_(r[36]);
+    const phones = [normalizePhoneForMatch_(r[35]), normalizePhoneForMatch_(r[36])].filter(Boolean);
     const registered = normalizeYesNo_(r[38]);
 
     if (email) mergeStatusIntoMap_(emailStatus, email, registered);
-    if (phone) mergeStatusIntoMap_(phoneStatus, phone, registered);
-    if (secondary) mergeStatusIntoMap_(phoneStatus, secondary, registered);
+    phones.forEach(p => mergeStatusIntoMap_(phoneStatus, p, registered));
+
+    const students = new Set(nameTokens_(r[33]));
+    if (!students.size) continue;
+    const row = { name: nameTokens_(r[32]), students, email, phones, registered };
+    students.forEach(t => {
+      if (!rowsByStudentToken.has(t)) rowsByStudentToken.set(t, []);
+      rowsByStudentToken.get(t).push(row);
+    });
   }
 
-  return { emailStatus, phoneStatus };
+  return { emailStatus, phoneStatus, rowsByStudentToken, studentTokensByOsis };
 }
 
 function mergeStatusIntoMap_(map, key, newStatus) {
@@ -44,11 +100,33 @@ function normalizeYesNo_(value) {
   return "";
 }
 
-function getParentsSquareStatus_(guardian, parentSquareIndex) {
-  let status = "";
+// PS rows whose "Students" column names this guardian's student (first + last name)
+function psRowsForStudent_(studentId, parentSquareIndex) {
+  const tokens = parentSquareIndex.studentTokensByOsis.get(normalizeOsis_(studentId)) || [];
+  if (tokens.length < 2) return [];
+  const candidates = parentSquareIndex.rowsByStudentToken.get(tokens[1]) || [];
+  return candidates.filter(r => tokens.every(t => r.students.has(t)));
+}
 
+function getParentsSquareStatus_(guardian, parentSquareIndex) {
   const email = normalizeEmail_(guardian.email);
   const phone = normalizePhoneForMatch_(guardian.mobile);
+  const reduceStatus = rows => rows.reduce((s, r) => mergeYesNoStatus_(s, r.registered), "");
+
+  // 1. Rows for this guardian's own student: name + contact, then name, then contact.
+  //    Keeps a shared household phone/email from giving one parent the other's status.
+  const studentRows = psRowsForStudent_(guardian.student_id, parentSquareIndex);
+  if (studentRows.length) {
+    const name = nameTokens_(guardian.guardianOutput);
+    const byName = studentRows.filter(r => namesMatch_(name, r.name));
+    const byContact = studentRows.filter(r => (email && r.email === email) || (phone && r.phones.indexOf(phone) !== -1));
+    const both = byContact.filter(r => byName.indexOf(r) !== -1);
+    const pick = both.length ? both : byName.length ? byName : byContact;
+    if (pick.length) return reduceStatus(pick);
+  }
+
+  // 2. Email/phone anywhere in Parent Square
+  let status = "";
 
   if (email && parentSquareIndex.emailStatus.has(email)) {
     status = mergeYesNoStatus_(status, parentSquareIndex.emailStatus.get(email));
@@ -66,46 +144,55 @@ function getParentsSquareStatus_(guardian, parentSquareIndex) {
 ========================= */
 
 function buildNYCSAIndex_(rawData) {
-  const byStudentAndName = new Map();
+  const byStudent = new Map(); // OSIS -> NYCSA guardian rows for that student
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
 
-    const osis = String(r[46] || "").trim(); // NYCSA Student ID is index 46
-    const first = properCase_(toText_(r[49]));
-    const last = properCase_(toText_(r[50]));
-    const fullName = `${first} ${last}`.trim();
-    if (!fullName || !osis) continue;
+    const osis = normalizeOsis_(r[46]); // NYCSA Student ID is index 46
+    const name = nameTokens_(`${toText_(r[49])} ${toText_(r[50])}`);
+    if (!osis || !name.length) continue;
 
-    const anotherCustodial = normalizeYesNo_(r[51]);
-    const accountCode = toText_(r[57]); // NYCSA Account Creation Code (Column BF)
-
-    // ✨ NEW: Unique Key using OSIS + Name to prevent sibling bleed
-    const compositeKey = `${osis}_${normalizeName_(fullName)}`;
-
-    byStudentAndName.set(compositeKey, {
-      anotherCustodial,
-      accountCode
+    if (!byStudent.has(osis)) byStudent.set(osis, []);
+    byStudent.get(osis).push({
+      name,
+      phones: [r[52], r[53], r[54]].map(normalizePhoneForMatch_).filter(Boolean), // Home, Work, Cell
+      anotherCustodial: normalizeYesNo_(r[51]),
+      accountCode: toText_(r[57]) // NYCSA Account Creation Code (Column BF)
     });
   }
 
-  return { byStudentAndName };
+  return { byStudent };
+}
+
+// Within one student's NYCSA rows: exact name, then phone (with a shared name part),
+// then partial name. Each later step must point to a single row, and never to a row
+// whose name is exactly the other guardian's.
+function findNYCSARow_(g, rows, otherGuardian) {
+  if (!g || !g.guardianOutput || !rows.length) return null;
+  const name = nameTokens_(g.guardianOutput);
+
+  const exact = rows.filter(r => sameNameExactly_(name, r.name));
+  if (exact.length) return exact[0];
+
+  const otherName = otherGuardian && otherGuardian.guardianOutput ? nameTokens_(otherGuardian.guardianOutput) : [];
+  const open = rows.filter(r => !sameNameExactly_(otherName, r.name));
+
+  const phone = normalizePhoneForMatch_(g.mobile);
+  const byPhone = phone ? open.filter(r => r.phones.indexOf(phone) !== -1 && shareNameToken_(name, r.name)) : [];
+  if (byPhone.length === 1) return byPhone[0];
+
+  const byName = open.filter(r => namesMatch_(name, r.name));
+  if (byName.length === 1) return byName[0];
+
+  return null;
 }
 
 function getNYCSAStatus_(currentGuardian, otherGuardian, index) {
-  const targetOsis = String(currentGuardian.student_id).trim();
+  const rows = index.byStudent.get(normalizeOsis_(currentGuardian.student_id)) || [];
 
-  const getMatch = (g) => {
-    if (!g || !g.guardianOutput) return null;
-    const name = normalizeName_(stripTrailingParenthetical_(g.guardianOutput));
-    
-    // ✨ NEW: Look up using the strict OSIS + Name key
-    const compositeKey = `${targetOsis}_${name}`;
-    return index.byStudentAndName.get(compositeKey);
-  };
-
-  const currentMatch = getMatch(currentGuardian);
-  const otherMatch = getMatch(otherGuardian);
+  const currentMatch = findNYCSARow_(currentGuardian, rows, otherGuardian);
+  const otherMatch = findNYCSARow_(otherGuardian, rows, currentGuardian);
 
   if (currentMatch) {
     const code = currentMatch.accountCode ? ` ${currentMatch.accountCode}` : "";
@@ -119,10 +206,6 @@ function getNYCSAStatus_(currentGuardian, otherGuardian, index) {
   }
 
   return "Yes/Unknown";
-}
-
-function normalizeName_(text) {
-  return toText_(text).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /* ========================= MASTER TABLE ========================= */

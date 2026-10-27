@@ -41,11 +41,12 @@ function groupGuardiansByStudent_(guardianRows) {
 }
 
 function normalizeEmail_(value) {
-  return toText_(value).toLowerCase();
+  return toText_(value).toLowerCase().replace(/\s+/g, "");
 }
 
 function normalizePhoneForMatch_(value) {
-  const digits = toText_(value).replace(/\D/g, "");
+  // Drop an extension ("x12", "ext. 12") so its digits don't make the number unmatchable
+  const digits = toText_(value).replace(/\s*(?:ext\.?|extension|x)\s*\d+\s*$/i, "").replace(/\D/g, "");
   if (!digits) return "";
   return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
 }
