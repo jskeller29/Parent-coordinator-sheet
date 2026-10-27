@@ -26,3 +26,6 @@ New Students tab (see NewStudents.gs):
   (Date Entered, Source ATS | Directory | ATS/Directory, OSIS, Student, Guardian, Site, Class, Language).
   Only appended to; a row is re-dated when the student re-enters or its Source changes.
 - Shared build: "Directory" = New/Edit Student. Owner build (z_PhoneOverride 4+) also counts Old Master Table.
+
+Workflow:
+- The owner wants every finished change merged into main: after pushing the working branch, also push it to main.
