@@ -60,6 +60,19 @@ function installedOnEdit(e) {
   if (endRow && row >= endRow) return;
 
   // =======================================================
+  // CONTACT LOG GHOST TYPIST — PASTED COLUMN (fills every pasted row)
+  // =======================================================
+  if (numRows > 1 && (col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT)) {
+    try {
+      const pasteRows = endRow ? Math.min(numRows, endRow - row) : numRows;
+      if (pasteRows > 0) fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow);
+    } catch (err) {
+      console.error(err);
+      e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
+    }
+  }
+
+  // =======================================================
   // CONTACT LOG GHOST TYPIST (OSIS, Guardian, Student)
   // Runs FIRST so the auto-filled values land on screen before the
   // cosmetic border/checkbox repair work below.
@@ -238,6 +251,153 @@ function isValidOsis_(value) {
 }
 
 // =========================================================
+// PASTE GHOST TYPIST HELPERS
+// =========================================================
+
+/**
+ * Reads Master Table A5:C ONCE and returns lookup(value, col) for pasted values,
+ * col 0 = OSIS, 1 = Student, 2 = Guardian. Case/spacing don't matter, and a
+ * single OSIS or parent name matches a sibling group / multi-parent cell.
+ */
+function buildGhostLookup_(ss) {
+  const master = ss.getSheetByName("Master Table");
+  const last = master ? master.getLastRow() : 0;
+  const data = last >= 5 ? master.getRange(5, 1, last - 4, 3).getValues() : [];
+  const key = v => String(v).trim().toLowerCase().replace(/\s+/g, " ");
+  const byCol = [new Map(), new Map(), new Map()];
+  const add = (c, k, rec) => { if (k && !byCol[c].has(k)) byCol[c].set(k, rec); };
+
+  data.forEach(r => {
+    const rec = { osis: r[0], student: r[1], guardian: r[2] };
+    for (let c = 0; c < 3; c++) add(c, key(r[c]), rec);
+    String(r[0]).split(",").forEach(o => add(0, key(o), rec));
+    String(r[1]).split(",").forEach(n => add(1, key(n), rec));
+    String(r[2]).split(",").forEach(n => add(2, key(stripTrailingParenthetical_(n)), rec));
+  });
+
+  return (value, col) => byCol[col].get(key(value)) || byCol[col].get(key(stripTrailingParenthetical_(value))) || null;
+}
+
+/** Reads Directory C:E ONCE; returns siteClass(osisGroup) -> { site, cls } like the single-cell typist. */
+function buildDirectorySiteClassLookup_(ss) {
+  const byOsis = new Map();
+  const dir = ss.getSheetByName("Directory");
+  const last = dir ? dir.getLastRow() : 0;
+  if (last > 0) {
+    dir.getRange(1, 3, last, 3).getValues().forEach(r => {
+      const o = String(r[0]).trim();
+      if (!o) return;
+      if (!byOsis.has(o)) byOsis.set(o, { sites: new Set(), classes: new Set() });
+      if (String(r[1]).trim()) byOsis.get(o).sites.add(String(r[1]).trim());
+      if (String(r[2]).trim()) byOsis.get(o).classes.add(String(r[2]).trim());
+    });
+  }
+  return osisGroup => {
+    const sites = new Set(), classes = new Set();
+    String(osisGroup).split(",").map(o => o.trim()).filter(Boolean).forEach(o => {
+      const hit = byOsis.get(o);
+      if (hit) { hit.sites.forEach(x => sites.add(x)); hit.classes.forEach(x => classes.add(x)); }
+    });
+    return { site: Array.from(sites).join(", "), cls: Array.from(classes).join(", ") };
+  };
+}
+
+function toastGhostMisses_(ss, filled, missing) {
+  if (!missing.length) {
+    ss.toast(`Filled ${filled} row${filled === 1 ? "" : "s"}.`, "Ghost Typist", 3);
+    return;
+  }
+  const shown = missing.slice(0, 5).join(", ") + (missing.length > 5 ? ` (+${missing.length - 5} more)` : "");
+  ss.toast(`Filled ${filled}. Not found in the Master Table: ${shown}`, "Ghost Typist", 8);
+}
+
+/** Contact Log: fills Guardian / OSIS / Student / Site / Class for every pasted row. */
+function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow) {
+  const lookup = buildGhostLookup_(ss);
+  const siteClass = buildDirectorySiteClassLookup_(ss);
+  const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
+
+  const updateRange = sheet.getRange(row, 3, numRows, 7); // C:I
+  const rows = updateRange.getValues();
+  const missing = [];
+  const filledRows = [];
+
+  rows.forEach((r, i) => {
+    const val = String(r[col - 3]).trim();
+    if (!val || val.toUpperCase() === "TRUE" || val.toUpperCase() === "FALSE") return;
+    const m = lookup(val, matchCol);
+    if (!m) { missing.push(val); return; }
+    const sc = siteClass(m.osis);
+    if (col !== CL_COL_GUARDIAN) r[0] = m.guardian; // C
+    if (col !== CL_COL_OSIS) r[2] = m.osis;         // E
+    if (col !== CL_COL_STUDENT) r[3] = m.student;   // F
+    r[5] = sc.site;                                 // H
+    r[6] = sc.cls;                                  // I
+    filledRows.push({ row: row + i, val });
+  });
+
+  updateRange.setValues(rows);
+  SpreadsheetApp.flush();
+
+  // Date / # / Follow-up defaults and the week formula for each filled row
+  filledRows.forEach(f => {
+    if (typeof autofillContactLogDefaults_ === "function") autofillContactLogDefaults_(sheet, f.row, col, endRow, f.val);
+    if (typeof patchMissingFormulasInRow_ === "function") patchMissingFormulasInRow_(sheet, f.row);
+  });
+  // Keep a blank row above the END bar when the paste reached it
+  if (typeof autoAddBlankRow_ === "function") autoAddBlankRow_(sheet, row + numRows - 1, endRow);
+
+  toastGhostMisses_(ss, filledRows.length, missing);
+}
+
+/** Notes: fills OSIS / Guardian / Student for every pasted row; families already on the sheet are removed. */
+function fillPastedNotesRows_(ss, sheet, row, numRows, col) {
+  const lookup = buildGhostLookup_(ss);
+  const matchCol = (col === 1) ? 0 : (col === 2) ? 2 : 1; // A=OSIS, B=Guardian, C=Student
+
+  const block = sheet.getRange(row, 1, numRows, 3).getValues();
+
+  // OSIS already logged outside the pasted rows
+  const seen = new Set();
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    sheet.getRange(2, 1, lastRow - 1, 1).getValues().forEach((r, i) => {
+      const rr = i + 2;
+      const o = String(r[0]).trim();
+      if (o && (rr < row || rr >= row + numRows)) seen.add(o);
+    });
+  }
+
+  const missing = [];
+  const dupes = [];
+  const filledRows = [];
+
+  block.forEach((r, i) => {
+    const val = String(r[col - 1]).trim();
+    if (!val || val.toUpperCase() === "TRUE" || val.toUpperCase() === "FALSE") return;
+    const m = lookup(val, matchCol);
+    if (!m) { missing.push(val); return; }
+    const osis = String(m.osis).trim();
+    if (seen.has(osis)) { dupes.push(m.student); block[i] = ["", "", ""]; return; }
+    seen.add(osis);
+    block[i] = [m.osis, m.guardian, m.student];
+    filledRows.push(row + i);
+  });
+
+  sheet.getRange(row, 1, numRows, 3).setValues(block);
+  filledRows.forEach(r => sheet.getRange(r, 5).insertCheckboxes().setFontColor("#000000"));
+
+  if (dupes.length) {
+    try {
+      SpreadsheetApp.getUi().alert("⚠️ Duplicates Removed",
+        `Already logged in the Notes sheet, so these were removed: ${dupes.join(", ")}`,
+        SpreadsheetApp.getUi().ButtonSet.OK);
+    } catch (err) {}
+  }
+  toastGhostMisses_(ss, filledRows.length, missing);
+}
+
+// =========================================================
 // NEW: CONTACT LOG AUTO-FILL (Date / # of interactions / Follow-up status)
 // =========================================================
 // When a coordinator enters real interaction content into a fresh row, stamp the
@@ -296,8 +456,12 @@ function watchNotesSheet_(e) {
   const row = range.getRow();
   const col = range.getColumn();
   
-  // Ignore headers and multi-cell edits
+  // Ignore headers; a pasted column of OSIS / Guardians / Students fills every row
   if (row < 2) return;
+  if (range.getNumRows() > 1 && col <= 3) {
+    fillPastedNotesRows_(e.source, sheet, row, range.getNumRows(), col);
+    return;
+  }
   if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) return;
 
   // 🛡️ BULLETPROOF CHECKBOX DETECTION:

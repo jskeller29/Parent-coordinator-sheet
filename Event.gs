@@ -199,6 +199,29 @@ function watchEventsSheet_(e) {
         }
       }
       
+      // ⚡ CASE A2: VERTICAL PASTE of Guardian or Student names
+      else if (range.getNumRows() > 1 && (relativeCol === 1 || relativeCol === 3)) {
+        const lookup = buildGhostLookup_(e.source);
+        const block = sheet.getRange(row, tableStartCol, range.getNumRows(), 5).getValues(); // OSIS..#Indv
+        const missing = [];
+        let filled = 0;
+
+        block.forEach(r => {
+          const val = String(r[relativeCol]).trim();
+          if (!val) return;
+          const m = lookup(val, relativeCol === 1 ? 2 : 1);
+          if (!m) { missing.push(val); return; }
+          r[0] = m.osis;
+          if (relativeCol !== 1) r[1] = m.guardian;
+          if (relativeCol !== 3) r[3] = m.student;
+          if (String(r[4]).trim() === "") r[4] = 1;
+          filled++;
+        });
+
+        sheet.getRange(row, tableStartCol, block.length, 5).setValues(block);
+        toastGhostMisses_(e.source, filled, missing);
+      }
+
       // ⚡ CASE B: SINGLE CELL EDIT OR COMMA-SEPARATED PASTE
       else if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
         const editedValue = String(e.value || range.getDisplayValue() || "").trim();
