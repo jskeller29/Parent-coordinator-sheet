@@ -7,7 +7,7 @@ var IS_RUNNING_SETUP = false;
 
 // The tabs shown by default. Everything else starts hidden; the user's saved
 // settings reveal the optional tabs later via updateVisualSettings_.
-var DEFAULT_VISIBLE_SHEETS = ["RAW Data", "Raw Data", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory"];
+var DEFAULT_VISIBLE_SHEETS = ["RAW Data", "Raw Data", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory", "New Students"];
 
 /** Shows only the default-visible tabs and hides every other sheet. */
 function applyDefaultSheetVisibility_(ss) {

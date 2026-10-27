@@ -730,7 +730,7 @@ function resetDerivedSheets_(ss) {
   backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
   backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
 
-  ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report"].forEach(name => {
+  ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);
     if (sheet && sheet.getLastRow() > 1) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();

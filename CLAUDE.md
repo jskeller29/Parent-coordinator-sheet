@@ -20,3 +20,9 @@ Backend tab (see Backend.gs):
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
   Use the backend* helpers in Backend.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.
+
+New Students tab (see NewStudents.gs):
+- Every build compares the fresh Master Table with the previous one and logs new / re-entered students
+  (Date Entered, Source ATS | Directory | ATS/Directory, OSIS, Student, Guardian, Site, Class, Language).
+  Only appended to; a row is re-dated when the student re-enters or its Source changes.
+- Shared build: "Directory" = New/Edit Student. Owner build (z_PhoneOverride 4+) also counts Old Master Table.

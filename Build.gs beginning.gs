@@ -27,15 +27,8 @@ function buildAllDerivedSheets() {
     }
   }
 
-  const oldMasterStatusMap = new Map();
-  const oldMasterSheetForReport = ss.getSheetByName("Master Table");
-  if (oldMasterSheetForReport) {
-    const oldMasterData = oldMasterSheetForReport.getDataRange().getValues();
-    for (let i = 4; i < oldMasterData.length; i++) {
-      const osis = String(oldMasterData[i][0]).trim();
-      if (osis && !osis.includes(",")) oldMasterStatusMap.set(osis, oldMasterData[i][5]);
-    }
-  }
+  // OSIS -> Status from the Master Table before it is rewritten (build report + New Students log)
+  const oldMasterStatusMap = readMasterStatusSnapshot_(ss);
 
   // --- Step 0: Pre-read the Override Sheet --- 
   // Remove New Student overrides that ATS has caught up with (and exact duplicates of Raw Data)
@@ -53,6 +46,11 @@ function buildAllDerivedSheets() {
   // --- Step 2: Build and Write Output Sheets ---
   const masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
+
+  // Log students who just appeared (ATS or New/Edit Student) to the "New Students" tab
+  try {
+    logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, new Set(overrides.students.keys()), guardianRows);
+  } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
 // ==========================================
   // REBUILD BACKEND EVENT LOG
@@ -122,7 +120,7 @@ function buildAllDerivedSheets() {
   for (let i = 1; i < masterTable.length; i++) {
     const osis = String(masterTable[i][0]).trim();
     const name = masterTable[i][1];
-    const status = String(masterTable[i][5]).trim();
+    const status = String(masterTable[i][6]).trim();
     if (osis && !osis.includes(",")) {
       const oldStatus = oldMasterStatusMap.get(osis);
       if (status === "Discharged" && oldStatus !== "Discharged" && oldMasterStatusMap.size > 0) dischargedLog.push(`${name} (${osis})`);
@@ -161,7 +159,7 @@ function buildAllDerivedSheets() {
   }), 21600);
 
   // FIX 4: Set Montserrat font ONCE at the very end instead of inside writeSheet_
-  ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"]
+  ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", NEW_STUDENTS_SHEET]
     .forEach(name => {
       const sh = ss.getSheetByName(name);
       if (sh) sh.getDataRange().setFontFamily("Montserrat");

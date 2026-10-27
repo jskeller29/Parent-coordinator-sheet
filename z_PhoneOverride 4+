@@ -209,6 +209,13 @@ function buildAllDerivedSheets() {
   masterTable = injectHistoricalMasterTable_(ss, masterTable);
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
+  // Log new students to the "New Students" tab; Old Master Table and New/Edit Student count as "Directory"
+  try {
+    const directoryOsis = getOldMasterOsisSet_(ss);
+    for (const id of overrides.students.keys()) directoryOsis.add(id);
+    logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows);
+  } catch (e) { console.warn("New Students log skipped: " + e.message); }
+
   // ⚡ FIX 2: REBUILD BACKEND EVENT LOG 
   // Writes only the Backend tab's Event Log section (AX:BF); writeSheet_ would wipe the other sections
   // ==========================================
@@ -522,6 +529,20 @@ function injectHistoricalMasterTable_(ss, masterTable) {
   }
 
   return masterTable;
+}
+
+/** Every OSIS listed in the Old Master Table (header row found by its "OSIS" column). */
+function getOldMasterOsisSet_(ss) {
+  const set = new Set();
+  const oldSheet = ss.getSheetByName("Old Master Table");
+  if (!oldSheet) return set;
+  const data = oldSheet.getDataRange().getValues();
+  const headerIdx = data.findIndex(r => String(r[0]).toUpperCase().includes("OSIS"));
+  for (let i = headerIdx + 1; i < data.length; i++) {
+    const osis = String(data[i][0]).trim();
+    if (osis && osis !== "#N/A") set.add(osis);
+  }
+  return set;
 }
 
 /**
