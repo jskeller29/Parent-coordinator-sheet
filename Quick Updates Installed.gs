@@ -302,6 +302,25 @@ function buildDirectorySiteClassLookup_(ss) {
   };
 }
 
+/**
+ * Pushes Notes rows into Combined Contact Tracking / Phone Contacts.
+ * onlyWithNotes: skip rows whose Notes (D) is blank. Many families at once
+ * use one full rebuild instead of a delta per student.
+ */
+function syncNotesRows_(sheet, row, numRows, onlyWithNotes) {
+  const ids = new Set();
+  sheet.getRange(row, 1, numRows, 4).getValues().forEach(r => {
+    if (onlyWithNotes && !String(r[3]).trim()) return;
+    String(r[0]).split(",").map(o => o.trim()).filter(Boolean).forEach(o => ids.add(o));
+  });
+  if (!ids.size) return;
+  if (ids.size > 5 && typeof updateContactAndPhoneOnly === "function") {
+    updateContactAndPhoneOnly();
+  } else if (typeof updateSingleOsisDelta_ === "function") {
+    ids.forEach(o => updateSingleOsisDelta_(o));
+  }
+}
+
 function toastGhostMisses_(ss, filled, missing) {
   if (!missing.length) {
     ss.toast(`Filled ${filled} row${filled === 1 ? "" : "s"}.`, "Ghost Typist", 3);
@@ -456,13 +475,17 @@ function watchNotesSheet_(e) {
   const row = range.getRow();
   const col = range.getColumn();
   
-  // Ignore headers; a pasted column of OSIS / Guardians / Students fills every row
+  // Ignore headers. Pastes (and multi-cell deletes) in A:D fill identities and sync notes for every row.
   if (row < 2) return;
-  if (range.getNumRows() > 1 && col <= 3) {
-    fillPastedNotesRows_(e.source, sheet, row, range.getNumRows(), col);
+  if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) {
+    if (col > 4) return;
+    const numRows = range.getNumRows();
+    if (col <= 3) fillPastedNotesRows_(e.source, sheet, row, numRows, col);
+    // A paste that touches Notes (D) syncs every row, so cleared notes are removed too
+    const touchesNotes = col + range.getNumColumns() - 1 >= 4;
+    syncNotesRows_(sheet, row, numRows, !touchesNotes);
     return;
   }
-  if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) return;
 
   // 🛡️ BULLETPROOF CHECKBOX DETECTION:
   const rawValue = range.getValue(); 
@@ -592,6 +615,9 @@ function watchNotesSheet_(e) {
         
         // Ensure a checkbox is securely placed in Column E if one isn't there already
         sheet.getRange(row, 5).insertCheckboxes().setFontColor("#000000");
+
+        // A note typed before the student was filled in syncs now that the row has an OSIS
+        syncNotesRows_(sheet, row, 1, true);
 
       } else {
         e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);

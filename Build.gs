@@ -593,15 +593,20 @@ function buildCombinedContactTrackingData_(ss, masterTable, contactLogData, even
   
   const startIndex = (masterTable.length > 0 && String(masterTable[0][0]).toUpperCase() === "OSIS") ? 1 : 0;
   
-  const masterMap = new Map(
-    masterTable
-      .slice(startIndex)
-      .filter(r => typeof isRealStudentId_ === "function" && isRealStudentId_(r[0]) && !String(r[0]).includes(","))
-      .map(r => [
-        typeof toText_ === "function" ? toText_(r[0]) : String(r[0]),
-        { guardians: typeof toText_ === "function" ? toText_(r[2]) : String(r[2]), student: typeof toText_ === "function" ? toText_(r[1]) : String(r[1]) }
-      ])
-  );
+  // OSIS -> guardians/student. A sibling-group row ("111, 222" / "Ann X, Ben X") gives each
+  // OSIS its own student name when the counts line up, so those rows aren't left blank.
+  const masterMap = new Map();
+  masterTable.slice(startIndex).forEach(r => {
+    const ids = String(r[0]).split(",").map(o => o.trim()).filter(o => isRealStudentId_(o));
+    const students = String(r[1]).split(",").map(n => n.trim());
+    ids.forEach((id, i) => {
+      if (masterMap.has(id) && ids.length > 1) return; // a student's own row wins over a group row
+      masterMap.set(id, {
+        guardians: toText_(r[2]),
+        student: ids.length > 1 && students.length === ids.length ? students[i] : toText_(r[1])
+      });
+    });
+  });
 
   const oldCombinedSheet = ss.getSheetByName("Combined Contact Tracking");
   const oldCombinedMap = new Map();
