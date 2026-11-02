@@ -47,9 +47,9 @@ function buildAllDerivedSheets() {
   const masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
-  // Log students who just appeared (ATS or New/Edit Student) to the "New Students" tab
+  // Log students who just appeared in Raw Data (ATS) to the "New Students" tab
   try {
-    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, new Set(overrides.students.keys()), guardianRows);
+    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianRows);
   } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
 // ==========================================

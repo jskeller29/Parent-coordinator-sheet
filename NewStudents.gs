@@ -2,9 +2,10 @@
 // FILE: NewStudents.gs
 // PURPOSE: Keeps a running "New Students" log. Every build (including the
 // nightly sync) compares the fresh Master Table with the one it is about to
-// replace and records students who just appeared or came back from Discharged.
+// replace and records students who just appeared in Raw Data (ATS) or came
+// back from Discharged. Only Raw Data counts; Source is always "ATS".
 // The tab is created once and only ever added to (a row is re-dated when its
-// student re-enters or its Source changes, e.g. Directory -> ATS/Directory).
+// student re-enters).
 // ======================================================================
 
 const NEW_STUDENTS_SHEET = "New Students";
@@ -41,15 +42,47 @@ function readMasterStatusSnapshot_(ss) {
   return map;
 }
 
+const ATS_SNAPSHOT_PROP = "NEW_STUDENTS_ATS_OSIS";
+const ATS_SNAPSHOT_CHUNK = 8000; // Document properties cap each value at ~9KB
+
 /**
+ * OSIS that were in Raw Data at the previous build, or null when there is no
+ * snapshot for this spreadsheet yet (first run, or a copied sheet's leftovers).
+ */
+function loadAtsSnapshot_(ss) {
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty(ATS_SNAPSHOT_PROP + "_SHEET") !== ss.getId()) return null;
+  const count = Number(props.getProperty(ATS_SNAPSHOT_PROP + "_N")) || 0;
+  let text = "";
+  for (let i = 0; i < count; i++) text += props.getProperty(ATS_SNAPSHOT_PROP + "_" + i) || "";
+  return new Set(text.split(",").filter(Boolean));
+}
+
+function saveAtsSnapshot_(ss, osisSet) {
+  const props = PropertiesService.getDocumentProperties();
+  const text = Array.from(osisSet).join(",");
+  const oldCount = Number(props.getProperty(ATS_SNAPSHOT_PROP + "_N")) || 0;
+  const values = {};
+  let n = 0;
+  for (let i = 0; i < text.length; i += ATS_SNAPSHOT_CHUNK) values[ATS_SNAPSHOT_PROP + "_" + n++] = text.slice(i, i + ATS_SNAPSHOT_CHUNK);
+  values[ATS_SNAPSHOT_PROP + "_N"] = String(n);
+  values[ATS_SNAPSHOT_PROP + "_SHEET"] = ss.getId();
+  props.setProperties(values);
+  for (let i = n; i < oldCount; i++) props.deleteProperty(ATS_SNAPSHOT_PROP + "_" + i);
+}
+
+/**
+ * Logs students who are new to Raw Data (ATS). Only Raw Data counts: New/Edit
+ * Student and other Directory sources are ignored, and Source is always "ATS".
+ * A student is new when their OSIS was not in Raw Data at the previous build
+ * (tracked in a snapshot), or when they come back from Discharged.
+ *
  * @param {Array[]} masterTable        Fresh Master Table (header row first)
  * @param {Map}     oldMasterStatusMap OSIS -> Status from the Master Table before this build
- * @param {Array[]} rawData            Raw Data values
- * @param {Set}     directoryOsis      OSIS that come from a non-ATS source (New/Edit Student, Old Master Table, ...)
+ * @param {Array[]} rawData            Raw Data values (A:AE)
  * @param {Array}   guardianRows       Guardian objects (for Language)
- * @param {Set}     [alsoNewOsis]      Optional: OSIS to log even though they were already in the Master Table
  */
-function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directoryOsis, guardianRows, alsoNewOsis) {
+function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianRows) {
   let sheet = ss.getSheetByName(NEW_STUDENTS_SHEET);
   if (!sheet) sheet = ss.insertSheet(NEW_STUDENTS_SHEET);
   if (!toText_(sheet.getRange(1, 1).getValue())) {
@@ -58,9 +91,6 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
     sheet.setFrozenRows(1);
   }
-
-  // First build has nothing to compare against, so it would list every student
-  if (oldMasterStatusMap.size === 0) return;
 
   const atsOsis = new Set();
   const homeLanguage = new Map();
@@ -71,6 +101,13 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
     if (!homeLanguage.has(id) && toText_(rawData[i][18])) homeLanguage.set(id, properCase_(firstWord_(rawData[i][18])));
   }
 
+  // Previous Raw Data roster. Without a snapshot, fall back to the old Master Table.
+  const prevAts = loadAtsSnapshot_(ss);
+  const hadBefore = osis => prevAts ? prevAts.has(osis) : oldMasterStatusMap.has(osis);
+
+  // First build has nothing to compare against, so it would list every student
+  if (!prevAts && oldMasterStatusMap.size === 0) { saveAtsSnapshot_(ss, atsOsis); return; }
+
   const languagesById = new Map();
   for (const g of guardianRows) {
     if (!g.language) continue;
@@ -79,13 +116,13 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
     if (list.indexOf(g.language) === -1) list.push(g.language);
   }
 
-  // Existing log rows by OSIS (row number + Source)
+  // Existing log rows by OSIS
   const lastRow = sheet.getLastRow();
   const logged = new Map();
   if (lastRow > 1) {
-    sheet.getRange(2, 1, lastRow - 1, 3).getValues().forEach((r, i) => {
-      const osis = String(r[2]).trim();
-      if (osis) logged.set(osis, { row: i + 2, source: String(r[1]).trim() });
+    sheet.getRange(2, 3, lastRow - 1, 1).getValues().forEach((r, i) => {
+      const osis = String(r[0]).trim();
+      if (osis) logged.set(osis, i + 2);
     });
   }
 
@@ -94,23 +131,17 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
   for (let i = 1; i < masterTable.length; i++) {
     const m = masterTable[i];
     const osis = String(m[0]).trim();
-    if (!osis || osis.includes(",")) continue;
+    if (!osis || osis.includes(",") || !atsOsis.has(osis)) continue;
     if (/discharge/i.test(String(m[6]))) continue;
 
-    const inAts = atsOsis.has(osis);
-    const inDirectory = directoryOsis.has(osis);
-    const source = inAts && inDirectory ? "ATS/Directory" : inAts ? "ATS" : "Directory";
-
-    const wasListed = oldMasterStatusMap.has(osis);
-    const reEntered = wasListed && /discharge/i.test(oldMasterStatusMap.get(osis));
-    const prior = logged.get(osis);
-    const forcedNew = !!(alsoNewOsis && alsoNewOsis.has(osis));
-    if (wasListed && !reEntered && !forcedNew && !(prior && prior.source !== source)) continue;
+    const reEntered = oldMasterStatusMap.has(osis) && /discharge/i.test(oldMasterStatusMap.get(osis));
+    if (hadBefore(osis) && !reEntered) continue;
 
     const language = (languagesById.get(osis) || []).join(", ") || homeLanguage.get(osis) || "";
-    const row = [today, source, m[0], m[1], m[2], m[3], m[4], language];
+    const row = [today, "ATS", m[0], m[1], m[2], m[3], m[4], language];
 
-    if (prior) sheet.getRange(prior.row, 1, 1, row.length).setValues([row]);
+    const priorRow = logged.get(osis);
+    if (priorRow) sheet.getRange(priorRow, 1, 1, row.length).setValues([row]);
     else toAppend.push(row);
   }
 
@@ -118,4 +149,6 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, directory
     sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
   }
   if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).setNumberFormat("M/d/yyyy");
+
+  saveAtsSnapshot_(ss, atsOsis);
 }

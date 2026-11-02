@@ -22,10 +22,10 @@ Backend tab (see Backend.gs):
 - Old copies migrate automatically the first time getBackendSheet_ runs.
 
 New Students tab (see NewStudents.gs):
-- Every build compares the fresh Master Table with the previous one and logs new / re-entered students
-  (Date Entered, Source ATS | Directory | ATS/Directory, OSIS, Student, Guardian, Site, Class, Language).
-  Only appended to; a row is re-dated when the student re-enters or its Source changes.
-- Shared build: "Directory" = New/Edit Student. Owner build (z_PhoneOverride 4+) also counts Old Master Table.
+- Only Raw Data (ATS, A:AE) counts. Every build compares Raw Data's OSIS list with the previous build's
+  (snapshot in document properties, tied to the sheet ID) and logs new / re-entered (from Discharged) students
+  (Date Entered, Source = always "ATS", OSIS, Student, Guardian, Site, Class, Language).
+  New/Edit Student and Old Master Table are ignored. Only appended to; a row is re-dated when the student re-enters.
 
 Workflow:
 - The owner wants every finished change merged into main: after pushing the working branch, also push it to main.
