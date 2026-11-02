@@ -39,6 +39,7 @@ Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
 - Built in TWO places that must match: buildCombinedContactTrackingData_ (Build.gs) and updateSingleOsisDelta_ (QuickUpdates.gs).
 
 POSSIBLE FUTURE PLAN (code-structure cleanup; reviewed 2026-11-02, not started, needs owner go-ahead)
+Until the owner says go: keep the CURRENT file layout/schema for all changes (do not restructure).
 Goal: same exact functionality, cleaner files. Do it in stages, each checked against the old code:
   1. Move only: functions copied word-for-word into new files, delete dead code, drop always-true
      `typeof fn === "function"` checks (107 of them; they only hide typos).
