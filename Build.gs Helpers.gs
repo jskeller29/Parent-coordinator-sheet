@@ -98,19 +98,23 @@ function osisCellIncludes_(cellValue, targetOsis) {
  * Bold Unicode text (same characters as lingojam.com/BoldTextGenerator):
  * A-Z, a-z and 0-9 become Mathematical Bold letters/digits; everything else
  * (spaces, punctuation, accented letters) is left as is.
+ * italic = true uses Bold Italic (serif) letters; Unicode has no italic digits,
+ * so digits stay bold.
  */
-function boldText_(text) {
+function boldText_(text, italic) {
+  const upper = italic ? 0x1D468 : 0x1D400;
+  const lower = italic ? 0x1D482 : 0x1D41A;
   return String(text == null ? "" : text).replace(/[A-Za-z0-9]/g, ch => {
     const c = ch.charCodeAt(0);
-    if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D400 + c - 65);   // A-Z
-    if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D41A + c - 97);  // a-z
-    return String.fromCodePoint(0x1D7CE + c - 48);                           // 0-9
+    if (c >= 65 && c <= 90) return String.fromCodePoint(upper + c - 65);   // A-Z
+    if (c >= 97 && c <= 122) return String.fromCodePoint(lower + c - 97);  // a-z
+    return String.fromCodePoint(0x1D7CE + c - 48);                         // 0-9
   });
 }
 
-/** Header of one notes line: "𝐃𝐚𝐭𝐞 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧}" in bold. */
+/** Header of one notes line: "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧}" (date bold italic, braces bold). */
 function noteLineHeader_(dateText, braceText) {
-  return `${boldText_(dateText)} - {${boldText_(braceText)}}`;
+  return `${boldText_(dateText, true)} - {${boldText_(braceText)}}`;
 }
 
 function firstWord_(text) {

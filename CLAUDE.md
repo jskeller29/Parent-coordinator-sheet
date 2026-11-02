@@ -34,8 +34,8 @@ Workflow:
 - The owner wants every finished change merged into main: after pushing the working branch, also push it to main.
 
 Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
-- Each line is "𝐃𝐚𝐭𝐞 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧} note [follow-up]" (event: "... - {𝐄𝐯𝐞𝐧𝐭 - [𝐏𝐞𝐫𝐬𝐨𝐧]} |Event|"), no bullet.
-  Bold = Unicode Mathematical Bold (lingojam BoldTextGenerator) via boldText_ / noteLineHeader_ (Build.gs Helpers.gs).
+- Each line is "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧} note [follow-up]" (event: "... - {𝐄𝐯𝐞𝐧𝐭 - [𝐏𝐞𝐫𝐬𝐨𝐧]} |Event|"), no bullet.
+  Date = Bold Italic serif (digits stay bold), braces = Mathematical Bold (lingojam BoldTextGenerator) via boldText_ / noteLineHeader_ (Build.gs Helpers.gs).
 - Built in TWO places that must match: buildCombinedContactTrackingData_ (Build.gs) and updateSingleOsisDelta_ (QuickUpdates.gs).
 
 POSSIBLE FUTURE PLAN (code-structure cleanup; reviewed 2026-11-02, not started, needs owner go-ahead)
