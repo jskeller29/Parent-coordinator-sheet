@@ -94,6 +94,25 @@ function osisCellIncludes_(cellValue, targetOsis) {
   return extractOsisTokens_(cellValue).indexOf(target) !== -1;
 }
 
+/**
+ * Bold Unicode text (same characters as lingojam.com/BoldTextGenerator):
+ * A-Z, a-z and 0-9 become Mathematical Bold letters/digits; everything else
+ * (spaces, punctuation, accented letters) is left as is.
+ */
+function boldText_(text) {
+  return String(text == null ? "" : text).replace(/[A-Za-z0-9]/g, ch => {
+    const c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) return String.fromCodePoint(0x1D400 + c - 65);   // A-Z
+    if (c >= 97 && c <= 122) return String.fromCodePoint(0x1D41A + c - 97);  // a-z
+    return String.fromCodePoint(0x1D7CE + c - 48);                           // 0-9
+  });
+}
+
+/** Header of one notes line: "𝐃𝐚𝐭𝐞 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧}" in bold. */
+function noteLineHeader_(dateText, braceText) {
+  return `${boldText_(dateText)} - {${boldText_(braceText)}}`;
+}
+
 function firstWord_(text) {
   return toText_(text).split(/\s+/)[0] || "";
 }

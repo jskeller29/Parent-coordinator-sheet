@@ -553,7 +553,7 @@ function updateSingleOsisDelta_(targetOsis) {
       // Only append the "- Person Spoke With" when Col D was actually filled;
       // a blank D should read "{Method}", not "{Method - }".
       const spokeWith = String(eVal).trim() ? ` - ${eVal}` : "";
-      let line = `• ${dateText} - {${methodLabel}${spokeWith}} ${pVal}`;
+      let line = `${noteLineHeader_(dateText, methodLabel + spokeWith)} ${pVal}`;
       if (rVal !== "") line += ` [${rVal}]`;
 
       let dObj = new Date(dateVal); 
@@ -580,7 +580,7 @@ function updateSingleOsisDelta_(targetOsis) {
       if (!person) person = "Parent";
 
       const dateText = typeof formatDateFull_ === "function" ? formatDateFull_(dateVal) : dateVal;
-      let line = `• ${dateText} - {Event - [${person}]} |${eventName}|`;
+      let line = `${noteLineHeader_(dateText, `Event - [${person}]`)} |${eventName}|`;
       if (notes) line += ` ${notes}`;
 
       let dateObj = new Date(dateVal); 
