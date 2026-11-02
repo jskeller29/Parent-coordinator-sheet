@@ -607,7 +607,17 @@ function syncToGoogleContacts() {
   if (emailEnabled === 'true') {
     const userEmail = Session.getActiveUser().getEmail(); 
     const subject = "🔄 Nightly Sync Complete";
-    const body = `Your Google Contacts sync has finished!\n\nResults:\nDeleted: ${deletedCount}\nCreated: ${createdCount}\nEdited: ${editedCount}\n\nCheck your spreadsheet for full logs.`;
+    // New / discharged students from the last build (Raw Data only; see detectAtsChanges_)
+    let studentLines = "";
+    try {
+      const report = typeof getBuildLogData === "function" ? getBuildLogData() : null;
+      if (report) {
+        const list = arr => (arr && arr.length) ? arr.map(x => `  - ${x}`).join("\n") : "  (none)";
+        studentLines = `\n\nNew Students (ATS): ${(report.newStudents || []).length}\n${list(report.newStudents)}` +
+                       `\n\nDischarged (no longer in ATS): ${(report.discharged || []).length}\n${list(report.discharged)}`;
+      }
+    } catch (e) {}
+    const body = `Your Google Contacts sync has finished!\n\nResults:\nDeleted: ${deletedCount}\nCreated: ${createdCount}\nEdited: ${editedCount}${studentLines}\n\nCheck your spreadsheet for full logs.`;
     
     try {
       MailApp.sendEmail(userEmail, subject, body);

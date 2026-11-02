@@ -26,6 +26,9 @@ New Students tab (see NewStudents.gs):
   (snapshot in document properties, tied to the sheet ID) and logs new / re-entered (from Discharged) students
   (Date Entered, Source = always "ATS", OSIS, Student, Guardian, Site, Class, Language).
   New/Edit Student and Old Master Table are ignored. Only appended to; a row is re-dated when the student re-enters.
+- detectAtsChanges_ (NewStudents.gs) is the single source for new / discharged students: the New Students tab,
+  the build report (sidebar) and the owner's nightly email all use it. Discharged = "Current" in the old
+  Master Table, in Raw Data at the last build, and no longer in Raw Data. The snapshot is saved at the end of the build.
 
 Workflow:
 - The owner wants every finished change merged into main: after pushing the working branch, also push it to main.

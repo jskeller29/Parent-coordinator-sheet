@@ -47,9 +47,11 @@ function buildAllDerivedSheets() {
   const masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
-  // Log students who just appeared in Raw Data (ATS) to the "New Students" tab
+  // Log students who just appeared in Raw Data (ATS) to the "New Students" tab.
+  // New / discharged students come from Raw Data only (same result feeds the tab and the build report)
+  const atsChanges = detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData);
   try {
-    if (typeof logNewStudents_ === "function") logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianRows);
+    logNewStudents_(ss, masterTable, atsChanges, rawData, guardianRows);
   } catch (e) { console.warn("New Students log skipped: " + e.message); }
 
 // ==========================================
@@ -112,22 +114,9 @@ function buildAllDerivedSheets() {
   // =========================================================
   // --- GENERATE BUILD REPORT ---
   // =========================================================
-  const newStudentsLog = [];
-  const dischargedLog = [];
+  const { newStudents: newStudentsLog, discharged: dischargedLog } = atsChangeReportLines_(masterTable, atsChanges);
   const nycsaLog = [];
   const psLog = [];
-
-  for (let i = 1; i < masterTable.length; i++) {
-    const osis = String(masterTable[i][0]).trim();
-    const name = masterTable[i][1];
-    const status = String(masterTable[i][6]).trim();
-    if (osis && !osis.includes(",")) {
-      const oldStatus = oldMasterStatusMap.get(osis);
-      if (status === "Discharged" && oldStatus !== "Discharged" && oldMasterStatusMap.size > 0) dischargedLog.push(`${name} (${osis})`);
-      if (status !== "Discharged" && oldStatus === "Discharged" && oldMasterStatusMap.size > 0) newStudentsLog.push(`${name} (${osis})`);
-      if (status !== "Discharged" && !oldMasterStatusMap.has(osis) && oldMasterStatusMap.size > 0) newStudentsLog.push(`${name} (${osis})`);
-    }
-  }
 
   if (oldPdMap.size > 0) {
     for (let i = 1; i < parentsDivided.length; i++) {
@@ -157,6 +146,9 @@ function buildAllDerivedSheets() {
     nycsaUpgrades: nycsaLog,
     psUpgrades: psLog
   }), 21600);
+
+  // Remember this build's Raw Data roster for the next comparison
+  try { saveAtsSnapshot_(ss, atsChanges.atsOsis); } catch (e) { console.warn("ATS snapshot not saved: " + e.message); }
 
   // FIX 4: Set Montserrat font ONCE at the very end instead of inside writeSheet_
   ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"]

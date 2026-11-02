@@ -72,17 +72,61 @@ function saveAtsSnapshot_(ss, osisSet) {
 }
 
 /**
- * Logs students who are new to Raw Data (ATS). Only Raw Data counts: New/Edit
- * Student and other Directory sources are ignored, and Source is always "ATS".
- * A student is new when their OSIS was not in Raw Data at the previous build
- * (tracked in a snapshot), or when they come back from Discharged.
+ * Compares Raw Data (ATS, A:AE) with the previous build. Shared by the New
+ * Students tab and the build report (sidebar / email) so they always agree.
+ *   newOsis:        in Raw Data now but not at the last build, or back from Discharged
+ *   dischargedOsis: "Current" in the old Master Table, in Raw Data at the last
+ *                   build, and no longer in Raw Data
+ * Call saveAtsSnapshot_(ss, changes.atsOsis) once the build has used them.
  *
  * @param {Array[]} masterTable        Fresh Master Table (header row first)
  * @param {Map}     oldMasterStatusMap OSIS -> Status from the Master Table before this build
- * @param {Array[]} rawData            Raw Data values (A:AE)
- * @param {Array}   guardianRows       Guardian objects (for Language)
+ * @param {Array[]} rawData            Raw Data values
  */
-function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianRows) {
+function detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData) {
+  const atsOsis = new Set();
+  for (let i = 0; i < rawData.length; i++) {
+    const id = toText_(rawData[i][2]);
+    if (isRealStudentId_(id)) atsOsis.add(id);
+  }
+  const newOsis = new Set();
+  const dischargedOsis = new Set();
+
+  // Previous Raw Data roster. Without a snapshot, fall back to the old Master Table.
+  const prevAts = loadAtsSnapshot_(ss);
+  // First build has nothing to compare against, so it would list every student
+  if (!prevAts && oldMasterStatusMap.size === 0) return { atsOsis, newOsis, dischargedOsis };
+
+  for (let i = 1; i < masterTable.length; i++) {
+    const m = masterTable[i];
+    const osis = String(m[0]).trim();
+    if (!osis || osis.includes(",")) continue;
+    const oldStatus = String(oldMasterStatusMap.has(osis) ? oldMasterStatusMap.get(osis) : "").trim();
+
+    if (atsOsis.has(osis)) {
+      if (/discharge/i.test(String(m[6]))) continue;
+      const hadBefore = prevAts ? prevAts.has(osis) : oldMasterStatusMap.has(osis);
+      if (!hadBefore || /discharge/i.test(oldStatus)) newOsis.add(osis);
+    } else if (/^current$/i.test(oldStatus)) {
+      // Without a snapshot, only count students the Master Table itself now marks Discharged
+      const wasInAts = prevAts ? prevAts.has(osis) : /discharge/i.test(String(m[6]));
+      if (wasInAts) dischargedOsis.add(osis);
+    }
+  }
+  return { atsOsis, newOsis, dischargedOsis };
+}
+
+/**
+ * Logs the students detectAtsChanges_ found new to Raw Data. Only Raw Data
+ * counts: New/Edit Student and other Directory sources are ignored, and Source
+ * is always "ATS".
+ *
+ * @param {Array[]} masterTable  Fresh Master Table (header row first)
+ * @param {Object}  changes      Result of detectAtsChanges_
+ * @param {Array[]} rawData      Raw Data values (A:AE)
+ * @param {Array}   guardianRows Guardian objects (for Language)
+ */
+function logNewStudents_(ss, masterTable, changes, rawData, guardianRows) {
   let sheet = ss.getSheetByName(NEW_STUDENTS_SHEET);
   if (!sheet) sheet = ss.insertSheet(NEW_STUDENTS_SHEET);
   if (!toText_(sheet.getRange(1, 1).getValue())) {
@@ -91,22 +135,13 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianR
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
     sheet.setFrozenRows(1);
   }
+  if (!changes.newOsis.size) return;
 
-  const atsOsis = new Set();
   const homeLanguage = new Map();
   for (let i = 0; i < rawData.length; i++) {
     const id = toText_(rawData[i][2]);
-    if (!isRealStudentId_(id)) continue;
-    atsOsis.add(id);
-    if (!homeLanguage.has(id) && toText_(rawData[i][18])) homeLanguage.set(id, properCase_(firstWord_(rawData[i][18])));
+    if (changes.newOsis.has(id) && !homeLanguage.has(id) && toText_(rawData[i][18])) homeLanguage.set(id, properCase_(firstWord_(rawData[i][18])));
   }
-
-  // Previous Raw Data roster. Without a snapshot, fall back to the old Master Table.
-  const prevAts = loadAtsSnapshot_(ss);
-  const hadBefore = osis => prevAts ? prevAts.has(osis) : oldMasterStatusMap.has(osis);
-
-  // First build has nothing to compare against, so it would list every student
-  if (!prevAts && oldMasterStatusMap.size === 0) { saveAtsSnapshot_(ss, atsOsis); return; }
 
   const languagesById = new Map();
   for (const g of guardianRows) {
@@ -131,11 +166,7 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianR
   for (let i = 1; i < masterTable.length; i++) {
     const m = masterTable[i];
     const osis = String(m[0]).trim();
-    if (!osis || osis.includes(",") || !atsOsis.has(osis)) continue;
-    if (/discharge/i.test(String(m[6]))) continue;
-
-    const reEntered = oldMasterStatusMap.has(osis) && /discharge/i.test(oldMasterStatusMap.get(osis));
-    if (hadBefore(osis) && !reEntered) continue;
+    if (!changes.newOsis.has(osis)) continue;
 
     const language = (languagesById.get(osis) || []).join(", ") || homeLanguage.get(osis) || "";
     const row = [today, "ATS", m[0], m[1], m[2], m[3], m[4], language];
@@ -149,6 +180,17 @@ function logNewStudents_(ss, masterTable, oldMasterStatusMap, rawData, guardianR
     sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
   }
   if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).setNumberFormat("M/d/yyyy");
+}
 
-  saveAtsSnapshot_(ss, atsOsis);
+/** Build report lines ("Name (OSIS)") for the sidebar / email. */
+function atsChangeReportLines_(masterTable, changes) {
+  const newStudents = [];
+  const discharged = [];
+  for (let i = 1; i < masterTable.length; i++) {
+    const osis = String(masterTable[i][0]).trim();
+    const line = `${masterTable[i][1]} (${osis})`;
+    if (changes.newOsis.has(osis)) newStudents.push(line);
+    if (changes.dischargedOsis.has(osis)) discharged.push(line);
+  }
+  return { newStudents, discharged };
 }
