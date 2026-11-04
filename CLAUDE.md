@@ -188,7 +188,8 @@ SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" t
   (one cell only; otherwise a toast says Ctrl+Z / Build Sheets Only).
 - Clearing 2+ rows at once (Contact Log above END, Notes, Send Out, Events rows 3+) asks Yes/No first. No puts the rows
   back from the onSelectionChange copy (document cache SHEET_LOCK_SEL_<sheetId>), or says "press Ctrl+Z" without one.
-  Rows that were already empty, pastes and checkbox-only unticks do not ask.
+  Pastes and checkbox-only unticks do not ask. An all-empty selection copy is ignored (onSelectionChange can read the
+  rows AFTER a fast Delete), so it then asks and offers Ctrl+Z. The column A toast only shows for edits in A alone.
 
 Contact Log search bar (rows below END; formulas typed in the sheet, not in the repo):
 - TEST (Test-Version): the "Communications" box is drawn by code, not a formula (CONTACT LOG SEARCH BAR section of

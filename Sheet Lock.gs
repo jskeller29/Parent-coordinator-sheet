@@ -441,10 +441,22 @@ function sheetLockGuard_(e, sheet, name) {
       hits.forEach(h => {
         lockedCells += (h.r2 - h.r1 + 1) * (h.c2 - h.c1 + 1);
         const kind = h.zone === "BODY" ? "built" : h.zone === "CLEND" ? "end" : h.zone === "CLWEEK" ? "week" : h.zone === "PCAR" ? "pcar" : (SHEET_LOCK_BUILT_TABS.hasOwnProperty(name) ? "built" : "header");
-        if (restoreLockedHit_(e, sheet, h, out.endRow)) problems.restored[kind] = true;
-        else problems.failed[kind] = true;
+        // Each area on its own: one failing never skips the others or the clear check
+        try {
+          const ok = restoreLockedHit_(e, sheet, h, out.endRow);
+          // Column A is only mentioned when the edit was in column A alone; when whole
+          // rows were cleared, a "change undone" toast would read as if the rows came back
+          if (kind === "week" && (er.c1 !== 1 || er.c2 !== 1)) return;
+          if (ok) problems.restored[kind] = true;
+          else problems.failed[kind] = true;
+        } catch (err) {
+          console.error("Sheet lock: could not put back " + h.zone + ": " + err.message);
+          problems.failed[kind] = true;
+        }
       });
-      if (name === "Contact Log" && !hits.some(h => h.zone === "CLEND")) keepContactLogEndSnapshotCurrent_(sheet, out.endRow);
+      try {
+        if (name === "Contact Log" && !hits.some(h => h.zone === "CLEND")) keepContactLogEndSnapshotCurrent_(sheet, out.endRow);
+      } catch (err) { console.warn("Sheet lock: END bar snapshot check failed: " + err.message); }
     }
 
     toastSheetLock_(e.source, problems);
@@ -623,9 +635,12 @@ function confirmMultiRowClear_(e, sheet, name, er, endRow) {
   }
   if (!sawBlank) return true;
 
-  const before = selectionSnapshotFor_(cache, sheet, r1, er.c1, r2, c2);
+  let before = selectionSnapshotFor_(cache, sheet, r1, er.c1, r2, c2);
   cache.remove(selKey);
-  if (before && before.every(row => row.every(isEmpty))) return true; // they were empty already
+  // An all-empty copy can't be trusted: when Delete is pressed right after selecting,
+  // onSelectionChange may only read the rows AFTER they were cleared. Ask anyway
+  // (and fall back to Ctrl+Z) instead of guessing they were empty already.
+  if (before && before.every(row => row.every(isEmpty))) before = null;
 
   const ui = SpreadsheetApp.getUi();
   const rowCount = r2 - r1 + 1;
