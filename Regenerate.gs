@@ -34,7 +34,6 @@ function resetToDisplayModeSteps_(ss) {
   resizeContactLog_(ss, 3);
   
   resetContactLog_(ss);
-  setFollowupDropdown_(ss); // Column N: only the 5 follow-up options
   clearTypeDropdownColors_(ss); // Wipe the dropdown colors!
   resetMasterTable_(ss);
   resetNotes_(ss);
@@ -134,7 +133,6 @@ function loadFakeDataSteps_(ss) {
   resizeContactLog_(ss, 30);
   
   resetContactLog_(ss);
-  setFollowupDropdown_(ss); // Column N: only the 5 follow-up options
   clearTypeDropdownColors_(ss); // Wipe the old colors before loading new data!
   resetMasterTable_(ss);
   resetNotes_(ss);
@@ -504,7 +502,7 @@ function loadFakeContactLog_(ss) {
     return fmtDate(d);
   };
 
-  // [days ago, Guardian, Spoke with, OSIS, Student, Method 1, Method 2, Type, Notes, Follow-up (N: FOLLOWUP_OPTIONS_), Follow-up notes (O), checkbox (P)]
+  // [days ago, Guardian, Spoke with, OSIS, Student, Method 1, Method 2, Type, Notes, Follow-up (N), Follow-up notes (O), checkbox (P)]
   const rows = [
     [20,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Call","Student Activities","Asked about after-school programs","No Followup Needed","",false],
     [17,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Call","School Schedule","Homer asked about start of school year","Skipped / Newer Interaction","",false],
@@ -753,42 +751,6 @@ function resetContactLog_(ss) {
     if (rowsToDelete > 0) {
       sheet.deleteRows(startDeleteRow, rowsToDelete);
     }
-  }
-}
-
-// Contact Log column N (Follow-up) dropdown options. Reset replaces N's dropdown
-// with exactly these, which deletes every other option.
-var FOLLOWUP_OPTIONS_ = [
-  "No Followup Needed", "Followup Needed", "Followup Needed - ASAP",
-  "Followed Up / Resolved", "Skipped / Newer Interaction"
-];
-
-/**
- * Sets the Follow-up dropdown (N, rows 2 to above END) to FOLLOWUP_OPTIONS_. Rows
- * that already have exactly that list are left alone, so chip colors set by hand
- * survive; replacing a list resets its chips to gray (Apps Script can't set them).
- */
-function setFollowupDropdown_(ss) {
-  const sheet = ss.getSheetByName("Contact Log");
-  if (!sheet) return;
-  const endRow = findEndRowInColumnE_(sheet);
-  if (!endRow || endRow <= 2) return;
-  const range = sheet.getRange(2, 14, endRow - 2, 1);
-  const wanted = FOLLOWUP_OPTIONS_.join("\u0001");
-  try {
-    const alreadyRight = range.getDataValidations().every(r => {
-      const rule = r[0];
-      return rule && rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST &&
-        rule.getCriteriaValues()[0].join("\u0001") === wanted;
-    });
-    if (alreadyRight) return;
-    range.setDataValidation(SpreadsheetApp.newDataValidation()
-      .requireValueInList(FOLLOWUP_OPTIONS_, true).build());
-  } catch (e) {
-    // Contact Log is a Sheets Table and N is a "Dropdown" typed column: Apps Script may not
-    // change its options ("not allowed on cells in typed columns"). Its options (and chip
-    // colors) are set by hand in the Table's column menu, so skip instead of stopping the reset.
-    console.warn("Follow-up dropdown left as is (Table dropdown column): " + e.message);
   }
 }
 
