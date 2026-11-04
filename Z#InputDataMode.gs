@@ -86,7 +86,7 @@ var IDM_STEPS = [
       "Type each class's <b>Teacher Name</b>.",
       "<b>Site</b> is optional: pick one from the dropdown or type a new one (it's added to the dropdown).",
       "Add a class that isn't listed by typing its code at the bottom of column A.",
-      "Click <b>✅ Save Site / Class</b> below when you're done."
+      "Click <b>✅ Save Site / Class &amp; finish</b> below when you're done."
     ]
   }
 ];
@@ -278,7 +278,11 @@ function idm_build() {
 
 /** Sidebar calls this right after the last screen shows: deletes the finished temp tab. */
 function idm_deleteLeftoverTab() {
-  return idm_withLock_(() => ({ deleted: idm_deleteLeftoverTab_() }));
+  return idm_withLock_(() => {
+    const deleted = idm_deleteLeftoverTab_();
+    const pending = !!PropertiesService.getDocumentProperties().getProperty(IDM_PENDING_DELETE_KEY);
+    return { deleted: deleted, pending: pending }; // pending -> the sidebar tries again shortly
+  });
 }
 
 /** Deletes the finished temp tab unless the user is on it (then it waits for next time). */
@@ -290,7 +294,15 @@ function idm_deleteLeftoverTab_() {
   const sheet = idm_sheetById_(ss, Number(id));
   if (!sheet) { props.deleteProperty(IDM_PENDING_DELETE_KEY); return false; }
   const active = ss.getActiveSheet();
-  if (active && active.getSheetId() === sheet.getSheetId()) { idm_log_("leftover tab is the active tab; not deleting yet"); return false; }
+  if (active && active.getSheetId() === sheet.getSheetId()) {
+    // Still on it (the switch to Raw Data didn't take). Move off now; the next try deletes it.
+    const raw = idm_rawSheet_(ss);
+    const landing = (raw && !raw.isSheetHidden()) ? raw
+      : ss.getSheets().filter(s => !s.isSheetHidden() && s.getSheetId() !== sheet.getSheetId())[0];
+    if (landing) landing.activate();
+    idm_log_("leftover tab is the active tab; moved to " + (landing ? landing.getName() : "nothing") + ", will retry");
+    return false;
+  }
   ss.deleteSheet(sheet);
   props.deleteProperty(IDM_PENDING_DELETE_KEY);
   idm_log_("leftover temp tab deleted");

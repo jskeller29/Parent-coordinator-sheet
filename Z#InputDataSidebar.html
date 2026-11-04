@@ -84,12 +84,22 @@
       <b>Fill in the <span id="siteTabName"></span> tab</b>
       <div class="muted">Your entries are only saved to Raw Data when you click Save.</div>
       <div class="row">
-        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class</button>
+        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class &amp; finish</button>
         <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
       </div>
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
+
+    <div id="exitAsk" class="error hidden">
+      <b>Save your Site / Class entries first?</b>
+      <div>Exit doesn't save what you typed on the tab.</div>
+      <div class="row">
+        <button class="primary" onclick="hideExitAsk(); saveSiteClass()">💾 Save &amp; exit</button>
+        <button class="danger" onclick="hideExitAsk(); reallyExit()">Exit without saving</button>
+        <button onclick="hideExitAsk()">Cancel</button>
+      </div>
+    </div>
 
     <div id="errorBox" class="error hidden">
       <div id="errorText"></div>
@@ -197,7 +207,8 @@
     show('uploadCard', !manual); show('pasteCard', !manual); show('siteCard', manual);
     $('howToTitle').textContent = manual ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
-    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip & finish';
+    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip (don\'t save) & finish';
+    show('exitAsk', false);
 
     var n = v.notice;
     show('notice', false); // success now shows in the list under Option 1
@@ -235,13 +246,21 @@
     if (v.notice && v.notice.message) { $('doneNotice').textContent = v.notice.message; show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported);
     // Delete the temp tab now that the user has been moved off it (see IDM_PENDING_DELETE_KEY)
-    setTimeout(function () {
-      clog('call idm_deleteLeftoverTab');
+    // Tries a few times: the first try may find the user still on the tab (it moves them off, then retries)
+    var tries = 0;
+    function deleteTab() {
+      tries++;
+      clog('call idm_deleteLeftoverTab (try ' + tries + ')');
       google.script.run
-        .withSuccessHandler(function (r) { clog('leftover tab deleted: ' + (r && r.deleted)); if (r && r.debug) $('dbgServer').textContent = 'SERVER (delete tab)\n' + r.debug.join('\n'); })
-        .withFailureHandler(function (e) { clog('delete tab FAILED: ' + (e && e.message ? e.message : e)); })
+        .withSuccessHandler(function (r) {
+          clog('leftover tab deleted: ' + (r && r.deleted) + (r && r.pending ? ' (still pending)' : ''));
+          if (r && r.debug) $('dbgServer').textContent = 'SERVER (delete tab)\n' + r.debug.join('\n');
+          if (r && r.pending && tries < 6) setTimeout(deleteTab, 2000);
+        })
+        .withFailureHandler(function (e) { clog('delete tab FAILED: ' + (e && e.message ? e.message : e)); if (tries < 6) setTimeout(deleteTab, 2000); })
         .idm_deleteLeftoverTab();
-    }, 1500);
+    }
+    setTimeout(deleteTab, 1500);
     $('summary').innerHTML = (v.summary || []).map(function (s) { return '<div>' + s + '</div>'; }).join('');
   }
 
@@ -317,7 +336,12 @@
   // --- buttons ---
   function saveSiteClass() { working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
   function skip() { working('Skipping…'); call('idm_skip'); }
-  function exitMode() { working('Bringing your tabs back…'); call('idm_exit'); }
+  function exitMode() {
+    if (currentManual) { show('exitAsk', true); $('exitAsk').scrollIntoView({ behavior: 'smooth' }); return; }
+    reallyExit();
+  }
+  function reallyExit() { working('Bringing your tabs back…'); call('idm_exit'); }
+  function hideExitAsk() { show('exitAsk', false); }
   function retry() {
     if ($('retryBtn').textContent === 'OK') {
       pendingUpload = null; show('errorBox', false);
