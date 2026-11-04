@@ -77,7 +77,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   metadata OWNER_PENDING_FAKE_DATA; it cannot fill the copy itself because buildAllDerivedSheets / buildEventTable /
   buildOverrideReport use the open sheet and the build's snapshot lives in this sheet's document properties; in the
   copy the Debug menu then shows "▶️ Load Fake Data on This Copy Now", which runs resetAndLoadFakeData there and
-  removes the mark) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
+  removes the mark; buildMenus_ adds the owner menus even before Initial Setup, because a copy's setup flag
+  is not copied, and skips the welcome pop-up while the mark is there) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
   RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New

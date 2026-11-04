@@ -41,6 +41,7 @@ function ownerHooks_() {
 
     // --- 🐞 Debug menu + toasts (onOpen / runAction_) ---
     addMenus: ownerAddMenus_,
+    fakeDataPending: ownerFakeDataPending_,
     debugOn: ownerDebugOn_,
     debugRun: ownerDebugRun_
   };
@@ -65,7 +66,8 @@ function ownerAddMenus_(ui) {
     menu.addItem("▶️ Load Fake Data on This Copy Now", "ownerMenuFinishFakeDataCopy").addSeparator();
     try {
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        "This is the fake-data copy. Click 🐞 Debug → ▶️ Load Fake Data on This Copy Now.", "🧪 Fake data copy", 20);
+        "This is the fake-data copy. Click 🐞 Debug → ▶️ Load Fake Data on This Copy Now " +
+        "(Google asks you to allow the script the first time).", "🧪 Fake data copy", 30);
     } catch (e) {}
   }
   menu
@@ -178,6 +180,7 @@ function ownerMenuCopyForFakeData() {
     SpreadsheetApp.flush();
     ownerShowCopyLink_(copy.getUrl(), "✅ Copy made",
       "Open the copy, then click <b>🐞 Debug → ▶️ Load Fake Data on This Copy Now</b> (top of the menu). " +
+      "The first time, Google asks you to allow the copy's script; if nothing loads after that, click it again. " +
       "This sheet was not changed.<br><br>The copy has no automatic triggers (edits, nightly): " +
       "run 🚀 App Menu → Initial Setup there if you want to test typing in it.");
   });
@@ -209,7 +212,7 @@ function ownerShowCopyLink_(url, title, message) {
   const html = HtmlService.createHtmlOutput(
     `<div style="font-family:Arial,sans-serif;font-size:14px">` +
     `<p>${message}</p><p><a href="${url}" target="_blank">Open the copy</a></p></div>`)
-    .setWidth(420).setHeight(220);
+    .setWidth(440).setHeight(260);
   SpreadsheetApp.getUi().showModalDialog(html, title);
 }
 
