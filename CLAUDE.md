@@ -22,7 +22,9 @@ Files (shared = every school's sheet):
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
   Owner asked to keep it exactly as is (not moved, not cleaned).
-- #ContactLog.gs (+ ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool; left as is.
+- Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool; left as is.
+  "Z#" = a temporary file for trying out a new feature: no other code may rely on Z# files (the only link is the
+  guarded `if (typeof buildContactLogMenu_ === "function")` line in onOpen, a no-op without the file).
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
@@ -47,7 +49,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
-  Regenerate, #ContactLog, the HTML files and the manifest are unchanged.
+  Regenerate, the other HTML files and the manifest are unchanged. The Contact Log tool is now named
+  Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
@@ -85,14 +88,14 @@ and pastes, settings, overrides, migration, version check, Contact Log tool) giv
 triggers, contacts, toasts and alerts; the only additions are the owner's Debug menu / toasts.
   1. Done: word-for-word moves, dead code deleted (isTruthy_, compareText_, findEndRowInColumnG_,
      getDirectoryLabelResourceName_, getGuideLink, runInitialBulkContactSync, showSidebar), always-true typeof
-     checks dropped (kept: buildContactLogMenu_ for the optional module, and inside Regenerate.gs / #ContactLog.gs).
+     checks dropped (kept: buildContactLogMenu_ for the optional module, and inside Regenerate.gs / Z#ContactLog.gs).
   2. Done: owner hooks (above); the owner copies of buildAllDerivedSheets and syncToGoogleContacts are gone.
   3. Done: one notes-line formatter, one last-name sort (Master Table + Combined), one Directory sort, one Contact Log
      hide filter + week formula, safeStr_ -> toText_, one Notes/Events single-cell Master Table lookup
      (findInMasterTable_) and one Events OSIS lookup (findMasterRowByOsis_).
      NOT merged because the versions behave differently (merging would change results): Contact Log single-cell
      typist (in-memory, trims) vs paste lookup (buildGhostLookup_, splits groups) vs TextFinder ones; the 3 Directory
-     site/class lookups (sibling order differs; one is in #ContactLog.gs); the 4 settings lists (different keys/defaults).
+     site/class lookups (sibling order differs; one is in Z#ContactLog.gs); the 4 settings lists (different keys/defaults).
      Not done: constants for the 123 sheet-name literals ("Raw Data" vs "RAW Data" lookups differ by place).
   Speed-ups (same results): Combined Contact Tracking groups rows by OSIS once (was every row x every student); sorts
   reuse one collator (compareNatural_); a sibling / multi-row edit reads the logs once (updateOsisDeltas_), and on the

@@ -255,7 +255,7 @@ function buildMenus_() {
       .addItem('📋 New Event', 'createNewEventTable')
       .addToUi();
 
-    // 3. Contact Log menu — optional module (ContactLog.gs). Guarded so the
+    // 3. Contact Log menu — optional module (Z#ContactLog.gs). Guarded so the
     //    app works unchanged if that file isn't included.
     if (typeof buildContactLogMenu_ === "function") buildContactLogMenu_();
   }

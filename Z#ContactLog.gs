@@ -35,7 +35,7 @@ function openManageNotes()    { CacheService.getScriptCache().put('CL_INIT_TAB',
 /** Opens the tool as a sidebar or a centered dialog, per the saved preference. */
 function cl_show_() {
   const mode = PropertiesService.getDocumentProperties().getProperty('CL_VIEW_MODE') || 'sidebar';
-  const html = HtmlService.createHtmlOutputFromFile('ContactLogSidebar').setTitle('Contact Log');
+  const html = HtmlService.createHtmlOutputFromFile('Z#ContactLogSidebar').setTitle('Contact Log');
   if (mode === 'modal') {
     SpreadsheetApp.getUi().showModalDialog(html.setWidth(720).setHeight(660), '📇 Contact Log');
   } else {
