@@ -78,6 +78,14 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
   Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
+- All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
+- Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
+  Belcher Louise/Gene + override-only Tina, Addams Wednesday/Pugsley), Parent Square, NYCSA, Site/Class in the new
+  BH:BI format (one row per site, classes one per line; 5 of 6 sites have 2-3 classes; "Y12"/"Y50" have no teacher),
+  26 Contact Log rows (30-row log; each row carries its Type / Follow-up / Follow-up note), 3 events (Fall PTC,
+  Graduation Workshop, Spring Festival; Backend Event Log rows now in the real column order), 5 Notes rows, 3
+  New/Edit Student overrides (New Student Tina Belcher, Peter Parker + guardian, Diana Prince hidden from report),
+  then the Students Override Report. PCAR and Send Out get no fake data (built from other tabs / not used by code).
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 

@@ -116,6 +116,7 @@ function ownerMenuCopyAndResetToDisplayMode() {
       resetContactLog_(copy);
       clearTypeDropdownColors_(copy);
       resetMasterTable_(copy);
+      resetNotes_(copy);
       fillContactLogHstackFormulas_(copy);
       stampVersionDate_(copy);
       saveSettingsToVersionSheet_(copy); // this sheet's current settings, written into the copy's Backend tab

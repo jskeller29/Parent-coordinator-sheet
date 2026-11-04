@@ -26,6 +26,7 @@ function resetToDisplayMode() {
   resetContactLog_(ss);
   clearTypeDropdownColors_(ss); // Wipe the dropdown colors!
   resetMasterTable_(ss);
+  resetNotes_(ss);
   fillContactLogHstackFormulas_(ss);
 
   // Stamp this template's build date so the Version Checker knows how old
@@ -104,12 +105,13 @@ function resetAndLoadFakeData() {
   resetDerivedSheets_(ss);
   resetEventsSystem_(ss); // NEW: Clears Events & Backend Log before loading new ones
   
-  // Expand the Contact Log to exactly 23 rows (plus the END row) BEFORE loading data
-  resizeContactLog_(ss, 23);
+  // Expand the Contact Log to exactly 30 rows (plus the END row) BEFORE loading data
+  resizeContactLog_(ss, 30);
   
   resetContactLog_(ss);
   clearTypeDropdownColors_(ss); // Wipe the old colors before loading new data!
   resetMasterTable_(ss);
+  resetNotes_(ss);
 
   // Load All Data (Row 7 Start)
   loadFakeATS_(ss);
@@ -118,12 +120,19 @@ function resetAndLoadFakeData() {
   loadFakeClassSiteData_(ss);
   loadFakeContactLog_(ss);
   loadFakeEvents_(ss); // NEW: Builds event tables and populates backend
+  loadFakeNotes_(ss);
+  loadFakeOverrides_(ss); // New / Edit Student (Backend tab), read by the build below
 
   fillContactLogHstackFormulas_(ss);
 
   if (typeof buildAllDerivedSheets === "function") {
     buildAllDerivedSheets();
   }
+
+  // Students Override Report (from the fake overrides above), then back to the Contact Log
+  if (typeof buildOverrideReport === "function") buildOverrideReport();
+  const contactLogTab = ss.getSheetByName("Contact Log");
+  if (contactLogTab) contactLogTab.activate();
 
   applyQBlackTextFilter_();
 
@@ -349,7 +358,13 @@ function loadFakeATS_(ss) {
     ["2025-2026","75M094","912345678","WAYNE","BRUCE","NA","M",12,1,0,1,0,"P - Permanent",0,1,"",6,"Y50","English","ALFRED PENNYWORTH","GUARDIAN","1212121212","ALFRED@WAYNE.COM","English","English","","","","","",""],
     ["2025-2026","75M094","923456789","STARK","TONY","NA","M",12,0,0,0,0,"P - Permanent",0,1,"",6,"Y50","English","PEPPER POTTS","GUARDIAN","1313131313","PEPPER@STARK.COM","English","English","","","","","",""],
     ["2025-2026","75M094","934567891","BANNER","BRUCE","NA","M",11,1,0,0,0,"T - Temporary",1,1,"",5,"Y24","English","BETTY ROSS","GUARDIAN","1414141414","BETTY.ROSS@gmail.com","English","English","","","","","",""],
-    ["2025-2026","75M094","945678912","PRINCE","DIANA","NA","F",10,1,0,0,0,"P - Permanent",0,1,"",4,"Y11","English","HIPPOLYTA","MOTHER","1515151515","HIPPOLYTA@AMAZON.COM","English","English","","","","","",""]
+    ["2025-2026","75M094","945678912","PRINCE","DIANA","NA","F",10,1,0,0,0,"P - Permanent",0,1,"",4,"Y11","English","HIPPOLYTA","MOTHER","1515151515","HIPPOLYTA@AMAZON.COM","English","English","","","","","",""],
+    ["2025-2026","75M094","956789123","BELCHER","LOUISE","NA","F",9,1,0,0,1,"P - Permanent",0,1,"",3,"Y42","English","LINDA BELCHER","MOTHER","1616161616","LINDA.BELCHER@gmail.com","English","English","BOB BELCHER","FATHER","1717171717","BOB.BELCHER@gmail.com","English","English"],
+    ["2025-2026","75M094","967891234","BELCHER","GENE","NA","M",11,1,0,0,1,"P - Permanent",0,1,"",5,"Y27","English","LINDA BELCHER","MOTHER","1616161616","LINDA.BELCHER@gmail.com","English","English","BOB BELCHER","FATHER","1717171717","BOB.BELCHER@gmail.com","English","English"],
+    ["2025-2026","75M094","245678912","ADDAMS","PUGSLEY","NA","M",10,1,1,0,1,"P - Permanent",0,1,"",4,"Y66","Spanish","MORTICIA ADDAMS","MOTHER","3333333333","MORTICIA.ADDAMS@gmail.com","Spanish","Spanish","GOMEZ ADDAMS","FATHER","3333334444","GOMEZ.ADDAMS@gmail.com","English","English"],
+    ["2025-2026","75M094","978912345","POSSIBLE","KIM","NA","F",12,1,0,0,0,"P - Permanent",0,1,"",6,"X31","English","ANN POSSIBLE","MOTHER","1818181818","ANN.POSSIBLE@gmail.com","English","English","JAMES POSSIBLE","FATHER","1919191919","JAMES.POSSIBLE@gmail.com","English","English"],
+    ["2025-2026","75M094","989123456","FA","MULAN","NA","F",10,1,1,0,0,"P - Permanent",0,1,"",4,"Y12","Chinese","FA ZHOU","FATHER","2020202020","","Chinese","Chinese","","","","","",""],
+    ["2025-2026","75M094","991234567","MADRIGAL","MIRABEL","NA","F",11,1,1,0,1,"P - Permanent",0,1,"",5,"Y28","Spanish","JULIETA MADRIGAL","MOTHER","2121212121","JULIETA.MADRIGAL@gmail.com","Spanish","Spanish","AGUSTIN MADRIGAL","FATHER","2323232323","","English","English"]
   ];
   sheet.getRange(7, 1, data.length, data[0].length).setValues(data);
 }
@@ -376,7 +391,16 @@ function loadFakeParentsSquare_(ss) {
     ["Pennyworth, Alfred","Bruce Wayne","ALFRED@WAYNE.COM","(121) 212-1212","","Oct 15, 2025","Yes","No"],
     ["Potts, Pepper","Tony Stark","PEPPER@STARK.COM","(131) 313-1313","","Oct 20, 2025","Yes","Yes"],
     ["Ross, Betty","Bruce Banner","BETTY.ROSS@gmail.com","(141) 414-1414","","Oct 22, 2025","No","No"],
-    ["Prince, Hippolyta","Diana Prince","HIPPOLYTA@AMAZON.COM","(151) 515-1515","","Oct 18, 2025","Yes","Yes"]
+    ["Prince, Hippolyta","Diana Prince","HIPPOLYTA@AMAZON.COM","(151) 515-1515","","Oct 18, 2025","Yes","Yes"],
+    ["Belcher, Linda","Louise Belcher","LINDA.BELCHER@gmail.com","(161) 616-1616","","Oct 3, 2025","Yes","Yes"],
+    ["Belcher, Bob","Louise Belcher","BOB.BELCHER@gmail.com","(171) 717-1717","","Oct 3, 2025","No","Yes"],
+    ["Belcher, Linda","Gene Belcher","LINDA.BELCHER@gmail.com","(161) 616-1616","","Oct 3, 2025","Yes","Yes"],
+    ["Belcher, Bob","Gene Belcher","BOB.BELCHER@gmail.com","(171) 717-1717","","Oct 3, 2025","No","Yes"],
+    ["Addams, Morticia","Pugsley Addams","MORTICIA.ADDAMS@gmail.com","(333) 333-3333","","Sep 18, 2025","No","Yes"],
+    ["Addams, Gomez","Pugsley Addams","GOMEZ.ADDAMS@gmail.com","(333) 333-4444","","Sep 18, 2025","Yes","Yes"],
+    ["Possible, Ann","Kim Possible","ANN.POSSIBLE@gmail.com","(181) 818-1818","","Nov 2, 2025","Yes","Yes"],
+    ["Possible, James","Kim Possible","JAMES.POSSIBLE@gmail.com","(191) 919-1919","","Nov 2, 2025","Yes","No"],
+    ["Madrigal, Julieta","Mirabel Madrigal","JULIETA.MADRIGAL@gmail.com","(212) 121-2121","","Oct 28, 2025","Yes","Yes"]
   ];
   sheet.getRange(7, columnLetterToNumber_("AG"), data.length, data[0].length).setValues(data);
 }
@@ -402,23 +426,33 @@ function loadFakeNYCSA_(ss) {
     ["M094",75,"P.S. M094","Y50",6,"912345678","BRUCE","WAYNE","ALFRED","PENNYWORTH","No","","","1212121212","GUARDIAN","Custodial User","B99999H1"],
     ["M094",75,"P.S. M094","Y50",6,"923456789","TONY","STARK","PEPPER","POTTS","No","","","1313131313","GUARDIAN","Custodial User","T10101J1"],
     ["M094",75,"P.S. M094","Y24",5,"934567891","BRUCE","BANNER","BETTY","ROSS","No","","","1414141414","GUARDIAN","Non-Custodial User","B20202K1"],
-    ["M094",75,"P.S. M094","Y11",4,"945678912","DIana","PRINCE","HIPPOLYTA","PRINCE","No","","","1515151515","MOTHER","Custodial User","D30303L1"]
+    ["M094",75,"P.S. M094","Y11",4,"945678912","DIana","PRINCE","HIPPOLYTA","PRINCE","No","","","1515151515","MOTHER","Custodial User","D30303L1"],
+    ["M094",75,"P.S. M094","Y42",3,"956789123","LOUISE","BELCHER","LINDA","BELCHER","No","","","1616161616","MOTHER","Custodial User","L40404M1"],
+    ["M094",75,"P.S. M094","Y42",3,"956789123","LOUISE","BELCHER","BOB","BELCHER","Yes","","","1717171717","FATHER","Custodial User","L40404M2"],
+    ["M094",75,"P.S. M094","Y27",5,"967891234","GENE","BELCHER","LINDA","BELCHER","No","","","1616161616","MOTHER","Custodial User","G50505N1"],
+    ["M094",75,"P.S. M094","Y66",4,"245678912","PUGSLEY","ADDAMS","MORTICIA","ADDAMS","No","","","3333333333","MOTHER","Custodial User","P60606P1"],
+    ["M094",75,"P.S. M094","X31",6,"978912345","KIM","POSSIBLE","ANN","POSSIBLE","No","","","1818181818","MOTHER","Custodial User","K70707Q1"],
+    ["M094",75,"P.S. M094","Y28",5,"991234567","MIRABEL","MADRIGAL","JULIETA","MADRIGAL","No","","","2121212121","MOTHER","Custodial User","M80808R1"]
   ];
   sheet.getRange(7, columnLetterToNumber_("AP"), data.length, data[0].length).setValues(data);
 }
 
+// Raw Data BH:BI: one row per site, BI = that site's classes, one per line
+// ("Y25: Sam", or a bare "Y12" when the class has no teacher). Every site but 340
+// has more than one class.
 function loadFakeClassSiteData_(ss) {
   const sheet = ss.getSheetByName("Raw Data");
   const data = [
-    ["15", "Y41: Tessa"],
-    ["51", "Y25: Sam"],
-    ["51", "Y66: Carl"],
-    ["188", "X30: Ham"],
-    ["276", "Y11: Bam"],
-    ["281", "Y24: LAM"],
-    ["340", "Y50:"]
+    ["15",  "Y41: Tessa\nY42: Nina"],
+    ["51",  "Y25: Sam\nY27: Rosa\nY66: Carl"],
+    ["188", "X30: Ham\nX31: Lee"],
+    ["276", "Y11: Bam\nY12"],
+    ["281", "Y24: Lam\nY28: Ortiz"],
+    ["340", "Y50"]
   ];
   sheet.getRange(7, columnLetterToNumber_("BH"), data.length, 2).setValues(data);
+  // Multi-line class cells would make the rows tall; Raw Data rows 7+ stay 21px
+  if (typeof lockRawDataRowHeights_ === "function") lockRawDataRowHeights_(sheet);
 }
 
 /* =========================
@@ -446,32 +480,41 @@ function loadFakeContactLog_(ss) {
     return fmtDate(d);
   };
 
+  // [days ago, Guardian, Spoke with, OSIS, Student, Method 1, Method 2, Type, Notes, Follow-up (N), Follow-up notes (O), checkbox (P)]
   const rows = [
-    [daysAgo(17),"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Call","Homer asked about start of school year",false],
-    [daysAgo(15),"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Walk In","Intake","Submitted documents for enrollment",true],
-    [daysAgo(14),"Mr. Incredible and Mrs. Incredible","Mrs. Incredible",345678912,"Dash Incredible","Parent-Teacher","In School","Attended parent-teacher conference",false],
-    [daysAgo(13),"Mr. Incredible and Mrs. Incredible","Mr. Incredible",456789123,"Violet Incredible","Phone","Parent Meeting","Asked about academic progress",false],
-    [daysAgo(12),"Homer Simpson and Marge Simpson","Marge Simpson",123456789,"Bart Simpson","Phone","Email","Requesting teacher contact info",true],
-    [daysAgo(9),"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Email","Requested teacher email again",true],
-    [daysAgo(8),"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Phone","Call","Discussed student progress",false],
-    [daysAgo(7),"Rio Morales and Jefferson Morales","Rio Morales",789123456,"Miles Morales","Phone","Call","Discussed attendance concerns",true],
-    [daysAgo(6),"Rio Morales and Jefferson Morales","Jefferson Morales",789123456,"Miles Morales","Phone","Email","Requested IEP documents",false],
-    [daysAgo(5),"May Parker","May Parker",678912345,"Peter Parker","Phone","Call","Asked about tutoring options",false],
-    [daysAgo(4),"Martha Kent and Jonathan Kent","Martha Kent",891234567,"Clark Kent","Phone","Call","Discussed college readiness",true],
-    [daysAgo(3),"Martha Kent and Jonathan Kent","Jonathan Kent",891234567,"Clark Kent","Phone","Call","Confirmed attendance improvement",false],
-    [daysAgo(2),"Alfred Pennyworth","Alfred Pennyworth",912345678,"Bruce Wayne","Walk In","Meeting","Discussed behavioral concerns",true],
-    [daysAgo(2),"Pepper Potts","Pepper Potts",923456789,"Tony Stark","Phone","Email","Requested report card copy",false],
-    [daysAgo(1),"Betty Ross","Betty Ross",934567891,"Bruce Banner","Phone","Call","Discussed housing situation",true],
-    [daysAgo(1),"Hippolyta","Hippolyta",945678912,"Diana Prince","Phone","Call","Asked about extracurriculars",false],
-    [daysAgo(0),"Homer Simpson and Marge Simpson","Homer Simpson",567891234,"Lisa Simpson","Phone","Call","Discussed academic performance",false],
-    [daysAgo(0),"Homer Simpson and Marge Simpson","Marge Simpson",567891234,"Lisa Simpson","Phone","Email","Requested meeting with teacher",false]
+    [20,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Call","Student Activities","Asked about after-school programs","No","",false],
+    [17,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Call","School Schedule","Homer asked about start of school year","No","",false],
+    [16,"Linda Belcher and Bob Belcher","Bob Belcher",967891234,"Gene Belcher","Walk In","Meeting","School Meeting","Discussed music class schedule","Waiting For Response","Teacher checking the band list",false],
+    [15,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Walk In","Intake","Enrollment Documents","Submitted documents for enrollment","No","",true],
+    [14,"Mr. Incredible and Mrs. Incredible","Mrs. Incredible",345678912,"Dash Incredible","Parent-Teacher","In School","School Meeting","Attended parent-teacher conference","No","",false],
+    [13,"Mr. Incredible and Mrs. Incredible","Mr. Incredible",456789123,"Violet Incredible","Phone","Parent Meeting","Academic Inquiry","Asked about academic progress","Yes","",false],
+    [12,"Homer Simpson and Marge Simpson","Marge Simpson",123456789,"Bart Simpson","Phone","Email","Contact Request","Requesting teacher contact info","No","",true],
+    [11,"Morticia Addams and Gomez Addams","Gomez Addams",245678912,"Pugsley Addams","Phone","Call","Academic Support","Discussed science fair project","Need To Follow Up","",true],
+    [10,"Ann Possible and James Possible","Ann Possible",978912345,"Kim Possible","Phone","Email","Records Request","Requested volunteer forms","Yes","",false],
+    [9,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Email","Email Request","Requested teacher email again","Yes - Important","",true],
+    [8,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Phone","Call","Progress Review","Discussed student progress","No","Called principal",false],
+    [7,"Rio Morales and Jefferson Morales","Rio Morales",789123456,"Miles Morales","Phone","Call","Attendance Meeting","Discussed attendance concerns","No","",true],
+    [6,"Rio Morales and Jefferson Morales","Jefferson Morales",789123456,"Miles Morales","Phone","Email","Records Request","Requested IEP documents","Yes","",false],
+    [6,"Fa Zhou","Fa Zhou",989123456,"Mulan Fa","Phone","Call","Meeting Request","Needs a Chinese interpreter for meetings","Followup ASAP","Ask the office for an interpreter",true],
+    [5,"May Parker","May Parker",678912345,"Peter Parker","Phone","Call","Academic Support","Asked about tutoring options","Newer Interaction","",false],
+    [4,"Martha Kent and Jonathan Kent","Martha Kent",891234567,"Clark Kent","Phone","Call","College Planning","Discussed college readiness","Yes - Important","",true],
+    [3,"Martha Kent and Jonathan Kent","Jonathan Kent",891234567,"Clark Kent","Phone","Call","Attendance Progress","Confirmed attendance improvement","No","",false],
+    [3,"Julieta Madrigal and Agustin Madrigal","Julieta Madrigal",991234567,"Mirabel Madrigal","Workshop","In School","Student Activities","Attended family literacy workshop","No","",false],
+    [2,"Alfred Pennyworth","Alfred Pennyworth",912345678,"Bruce Wayne","Walk In","Meeting","Behavioral Consultation","Discussed behavioral concerns","Yes","",true],
+    [2,"Pepper Potts","Pepper Potts",923456789,"Tony Stark","Phone","Email","Student Records","Requested report card copy","No","",false],
+    [1,"Betty Ross","Betty Ross",934567891,"Bruce Banner","Phone","Call","Housing Situation","Discussed housing situation","No","",true],
+    [1,"Hippolyta","Hippolyta",945678912,"Diana Prince","Phone","Call","Student Activities","Asked about extracurriculars","No","",false],
+    [1,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Email","Contact Request","Asked for a callback about the bus route","Need to respond","",false],
+    [0,"Homer Simpson and Marge Simpson","Homer Simpson",567891234,"Lisa Simpson","Phone","Call","Academic Advising","Discussed academic performance","No","",false],
+    [0,"Homer Simpson and Marge Simpson","Marge Simpson",567891234,"Lisa Simpson","Phone","Email","Meeting Request","Requested meeting with teacher","No","Teacher will reach out",false],
+    [0,"Ann Possible and James Possible","James Possible",978912345,"Kim Possible","Phone","Call","School Meeting","Confirmed attendance at PTC","Waiting - Check Up","",false]
   ];
 
   const writeRows = rows.slice(0, maxRows);
   if (!writeRows.length) return;
 
   // ⚡ ALL COLUMNS SHIFTED 
-  writeSingleColumn_(sheet, startRow, 2, writeRows.map(r => [r[0]]));  // Col B (Date)
+  writeSingleColumn_(sheet, startRow, 2, writeRows.map(r => [daysAgo(r[0])]));  // Col B (Date)
   writeSingleColumn_(sheet, startRow, 3, writeRows.map(r => [r[1]]));  // Col C (Guardian)
   writeSingleColumn_(sheet, startRow, 4, writeRows.map(r => [r[2]]));  // Col D (Person Spoke With)
   writeSingleColumn_(sheet, startRow, 5, writeRows.map(r => [r[3]]));  // Col E (OSIS)
@@ -479,32 +522,16 @@ function loadFakeContactLog_(ss) {
   
   writeSingleColumn_(sheet, startRow, 10, writeRows.map(r => [r[5]])); // Col J (Method 1)
   writeSingleColumn_(sheet, startRow, 11, writeRows.map(r => [r[6]])); // Col K (Method 2)
-  
-  const fakeTypes = [
-    "School Schedule", "Enrollment Documents", "School Meeting", "Academic Inquiry",
-    "Contact Request", "Email Request", "Progress Review", "Attendance Meeting", 
-    "Records Request", "Academic Support", "College Planning", "Attendance Progress", 
-    "Behavioral Consultation", "Student Records", "Housing Situation", "Student Activities", 
-    "Academic Advising", "Meeting Request"
-  ];
-  writeSingleColumn_(sheet, startRow, 12, fakeTypes.slice(0, writeRows.length).map(t => [t])); // Col L (Type)
-
-  writeSingleColumn_(sheet, startRow, 13, writeRows.map(r => [r[7]])); // Col M (Notes)
+  writeSingleColumn_(sheet, startRow, 12, writeRows.map(r => [r[7]])); // Col L (Type)
+  writeSingleColumn_(sheet, startRow, 13, writeRows.map(r => [r[8]])); // Col M (Notes)
 
   const numberValues = new Array(writeRows.length).fill([1]);
   sheet.getRange(startRow, 7, numberValues.length, 1).setValues(numberValues); // Col G (# interactions)
 
-  const sisStatus = [
-    "No","No","No","Yes","No","Yes - Important","No",
-    "No","Yes","Newer Interaction","Yes - Important",
-    "No","Yes","No","No","No","No", "No"
-  ].slice(0, writeRows.length).map(v => [v]);
-  sheet.getRange(startRow, 14, sisStatus.length, 1).setValues(sisStatus); // Col N (SIS)
+  writeSingleColumn_(sheet, startRow, 14, writeRows.map(r => [r[9]]));  // Col N (Follow-up)
+  writeSingleColumn_(sheet, startRow, 15, writeRows.map(r => [r[10]])); // Col O (Follow-up notes)
 
-  if (maxRows >= 7) sheet.getRange("O8").setValue("Called principal"); // Col O
-  if (maxRows >= 18) sheet.getRange("O19").setValue("Teacher will reach out"); // Col O
-
-  const checkboxValues = writeRows.map(r => [r[8]]);
+  const checkboxValues = writeRows.map(r => [r[11]]);
   const sRange = sheet.getRange(startRow, 16, checkboxValues.length, 1); // Col P (16)
   sRange.clearContent().insertCheckboxes().setValues(checkboxValues).setFontColor("#000000");
 
@@ -549,6 +576,12 @@ function loadFakeEvents_(ss) {
   if (typeof buildEventTable !== "function") return;
 
   const today = new Date();
+
+  // Fake Event 0: Fall PTC (14 days ago). Built first, so it ends up furthest right (cols 15-20).
+  let d0 = new Date(today);
+  d0.setDate(d0.getDate() - 14);
+  const dateStr0 = Utilities.formatDate(d0, Session.getScriptTimeZone(), "MM/dd/yyyy");
+  buildEventTable("Fall PTC", "Classrooms", dateStr0, "PTC");
   
   // Fake Event 1: Graduation Workshop (10 Days Ago)
   let d1 = new Date(today);
@@ -573,7 +606,7 @@ function loadFakeEvents_(ss) {
   eventsSheet.getRange(3, 1, springData.length, 6).setValues(springData);
 
   backendAppendRows_(ss, "EVENT_LOG", springData.map(row =>
-    [d2, "Spring Festival", "Other", row[0], row[1], row[2], row[3], row[4], row[5]]));
+    [d2, "Spring Festival", "Other", row[0], row[3], row[1], row[2], row[4], row[5]]));
 
   // --- INJECT GRADUATION WORKSHOP DATA (Cols 8-13) ---
   const gradData = [
@@ -584,7 +617,81 @@ function loadFakeEvents_(ss) {
   eventsSheet.getRange(3, 8, gradData.length, 6).setValues(gradData);
 
   backendAppendRows_(ss, "EVENT_LOG", gradData.map(row =>
-    [d1, "Graduation Workshop", "Workshop", row[0], row[1], row[2], row[3], row[4], row[5]]));
+    [d1, "Graduation Workshop", "Workshop", row[0], row[3], row[1], row[2], row[4], row[5]]));
+
+  // --- INJECT FALL PTC DATA (Cols 15-20) ---
+  const ptcData = [
+    [978912345, "Ann Possible and James Possible", "Ann Possible", "Kim Possible", 2, ""],
+    [956789123, "Linda Belcher and Bob Belcher", "Linda Belcher", "Louise Belcher", 1, "Also asked about Gene"],
+    [989123456, "Fa Zhou", "Fa Zhou", "Mulan Fa", 1, "Needed an interpreter"],
+    [245678912, "Morticia Addams and Gomez Addams", "Gomez Addams", "Pugsley Addams", 1, ""]
+  ];
+  eventsSheet.getRange(3, 15, ptcData.length, 6).setValues(ptcData);
+
+  backendAppendRows_(ss, "EVENT_LOG", ptcData.map(row =>
+    [d0, "Fall PTC", "PTC", row[0], row[3], row[1], row[2], row[4], row[5]]));
+}
+
+/* =========================
+NOTES TAB + NEW / EDIT STUDENT (fake data)
+========================= */
+
+// Clears the Notes tab's rows (A:D: OSIS, Guardians, Student, Notes); the header row stays.
+function resetNotes_(ss) {
+  const sheet = ss.getSheetByName("Notes");
+  if (sheet && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).clearContent();
+  }
+}
+
+// Manual notes (Notes tab, row 2+): they show at the top of that student's notes.
+function loadFakeNotes_(ss) {
+  const sheet = ss.getSheetByName("Notes");
+  if (!sheet) return;
+  const data = [
+    [123456789, "Homer Simpson and Marge Simpson", "Bart Simpson", "Prefers calls after 5 PM. Grandpa Abe may pick up."],
+    [234567891, "Morticia Addams and Gomez Addams", "Wednesday Addams", "Send letters home in Spanish."],
+    [912345678, "Alfred Pennyworth", "Bruce Wayne", "Alfred is the main contact; father often traveling."],
+    [989123456, "Fa Zhou", "Mulan Fa", "Needs a Chinese interpreter for every meeting."],
+    [967891234, "Linda Belcher and Bob Belcher", "Gene Belcher", "Brother of Louise (and Tina, new this year)."]
+  ];
+  sheet.getRange(2, 1, data.length, 4).setValues(data);
+}
+
+// New / Edit Student overrides (Backend tab), same 42-column rows as saveStudentOverrides:
+// one New Student not in ATS yet (Tina Belcher), one edit that adds a guardian (Peter Parker)
+// and one edit hidden from the Override Report (Diana Prince's new phone).
+function loadFakeOverrides_(ss) {
+  const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+  const makeRow = (type, osis, last, first, gender, age, grade, classCode, lang, guardians, label, hide) => {
+    const row = new Array(42).fill("");
+    [dateStr, type, osis, last, first, gender, age, grade, classCode, lang].forEach((v, i) => row[i] = v);
+    guardians.slice(0, 5).forEach((g, i) => {
+      const base = 10 + (i * 6);
+      row[base] = g[0];     // name
+      row[base + 1] = g[1]; // relationship
+      row[base + 2] = g[2]; // phone
+      row[base + 3] = g[3]; // email
+      row[base + 4] = g[4]; // language (written twice, like the dialog)
+      row[base + 5] = g[4];
+    });
+    row[40] = label;
+    row[41] = hide;
+    return row;
+  };
+  backendAppendRows_(ss, "OVERRIDES", [
+    makeRow("New Student", "998877665", "Belcher", "Tina", "F", 13, 7, "Y42", "English", [
+      ["Linda Belcher", "MOTHER", "1616161616", "LINDA.BELCHER@gmail.com", "English"],
+      ["Bob Belcher", "FATHER", "1717171717", "BOB.BELCHER@gmail.com", "English"]
+    ], "Current", false),
+    makeRow("Edit Existing Student", "678912345", "Parker", "Peter", "M", 10, 4, "Y11", "English", [
+      ["May Parker", "AUNT", "6666666666", "MAY.PARKER@gmail.com", "English"],
+      ["Ben Parker", "UNCLE", "2424242424", "", "English"]
+    ], "Current", false),
+    makeRow("Edit Existing Student", "945678912", "Prince", "Diana", "F", 10, 4, "Y11", "English", [
+      ["Hippolyta", "MOTHER", "1515150000", "HIPPOLYTA@AMAZON.COM", "English"]
+    ], "Current", true)
+  ]);
 }
 
 // --------------------------------------------------------------------------------------
