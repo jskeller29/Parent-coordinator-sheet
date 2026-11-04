@@ -318,39 +318,36 @@ function showWelcomeDialog() {
   const links = getTemplateLinks_();
   const guideUrl = getGuideLink_();
 
-  const htmlContent = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
-      <h2 style="color: #0F172A; margin-top: 0;">Welcome to the PC Tracker!</h2>
-      <p style="color: #334155; font-size: 14px; margin-bottom: 20px; line-height: 1.5; text-align: left;">
-        This system is designed to automate your directory, track your parent interactions, and easily compile your PCAR data.
-        <br><br><b>Next Steps:</b> Click <b>🚀 App Menu</b> at the top of your screen to safely <b>Import Old Data</b> from a previous version, or close this window and paste your new student data directly into the <b>RAW Data</b> tab!
-      </p>
-
-      <a href="${guideUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        📖 Read the User Guide
-      </a>
-
-      <div style="margin-top: 22px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-        <p style="color: #475569; font-size: 12px; margin: 0 0 10px;">Need to share a fresh copy?</p>
-        <a href="${links.blankCopyUrl}" target="_blank" rel="noopener" style="display: inline-block; margin: 4px; padding: 10px 18px; background-color: #0F9D58; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">
-          📄 New Copy (Blank)
-        </a>
-        <a href="${links.migrateCopyUrl}" target="_blank" rel="noopener" style="display: inline-block; margin: 4px; padding: 10px 18px; background-color: #7C3AED; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px;">
-          🔄 Upgrade Copy (Migrate)
-        </a>
+  const htmlContent = include_('Styles') + `
+    <style>
+      .note-dlg { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 14px; }
+      .note-dlg p { line-height: 1.5; }
+      .note-dlg .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+      .note-dlg .sub { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    </style>
+    <div class="note-dlg">
+      <h1>Welcome to the PC Tracker</h1>
+      <p>This system builds your directory, tracks your parent interactions, and compiles your PCAR data for you.</p>
+      <p><b>Next steps:</b> click <b>🚀 App Menu</b> at the top of your screen to <b>Import Old Data</b> from a previous version, or close this window and paste your new student data into the <b>RAW Data</b> tab.</p>
+      <div class="foot">
+        <a class="btn pri" href="${guideUrl}" target="_blank" rel="noopener">Read the User Guide</a>
       </div>
-
-      <p style="margin-top: 22px; font-size: 12px; color: #94a3b8;">
-        You can always access this guide later by clicking<br><b>🚀 App Menu ➔ 📖 Open User Guide</b> at the top of the screen.
-      </p>
+      <div class="sub">
+        <p class="help" style="margin:0">Need to share a fresh copy?</p>
+        <div class="foot" style="justify-content:flex-start">
+          <a class="btn sec" href="${links.blankCopyUrl}" target="_blank" rel="noopener">New copy (blank)</a>
+          <a class="btn sec" href="${links.migrateCopyUrl}" target="_blank" rel="noopener">Upgrade copy (migrate)</a>
+        </div>
+      </div>
+      <p class="hint">You can open this again any time from <b>🚀 App Menu ➔ 📖 Open User Guide</b>.</p>
     </div>
   `;
 
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-    .setWidth(420)
-    .setHeight(400);
+    .setWidth(460)
+    .setHeight(420);
 
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "📖 PC Tracker User Guide");
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "PC Tracker User Guide");
 }
 
 // ==========================================
@@ -361,15 +358,20 @@ function showWelcomeDialog() {
 // ==========================================
 function reportABug() {
   const formUrl = "https://forms.gle/5dXR2me3jt37aGhQ9";
-  const htmlContent = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
-      <h2 style="color: #0F172A; margin-top: 0;">🐞 Report a Bug</h2>
-      <p style="color: #334155; font-size: 14px; margin-bottom: 25px; line-height: 1.5;">
-        Found something broken or confusing? The report form should open in a new tab automatically. If it didn't, click below.
-      </p>
-      <a href="${formUrl}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #EF4444; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        🐞 Open the Bug Report Form
-      </a>
+  const htmlContent = include_('Styles') + `
+    <style>
+      .note-dlg { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 14px; }
+      .note-dlg p { line-height: 1.5; }
+      .note-dlg .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+      .note-dlg .sub { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    </style>
+    <div class="note-dlg">
+      <h1>Report a bug</h1>
+      <p>Found something broken or confusing? The report form should open in a new tab. If it didn't, use the button below.</p>
+      <div class="foot">
+        <button type="button" class="btn sec" onclick="google.script.host.close()">Close</button>
+        <a class="btn pri" href="${formUrl}" target="_blank" rel="noopener">Open the bug report form</a>
+      </div>
     </div>
     <script>
       // Try to open the form immediately; the button above covers pop-up blockers.
@@ -378,10 +380,10 @@ function reportABug() {
   `;
 
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-    .setWidth(400)
+    .setWidth(420)
     .setHeight(220);
 
-  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "🐞 Report a Bug");
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, "Report a Bug");
 }
 
 // ==========================================
@@ -389,7 +391,7 @@ function reportABug() {
 // ==========================================
 function runBuildOnly() {
   CacheService.getScriptCache().put('RUN_MODE', 'BUILD_ONLY', 600);
-  const html = HtmlService.createHtmlOutputFromFile('ProgressSidebar')
+  const html = htmlFromFile_('ProgressSidebar')
       .setTitle('Build Sheets Manager')
       .setWidth(320);
   SpreadsheetApp.getUi().showSidebar(html);
@@ -397,7 +399,7 @@ function runBuildOnly() {
 
 function openProgressBarSidebar() {
   CacheService.getScriptCache().put('RUN_MODE', 'FULL_SYNC', 600);
-  const html = HtmlService.createHtmlOutputFromFile('ProgressSidebar')
+  const html = htmlFromFile_('ProgressSidebar')
       .setTitle('Build & Sync Manager')
       .setWidth(320);
   SpreadsheetApp.getUi().showSidebar(html);
@@ -496,10 +498,10 @@ function onEdit(e) {
 // ⚙️ SETTINGS BACKEND LOGIC (was Settings Backend.gs)
 // ==========================================
 function openSettingsDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('SettingsDialog')
+  const html = htmlFromFile_('SettingsDialog')
       .setTitle('Dashboard Settings')
-      .setWidth(360)
-      .setHeight(830); 
+      .setWidth(780)
+      .setHeight(580);
   SpreadsheetApp.getUi().showModalDialog(html, 'Settings');
 }
 
@@ -856,19 +858,19 @@ function refreshContactLogFilter_() {
  * ==============================================================================
  */
 function openNewStudentDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('NewStudentDialog')
+  const html = htmlFromFile_('NewStudentDialog')
       .setTitle('New / Edit Student Override')
       .setWidth(600) 
       .setHeight(750);
-  SpreadsheetApp.getUi().showModalDialog(html, '✨ New / Edit Student');
+  SpreadsheetApp.getUi().showModalDialog(html, 'New / Edit Student');
 }
 
 function openManageOverridesDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('ManageOverridesDialog')
+  const html = htmlFromFile_('ManageOverridesDialog')
       .setTitle('Manage Student Overrides')
       .setWidth(500)
       .setHeight(650);
-  SpreadsheetApp.getUi().showModalDialog(html, '🗂️ Manage Overrides');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Manage Overrides');
 }
 
 /**
@@ -1328,7 +1330,7 @@ function buildOverrideReport() {
  * Opens the Rollover Wizard UI.
  */
 function openRolloverWizard() {
-  const html = HtmlService.createHtmlOutputFromFile('RolloverWizard')
+  const html = htmlFromFile_('RolloverWizard')
       .setTitle('End of Year Rollover')
       .setWidth(450)
       .setHeight(420);
@@ -1494,7 +1496,7 @@ function processRolloverBackend() {
 // newest version, using Smart Mapping to handle column schema changes.
 // ======================================================================
 function openMigrationWizard() {
-  const html = HtmlService.createHtmlOutputFromFile('MigrationUI')
+  const html = htmlFromFile_('MigrationUI')
     .setTitle('🔄 System Upgrade Wizard')
     .setWidth(550)
     .setHeight(600);
@@ -1925,39 +1927,42 @@ function showDataReminderDialog_(stale) {
   const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const limitText = { week: "a week", '2weeks': "2 weeks", month: "a month" }[getDataReminderSetting_()];
   const rows = stale.map(s =>
-    `<tr><td>${esc(s.name)}</td><td style="text-align:right;color:#b91c1c;font-weight:600">${s.days} days ago</td></tr>`).join("");
+    `<tr><td>${esc(s.name)}</td><td class="age">${s.days} days ago</td></tr>`).join("");
 
-  const html = `
+  const html = include_('Styles') + `
     <style>
-      body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 6px 12px; color: #0F172A; text-align: center; }
-      h2 { margin: 4px 0 6px; font-size: 19px; }
-      p { color: #334155; font-size: 14px; line-height: 1.45; margin: 6px 0; }
-      table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 14px; text-align: left; }
-      td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
-      button, .btn { display: block; width: 100%; box-sizing: border-box; padding: 11px; margin: 8px 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #0F172A; text-decoration: none; font-family: inherit; }
-      .primary { background: #2563EB; border-color: #2563EB; color: #fff; }
-      .muted { font-size: 12px; color: #94a3b8; }
-      .hidden { display: none; }
+      .note-dlg { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+      .note-dlg p { line-height: 1.5; }
+      .stale { width: 100%; border-collapse: collapse; font-size: 14px; }
+      .stale td { padding: 7px 2px; border-bottom: 1px solid var(--line); }
+      .stale td.age { text-align: right; color: var(--danger); font-weight: 600; font-variant-numeric: tabular-nums; }
+      .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+      .choices { display: flex; flex-direction: column; gap: 8px; }
+      .working { display: flex; align-items: center; gap: 8px; color: var(--muted); }
     </style>
-    <div id="ask">
-      <h2>⏰ Time to Update Your Data</h2>
+    <div id="ask" class="note-dlg">
+      <h1>Time to update your data</h1>
       <p>This data hasn't been updated in over ${limitText}:</p>
-      <table>${rows}</table>
-      ${hasInputMode
-        ? `<button class="primary" onclick="go()">📥 Go to Input Data Mode</button>`
-        : `<a class="btn primary" href="${DATA_GUIDE_URL}" target="_blank" rel="noopener">📖 How to Update Your Data</a>`}
-      <button onclick="skip()">Skip</button>
+      <table class="stale">${rows}</table>
+      <div class="foot">
+        <button type="button" class="btn sec" onclick="skip()">Skip</button>
+        ${hasInputMode
+          ? `<button type="button" class="btn pri" onclick="go()">Go to Input Data Mode</button>`
+          : `<a class="btn pri" href="${DATA_GUIDE_URL}" target="_blank" rel="noopener">How to update your data</a>`}
+      </div>
     </div>
-    <div id="later" class="hidden">
-      <h2>⏭️ Skipped</h2>
+    <div id="later" class="note-dlg hidden">
+      <h1>Skipped</h1>
       <p>When should we remind you next?</p>
-      <button onclick="choose('2weeks')">Remind After 2 Weeks</button>
-      <button onclick="choose('month')">Remind After 1 Month</button>
-      <button onclick="choose('off')">Remove Reminders</button>
-      <button class="primary" onclick="google.script.host.close()">Just skip for today</button>
-      <p class="muted">You can change this any time in ⚙️ Settings.</p>
+      <div class="choices">
+        <button type="button" class="btn sec wide" onclick="choose('2weeks')">Remind me after 2 weeks</button>
+        <button type="button" class="btn sec wide" onclick="choose('month')">Remind me after 1 month</button>
+        <button type="button" class="btn sec wide" onclick="choose('off')">Turn off reminders</button>
+        <button type="button" class="btn pri wide" onclick="google.script.host.close()">Just skip for today</button>
+      </div>
+      <p class="hint">You can change this any time in ⚙️ Settings.</p>
     </div>
-    <div id="busy" class="hidden"><p>Working…</p></div>
+    <div id="busy" class="note-dlg hidden"><div class="working"><div class="spinner"></div>Working…</div></div>
     <script>
       function show(id) { ['ask','later','busy'].forEach(function (x) { document.getElementById(x).classList.toggle('hidden', x !== id); }); }
       function fail(e) { alert('Something went wrong: ' + (e && e.message ? e.message : e)); google.script.host.close(); }
@@ -1965,8 +1970,8 @@ function showDataReminderDialog_(stale) {
       function skip() { show('later'); }
       function choose(c) { show('busy'); google.script.run.withSuccessHandler(function () { google.script.host.close(); }).withFailureHandler(fail).dataReminderChoose(c); }
     </script>`;
-  const height = Math.max(320, 250 + stale.length * 36); // the Skip screen needs ~320
-  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(420).setHeight(height), "⏰ Update Your Data");
+  const height = Math.max(330, 250 + stale.length * 36); // the Skip screen needs ~330
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(440).setHeight(height), "Update Your Data");
 }
 
 /** Reminder pop-up: "📥 Go to Input Data Mode". */
@@ -2038,8 +2043,8 @@ function checkForUpdates_(isManual) {
   } catch (e) { console.error(e); }
 
   // Plain static HTML — the dialog fetches its data via google.script.run
-  const title = payload.entries.length ? "🚀 New Version Available!" : "🔔 Update Preferences";
-  const html = HtmlService.createHtmlOutputFromFile('VersionDialog')
+  const title = payload.entries.length ? "New Version Available" : "Update Preferences";
+  const html = htmlFromFile_('VersionDialog')
     .setWidth(540)
     .setHeight(600);
   SpreadsheetApp.getUi().showModalDialog(html, title);

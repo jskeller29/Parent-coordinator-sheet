@@ -2,56 +2,42 @@
 <html>
 <head>
   <base target="_top">
+  <?!= include_('Styles') ?>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; color: #333; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-
-    .header { padding: 18px 22px 10px 22px; }
-    h2 { font-size: 18px; margin: 0 0 4px 0; color: #0f172a; }
-    .sub { font-size: 13px; color: #64748b; margin: 0; }
-
-    .changelog { flex: 1; overflow-y: auto; padding: 6px 22px 10px 22px; }
-    .entry { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-    .entry-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .ver { font-size: 15px; font-weight: bold; color: #0f172a; }
-    .badge { font-size: 10px; font-weight: bold; padding: 3px 9px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-    .badge.major { background: #fee2e2; color: #b91c1c; }
-    .badge.small { background: #dbeafe; color: #1d4ed8; }
-    .notes { font-size: 13px; color: #334155; line-height: 1.5; white-space: pre-wrap; margin: 0; }
-    .getlink { display: inline-block; margin-top: 10px; padding: 7px 14px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600; }
-    .getlink:hover { background-color: #1d4ed8; }
-
-    .older { margin: 2px 4px 14px 4px; }
-    .older-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #e2e8f0; }
-    .older-title { font-size: 13px; font-weight: bold; color: #475569; }
-
-    .loading { display: flex; align-items: center; gap: 10px; color: #64748b; font-size: 13px; padding: 10px 4px; }
-    .spinner { width: 18px; height: 18px; border: 3px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .errorbox { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 16px; margin: 4px 0 12px 0; }
-    .errorbox b { color: #b91c1c; font-size: 13px; display: block; margin-bottom: 6px; }
-    .errorbox p { font-size: 12px; color: #7f1d1d; margin: 0; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
-
-    .footer { border-top: 1px solid #e2e8f0; background: #ffffff; padding: 12px 22px 12px 22px; }
-    .pref { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; margin-bottom: 12px; user-select: none; cursor: pointer; }
-    .pref input { width: 15px; height: 15px; cursor: pointer; margin: 0; }
-    .saved { font-size: 11px; color: #16a34a; font-weight: 600; opacity: 0; transition: opacity .3s; }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .header { padding: 6px 22px 12px; display: flex; flex-direction: column; gap: 4px; }
+    .sub { font-size: 13.5px; color: var(--muted); }
+    .changelog > * { flex-shrink: 0; }
+    .changelog { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 22px 14px; display: flex; flex-direction: column; gap: 16px; }
+    .entry { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .entry-top, .older-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .ver { font: 600 16px/1.3 var(--font-head); }
+    .badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .badge.major { background: var(--danger-soft); color: var(--danger); }
+    .badge.small { background: var(--accent-soft); color: var(--accent); }
+    .notes { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
+    .getlink { align-self: flex-start; margin-top: 4px; }
+    .older { display: flex; flex-direction: column; gap: 6px; }
+    .older-head { border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+    .older-title { font-size: 13.5px; font-weight: 700; color: var(--muted); }
+    .loading { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; padding: 10px 0; }
+    .errorbox { padding: 12px 14px; }
+    .errorbox b { display: block; margin-bottom: 4px; }
+    .errorbox p { font-size: 12.5px; line-height: 1.5; word-break: break-word; white-space: pre-wrap; }
+    .footer { border-top: 1px solid var(--line); padding: 12px 22px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .pref { display: flex; align-items: center; gap: 9px; font-size: 13.5px; cursor: pointer; user-select: none; }
+    .pref input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+    .saved { font-size: 12px; color: var(--ok); font-weight: 600; opacity: 0; transition: opacity .3s; }
     .saved.show { opacity: 1; }
-
-    .btn-row { display: flex; gap: 10px; }
-    button { border: none; border-radius: 6px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background-color .15s; }
-    #dismissBtn { background: #2563eb; color: #ffffff; flex: 1; }
-    #dismissBtn:hover { background: #1d4ed8; }
-    #dismissNowBtn { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; flex: 1; }
-    #dismissNowBtn:hover { background: #e2e8f0; }
-    button:disabled { opacity: .5; cursor: not-allowed; }
-    .hint { font-size: 11px; color: #94a3b8; margin: 9px 0 0 0; text-align: center; }
+    .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 2px; }
+    .footer .hint { text-align: right; }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h2 id="mainTitle">🚀 New Version Available!</h2>
+    <h1 id="mainTitle">A new version is available</h1>
     <p class="sub" id="subtitle">Checking the Version Tracker…</p>
   </div>
 
@@ -62,19 +48,19 @@
   <div class="footer">
     <label class="pref">
       <input type="checkbox" id="majorsOnly" onchange="savePref()">
-      <span>🔕 Only auto-notify me about <b>Major</b> updates</span>
-      <span class="saved" id="savedMajors">Saved ✓</span>
+      <span>Only tell me about <b>Major</b> updates automatically</span>
+      <span class="saved" id="savedMajors">Saved</span>
     </label>
     <label class="pref">
       <input type="checkbox" id="dismissForever" onchange="saveForever()">
-      <span>🚫 Stop <b>automatic</b> update checks</span>
-      <span class="saved" id="savedForever">Saved ✓</span>
+      <span>Stop <b>automatic</b> update checks</span>
+      <span class="saved" id="savedForever">Saved</span>
     </label>
     <div class="btn-row">
-      <button id="dismissNowBtn" onclick="dismissForNow()">Dismiss for now</button>
-      <button id="dismissBtn" onclick="dismissUpdate()">Dismiss this update</button>
+      <button id="dismissNowBtn" class="btn sec" onclick="dismissForNow()">Dismiss for now</button>
+      <button id="dismissBtn" class="btn pri" onclick="dismissUpdate()">Dismiss this update</button>
     </div>
-    <p class="hint">You can always check manually: 🚀 App Menu → 🔔 Check for Updates (shows all updates)</p>
+    <p class="hint">You can always check yourself: 🚀 App Menu → 🔔 Check for Updates (shows all updates)</p>
   </div>
 
   <script>
@@ -106,9 +92,9 @@
       const list = document.getElementById('changelog');
       list.innerHTML = '';
       const box = document.createElement('div');
-      box.className = 'errorbox';
+      box.className = 'errorbox notice err';
       const b = document.createElement('b');
-      b.textContent = '⚠️ ' + title;
+      b.textContent = title;
       const p = document.createElement('p');
       p.textContent = detail;
       box.appendChild(b);
@@ -130,7 +116,7 @@
       list.innerHTML = '';
 
       if (!DATA.entries || DATA.entries.length === 0) {
-        document.getElementById('mainTitle').textContent = '✅ You are Up to Date';
+        document.getElementById('mainTitle').textContent = "You're up to date";
         document.getElementById('subtitle').textContent =
           "You're already caught up! Change your notification preference below anytime.";
         const card = document.createElement('div');
@@ -158,11 +144,11 @@
       // Single button — always points at the latest template
       if (DATA.latestLink) {
         const a = document.createElement('a');
-        a.className = 'getlink';
+        a.className = 'getlink btn pri';
         a.href = DATA.latestLink;
         a.target = '_blank';
         a.rel = 'noopener';
-        a.textContent = '🔗 Get the Latest Version';
+        a.textContent = 'Get the latest version';
         card.appendChild(a);
       }
       list.appendChild(card);

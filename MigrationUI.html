@@ -2,140 +2,45 @@
 <html>
 <head>
   <base target="_top">
+  <?!= include_('Styles') ?>
   <style>
-    body {
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background-color: #f8f9fa;
-      color: #202124;
-      padding: 20px;
-      margin: 0;
-    }
-    .container {
-      background: white;
-      padding: 24px;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-    h2 {
-      margin-top: 0;
-      color: #1a73e8;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    p {
-      color: #5f6368;
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    .input-group {
-      margin-top: 20px;
-      margin-bottom: 20px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #dadce0;
-      border-radius: 6px;
-      font-size: 14px;
-      box-sizing: border-box;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input[type="text"]:focus {
-      border-color: #1a73e8;
-    }
-    button {
-      background-color: #1a73e8;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-      transition: background-color 0.2s;
-    }
-    button:hover {
-      background-color: #1557b0;
-    }
-    button:disabled {
-      background-color: #dadce0;
-      cursor: not-allowed;
-    }
-    .checklist {
-      margin-top: 20px;
-      display: none;
-      background: #f1f3f4;
-      padding: 15px;
-      border-radius: 8px;
-    }
-    .step {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
-      font-size: 14px;
-      color: #5f6368;
-    }
-    .step:last-child {
-      margin-bottom: 0;
-    }
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #dadce0;
-      border-top: 2px solid #1a73e8;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      display: none;
-    }
-    .status-icon {
-      width: 16px;
-      height: 16px;
-      display: inline-block;
-      text-align: center;
-      line-height: 16px;
-      font-weight: bold;
-    }
-    .pending { color: #9aa0a6; }
+    .wiz { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 16px; }
+    .wiz > p { line-height: 1.5; color: var(--ink); }
+    #error-msg { display: none; margin-top: 8px; }
+    .checklist { display: none; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+    .step { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+    .step + .step { margin-top: 9px; }
+    .step .spinner { display: none; width: 17px; height: 17px; }
+    .status-icon { width: 17px; height: 17px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font: 700 10px/1 var(--font); color: transparent; border: 1.5px solid var(--line); }
+    .pending { color: var(--muted); }
+    .running { font-weight: 600; }
     .running .spinner { display: inline-block; }
     .running .status-icon { display: none; }
-    .done .status-icon { color: #34a853; }
+    .done .status-icon { background: var(--accent); border-color: var(--accent); color: #ffffff; }
     .done .spinner { display: none; }
-    
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    
-    #error-msg {
-      color: #d93025;
-      font-size: 13px;
-      margin-top: 10px;
-      font-weight: 500;
-      display: none;
-    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h2>🚀 System Upgrade Wizard</h2>
-    <p>Paste the link to your older PC Tracking Sheet below. We will securely extract your Raw Data, Event Logs, Contact Logs, and custom settings, and smartly migrate them into this new version.</p>
-    
-    <div class="input-group">
+  <div class="wiz">
+    <h1>Upgrade from an older tracker</h1>
+    <p>Paste the link to your older PC Tracking Sheet. Your Raw Data, event logs, Contact Log and settings are copied into this new version. The old sheet isn't changed.</p>
+
+    <div>
+      <label class="lab" for="sheetUrl">Link to your old sheet</label>
       <input type="text" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off">
-      <div id="error-msg"></div>
+      <div id="error-msg" class="notice err"></div>
     </div>
 
-    <button id="startBtn" onclick="startMigration()">Start Safe Migration</button>
+    <button id="startBtn" class="btn pri wide" onclick="startMigration()">Start upgrade</button>
 
     <div class="checklist" id="checklist">
-      <div class="step pending" id="step-1"><span class="spinner"></span><span class="status-icon">○</span> 1. Connecting to Old System</div>
-      <div class="step pending" id="step-2"><span class="spinner"></span><span class="status-icon">○</span> 2. Recovering Custom Settings</div>
-      <div class="step pending" id="step-3"><span class="spinner"></span><span class="status-icon">○</span> 3. Migrating ATS Raw Data</div>
-      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> 4. Transferring Core Logs (Events, Overrides)</div>
-      <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> 5. Smart-Mapping Contact Log</div>
-      <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> 6. Finalizing & Rebuilding Directories</div>
+      <div class="step pending" id="step-1"><span class="spinner"></span><span class="status-icon">○</span> Connect to the old sheet</div>
+      <div class="step pending" id="step-2"><span class="spinner"></span><span class="status-icon">○</span> Bring over your settings</div>
+      <div class="step pending" id="step-3"><span class="spinner"></span><span class="status-icon">○</span> Copy ATS Raw Data</div>
+      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy events and student changes</div>
+      <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> Match up the Contact Log</div>
+      <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> Rebuild the directory and other tabs</div>
     </div>
   </div>
 
@@ -169,7 +74,7 @@
 
       errorMsg.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = "Migration in Progress...";
+      btn.textContent = "Upgrading…";
       document.getElementById('checklist').style.display = 'block';
 
       // Step 1: Verify Connection
@@ -202,7 +107,7 @@
                 setStep(6, 'running');
                 google.script.run.withSuccessHandler(() => {
                   setStep(6, 'done');
-                  btn.textContent = "Upgrade Complete! 🎉";
+                  btn.textContent = "Upgrade complete";
                   setTimeout(() => google.script.host.close(), 3000);
                 }).withFailureHandler(e => showError(e.message)).ma_finish();
                 

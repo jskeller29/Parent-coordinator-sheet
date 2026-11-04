@@ -2,63 +2,64 @@
 <html>
   <head>
     <base target="_top">
+    <?!= include_('Styles') ?>
     <style>
-      body { font-family: 'Roboto', sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding: 20px; }
-      .container { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
-      h2 { color: #1a73e8; margin-top: 0; }
-      p { font-size: 14px; line-height: 1.5; color: #555; text-align: left; }
-      ul { text-align: left; font-size: 14px; color: #555; padding-left: 20px; }
-      .btn { display: inline-block; padding: 10px 20px; margin-top: 15px; border-radius: 4px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; text-decoration: none; transition: 0.2s; }
-      .btn-primary { background-color: #1a73e8; color: white; }
-      .btn-primary:hover { background-color: #1557b0; }
-      .btn-success { background-color: #188038; color: white; width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; }
-      .btn-success:hover { background-color: #115e27; }
-      .btn-outline { background-color: transparent; color: #1a73e8; border: 1px solid #1a73e8; margin-left: 10px; }
-      .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1a73e8; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      .hidden { display: none; }
-      .success-icon { font-size: 40px; margin-bottom: 10px; }
+      .stepper { display: flex; align-items: center; gap: 8px; padding: 8px 12px 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; font-size: 12.5px; color: var(--muted); }
+      .stepper span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+      .stepper i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 700 11px/1 var(--font); font-style: normal; border: 1.5px solid var(--line); }
+      .stepper .cur { color: var(--ink); font-weight: 600; }
+      .stepper .cur i { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+      .stepper .done i { background: var(--accent-soft); border-color: var(--accent-soft); color: var(--accent); }
+      .stepper hr { flex: 1; border: 0; border-top: 1px solid var(--line); margin: 0; min-width: 14px; }
+      .ro { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 14px; }
+      .ro p { line-height: 1.5; }
+      .ro ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+      .ro .foot { display: flex; justify-content: flex-end; gap: 8px; }
+      .working { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 18px 0; }
+      .working .spinner { width: 34px; height: 34px; border-width: 3px; }
+      .next { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
     </style>
   </head>
   <body>
-    <div class="container">
-      
-      <!-- STEP 1: INITIAL WARNING -->
-      <div id="step1">
-        <h2>End of Year Rollover</h2>
-        <p>Ready to close out the school year? This wizard will safely archive your data and prepare you for next year.</p>
-        <p><strong>What this does:</strong></p>
-        <ul>
-          <li>Generates a permanent <strong>PDF Archive</strong> of your Contact Log & Combined Tracking.</li>
-          <li><strong>Freezes this sheet</strong> by turning off all Nightly Phone Syncs so it doesn't overwrite your new data next year.</li>
-          <li>Provides the link to download your fresh, blazing-fast template for September!</li>
-        </ul>
-        <button class="btn btn-primary" onclick="startRollover()">Start Archive Process</button>
-        <button class="btn btn-outline" onclick="google.script.host.close()">Cancel</button>
+    <div class="stepper" aria-label="Rollover steps">
+      <span id="stage1" class="cur"><i>1</i>Review</span><hr>
+      <span id="stage2"><i>2</i>Archive</span><hr>
+      <span id="stage3"><i>3</i>Next year</span>
+    </div>
+
+    <!-- STEP 1: REVIEW -->
+    <div id="step1" class="ro">
+      <h1>Close out the school year</h1>
+      <p>This saves a permanent copy of this year's data and gets you ready for September.</p>
+      <ul>
+        <li>Saves a permanent <b>PDF archive</b> of your Contact Log and Combined Contact Tracking.</li>
+        <li><b>Freezes this sheet</b> by turning off the nightly phone sync, so it can't overwrite next year's data.</li>
+        <li>Gives you the link to a fresh template for September.</li>
+      </ul>
+      <div class="foot">
+        <button class="btn sec" onclick="google.script.host.close()">Cancel</button>
+        <button class="btn pri" onclick="startRollover()">Start archive</button>
       </div>
+    </div>
 
-      <!-- STEP 2: LOADING SCREEN -->
-      <div id="step2" class="hidden">
-        <h2>Archiving Data...</h2>
-        <div class="loader"></div>
-        <p style="text-align: center;">Packaging your logs into a PDF and freezing sync triggers.<br><br><em>This may take up to 30 seconds. Do not close this window.</em></p>
+    <!-- STEP 2: ARCHIVING -->
+    <div id="step2" class="ro hidden">
+      <div class="working">
+        <div class="spinner"></div>
+        <h1>Archiving your data…</h1>
+        <p>Saving your logs as a PDF and turning off the nightly sync.<br>This can take up to 30 seconds. Please keep this window open.</p>
       </div>
+    </div>
 
-      <!-- STEP 3: SUCCESS SCREEN -->
-      <div id="step3" class="hidden">
-        <div class="success-icon">✅</div>
-        <h2>Archive Complete!</h2>
-        <p style="text-align: center;">Your data has been successfully frozen and archived.</p>
-        
-        <a id="pdfLink" href="#" target="_blank" class="btn btn-outline" style="margin: 0 auto 20px auto; display: block; width: 80%;">📄 View Archived PDF</a>
-        
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-        <p style="text-align: center; font-weight: bold; color: #1a73e8;">Ready for next year?</p>
-        <a id="blankBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn btn-success" onclick="closeAfterClick()">📄 Get New Blank Template</a>
-        <a id="migrateBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn btn-outline" style="display: block; width: 80%; margin: 10px auto 0; box-sizing: border-box;" onclick="closeAfterClick()">🔄 Upgrade &amp; Migrate Last Year's Data</a>
+    <!-- STEP 3: DONE -->
+    <div id="step3" class="ro hidden">
+      <div class="notice ok">Your data is archived and this sheet is frozen.</div>
+      <a id="pdfLink" href="#" target="_blank" class="btn sec wide">View archived PDF</a>
+      <div class="next">
+        <h2>Ready for next year?</h2>
+        <a id="blankBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn pri wide" onclick="closeAfterClick()">Get a new blank template</a>
+        <a id="migrateBtn" href="https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2" target="_blank" class="btn sec wide" onclick="closeAfterClick()">Upgrade and bring over last year's data</a>
       </div>
-
     </div>
 
     <script>
@@ -75,7 +76,15 @@
         }).getTemplateLinks();
       })();
 
+      // Marks the current stage in the step list at the top (1 Review, 2 Archive, 3 Next year)
+      function setStage(n) {
+        [1, 2, 3].forEach(function(i) {
+          document.getElementById('stage' + i).className = i < n ? 'done' : (i === n ? 'cur' : '');
+        });
+      }
+
       function startRollover() {
+        setStage(2);
         document.getElementById('step1').classList.add('hidden');
         document.getElementById('step2').classList.remove('hidden');
         
@@ -89,11 +98,12 @@
       function showSuccess(response) {
         document.getElementById('step2').classList.add('hidden');
         document.getElementById('step3').classList.remove('hidden');
+        setStage(3);
         
         if(response.success) {
           document.getElementById('pdfLink').href = response.fileUrl;
           if (response.isFallback) {
-             document.getElementById('pdfLink').innerHTML = "📄 View Archive Spreadsheet";
+             document.getElementById('pdfLink').innerHTML = "View archive spreadsheet";
           }
         } else {
           showError(response.error);
@@ -103,6 +113,7 @@
       function showError(errorMsg) {
         document.getElementById('step2').classList.add('hidden');
         document.getElementById('step1').classList.remove('hidden');
+        setStage(1);
         alert("An error occurred: " + errorMsg);
       }
 

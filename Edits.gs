@@ -1220,35 +1220,66 @@ function writeMultipleRowDeltas_(ss, sheetName, newArrayData, targetOsis, osisCo
 // 1. ONE-BOX EVENT FORM (Custom UI with Calendar Picker)
 // ==============================================================
 function createNewEventTable() {
-  const html = `
-    <div style="font-family: Arial, sans-serif; padding: 10px;">
-      <label><b>Event Name</b> <span style="color:red;">*</span> (e.g., Spring Festival):</label><br>
-      <input type="text" id="name" style="width: 100%; margin-bottom: 15px; padding: 5px;" autofocus><br>
-      
-      <label><b>Event Type / Category</b> <span style="color:red;">*</span> (e.g., Workshop):</label>
-      <button type="button" onclick="fillPTC()" style="margin-left: 5px; font-size: 11px; padding: 3px 6px; background: #e0e0e0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">PTC Quick Fill</button><br>
-      <input type="text" id="type" style="width: 100%; margin-bottom: 15px; padding: 5px;"><br>
+  const html = include_('Styles') + `
+    <style>
+      .ev { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 14px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+      .chip { border: 1px solid var(--line); background: #ffffff; border-radius: var(--radius); padding: 5px 10px; font: 600 12.5px var(--font); color: var(--ink); cursor: pointer; }
+      .chip:hover { background: var(--panel); }
+      .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+      .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    </style>
+    <div class="ev">
+      <div>
+        <label class="lab" for="name">Event name <span class="req">*</span></label>
+        <input type="text" id="name" placeholder="e.g. Spring Festival" autofocus>
+      </div>
 
-      <label><b>Location</b> (e.g., Gym, Zoom):</label><br>
-      <input type="text" id="loc" style="width: 100%; margin-bottom: 15px; padding: 5px;"><br>
-      
-      <label><b>Date</b> <span style="color:red;">*</span>:</label><br>
-      <input type="date" id="date" style="width: 100%; margin-bottom: 20px; padding: 5px; font-family: Arial, sans-serif;"><br>
-      
-      <button id="createBtn" onclick="submit()" style="padding: 8px 15px; background: #0f9d58; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Create Table</button>
-      <button onclick="google.script.host.close()" style="padding: 8px 15px; background: #ddd; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Cancel</button>
-      
+      <div>
+        <label class="lab" for="type">Type <span class="req">*</span></label>
+        <div class="chips" id="typeChips">
+          <button type="button" class="chip">Parent Teacher Conference</button>
+          <button type="button" class="chip">Workshop</button>
+          <button type="button" class="chip">Family event</button>
+          <button type="button" class="chip">Meeting</button>
+        </div>
+        <input type="text" id="type" placeholder="Pick one above or type your own">
+      </div>
+
+      <div>
+        <label class="lab" for="loc">Location</label>
+        <input type="text" id="loc" placeholder="e.g. Gym, Zoom">
+      </div>
+
+      <div>
+        <label class="lab" for="date">Date <span class="req">*</span></label>
+        <input type="date" id="date">
+      </div>
+
+      <div class="foot">
+        <button type="button" class="btn sec" onclick="google.script.host.close()">Cancel</button>
+        <button type="button" class="btn pri" id="createBtn" onclick="submit()">Create table</button>
+      </div>
+
       <script>
-        function fillPTC() {
-          document.getElementById('type').value = "Parent Teacher Conference";
+        // The type buttons only fill in the Type box; any typed type works too.
+        const typeBox = document.getElementById('type');
+        const chips = document.querySelectorAll('#typeChips .chip');
+        function markChip() {
+          chips.forEach(function(c) { c.setAttribute('aria-pressed', String(c.textContent === typeBox.value.trim())); });
         }
+        chips.forEach(function(c) {
+          c.addEventListener('click', function() { typeBox.value = c.textContent; markChip(); });
+        });
+        typeBox.addEventListener('input', markChip);
+        markChip();
 
         function submit() {
           const name = document.getElementById('name').value.trim();
           const type = document.getElementById('type').value.trim();
           const loc = document.getElementById('loc').value.trim();
           const rawDate = document.getElementById('date').value; // Comes out as YYYY-MM-DD
-          
+
           if(!name) {
             alert("⚠️ Event Name is required!");
             return;
@@ -1261,25 +1292,23 @@ function createNewEventTable() {
             alert("⚠️ Date is required! Please select a date from the calendar.");
             return;
           }
-          
+
           // Prevent double-clicking by instantly disabling the button
           const btn = document.getElementById('createBtn');
           btn.disabled = true;
-          btn.innerText = 'Creating...';
-          btn.style.background = '#888';
-          btn.style.cursor = 'not-allowed';
-          
+          btn.innerText = 'Creating…';
+
           // Reformat the calendar output from YYYY-MM-DD to MM/DD/YYYY
           const parts = rawDate.split('-');
           const formattedDate = parts[1] + '/' + parts[2] + '/' + parts[0];
-          
+
           google.script.run.withSuccessHandler(google.script.host.close).buildEventTable(name, loc, formattedDate, type);
         }
       </script>
     </div>
   `;
-  const ui = HtmlService.createHtmlOutput(html).setWidth(300).setHeight(380);
-  SpreadsheetApp.getUi().showModalDialog(ui, '🚀 Create New Event');
+  const ui = HtmlService.createHtmlOutput(html).setWidth(440).setHeight(450);
+  SpreadsheetApp.getUi().showModalDialog(ui, 'Create New Event');
 }
 
 // ==============================================================

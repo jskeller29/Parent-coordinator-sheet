@@ -25,6 +25,11 @@ Files (shared = every school's sheet):
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
   Owner asked to keep it exactly as is (not moved, not cleaned).
+- Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
+  checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
+  <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
+  dialogs built as strings in .gs (Welcome, Report a Bug, ATS reminder, Create Event) start with include_('Styles').
+  No other <? ... ?> tags may appear in the HTML files. Z#ContactLogSidebar keeps its own style (left as is).
 - Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool; left as is.
   "Z#" = a temporary file for trying out a new feature: no other code may rely on Z# files (the only link is the
   guarded `if (typeof buildContactLogMenu_ === "function")` line in onOpen, a no-op without the file).
@@ -78,7 +83,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
-  Regenerate (now also has colorTabs), the other HTML files and the manifest are unchanged. The Contact Log tool is now named
+  UI refresh: also add Styles.html (new) and re-paste SettingsDialog, ProgressSidebar, NewStudentDialog,
+  ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (now also has colorTabs), the Z# files
+  and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
   with them.
@@ -103,6 +110,20 @@ New Students (detection: NEW / DISCHARGED STUDENTS section of Build.gs; tab: z_M
   the owner's New Students tab, the build report
   (sidebar) and the owner's nightly email all use it. Discharged = "Current" in the old Master Table, in Raw Data at
   the last build, and no longer in Raw Data. The snapshot is saved at the end of the build.
+
+UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's picks, same functions / endpoints / saved values.
+- Every dialog/sidebar uses Styles.html; Tailwind CDN removed; emoji removed inside dialogs and from dialog titles
+  (menus, alert/confirm texts and menu paths like "🚀 App Menu" keep theirs). Browser confirm()/alert() kept.
+- Settings: 780x580, section list on the left (Contacts & sync / Tabs & columns / Live updates / Notes / Student data).
+  "Rebuild sheets" dropdown = disableRebuilds + disableNightlySync (4 combos); notes timing buttons = autoNotes;
+  "Fill in Date, # and Follow-up" = !disableContactAutofill; "Contact Log shows" = contactLogTodayOnly; date-range
+  dropdown fills the same dates as the old preset buttons. Checked offline: 96 save / reset payloads identical to the old dialog.
+- Build & Sync sidebar: live build checklist (from getSyncStatus's buildSteps / buildStep, see BUILD_STEPS in Build.gs;
+  the current step shows its detail line) + phone-sync progress bar.
+- Data update reminder (showDataReminderDialog_) restyled; Settings has it under Student data. Z#InputDataSidebar
+  (trial file) keeps its own style.
+- Create Event: type buttons (PTC, Workshop, Family event, Meeting) only fill the Type box. New/Edit Student: one grouped
+  form, entry type as two buttons over a hidden #entryType input. Manage Overrides: cards. Rollover: step markers.
 
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets

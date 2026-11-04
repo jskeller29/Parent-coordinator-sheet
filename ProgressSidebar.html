@@ -2,116 +2,214 @@
 <html>
   <head>
     <base target="_top">
+    <?!= include_('Styles') ?>
     <style>
-      body { font-family: Arial, sans-serif; padding: 15px; margin: 0; }
-      progress { width: 100%; height: 20px; margin-top: 5px; transition: accent-color 0.3s ease; }
-      .section { margin-bottom: 20px; }
-      .status { font-size: 13px; color: #555; margin-top: 3px; }
-      .safe-note { font-size: 11px; color: #0066cc; font-style: italic; margin-top: 3px;}
-      .success { color: green; font-weight: bold; }
-      
-      /* Summary Box Styling */
-      .summary { margin-top: 10px; font-size: 14px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
-      .log-link { display: block; margin: 8px 0; cursor: pointer; text-decoration: none; color: #334155; padding: 6px; border-radius: 4px; transition: 0.2s;}
-      .log-link:hover { background-color: #e2e8f0; }
-      
-      progress.cancelled::-webkit-progress-value { background-color: #f44336 !important; }
-      progress.cancelled::-moz-progress-bar { background-color: #f44336 !important; }
-      progress.cancelled { accent-color: #f44336; }
-      
-      .control-panel { margin-top: 25px; text-align: center; border-top: 1px solid #ddd; padding-top: 15px; }
-      .action-btn { margin: 0 4px; padding: 10px 12px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 12px; color: white; width: 45%; transition: 0.2s; }
-      .action-btn:hover { opacity: 0.8; }
-      .btn-restart { background-color: #ff9800; }
-      .btn-cancel { background-color: #f44336; }
-      .btn-start { background-color: #2196F3; width: 95%; } 
+      body { padding: 16px; }
+      .stack { gap: 18px; }
+      .grp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+      .grp-head .eyebrow span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+      .grp-head .time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-      /* Details View Styling */
+      .cl { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+      .cl li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+      .cl li.todo { color: var(--muted); }
+      .cl li.now { font-weight: 600; }
+      .cl li.fail { color: var(--danger); font-weight: 600; }
+      .ck { width: 17px; height: 17px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font: 700 10px/1 var(--font); margin-top: 1px; color: #ffffff; }
+      .cl li.done .ck { background: var(--accent); }
+      .cl li.now .ck { border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+      .cl li.todo .ck { border: 1.5px solid var(--line); }
+      .cl li.fail .ck { background: var(--danger); }
+      .cl li .sub { display: none; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 1px; }
+      .cl li.now .sub, .cl li.fail .sub { display: block; }
+      .build-intro { font-size: 12px; color: var(--muted); margin: -2px 0 10px; }
+
+      .bar { height: 8px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+      .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s ease; }
+      .bar.waiting i { width: 0; }
+      .bar.done i { background: var(--ok); }
+      .bar.cancelled i { background: var(--danger); }
+      .sync-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 2px 0 6px; font-size: 13.5px; }
+      .sync-top b { font-weight: 600; }
+      .sync-top span { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .status { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+      .status.ok { color: var(--ok); font-weight: 600; }
+      .status.err { color: var(--danger); font-weight: 600; }
+      .eta { font-size: 12.5px; color: var(--ink); margin-top: 3px; font-variant-numeric: tabular-nums; }
+      .safe-note { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+      .rep .rh { padding: 9px 11px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--line); background: var(--panel); }
+      .rep a { display: flex; justify-content: space-between; gap: 8px; padding: 8px 11px; font-size: 13px; color: var(--ink); text-decoration: none; cursor: pointer; }
+      .rep a:hover { background: var(--panel); }
+      .rep a + a { border-top: 1px solid var(--line); }
+      .rep a b { font-variant-numeric: tabular-nums; }
+      .rep a b::after { content: " \203A"; color: var(--muted); font-weight: 400; }
+      .rep .rhint { font-size: 11.5px; color: var(--muted); padding: 6px 11px 0; }
+
+      .control-panel { display: none; gap: 8px; }
+      .control-panel .btn { flex: 1; }
+
       #detailsView { display: none; }
-      .back-btn { background: none; border: none; color: #2196F3; font-weight: bold; cursor: pointer; padding: 0; margin-bottom: 15px; font-size: 14px; }
-      .back-btn:hover { text-decoration: underline; }
-      .log-list { list-style-type: none; padding-left: 0; font-size: 13px; max-height: 400px; overflow-y: auto; }
-      .log-item { background: #f1f5f9; padding: 8px; margin-bottom: 6px; border-radius: 4px; border-left: 3px solid #94a3b8; }
-      .log-item.created { border-left-color: #22c55e; }
-      .log-item.edited { border-left-color: #f59e0b; }
-      .log-item.deleted { border-left-color: #ef4444; }
-      .log-item.upgrade { border-left-color: #3b82f6; }
-
-      /* Build checklist ("Building Sheets & Directory") */
-      .build-intro { font-size: 12px; color: #555; margin: 3px 0 6px; }
-      .step-list { list-style-type: none; padding-left: 0; margin: 8px 0 0; font-size: 12px; }
-      .step-item { display: flex; gap: 6px; padding: 4px 6px; border-radius: 4px; color: #94a3b8; }
-      .step-item .step-icon { width: 16px; flex-shrink: 0; text-align: center; }
-      .step-item .step-label { font-weight: bold; }
-      .step-item .step-detail { font-size: 11px; }
-      .step-item.done { color: #334155; }
-      .step-item.current { color: #0f172a; background: #eff6ff; }
-      .step-item.failed { color: #b91c1c; background: #fef2f2; }
+      .back-btn { margin-bottom: 12px; font-size: 13.5px; }
+      #detailsTitle { margin-bottom: 10px; }
+      .log-list { list-style: none; padding: 0; margin: 0; font-size: 13px; border: 1px solid var(--line); border-radius: var(--radius); }
+      .log-item { padding: 8px 10px 8px 24px; position: relative; line-height: 1.4; }
+      .log-item + .log-item { border-top: 1px solid var(--line); }
+      .log-item::before { content: ""; position: absolute; left: 10px; top: 13px; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+      .log-item.created::before { background: var(--ok); }
+      .log-item.edited::before { background: #b7791f; }
+      .log-item.deleted::before { background: var(--danger); }
+      .log-item.upgrade::before { background: var(--accent); }
+      .log-item.empty { padding-left: 10px; color: var(--muted); }
+      .log-item.empty::before { display: none; }
     </style>
   </head>
   <body>
-    
-    <div id="mainView">
-      <h3 id="mainTitle" style="margin-top: 0;">App Build & Sync</h3>
-      
-      <div class="section">
-        <strong>1. Building Sheets & Directory</strong>
-        <div class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and your Student Overrides.</div>
-        <progress id="buildBar" value="0" max="1"></progress>
-        <div id="buildStatus" class="status">Waiting to start...</div>
-        <ul id="buildSteps" class="step-list"></ul>
+
+    <div id="mainView" class="stack">
+
+      <div id="buildSection">
+        <div class="grp-head"><div class="eyebrow" id="buildHead">Build sheets</div><div class="time" id="buildTime"></div></div>
+        <p class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and your Student Overrides.</p>
+        <ul class="cl" id="stepList"></ul>
+        <div id="buildStatus" class="status">Waiting to start…</div>
       </div>
 
-      <div class="section" id="syncSection">
-        <strong>2. Syncing Google Contacts</strong>
-        <progress id="syncBar" value="0" max="100"></progress>
-        <div id="syncStatus" class="status">Waiting for build to finish...</div>
-        <div id="etaText" style="margin-top: 6px; font-size: 13px; color: #0f172a; font-weight: bold;"></div>
-        <div class="safe-note">🛡️ Safe to close or refresh. Sync runs in background.</div>
+      <div id="syncSection">
+        <div class="grp-head"><div class="eyebrow">Sync phones</div></div>
+        <div class="sync-top"><b>Google Contacts</b><span id="syncCount"></span></div>
+        <div class="bar waiting" id="syncBar"><i id="syncFill"></i></div>
+        <div id="syncStatus" class="status">Starts after the build.</div>
+        <div id="etaText" class="eta"></div>
+        <div class="safe-note">You can close this panel. The sync keeps running in the background.</div>
       </div>
-      
+
       <div id="buildReport"></div>
       <div id="summaryReport"></div>
 
-      <div id="controlPanel" class="control-panel" style="display: none;">
-        <button id="btnRestart" class="action-btn btn-restart" onclick="triggerRestart()">Restart Run</button>
-        <button id="btnCancel" class="action-btn btn-cancel" onclick="triggerCancel()">Cancel Run</button>
-        <button id="btnStart" class="action-btn btn-start" style="display: none;" onclick="triggerRestart()">Start New Build</button>
+      <div id="controlPanel" class="control-panel">
+        <button id="btnRestart" class="btn sec" onclick="triggerRestart()">Restart run</button>
+        <button id="btnCancel" class="btn dgr" onclick="triggerCancel()">Cancel run</button>
+        <button id="btnStart" class="btn pri" style="display: none;" onclick="triggerRestart()">Start new build</button>
       </div>
     </div>
 
     <div id="detailsView">
-      <button class="back-btn" onclick="showMainView()">← Back to Summary</button>
-      <h3 id="detailsTitle" style="margin-top: 0;">Log Details</h3>
+      <button class="link back-btn" onclick="showMainView()">‹ Back to summary</button>
+      <h2 id="detailsTitle">Log details</h2>
       <ul id="logList" class="log-list"></ul>
     </div>
 
     <script>
       let poller;
-      let cachedLogData = null; 
+      let cachedLogData = null;
       let cachedBuildLogData = null;
       let runMode = 'FULL_SYNC';
-      let buildReportShown = false; 
-      let isBuilding = false;
-      let buildStepList = [];
-      let lastBuildStep = 0;
-      
+      let buildReportShown = false;
+
       // --- ETA VARIABLES ---
       let syncStartTime = null;
       let syncStartProgress = null;
       let pauseStartTime = null;
-      let totalPauseTime = 0; 
+      let totalPauseTime = 0;
       let lastCalculatedProgress = null;
       let estimatedMsRemaining = 0;
       let lastUpdateTime = null;
 
+      // --- BUILD STEPS ---
+      // The server sends the real list (BUILD_STEPS in Build.gs) and the current step
+      // with every status poll; this copy only fills the list before the first poll.
+      let STEPS = [
+        { label: "Reading your data", detail: "" },
+        { label: "Master Table", detail: "" },
+        { label: "Event Log", detail: "" },
+        { label: "Combined Contact Tracking", detail: "" },
+        { label: "Parents Divided", detail: "" },
+        { label: "Directory", detail: "" },
+        { label: "Phone Contacts", detail: "" },
+        { label: "Finishing up", detail: "" }
+      ];
+      let buildStartTime = null;
+      let buildEndTime = null;
+      let lastStepIndex = -1;
+      let lastPhase = null;
+
+      function el(id) { return document.getElementById(id); }
+
+      function renderStepList() {
+        const list = el('stepList');
+        list.innerHTML = '';
+        STEPS.forEach(function(s, i) {
+          const li = document.createElement('li');
+          li.id = 'step-' + i;
+          li.className = 'todo';
+          const ck = document.createElement('span'); ck.className = 'ck';
+          const label = document.createElement('span');
+          label.textContent = s.label;
+          if (s.detail) {
+            const sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = s.detail;
+            label.appendChild(sub);
+          }
+          li.appendChild(ck); li.appendChild(label);
+          list.appendChild(li);
+        });
+      }
+
+      // done = steps before `current`; `current` is running (or failed); -1 = nothing yet; STEPS.length = all done
+      function setSteps(current, failed) {
+        STEPS.forEach(function(s, i) {
+          const li = el('step-' + i);
+          const ck = li.querySelector('.ck');
+          let cls = i < current ? 'done' : (i === current ? (failed ? 'fail' : 'now') : 'todo');
+          li.className = cls;
+          ck.textContent = cls === 'done' ? '✓' : (cls === 'fail' ? '✕' : '');
+        });
+      }
+
+      function fmtClock(ms) {
+        const s = Math.max(0, Math.floor(ms / 1000));
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        return m + ':' + (r < 10 ? '0' + r : r);
+      }
+
+      function showBuildTime() {
+        if (!buildStartTime) { el('buildTime').textContent = ''; return; }
+        const end = buildEndTime || Date.now();
+        el('buildTime').textContent = (buildEndTime ? 'done in ' : '') + fmtClock(end - buildStartTime);
+      }
+
+      function markBuildDone() {
+        setSteps(STEPS.length);
+        if (buildStartTime && !buildEndTime) buildEndTime = Date.now();
+        showBuildTime();
+        el('buildStatus').className = 'status ok';
+        el('buildStatus').innerText = 'Sheets built';
+      }
+
+      function setSyncBar(progress, total, cls) {
+        const pct = total > 0 ? Math.min(100, Math.round(progress / total * 100)) : 0;
+        el('syncFill').style.width = pct + '%';
+        el('syncBar').className = 'bar' + (cls ? ' ' + cls : '');
+        el('syncCount').textContent = total > 0 ? progress + ' of ' + total : '';
+      }
+
+      function showControls(running) {
+        el('controlPanel').style.display = 'flex';
+        el('btnRestart').style.display = running ? 'inline-flex' : 'none';
+        el('btnCancel').style.display = running ? 'inline-flex' : 'none';
+        el('btnStart').style.display = running ? 'none' : 'inline-flex';
+        el('btnStart').innerText = runMode === 'BUILD_ONLY' ? 'Start new build' : 'Start new run';
+      }
+
       window.onload = function() {
-        // Automatically fetch last known build log just in case they reopen the sidebar
+        renderStepList();
+
+        // Show the last build report if you reopen the sidebar
         google.script.run.withSuccessHandler(data => {
             if (data && (data.newStudents.length > 0 || data.discharged.length > 0 || data.nycsaUpgrades.length > 0 || data.psUpgrades.length > 0)) {
                 cachedBuildLogData = data;
-                // Only show it if we aren't actively building a new one right now
-                if (!isBuilding) {
+                if (lastPhase !== 'building') {
                     showBuildReport();
                     buildReportShown = true;
                 }
@@ -121,13 +219,12 @@
         google.script.run.withSuccessHandler(mode => {
            runMode = mode;
            if (runMode === 'BUILD_ONLY') {
-              document.getElementById('syncSection').style.display = 'none';
-              document.getElementById('mainTitle').innerText = 'App Build Manager';
+              el('syncSection').style.display = 'none';
               google.script.run.withFailureHandler(onFailure).startBuildOnlyProcess();
            } else {
               google.script.run.withFailureHandler(onFailure).startResilientSync();
            }
-           poller = setInterval(pollServer, 1500); 
+           poller = setInterval(pollServer, 1500);
         }).getRunMode();
       };
 
@@ -137,88 +234,61 @@
 
       function updateUI(state) {
         if (!state || state.phase === 'idle') return;
+        const prevPhase = lastPhase;
+        lastPhase = state.phase;
 
-        const controls = document.getElementById('controlPanel');
-        const btnRestart = document.getElementById('btnRestart');
-        const btnCancel = document.getElementById('btnCancel');
-        const btnStart = document.getElementById('btnStart');
+        // Use the server's step list (labels + one-line details) once it arrives
+        if (state.buildSteps && state.buildSteps.length && STEPS !== state.buildSteps &&
+            JSON.stringify(STEPS) !== JSON.stringify(state.buildSteps)) {
+          STEPS = state.buildSteps;
+          renderStepList();
+          setSteps(lastStepIndex);
+        }
 
         if (['building', 'syncing', 'paused', 'quota'].includes(state.phase)) {
-          controls.style.display = 'block';
-          btnRestart.style.display = 'inline-block';
-          btnCancel.style.display = 'inline-block';
-          btnStart.style.display = 'none';
-          document.getElementById('buildBar').classList.remove('cancelled');
-          document.getElementById('syncBar').classList.remove('cancelled');
+          showControls(true);
         }
-
-        if (state.buildSteps) buildStepList = state.buildSteps;
-        if (state.phase === 'building') isBuilding = true;
-        else if (state.phase !== 'killed') isBuilding = false;
 
         if (state.phase === 'building') {
-          const steps = buildStepList;
-          const step = Math.min(Math.max(Number(state.buildStep) || 0, 0), Math.max(steps.length - 1, 0));
-          lastBuildStep = step;
-          const bar = document.getElementById('buildBar');
-          if (steps.length) {
-            bar.max = steps.length;
-            bar.value = step;
-            document.getElementById('buildStatus').innerText =
-              `Building sheets... Step ${step + 1} of ${steps.length}: ${steps[step].label}`;
-          } else {
-            bar.removeAttribute('value');
-            document.getElementById('buildStatus').innerText = 'Building sheets...';
-          }
-          renderBuildSteps(step, 'running');
-          // Ensure old reports are wiped off the screen while a new build happens
-          document.getElementById('buildReport').innerHTML = '';
-          buildReportShown = false; 
+          if (prevPhase !== 'building') { buildStartTime = Date.now(); buildEndTime = null; }
+          let idx = Math.min(Math.max(Number(state.buildStep) || 0, 0), STEPS.length - 1);
+          lastStepIndex = idx;
+          setSteps(idx);
+          showBuildTime();
+          el('buildStatus').className = 'status';
+          el('buildStatus').innerText = 'Building sheets…';
+          el('syncStatus').className = 'status';
+          el('syncStatus').innerText = 'Starts after the build.';
+          // Clear the old report while a new build runs
+          el('buildReport').innerHTML = '';
+          buildReportShown = false;
         }
-        
+
         if (state.phase === 'done_build_only') {
           clearInterval(poller);
-          document.getElementById('buildBar').max = 1; 
-          document.getElementById('buildBar').value = 1;
-          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
-          renderBuildSteps(buildStepList.length, 'done');
-          
+          markBuildDone();
           if (!buildReportShown) { showBuildReport(); buildReportShown = true; }
-
-          controls.style.display = 'block';
-          btnRestart.style.display = 'none';
-          btnCancel.style.display = 'none';
-          btnStart.style.display = 'inline-block';
-          btnStart.innerText = "Start New Build";
-
+          showControls(false);
           google.script.run.resetSyncStatus();
           return;
         }
 
-        // ==============================================================
-        // ✨ THE MAGIC HAPPENS HERE: SHOW REPORT WHILE SYNC RUNS
-        // ==============================================================
+        // Show the build report while the phone sync runs
         if (['syncing', 'paused', 'quota'].includes(state.phase)) {
-          
-          document.getElementById('buildBar').max = 1; 
-          document.getElementById('buildBar').value = 1;
-          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
-          renderBuildSteps(buildStepList.length, 'done');
-
-          // Instantly pop the build report onto the screen while phone sync works!
-          if (!buildReportShown) { 
-              showBuildReport(); 
-              buildReportShown = true; 
+          markBuildDone();
+          if (!buildReportShown) {
+              showBuildReport();
+              buildReportShown = true;
           }
 
           if (state.phase === 'syncing') {
-              document.getElementById('syncBar').max = state.total;
-              document.getElementById('syncBar').value = state.progress;
-              document.getElementById('syncStatus').innerText = `Syncing contact ${state.progress} of ${state.total}...`;
+              setSyncBar(state.progress, state.total);
+              el('syncStatus').className = 'status';
+              el('syncStatus').innerText = 'Syncing contacts…';
 
               if (pauseStartTime) {
                   totalPauseTime += (Date.now() - pauseStartTime);
-                  pauseStartTime = null; 
+                  pauseStartTime = null;
               }
 
               if (!syncStartTime || syncStartProgress === null || state.progress < syncStartProgress) {
@@ -228,7 +298,7 @@
                   lastCalculatedProgress = state.progress;
                   estimatedMsRemaining = 0;
                   lastUpdateTime = Date.now();
-                  document.getElementById('etaText').innerText = "⏱️ Calculating ETA...";
+                  el('etaText').innerText = "Working out the time left…";
               } else {
                   if (state.progress > lastCalculatedProgress) {
                       let rowsDone = state.progress - syncStartProgress;
@@ -237,7 +307,7 @@
 
                       let msPerRow = trueElapsedMs / rowsDone;
                       let rowsLeft = state.total - state.progress;
-                      
+
                       estimatedMsRemaining = rowsLeft * msPerRow;
                       lastCalculatedProgress = state.progress;
                       lastUpdateTime = Date.now();
@@ -252,111 +322,82 @@
                       let hours = Math.floor(totalSeconds / 3600);
                       let minutes = Math.floor((totalSeconds % 3600) / 60);
                       let seconds = totalSeconds % 60;
-                      
+
                       let secStr = seconds < 10 ? "0" + seconds : seconds;
                       let minStr = (hours > 0 && minutes < 10) ? "0" + minutes : minutes;
 
                       let timeString = hours > 0 ? `${hours}h ${minStr}m ${secStr}s` : `${minutes}m ${secStr}s`;
-                      document.getElementById('etaText').innerText = `⏱️ Estimated Time Remaining: ${timeString}`;
+                      el('etaText').innerText = `About ${timeString} left`;
                   }
               }
           }
 
           if (state.phase === 'paused') {
-            if (!pauseStartTime) pauseStartTime = Date.now(); 
-            document.getElementById('syncStatus').innerText = `Large batch: 60s cooldown to protect server. Resuming at ${state.progress}...`;
-            document.getElementById('etaText').innerText = "⏱️ Paused... (Timer suspended)"; 
+            if (!pauseStartTime) pauseStartTime = Date.now();
+            setSyncBar(state.progress, state.total);
+            el('syncStatus').className = 'status';
+            el('syncStatus').innerText = `Large batch: pausing 60 seconds to protect the server. Resuming at ${state.progress}…`;
+            el('etaText').innerText = "Paused. The timer is stopped.";
           }
 
           if (state.phase === 'quota') {
-            if (!pauseStartTime) pauseStartTime = Date.now(); 
-            document.getElementById('syncStatus').innerText = `Google API Quota hit. Paused for 15 minutes. Resuming at ${state.progress}...`;
-            document.getElementById('etaText').innerText = "⏳ API Limit: Paused for 15 mins... (Timer suspended)"; 
+            if (!pauseStartTime) pauseStartTime = Date.now();
+            setSyncBar(state.progress, state.total);
+            el('syncStatus').className = 'status';
+            el('syncStatus').innerText = `Google's limit was reached. Pausing 15 minutes. Resuming at ${state.progress}…`;
+            el('etaText').innerText = "Paused. The timer is stopped.";
           }
         }
-        
+
         if (state.phase === 'killed') {
-          clearInterval(poller); 
-          document.getElementById('buildBar').classList.add('cancelled');
-          document.getElementById('syncBar').classList.add('cancelled');
-          
+          clearInterval(poller);
+          const wasBuilding = prevPhase === 'building' || prevPhase === null;
+
           // A crash is reported as 'killed' with the error attached; only a real Cancel has no error
-          let cancelText = runMode === 'BUILD_ONLY' ? '🛑 Build Terminated by User' : '🛑 Sync Terminated by User';
+          let cancelText = runMode === 'BUILD_ONLY' ? 'Build cancelled' : 'Sync cancelled';
           if (state.error) {
-            const safeError = String(state.error).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-            cancelText = (runMode === 'BUILD_ONLY' ? '❌ Build failed: ' : '❌ Sync failed: ') + safeError;
+            cancelText = (runMode === 'BUILD_ONLY' ? 'Build failed: ' : 'Sync failed: ') + String(state.error);
           }
-          
-          // Stopped while building: mark the step it was on
-          if (isBuilding) { renderBuildSteps(lastBuildStep, 'failed'); isBuilding = false; }
 
+          if (wasBuilding && lastStepIndex >= 0) setSteps(lastStepIndex, true);
           if (runMode === 'BUILD_ONLY') {
-             document.getElementById('buildStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;
+             el('buildStatus').className = 'status err';
+             el('buildStatus').innerText = cancelText;
           } else {
-             document.getElementById('syncStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;
+             el('syncBar').classList.add('cancelled');
+             el('syncStatus').className = 'status err';
+             el('syncStatus').innerText = cancelText;
           }
-          
-          document.getElementById('etaText').innerText = ""; 
-          
-          controls.style.display = 'block';
-          btnRestart.style.display = 'none';
-          btnCancel.style.display = 'none';
-          btnStart.style.display = 'inline-block';
+          el('etaText').innerText = "";
 
-          google.script.run.resetSyncStatus(); 
+          showControls(false);
+          google.script.run.resetSyncStatus();
           return;
         }
-        
+
         if (state.phase === 'done') {
           clearInterval(poller);
-          
-          document.getElementById('buildBar').max = 1; 
-          document.getElementById('buildBar').value = 1;
-          document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
-          renderBuildSteps(buildStepList.length, 'done');
+          markBuildDone();
+          setSyncBar(state.total, state.total, 'done');
+          el('syncStatus').className = 'status ok';
+          el('syncStatus').innerText = 'Sync complete';
+          el('etaText').innerText = "";
 
-          document.getElementById('syncBar').max = state.total;
-          document.getElementById('syncBar').value = state.total;
-          document.getElementById('syncStatus').innerHTML = '<span class="success">✓ Sync Complete!</span>';
-          document.getElementById('etaText').innerText = ""; 
-          
-          if (!buildReportShown) { showBuildReport(); buildReportShown = true; } 
-          
+          if (!buildReportShown) { showBuildReport(); buildReportShown = true; }
           showFinalReport(state.created, state.deleted, state.edited);
 
-          controls.style.display = 'block';
-          btnRestart.style.display = 'none';
-          btnCancel.style.display = 'none';
-          btnStart.style.display = 'inline-block';
-
+          showControls(false);
           google.script.run.resetSyncStatus();
         }
       }
 
-      // The build checklist: steps before `current` are done (✅), `current` is
-      // running (⏳) or where it stopped (❌), the rest are still to come.
-      function renderBuildSteps(current, mode) {
-        const list = document.getElementById('buildSteps');
-        if (!buildStepList.length) { list.innerHTML = ''; return; }
-        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-        list.innerHTML = buildStepList.map((s, i) => {
-          let cls = '', icon = '○';
-          if (i < current || mode === 'done') { cls = 'done'; icon = '✅'; }
-          else if (i === current) { cls = mode === 'failed' ? 'failed' : 'current'; icon = mode === 'failed' ? '❌' : '⏳'; }
-          return `<li class="step-item ${cls}"><span class="step-icon">${icon}</span>` +
-                 `<span><span class="step-label">${esc(s.label)}</span><br><span class="step-detail">${esc(s.detail)}</span></span></li>`;
-        }).join('');
-      }
-
       function showBuildReport() {
-        document.getElementById('buildReport').innerHTML = `
-          <div class="summary" id="buildSummaryBox">
-            <strong style="color: #2563eb;">🏗️ Build Report</strong><br><br>
-            <div id="buildReportLinks">Loading...</div>
+        el('buildReport').innerHTML = `
+          <div class="box rep" id="buildSummaryBox">
+            <div class="rh">Build report</div>
+            <div id="buildReportLinks"><div class="rhint">Loading…</div></div>
           </div>
         `;
-        
-        // If we already loaded data from cache, render it instantly. If not, fetch it.
         if (cachedBuildLogData) {
             renderBuildLinks(cachedBuildLogData);
         } else {
@@ -368,33 +409,38 @@
       }
 
       function renderBuildLinks(data) {
-          document.getElementById('buildReportLinks').innerHTML = `
-              <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">Click an item below to view details:</div>
-              <a class="log-link" onclick="openBuildDetails('newStudents')">👶 New Students: <b>${data.newStudents ? data.newStudents.length : 0}</b> 🔍</a>
-              <a class="log-link" onclick="openBuildDetails('discharged')">👋 Discharged: <b>${data.discharged ? data.discharged.length : 0}</b> 🔍</a>
-              <a class="log-link" onclick="openBuildDetails('nycsaUpgrades')">🗽 NYCSA Upgrades: <b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b> 🔍</a>
-              <a class="log-link" onclick="openBuildDetails('psUpgrades')">📱 Parent Square Upgrades: <b>${data.psUpgrades ? data.psUpgrades.length : 0}</b> 🔍</a>
+          el('buildReportLinks').innerHTML = `
+              <a onclick="openBuildDetails('newStudents')">New students<b>${data.newStudents ? data.newStudents.length : 0}</b></a>
+              <a onclick="openBuildDetails('discharged')">Discharged<b>${data.discharged ? data.discharged.length : 0}</b></a>
+              <a onclick="openBuildDetails('nycsaUpgrades')">NYCSA upgrades<b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b></a>
+              <a onclick="openBuildDetails('psUpgrades')">Parent Square upgrades<b>${data.psUpgrades ? data.psUpgrades.length : 0}</b></a>
           `;
       }
 
       function triggerCancel() {
-        document.getElementById('syncStatus').innerText = 'Cancelling background tasks...';
+        el('syncStatus').className = 'status';
+        el('syncStatus').innerText = 'Cancelling background tasks…';
+        if (runMode === 'BUILD_ONLY') el('buildStatus').innerText = 'Cancelling…';
         google.script.run.EMERGENCY_STOP_SYNC();
       }
 
       function triggerRestart() {
-        document.getElementById('controlPanel').style.display = 'none';
-        document.getElementById('buildBar').removeAttribute('value');
-        document.getElementById('syncBar').removeAttribute('value');
-        document.getElementById('buildBar').classList.remove('cancelled');
-        document.getElementById('syncBar').classList.remove('cancelled');
-        document.getElementById('buildStatus').innerText = 'Starting engine...';
-        document.getElementById('syncStatus').innerText = 'Initializing...';
-        document.getElementById('summaryReport').innerHTML = ''; 
-        document.getElementById('buildReport').innerHTML = ''; 
-        document.getElementById('buildSteps').innerHTML = '';
-        
-        document.getElementById('etaText').innerText = "";
+        el('controlPanel').style.display = 'none';
+        setSteps(-1);
+        lastStepIndex = -1;
+        lastPhase = null;
+        buildStartTime = null;
+        buildEndTime = null;
+        showBuildTime();
+        setSyncBar(0, 0, 'waiting');
+        el('buildStatus').className = 'status';
+        el('buildStatus').innerText = 'Starting…';
+        el('syncStatus').className = 'status';
+        el('syncStatus').innerText = 'Starts after the build.';
+        el('summaryReport').innerHTML = '';
+        el('buildReport').innerHTML = '';
+
+        el('etaText').innerText = "";
         syncStartTime = null;
         syncStartProgress = null;
         pauseStartTime = null;
@@ -404,8 +450,8 @@
         lastUpdateTime = null;
         cachedLogData = null;
         cachedBuildLogData = null;
-        
-        buildReportShown = false; 
+
+        buildReportShown = false;
 
         clearInterval(poller);
         poller = setInterval(pollServer, 1500);
@@ -418,104 +464,84 @@
       }
 
       function onFailure(error) {
-        document.getElementById('buildStatus').innerHTML = `<span style="color:red;">Error: ${error.message}</span>`;
+        el('buildStatus').className = 'status err';
+        el('buildStatus').innerText = 'Error: ' + error.message;
       }
 
       function showFinalReport(created, deleted, edited) {
-        document.getElementById('summaryReport').innerHTML = `
-          <div class="summary">
-            <strong style="color: green;">☎️ Phone Sync Complete!</strong><br><br>
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">Click an item below to view details:</div>
-            <a class="log-link" onclick="openDetails('created')">✅ New Contacts: <b>${created || 0}</b> 🔍</a>
-            <a class="log-link" onclick="openDetails('edited')">✏️ Edited Contacts: <b>${edited || 0}</b> 🔍</a>
-            <a class="log-link" onclick="openDetails('deleted')">❌ Stale Removed: <b>${deleted || 0}</b> 🔍</a>
+        el('summaryReport').innerHTML = `
+          <div class="box rep">
+            <div class="rh">Phone sync report</div>
+            <a onclick="openDetails('created')">New contacts<b>${created || 0}</b></a>
+            <a onclick="openDetails('edited')">Edited contacts<b>${edited || 0}</b></a>
+            <a onclick="openDetails('deleted')">Old contacts removed<b>${deleted || 0}</b></a>
           </div>
         `;
       }
 
       function openBuildDetails(type) {
-        document.getElementById('mainView').style.display = 'none';
-        document.getElementById('detailsView').style.display = 'block';
+        el('mainView').style.display = 'none';
+        el('detailsView').style.display = 'block';
         renderBuildLogList(type);
       }
 
       function openDetails(type) {
-        document.getElementById('mainView').style.display = 'none';
-        document.getElementById('detailsView').style.display = 'block';
-        
+        el('mainView').style.display = 'none';
+        el('detailsView').style.display = 'block';
+
         if (!cachedLogData) {
-           document.getElementById('detailsTitle').innerText = "Loading data...";
-           document.getElementById('logList').innerHTML = "<li class='log-item'>Fetching logs from server...</li>";
-           
-           google.script.run.withSuccessHandler(data => { 
-               cachedLogData = data; 
-               renderLogList(type); 
+           el('detailsTitle').innerText = "Loading…";
+           el('logList').innerHTML = "<li class='log-item empty'>Fetching logs from the server…</li>";
+
+           google.script.run.withSuccessHandler(data => {
+               cachedLogData = data;
+               renderLogList(type);
            }).getSyncLogData();
         } else {
            renderLogList(type);
         }
       }
 
+      function fillList(titleStr, arr, cssClass) {
+        el('detailsTitle').innerText = titleStr;
+        const listEl = el('logList');
+        listEl.innerHTML = "";
+        if (arr.length === 0) {
+            listEl.innerHTML = "<li class='log-item empty'>Nothing in this list.</li>";
+            return;
+        }
+        arr.forEach(item => {
+           let li = document.createElement('li');
+           li.className = `log-item ${cssClass}`;
+           li.innerHTML = item;
+           listEl.appendChild(li);
+        });
+      }
+
       function renderBuildLogList(type) {
-        const titleEl = document.getElementById('detailsTitle');
-        const listEl = document.getElementById('logList');
-        
         let arr = cachedBuildLogData ? (cachedBuildLogData[type] || []) : [];
         let titleStr = "";
         let cssClass = "upgrade";
-        
-        if (type === 'newStudents') { titleStr = "👶 New Students"; cssClass = "created"; }
-        if (type === 'discharged') { titleStr = "👋 Discharged Students"; cssClass = "deleted"; }
-        if (type === 'nycsaUpgrades') { titleStr = "🗽 NYCSA Upgrades"; }
-        if (type === 'psUpgrades') { titleStr = "📱 Parent Square Upgrades"; }
-
-        titleEl.innerText = titleStr;
-        listEl.innerHTML = "";
-
-        if (arr.length === 0) {
-            listEl.innerHTML = "<li class='log-item'>No items in this category.</li>";
-            return;
-        }
-
-        arr.forEach(item => {
-           let li = document.createElement('li');
-           li.className = `log-item ${cssClass}`;
-           li.innerHTML = item; 
-           listEl.appendChild(li);
-        });
+        if (type === 'newStudents') { titleStr = "New students"; cssClass = "created"; }
+        if (type === 'discharged') { titleStr = "Discharged students"; cssClass = "deleted"; }
+        if (type === 'nycsaUpgrades') { titleStr = "NYCSA upgrades"; }
+        if (type === 'psUpgrades') { titleStr = "Parent Square upgrades"; }
+        fillList(titleStr, arr, cssClass);
       }
 
       function renderLogList(type) {
-        const titleEl = document.getElementById('detailsTitle');
-        const listEl = document.getElementById('logList');
-        
         let arr = cachedLogData[type] || [];
         let titleStr = "";
         let cssClass = "";
-        
-        if (type === 'created') { titleStr = "✅ New Contacts"; cssClass = "created"; }
-        if (type === 'edited') { titleStr = "✏️ Edited Contacts"; cssClass = "edited"; }
-        if (type === 'deleted') { titleStr = "❌ Stale Removed"; cssClass = "deleted"; }
-
-        titleEl.innerText = titleStr;
-        listEl.innerHTML = "";
-
-        if (arr.length === 0) {
-            listEl.innerHTML = "<li class='log-item'>No items in this category.</li>";
-            return;
-        }
-
-        arr.forEach(item => {
-           let li = document.createElement('li');
-           li.className = `log-item ${cssClass}`;
-           li.innerHTML = item; 
-           listEl.appendChild(li);
-        });
+        if (type === 'created') { titleStr = "New contacts"; cssClass = "created"; }
+        if (type === 'edited') { titleStr = "Edited contacts"; cssClass = "edited"; }
+        if (type === 'deleted') { titleStr = "Old contacts removed"; cssClass = "deleted"; }
+        fillList(titleStr, arr, cssClass);
       }
 
       function showMainView() {
-        document.getElementById('detailsView').style.display = 'none';
-        document.getElementById('mainView').style.display = 'block';
+        el('detailsView').style.display = 'none';
+        el('mainView').style.display = 'flex';
       }
     </script>
   </body>

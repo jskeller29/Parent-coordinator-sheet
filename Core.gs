@@ -504,3 +504,19 @@ function boldText_(text, italic) {
 function noteLineHeader_(dateText, braceText) {
   return `${boldText_(dateText, true)} - {${boldText_(braceText)}}`;
 }
+
+// ======================================================================
+// DIALOG STYLES
+// Every dialog / sidebar shares one look, kept in Styles.html.
+// HTML files pull it in with a scriptlet (<?!= include_('Styles') ?>) and are
+// opened with createTemplateFromFile(...).evaluate(); dialogs built as strings
+// in the .gs files put include_('Styles') at the front of their HTML.
+// ======================================================================
+function include_(name) {
+  return HtmlService.createHtmlOutputFromFile(name).getContent();
+}
+
+/** Opens an HTML file as a template so its include_('Styles') line is filled in. */
+function htmlFromFile_(name) {
+  return HtmlService.createTemplateFromFile(name).evaluate();
+}

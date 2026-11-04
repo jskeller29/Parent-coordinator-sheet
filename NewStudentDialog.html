@@ -2,119 +2,103 @@
 <html>
 <head>
   <base target="_top">
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <?!= include_('Styles') ?>
   <style>
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    #studentForm { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .stu-body > * { flex-shrink: 0; }
+    .stu-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 22px 20px; display: flex; flex-direction: column; gap: 20px; }
+    .sec-h { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 12px; }
+    .searchbox { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; position: relative; }
+    .searchbox .lab { color: var(--accent); }
+    .results { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 24px rgba(16,24,40,.16); max-height: 220px; overflow-y: auto; z-index: 50; }
+    .res { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--panel); }
+    .res:last-child { border-bottom: 0; }
+    .res:hover { background: var(--accent-soft); }
+    .res .nm { font-weight: 600; }
+    .res .os { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
+    .res .meta { color: var(--muted); font-size: 12px; margin-top: 1px; }
+    .res-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; }
+    .gblock { display: block; }
+    .addg { width: 100%; border: 1.5px dashed var(--line); background: #ffffff; border-radius: var(--radius); padding: 10px; display: flex; justify-content: center; font: 600 13px var(--font); color: var(--accent); cursor: pointer; }
+    .addg:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .dfoot .cbx { font-size: 13px; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans p-4">
+<body>
   <form id="studentForm" onsubmit="submitForm(event)">
+    <div class="stu-body">
 
-    <div class="bg-white rounded-lg shadow-sm p-4 mb-4 border border-gray-200">
-      <h2 class="text-lg font-bold text-gray-700 mb-3 border-b pb-2">🎓 Student Information</h2>
-      <div class="grid grid-cols-2 gap-3">
-        
-        <div class="col-span-2">
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Override Type *</label>
-          <select id="entryType" onchange="handleTypeChange()" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white font-semibold">
-            <option value="Edit Existing Student">✏️ Edit Existing Student (Override ATS Data)</option>
-            <option value="New Student">✨ New Student (Not in ATS Yet)</option>
-          </select>
-        </div>
+      <div class="segm" role="group" aria-label="Override type" id="entryTypeButtons">
+        <button type="button" data-type="Edit Existing Student" onclick="setEntryType(this.dataset.type)">Edit a student from ATS</button>
+        <button type="button" data-type="New Student" onclick="setEntryType(this.dataset.type)">New student (not in ATS yet)</button>
+      </div>
+      <input type="hidden" id="entryType" value="Edit Existing Student">
 
-        <div id="selectStudentContainer" class="col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-md relative">
-          <label class="block text-xs font-bold text-blue-800 mb-2">🔍 Search Database to Auto-Fill</label>
-          <div class="relative">
-            <input type="text" id="searchUniversal" oninput="handleSearch()" autocomplete="off" disabled class="w-full px-3 py-2 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" placeholder="Loading DB...">
-            
-            <div id="searchResults" class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto hidden z-50">
-            </div>
+      <div id="selectStudentContainer" class="searchbox">
+        <label class="lab" for="searchUniversal">Search to fill in the form</label>
+        <input type="text" id="searchUniversal" oninput="handleSearch()" autocomplete="off" disabled placeholder="Loading students…">
+        <div id="searchResults" class="results hidden"></div>
+      </div>
+
+      <div>
+        <div class="sec-h"><h2>Student</h2></div>
+        <div class="grid3">
+          <div>
+            <label class="lab" for="osis">OSIS / Student ID <span class="req">*</span></label>
+            <input type="text" id="osis" required placeholder="e.g. 123456789">
+          </div>
+          <div>
+            <label class="lab" for="classCode">Official class <span class="req">*</span></label>
+            <input type="text" id="classCode" required placeholder="e.g. Y66">
+          </div>
+          <div>
+            <label class="lab" for="label">Status / label</label>
+            <input type="text" id="label" placeholder="e.g. Current">
+          </div>
+          <div>
+            <label class="lab" for="firstName">First name <span class="req">*</span></label>
+            <input type="text" id="firstName" required>
+          </div>
+          <div>
+            <label class="lab" for="lastName">Last name <span class="req">*</span></label>
+            <input type="text" id="lastName" required>
+          </div>
+          <div>
+            <label class="lab" for="grade">Grade</label>
+            <input type="text" id="grade">
+          </div>
+          <div>
+            <label class="lab" for="age">Age</label>
+            <input type="number" id="age">
+          </div>
+          <div>
+            <label class="lab" for="gender">Gender</label>
+            <input type="text" id="gender">
+          </div>
+          <div>
+            <label class="lab" for="homeLanguage">Home language</label>
+            <input type="text" id="homeLanguage">
           </div>
         </div>
-
-        <div class="col-span-2 sm:col-span-1">
-          <label class="block text-xs font-semibold text-gray-600 mb-1">OSIS / Student ID *</label>
-          <input type="text" id="osis" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g. 123456789">
-        </div>
-        <div class="col-span-2 sm:col-span-1">
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Official Class *</label>
-          <input type="text" id="classCode" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="e.g. Y66">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">First Name *</label>
-          <input type="text" id="firstName" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Last Name *</label>
-          <input type="text" id="lastName" required class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        
-        <!-- NEW LABEL / STATUS FIELD -->
-        <div>
-          <label class="block text-xs font-semibold text-purple-700 mb-1">Status / Label</label>
-          <input type="text" id="label" class="w-full px-3 py-2 border border-purple-300 bg-purple-50 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm font-semibold text-purple-900" placeholder="e.g. Current">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Grade</label>
-          <input type="text" id="grade" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Age</label>
-          <input type="number" id="age" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Gender</label>
-          <input type="text" id="gender" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
-        <div class="col-span-2">
-          <label class="block text-xs font-semibold text-gray-600 mb-1">Home Language</label>
-          <input type="text" id="homeLanguage" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-        </div>
       </div>
-    </div>
 
-    <div id="siblingNotice" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 hidden shadow-sm rounded-r-lg">
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <svg class="h-5 w-5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        <div class="ml-3">
-          <p class="text-sm text-yellow-800" id="siblingNoticeText">
-            <b>Notice:</b> This child has a sibling that attends this school.
-          </p>
-        </div>
+      <div id="siblingNotice" class="notice warn hidden">
+        <p id="siblingNoticeText"><b>Notice:</b> This child has a sibling that attends this school.</p>
       </div>
+
+      <div id="guardiansContainer" class="stack" style="gap:20px"></div>
+
+      <button type="button" id="addGuardianBtn" class="addg" onclick="showNextGuardian()">+ Add another guardian</button>
     </div>
 
-    <div id="guardiansContainer"></div>
-
-    <div class="mb-6 mt-2 text-center">
-        <button type="button" id="addGuardianBtn" onclick="showNextGuardian()" class="text-blue-600 hover:text-blue-800 font-semibold text-sm flex items-center justify-center w-full py-2 border-2 border-dashed border-blue-200 rounded-lg hover:border-blue-400 bg-blue-50 hover:bg-blue-100 transition-colors">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-            Add Another Guardian
-        </button>
-    </div>
-
-    <!-- NEW STEALTH MODE TOGGLE -->
-    <div class="bg-gray-100 p-3 rounded-md mb-4 border border-gray-200 flex items-center">
-      <input type="checkbox" id="hideFromReport" class="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer">
-      <label for="hideFromReport" class="ml-2 block text-sm font-semibold text-gray-700 cursor-pointer">
-        🚫 Stealth Mode: Hide this override from the Delta Report
-      </label>
-    </div>
-
-    <div class="sticky bottom-0 bg-gray-50 pt-2 pb-2 border-t flex justify-end gap-3 mt-4">
-        <button type="button" onclick="closeDialog()" class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">Cancel</button>
-        
-        <button type="button" id="syncSiblingsBtn" onclick="submitSyncSiblings()" class="hidden px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">Sync to All Siblings</button>
-        
-        <button type="submit" id="submitBtn" onclick="isSyncingSiblings = false" disabled class="opacity-50 px-5 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Loading DB...</button>
+    <div class="dfoot">
+      <label class="cbx" for="hideFromReport"><input type="checkbox" id="hideFromReport"><span>Hide this change from the Delta Report</span></label>
+      <span class="sp"></span>
+      <button type="button" class="btn sec" onclick="closeDialog()">Cancel</button>
+      <button type="button" id="syncSiblingsBtn" class="btn sec hidden" onclick="submitSyncSiblings()">Sync to all siblings</button>
+      <button type="submit" id="submitBtn" class="btn pri opacity-50" onclick="isSyncingSiblings = false" disabled>Loading…</button>
     </div>
   </form>
 
@@ -130,31 +114,31 @@
     function buildGuardianHTML(index, isVisible) {
         const display = isVisible ? 'block' : 'none';
         return `
-        <div id="guardianBlock${index}" class="bg-white rounded-lg shadow-sm p-4 mb-4 border border-gray-200" style="display: ${display};">
-            <h2 class="text-md font-bold text-gray-700 mb-3 border-b pb-2 flex justify-between items-center">
-                👨‍👩‍👧 Guardian ${index}
-                ${index > 2 ? `<button type="button" onclick="hideGuardian(${index})" class="text-xs text-red-500 hover:text-red-700 font-normal">Remove</button>` : ''}
-            </h2>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Name ${index === 1 ? '*' : ''}</label>
-                    <input type="text" id="g${index}Name" ${index === 1 ? 'required' : ''} class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="First Last">
+        <div id="guardianBlock${index}" class="gblock" style="display: ${display};">
+            <div class="sec-h">
+                <h2>Guardian ${index}</h2>
+                ${index > 2 ? `<button type="button" onclick="hideGuardian(${index})" class="link dgr">Remove</button>` : ''}
+            </div>
+            <div class="grid3">
+                <div class="span2">
+                    <label class="lab" for="g${index}Name">Name ${index === 1 ? '<span class="req">*</span>' : ''}</label>
+                    <input type="text" id="g${index}Name" ${index === 1 ? 'required' : ''} placeholder="First Last">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Relationship</label>
-                    <input type="text" id="g${index}Rel" placeholder="e.g. Mother" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <label class="lab" for="g${index}Rel">Relationship</label>
+                    <input type="text" id="g${index}Rel" placeholder="e.g. Mother">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Phone</label>
-                    <input type="tel" id="g${index}Phone" placeholder="(555) 555-5555" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <label class="lab" for="g${index}Phone">Phone</label>
+                    <input type="tel" id="g${index}Phone" placeholder="(555) 555-5555">
+                </div>
+                <div class="span2">
+                    <label class="lab" for="g${index}Email">Email</label>
+                    <input type="email" id="g${index}Email" placeholder="email@example.com">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Email</label>
-                    <input type="email" id="g${index}Email" placeholder="email@example.com" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
-                </div>
-                <div class="col-span-2">
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Language</label>
-                    <input type="text" id="g${index}Lang" placeholder="e.g. Spanish" class="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <label class="lab" for="g${index}Lang">Language</label>
+                    <input type="text" id="g${index}Lang" placeholder="e.g. Spanish">
                 </div>
             </div>
         </div>`;
@@ -166,6 +150,7 @@
         for(let i=1; i<=MAX_GUARDIANS; i++) html += buildGuardianHTML(i, i <= visibleGuardians);
         container.innerHTML = html;
         updateAddButton();
+        handleTypeChange();
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
            google.script.run
@@ -180,11 +165,11 @@
       const searchUniversal = document.getElementById('searchUniversal');
 
       searchUniversal.disabled = false;
-      searchUniversal.placeholder = "Search parent, student, or OSIS...";
+      searchUniversal.placeholder = "Search parent, student, or OSIS…";
 
       const btn = document.getElementById('submitBtn');
       btn.disabled = false;
-      btn.innerHTML = 'Save & Override Data';
+      btn.innerHTML = 'Save student';
       btn.classList.remove('opacity-50');
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -219,7 +204,7 @@
         matches = matches.slice(0, 15);
 
         if (matches.length === 0) {
-            resultsContainer.innerHTML = '<div class="p-3 text-sm text-gray-500 font-semibold text-center">No matching students found.</div>';
+            resultsContainer.innerHTML = '<div class="res-empty">No matching students found.</div>';
             resultsContainer.classList.remove('hidden');
             return;
         }
@@ -228,9 +213,9 @@
         matches.forEach(s => {
             const gName = s.guardians.length > 0 ? s.guardians.map(g=>g.name).join(', ') : "No Guardian";
             html += `
-            <div class="p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 transition" onclick="selectSearchResult('${s.osis}')">
-                <div class="font-bold text-gray-800">${s.lastName}, ${s.firstName} <span class="text-gray-500 font-normal text-xs ml-1">(${s.osis})</span></div>
-                <div class="text-gray-600 text-xs mt-0.5"><b>Parent(s):</b> ${gName} &nbsp;|&nbsp; <b>Class:</b> ${s.classCode}</div>
+            <div class="res" onclick="selectSearchResult('${s.osis}')">
+                <div class="nm">${s.lastName}, ${s.firstName} <span class="os">${s.osis}</span></div>
+                <div class="meta">Parent(s): ${gName} · Class ${s.classCode}</div>
             </div>`;
         });
 
@@ -276,8 +261,15 @@
         });
     }
 
+    // The two buttons at the top stand in for the old dropdown; the value lives in #entryType.
+    function setEntryType(type) {
+      document.getElementById('entryType').value = type;
+      handleTypeChange();
+    }
+
     function handleTypeChange() {
       const type = document.getElementById('entryType').value;
+      document.querySelectorAll('#entryTypeButtons button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.type === type)));
       const selectDiv = document.getElementById('selectStudentContainer');
       
       if (type === "New Student") {
@@ -426,7 +418,7 @@
         
         btn.disabled = true;
         btn.classList.add('opacity-75');
-        btn.innerHTML = 'Sending...';
+        btn.innerHTML = 'Saving…';
         
         if (!syncBtn.classList.contains('hidden')) {
             syncBtn.disabled = true;
@@ -489,7 +481,7 @@
                .withFailureHandler((err) => {
                    alert("Error saving: " + err.message);
                    btn.disabled = false;
-                   btn.innerHTML = 'Save & Override Data';
+                   btn.innerHTML = 'Save student';
                    btn.classList.remove('opacity-75');
                    isSyncingSiblings = false;
                })
