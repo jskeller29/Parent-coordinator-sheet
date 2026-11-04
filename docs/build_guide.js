@@ -21,7 +21,7 @@ const {
 // The Drive folder that holds the shareable template files. Both buttons on the
 // "Get Your Copy" page default to this folder; replace them with the exact
 // (BLANK) and (MIGRATE) "make a copy" links each release. (Inside the sheet,
-// LinkResolver.gs resolves these automatically — this doc is static.)
+// the Welcome dialog and Rollover resolve these automatically — this doc is static.)
 const TEMPLATE_FOLDER_URL = "https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
 const BLANK_COPY_URL = TEMPLATE_FOLDER_URL;   // ← paste the (BLANK) copy link here
 const MIGRATE_COPY_URL = TEMPLATE_FOLDER_URL; // ← paste the (MIGRATE) copy link here
@@ -36,7 +36,6 @@ const HEADSHADE = "0F2A4A";
 const ROWSHADE = "F1F5F9";
 const GREEN = "166534";
 const RED = "B91C1C";
-const SHOTSHADE = "F1F5F9";
 
 // ---------- inline helpers ----------
 function t(text, o = {}) {
@@ -93,24 +92,6 @@ function callout(title, bodyText, color = BLUE, shade = "EEF4FF") {
       children: [
         new Paragraph({ spacing: { after: bodyText ? 40 : 0 }, children: [new TextRun({ text: title, bold: true, color, size: 21, font: "Calibri" })] }),
         ...(bodyText ? [new Paragraph({ children: [new TextRun({ text: bodyText, color: SLATE, size: 20, font: "Calibri" })] })] : []),
-      ],
-    })] })],
-  });
-}
-
-// ---------- screenshot placeholder ----------
-function screenshot(caption) {
-  const dashed = { style: BorderStyle.DASHED, size: 6, color: "94A3B8" };
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE }, columnWidths: [9360],
-    borders: { top: dashed, bottom: dashed, left: dashed, right: dashed, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-    rows: [new TableRow({ children: [new TableCell({
-      width: { size: 9360, type: WidthType.DXA },
-      shading: { type: ShadingType.CLEAR, fill: SHOTSHADE, color: "auto" },
-      margins: { top: 200, bottom: 200, left: 160, right: 160 },
-      children: [
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: "📷  SCREENSHOT PLACEHOLDER", bold: true, color: "64748B", size: 20, font: "Calibri" })] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: caption, italics: true, color: "64748B", size: 19, font: "Calibri" })] }),
       ],
     })] })],
   });
@@ -234,7 +215,7 @@ P(table(
 ));
 P(spacer(60));
 P(callout("Coordinator note — update these two links each release",
-  "Both templates live in this Drive folder: " + TEMPLATE_FOLDER_URL + ". Replace the two buttons above with the current (BLANK) and (MIGRATE) “make a copy” links whenever you ship a new version. Inside the sheet, the Welcome dialog and End-of-Year Rollover resolve these automatically from the folder (see LinkResolver.gs) — this printable guide is the one place you swap them by hand.",
+  "Both templates live in this Drive folder: " + TEMPLATE_FOLDER_URL + ". Replace the two buttons above with the current (BLANK) and (MIGRATE) “make a copy” links whenever you ship a new version. Inside the sheet, the Welcome dialog and End-of-Year Rollover resolve these automatically from the folder — this printable guide is the one place you swap them by hand.",
   BLUE, "EEF4FF"));
 P(new Paragraph({ children: [new PageBreak()] }));
 
@@ -260,9 +241,9 @@ P(p([
 ]));
 P(p("It's organized into three kinds of sheets:"));
 P(
-  bullet([t("The Engine — ", { bold: true }), t("RAW Data and Type List, where you paste your system exports and customize your dropdowns.")]),
+  bullet([t("The Engine — ", { bold: true }), t("RAW Data and the Backend tab's Type List, where you paste your system exports and customize your dropdowns.")]),
   bullet([t("The Workspaces — ", { bold: true }), t("Contact Log and Events, where you'll spend most of your day logging calls and workshops.")]),
-  bullet([t("The Output — ", { bold: true }), t("automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided, PCAR, and Phone Contacts. You never type into these — they build themselves.")]),
+  bullet([t("The Output — ", { bold: true }), t("automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided, PCAR, Phone Contacts, and New Students. You never type into these — they build themselves.")]),
 );
 P(callout("New here? Do the one-time setup in Part 1, load your data, run Build, and you're running in a few minutes.", "", BLUE, "EEF4FF"));
 
@@ -288,17 +269,15 @@ P(h2("Step 2 — Run Initial Setup (once)"));
 P(p([t("Wait for the spreadsheet to finish loading until the "), t("🚀 App Menu", { bold: true }), t(" appears in the top toolbar — don't click anything else until it shows. Then click "), t("🚀 App Menu → 🚨 Initial Setup (Run Once)", { bold: true }), t(". This does the behind-the-scenes wiring:")]));
 P(
   bullet("Authorizes the script to run as you."),
-  bullet("Installs the automatic triggers — instant updates when you edit the Contact Log, a nightly refresh/sync (around 11 PM), and a periodic “check for updates.”"),
+  bullet("Installs the automatic triggers — instant updates when you edit the Contact Log, a nightly refresh/sync (overnight), and a periodic “check for updates.”"),
   bullet("Records this copy as your original (a clone-detector so a later copy starts clean)."),
   bullet("Applies the default tab layout and opens this User Guide."),
 );
-P(screenshot("The 🚀 App Menu open, showing “🚨 Initial Setup (Run Once).”"));
 P(callout("Until setup is done, the sheet is intentionally locked.", "If you try to type before running Initial Setup, you'll see “🔒 Action Blocked — Initialization process needs to occur first.” That's expected — just run Initial Setup.", RED, "FEF2F2"));
 
 P(h2("Step 3 — The authorization screen"));
 P(p([t("Because this is a personal tool and not a paid Marketplace app, Google shows a warning like "), t("“Google hasn't verified this app.”", { italics: true }), t(" To continue, click "), t("Advanced", { bold: true }), t(" → "), t("Go to … (unsafe)", { bold: true }), t(" → choose your account → "), t("Allow", { bold: true }), t(".")]));
 P(p([t("“Unverified” means Google hasn't done a formal brand review — "), t("not", { italics: true }), t(" that anything is wrong. You are granting permission to a script that runs entirely inside "), t("your own", { bold: true }), t(" account.")]));
-P(screenshot("The Google consent screen: “Google hasn't verified this app” → Advanced → Go to … (unsafe) → Allow."));
 
 P(h3("What each authorization actually does"));
 P(p("On the Allow screen, Google lists the permissions below. The tool asks only for what it needs — and everything runs inside your own account, so approving it does not give the developer any access."));
@@ -309,7 +288,7 @@ P(table(
     ["See, edit, download, and permanently delete your contacts", "The optional “School Directory” phone sync that mirrors parent numbers into your Google Contacts.", "Only used if you turn on phone syncing in Settings. If you never enable it, nothing is written to your contacts."],
     ["See, edit, create, and delete all of your Google Drive files", "Saving the year-end PDF archive to your Drive, and opening your old sheet during a migration.", "Rollover creates a PDF file; migration opens the old spreadsheet you point it at."],
     ["Connect to an external service", "A read-only check of the shared “Version Tracker” sheet so you're told when a newer template ships.", "The only outside call the tool makes. It reads release dates/links — never your data."],
-    ["Run when you're not present / manage its own triggers", "The automatic triggers: instant Contact Log updates, the nightly rebuild/sync (~11 PM), and the update check on open.", "Lets the sheet keep itself current without you clicking Build every time."],
+    ["Run when you're not present / manage its own triggers", "The automatic triggers: instant Contact Log updates, the nightly rebuild/sync (overnight), and the update check on open.", "Lets the sheet keep itself current without you clicking Build every time."],
     ["Display and run third-party web content in dialogs and sidebars", "The menus, wizards, and sidebars — Settings, Migration, Rollover, and the progress bars.", "These custom screens are how you drive the tool."],
   ],
   [3000, 3400, 2960],
@@ -341,14 +320,13 @@ P(
   numbered("Export the “Students with Non-NYCSA Account” report."),
   numbered([t("Copy the data and paste it into "), t("cell AP2", { bold: true }), t(".")]),
 );
-P(screenshot("The RAW Data tab showing the colored PASTE boxes (Blue A5 / Orange AG6 / Green AP2)."));
 P(h3("Missing or wrong data? Use the New/Edit Student override"));
-P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, the script checks your overrides first and applies them across the entire directory. (More in Part 2.)")]));
-P(h3("Customizing dropdowns — the Type List tab"));
-P(p([t("The optional "), t("Type", { bold: true }), t(" column in the Contact Log is driven by the "), t("Type List", { bold: true }), t(" tab. Edit that tab to set your own conversation-topic categories (for example: Attendance, Behavior, Enrollment, IEP).")]));
+P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, your overrides are applied to the Master Table, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist. The "), t("Directory", { bold: true }), t(" and "), t("New Students", { bold: true }), t(" tabs always show ATS (RAW Data) only. Overrides also tidy themselves up: a “New Student” override is removed once ATS has that student, an edit that ATS now matches exactly is removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)")]));
+P(h3("Customizing dropdowns — the Type List"));
+P(p([t("The optional "), t("Type", { bold: true }), t(" column in the Contact Log is driven by the Type List in the hidden "), t("Backend", { bold: true }), t(" tab (column BL). Unhide Backend and edit that column to set your own conversation-topic categories (for example: Attendance, Behavior, Enrollment, IEP).")]));
 
 P(h2("Step 5 — Build the sheets"));
-P(p([t("Run "), t("🚀 App Menu → 🏗️ Build Sheets Only", { bold: true }), t(". A progress sidebar opens and generates every derived tab. The "), t("first", { italics: true }), t(" successful build unlocks the full menu — a toast will ask you to press "), t("F5", { bold: true }), t(" to refresh and reveal the new options.")]));
+P(p([t("Run "), t("🚀 App Menu → 🏗️ Build Sheets Only", { bold: true }), t(". A progress sidebar opens and generates every derived tab. When it finishes, the sidebar shows a short report — new students, discharged students, and families newly signed up for NYCSA or ParentSquare (click a count to see the names). The "), t("first", { italics: true }), t(" successful build unlocks the full menu — a toast will ask you to press "), t("F5", { bold: true }), t(" to refresh and reveal the new options.")]));
 P(callout("The golden rule of this sheet", "RAW Data is the only tab you paste into. Everything else is generated — so re-running Build always safely rebuilds it. Never hand-type into Master Table, Directory, or other generated tabs; your edits would be overwritten on the next build.", GREEN, "F0FDF4"));
 
 // ============================================================
@@ -379,7 +357,7 @@ P(p("“Overrides” let you correct or add student and guardian information wit
 P(table(
   ["Menu item", "What it does"],
   [
-    ["✨ New / Edit Student", "Add a student who isn't in ATS, or correct a name, phone, email, language, class, grade, or up to 5 guardians. You can also set a status Label and turn on “Hide from Report (Stealth Mode).” Saves and rebuilds in the background (~1 minute)."],
+    ["✨ New / Edit Student", "Add a student who isn't in ATS, or correct a name, phone, email, language, grade, or up to 5 guardians (a student's class always follows RAW Data once they're in ATS). You can also set a status Label and turn on “Hide from Report (Stealth Mode).” Saving opens the Build sidebar and rebuilds the sheets (if rebuilds are paused in Settings, it just saves)."],
     ["🗂️ Manage Overrides", "See every override you've made; edit or delete any of them."],
     ["📄 Override Report", "Builds a side-by-side “Students Override Report” comparing the raw ATS data against your overrides. Stealth-mode students are skipped."],
   ],
@@ -388,7 +366,7 @@ P(table(
 
 P(spacer(60));
 P(h2("📆 Events"));
-P(p([t("Use the Events tab for large-scale attendances (workshops, graduations, fairs) so they don't clutter your daily Contact Log. Click "), t("📆 Events → 📋 New Event", { bold: true }), t(". A pop-up with a calendar picker asks for the event name, type/category (with a "), t("PTC Quick Fill", { bold: true }), t(" button for “Parent Teacher Conference”), and location, then builds an attendance table. Log attendees by OSIS — the records map back to each student's Combined Contact Tracking and tally automatically in PCAR.")]));
+P(p([t("Use the Events tab for large-scale attendances (workshops, graduations, fairs) so they don't clutter your daily Contact Log. Click "), t("📆 Events → 📋 New Event", { bold: true }), t(". A pop-up with a calendar picker asks for the event name, type/category (with a "), t("PTC Quick Fill", { bold: true }), t(" button for “Parent Teacher Conference”), and location, then builds an attendance table. Log attendees by OSIS, student name, or guardian name — type one, paste a whole column, or put several OSIS numbers in one cell separated by commas — and the Ghost Typist fills in the rest. The records map back to each student's Combined Contact Tracking and tally automatically in PCAR.")]));
 
 P(spacer(60));
 P(h2("The tabs — what each one is for"));
@@ -396,17 +374,17 @@ P(table(
   ["Tab", "Purpose", "Visible by default?"],
   [
     ["RAW Data", "Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA).", "Yes"],
-    ["Type List", "Drives the optional Type dropdown in the Contact Log. Edit it to set your own categories.", "Yes"],
     ["Contact Log", "The heart of the tool. Log every guardian contact here (deep dive below).", "Yes"],
-    ["Master Table", "The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.", "Yes (generated)"],
-    ["Directory", "A clean, printable class directory merging ATS, ParentSquare, and NYCSA data.", "Yes (generated)"],
+    ["Master Table", "The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.", "Hidden (generated)"],
+    ["Directory", "A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.", "Yes (generated)"],
     ["Combined Contact Tracking", "One comprehensive history block per student — all contact notes and event attendances together. Great before an IEP meeting.", "Yes (generated)"],
+    ["New Students", "A running log of students who are new to ATS (or came back from Discharged): date entered, OSIS, student, guardian, site, class, and language. Each build adds to it.", "Yes (generated)"],
     ["PCAR", "Your auto-compiled PCAR reporting numbers (Phone, Walk-In, Workshops, PTCs, totals).", "Yes (generated)"],
     ["Phone Contacts", "The exact data that gets pushed to Google Contacts.", "Hidden (optional)"],
     ["Parents Divided", "One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges.", "Hidden (optional)"],
-    ["Notes", "An optional manual notes tab with its own auto-fill and duplicate protection.", "Hidden (optional)"],
+    ["Notes", "An optional manual notes tab (one row per family) with its own auto-fill and duplicate protection. Its notes show at the top of that student's Combined Contact Tracking.", "Hidden (optional)"],
     ["Send Out", "Optional tab tied to extra PCAR rows.", "Hidden (optional)"],
-    ["Version / Backend_Event_Log", "Behind-the-scenes tabs (build date, saved settings, event data). Leave them alone.", "Hidden (system)"],
+    ["Backend", "Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ) and the Type List that drives the Contact Log Type dropdown (BL). Only edit the Type List.", "Hidden (system)"],
   ],
   [2280, 5080, 2000],
 ));
@@ -427,22 +405,21 @@ P(table(
     ["Site & Class", "(Optional) Auto-fills from the student's profile; can be hidden in Settings."],
     ["📱🚶 Category", "Categorize for PCAR — e.g., Phone, Walk-In, Parent-Teacher."],
     ["Method", "The exact method — Call, Email, In School, etc."],
-    ["Type", "(Optional) A custom topic dropdown driven by the Type List tab; can be hidden in Settings."],
+    ["Type", "(Optional) A custom topic dropdown driven by the Backend tab's Type List; can be hidden in Settings."],
     ["Notes", "Detailed notes about the conversation."],
     ["⁉️ Follow-Up Needed", "A visual flag: Yes · Yes – Important · No · Waiting on Someone · Completed. Auto-fills to “No” if blank."],
     ["Followup Notes", "Next steps or what you did after the initial contact (e.g., “Teacher will reach out,” cc'd the teacher)."],
-    ["Hide", "Check this box to hide the row from view while keeping its data active for PCAR counting."],
+    ["Hide", "Check this box to keep this note out of the compiled notes (Combined Contact Tracking and Phone Contacts). The row stays in the Contact Log and still counts for PCAR."],
   ],
   [2600, 6760],
 ));
 P(spacer(60));
 P(p("Three things the Contact Log does for you automatically:"));
 P(
-  bullet([t("Ghost Typist. ", { bold: true }), t("Type an OSIS, student name, or guardian name and the other identity columns (plus Site and Class, including for siblings) fill in. If it can't match what you typed, it warns “Could not find … in the Master Table.”")]),
+  bullet([t("Ghost Typist. ", { bold: true }), t("Type — or paste a whole column of — OSIS numbers, student names, or guardian names, and the other identity columns (plus Site and Class, including for siblings) fill in for every row. If it can't match what you typed, it warns “Could not find … in the Master Table” (after a paste, it lists the ones it couldn't find).")]),
   bullet([t("Smart auto-fill. ", { bold: true }), t("Entering real content stamps today's Date, sets # to 1, and Follow-up to “No” — but only where you left them blank. Anything you typed yourself is never overwritten.")]),
-  bullet([t("Auto-adding rows + the master hide filter. ", { bold: true }), t("A fresh blank row is always kept above the dark “END” bar, and the checkbox on the END-bar row toggles hiding of your hidden rows so you can focus on active ones.")]),
+  bullet([t("Auto-adding rows + the master hide filter. ", { bold: true }), t("A fresh blank row is always kept above the dark “END” bar. The checkbox on the END-bar row turns on a filter that shows only this and last week's rows (or only today's — see Settings), plus anything still marked for follow-up, so you can focus on active ones.")]),
 );
-P(screenshot("The Contact Log: the pre-call search bar up top and a row being auto-filled by the Ghost Typist."));
 P(callout("If the Ghost Typist says “Could not find … in the Master Table”", "That family isn't compiled yet. Run 🏗️ Build Sheets Only once so your latest RAW Data / overrides are included, then try again.", BLUE, "EEF4FF"));
 
 P(spacer(80));
@@ -458,6 +435,7 @@ P(table(
     ["Disable Nightly Sync Entirely", "Turns off the automatic nightly rebuild and phone sync completely."],
     ["Update Contact Log only on Build", "Notes stop syncing on every edit and update only when you run Build."],
     ["Disable Contact Log Auto-Fill", "Stops auto-stamping Date, #, and Follow-up. The parent/student/OSIS lookup still fills in."],
+    ["Contact Log: Show Today Only", "Off shows this and last week's rows in the Contact Log; on shows only today's. Important notes and open follow-ups always show."],
     ["Date Range for Compiled Notes", "Limits compiled notes to a window (with Last Month / 6 Months / Year presets). Blank = all time."],
     ["Disable Hidden Notes (Show All)", "Includes notes you've hidden with the row checkbox in the compiled output."],
     ["Hide “Discharged” in Master Table", "Visual only — filters discharged students out of view. Turn off to show them again."],
@@ -466,8 +444,7 @@ P(table(
   ],
   [3560, 5800],
 ));
-P(screenshot("The ⚙️ Settings dialog with its toggle switches."));
-P(callout("Settings travel with your copy.", "Your choices are quietly saved into the hidden Version tab, so if you upgrade to a newer template later, a fresh copy inherits your settings automatically.", GREEN, "F0FDF4"));
+P(callout("Settings travel with your copy.", "Your choices are quietly saved into the hidden Backend tab, so if you upgrade to a newer template later, a fresh copy inherits your settings automatically.", GREEN, "F0FDF4"));
 
 P(spacer(80));
 P(h2("Build vs. Full Sync — know the difference"));
@@ -497,14 +474,14 @@ P(
   numbered("Smart-map the Contact Log — it matches columns by their headers, so it still works even if the layout changed between versions, and it strips blank/“ghost” rows automatically."),
   numbered("Finalize and rebuild all directories."),
 );
-P(screenshot("The System Upgrade Wizard with the old-sheet URL box and the six-step checklist."));
 P(callout("Migration is one-directional and non-destructive.", "It reads your old sheet (which you already own) and writes into the new one. Nothing is deleted or changed in your old sheet — keep it as a backup until you're happy with the new copy.", GREEN, "F0FDF4"));
 
 P(h2("Staying current (the update checker)"));
 P(p([t("Each copy remembers its own build date. Quietly, on open (at most once every few hours), the sheet checks a shared "), t("Version Tracker", { bold: true }), t(" to see whether a newer template has shipped. If so, it pops a short changelog with a link to the newest copy. You can also check any time with "), t("🚀 App Menu → 🔔 Check for Updates", { bold: true }), t(".")]));
 P(p("Inside that dialog you can:"));
 P(
-  bullet([t("Dismiss", { bold: true }), t(" — hide this update until something even newer ships.")]),
+  bullet([t("Dismiss for now", { bold: true }), t(" — close it; it pops up again on the next check.")]),
+  bullet([t("Dismiss this update", { bold: true }), t(" — hide this update until something even newer ships.")]),
   bullet([t("Major updates only", { bold: true }), t(" — automatic pop-ups only for big releases (a manual check still shows everything).")]),
   bullet([t("Stop automatic update checks", { bold: true }), t(" — silence the on-open checks; the manual menu check always still works.")]),
 );
@@ -518,7 +495,6 @@ P(
   bullet("Freezes the sheet — turns off nightly and phone sync so it won't overwrite next year's data — and renames it “… – Retired on [date].”"),
   bullet("Hands you the link to next year's fresh, fast template."),
 );
-P(screenshot("The End of Year Rollover wizard: archive summary and the “Get New Template” button."));
 P(callout("Rollover is safe to run once you're done for the year.", "It archives and freezes the OLD sheet; you then set up a brand-new copy for the new year (and can migrate anything you need). Keep the retired sheet and its PDF as your record.", BLUE, "EEF4FF"));
 
 // ============================================================
@@ -569,6 +545,7 @@ P(
   bullet([t("Back-dating works. ", { bold: true }), t("Type your own date, count, or follow-up status and the auto-fill leaves it alone.")]),
   bullet([t("Hide vs. Purge discharged. ", { bold: true }), t("“Hide Discharged” is a reversible view filter; “Purge Discharged Students” permanently deletes them. Use Purge only when you're sure.")]),
   bullet([t("Refresh if a menu looks stale. ", { bold: true }), t("Many actions update the menu live, but pressing F5 always reloads the latest menu.")]),
+  bullet([t("Fresh-data reminder. ", { bold: true }), t("If the ATS data in RAW Data is more than 30 days old, the sheet reminds you (once a day) when you open it to paste a fresh export.")]),
 );
 
 P(h2("Troubleshooting / FAQ"));
@@ -599,8 +576,8 @@ const doDont = new Table({
   rows: [
     new TableRow({ tableHeader: true, children: [cell("✅ Do", { header: true, width: 4680 }), cell("🚫 Don't", { header: true, width: 4680 })] }),
     new TableRow({ children: [cell("Paste raw data only into RAW Data — as Values Only.", { width: 4680, shade: "F0FDF4" }), cell("Type into Master Table, Directory, or other generated tabs — they're overwritten on build.", { width: 4680, shade: "FEF2F2" })] }),
-    new TableRow({ children: [cell("Use Overrides to fix names, phones, or add students.", { width: 4680 }), cell("Rename or delete the generated / hidden tabs (including Version).", { width: 4680 })] }),
-    new TableRow({ children: [cell("Run Build after big changes.", { width: 4680, shade: "F0FDF4" }), cell("Hand-edit the hidden Version tab's saved settings.", { width: 4680, shade: "FEF2F2" })] }),
+    new TableRow({ children: [cell("Use Overrides to fix names, phones, or add students.", { width: 4680 }), cell("Rename or delete the generated / hidden tabs (including Backend).", { width: 4680 })] }),
+    new TableRow({ children: [cell("Run Build after big changes.", { width: 4680, shade: "F0FDF4" }), cell("Hand-edit the hidden Backend tab's saved settings.", { width: 4680, shade: "FEF2F2" })] }),
     new TableRow({ children: [cell("Keep your old / retired sheet as a backup until you've verified the new one.", { width: 4680 }), cell("Purge discharged students unless you're certain.", { width: 4680 })] }),
   ],
 });
@@ -614,10 +591,10 @@ P(table(
     ["OSIS", "The unique student ID number from ATS. The tool uses it to match students, siblings, and contacts."],
     ["ATS / Insight", "The NYC DOE student data systems your Raw Data export comes from (via TeachHub)."],
     ["PCAR", "Parent Coordinator Activity Report — the reporting numbers this tool compiles for you."],
-    ["Ghost Typist", "The auto-fill that completes a Contact Log (or Notes) row from a single OSIS or name."],
+    ["Ghost Typist", "The auto-fill that completes a Contact Log, Notes, or Events row from a single OSIS or name."],
     ["Override", "A correction or addition you make to student/guardian info without changing raw ATS data."],
     ["Stealth Mode", "An override flag that keeps a student out of the Override Report."],
-    ["NYCSA / ParentSquare", "Parent account/communication systems whose exports feed the directory and Parents Divided tab."],
+    ["NYCSA / ParentSquare", "Parent account/communication systems whose exports show each family's sign-up status in Parents Divided and Phone Contacts."],
     ["Build", "Regenerating all derived tabs from your current data (🏗️ Build Sheets Only)."],
   ],
   [1900, 7460],
