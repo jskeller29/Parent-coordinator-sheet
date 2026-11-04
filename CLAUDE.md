@@ -59,6 +59,14 @@ Files (shared = every school's sheet):
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
 
+- Z#Fonts.gs (+ Z#FontsSidebar.html): optional "🔤 Sheet Fonts" sidebar (🚀 App Menu full menu, one guarded
+  `addFontsMenuItem_` line in onOpen). Cycle fonts (‹ › or arrow keys; recommended first, then the rest), live preview
+  on the open tab (old fonts saved run-length encoded in the user cache ZF_SNAP_<sheetId> / ZF_SNAPS; Undo, Apply and
+  the next open put them back), Apply to whole tabs (built tabs / Contact Log / any other tab, Backend skipped) and
+  optionally the spreadsheet theme font. Apply saves doc properties SHEET_FONT_BUILT / SHEET_FONT_CONTACTLOG, read by
+  shared getSheetFont_ (Core.gs; defaults Montserrat / Roboto) in the build's font step (builtFontSheets_, Build.gs)
+  and the Contact Log column D repair (Edits.gs), so they keep the chosen font. Regenerate's resets still use its own fonts.
+
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
   which returns those hooks on the owner's sheet and null everywhere else. No shared function is redefined, so file
@@ -120,6 +128,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
+  with them.
+- Sheet Fonts: also paste Z#Fonts (script) + Z#FontsSidebar (HTML); optional, needs Styles.html; menu item only appears
   with them.
 
 Backend tab (see Core.gs):

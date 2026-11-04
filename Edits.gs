@@ -194,7 +194,7 @@ function handleEdit_(e) {
     // --- INSTANT ROW REPAIR ---
     sheet.getRange(row, 1, safeNumRows, CL_WIDTH).setBackground(null);
     formatContactLogRows_(sheet, row, safeNumRows);
-    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily("Roboto");
+    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily(getSheetFont_('CONTACTLOG'));
   }
 
   autoAddBlankRow_(sheet, row, endRow);

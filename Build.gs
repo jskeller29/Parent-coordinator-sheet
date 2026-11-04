@@ -204,12 +204,12 @@ function buildAllDerivedSheets() {
   // Remember this build's Raw Data roster for the next comparison
   try { saveAtsSnapshot_(ss, atsChanges.atsOsis); } catch (e) { console.warn("ATS snapshot not saved: " + e.message); }
 
-  // Set Montserrat font ONCE at the very end instead of inside writeSheet_
-  const fontSheets = owner ? owner.montserratSheets
-    : ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
-  fontSheets.forEach(name => {
+  // Set the built tabs' font ONCE at the very end instead of inside writeSheet_
+  // (Montserrat unless a different one was saved; see getSheetFont_ in Core.gs)
+  const builtFont = getSheetFont_('BUILT');
+  builtFontSheets_().forEach(name => {
     const sh = ss.getSheetByName(name);
-    if (sh) sh.getDataRange().setFontFamily("Montserrat");
+    if (sh) sh.getDataRange().setFontFamily(builtFont);
   });
 
   // Combined Contact Tracking was rebuilt: redraw the search bar's Communications box
@@ -218,6 +218,13 @@ function buildAllDerivedSheets() {
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
+}
+
+/** The tabs the build re-fonts every time (the owner's sheet uses its own list). */
+function builtFontSheets_() {
+  const owner = getOwnerHooks_();
+  return owner ? owner.montserratSheets
+    : ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
