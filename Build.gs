@@ -212,6 +212,9 @@ function buildAllDerivedSheets() {
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
   });
 
+  // Combined Contact Tracking was rebuilt: redraw the search bar's Communications box
+  refreshSearchBarCommunications_(contactLogSheet);
+
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
