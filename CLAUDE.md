@@ -63,7 +63,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm; they also delete Old Master Table / Old Phone Contacts) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS).
+  confirm; they also delete Old Master Table / Old Phone Contacts), "Color Tabs" (colorTabs in Regenerate.gs, colors from
+  TAB_COLORS_: yellow = paste-in data, green/orange = typed tabs, blues/teals = built, purples = reports, greys = backend/old)
+  and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS).
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 
@@ -73,7 +75,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
-  Regenerate, the other HTML files and the manifest are unchanged. The Contact Log tool is now named
+  Regenerate (now also has colorTabs), the other HTML files and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
   with them.

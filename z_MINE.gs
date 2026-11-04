@@ -58,6 +58,7 @@ function ownerAddMenus_(ui) {
   ui.createMenu("🐞 Debug")
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
+    .addItem("🎨 Color Tabs", "ownerMenuColorTabs")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug")
     .addToUi();
@@ -69,6 +70,10 @@ function ownerMenuResetAndLoadFakeData() {
 
 function ownerMenuResetToDisplayMode() {
   if (ownerConfirmWipe_("Reset to Display Mode")) runAction_("Reset to Display Mode", () => resetToDisplayMode());
+}
+
+function ownerMenuColorTabs() {
+  runAction_("Color Tabs", () => colorTabs());
 }
 
 function ownerMenuToggleDebug() {

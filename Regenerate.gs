@@ -824,3 +824,44 @@ function resetContactLogFormatting() {
     applyTypeDropdownColors();
   }
 }
+
+/* =========================
+TAB COLORS
+========================= */
+
+// One color per tab, grouped by what the tab is for:
+//   yellow = data you paste in (like the yellow paste zones on Raw Data)
+//   green / orange = tabs you type in every day
+//   blues / teals  = tabs the build makes for you (read-only)
+//   purples        = reports / new-student lists
+//   greys          = behind-the-scenes and old history tabs
+// Tabs missing from this sheet are skipped; tabs not listed keep their color.
+var TAB_COLORS_ = {
+  "Raw Data":                  "#F1C232", // yellow  - paste ATS / ParentSquare / NYCSA here
+  "RAW Data":                  "#F1C232",
+  "Contact Log":               "#6AA84F", // green   - daily typing
+  "Notes":                     "#93C47D", // light green - typed notes
+  "Events":                    "#E69138", // orange  - event attendance
+  "PCAR":                      "#CC4125", // red     - report to hand in
+  "Combined Contact Tracking": "#3C78D8", // blue    - built
+  "Directory":                 "#6D9EEB", // light blue - built
+  "Master Table":              "#1C4587", // dark blue  - built
+  "Phone Contacts":            "#45818E", // teal    - built
+  "Parents Divided":           "#76A5AF", // light teal - built
+  "New Students":              "#8E7CC3", // purple  - new / re-entered students
+  "Students Override Report":  "#B4A7D6", // light purple - report
+  "Backend":                   "#999999", // grey    - hidden settings
+  "Old Master Table":          "#CCCCCC", // light grey - old history
+  "Old Phone Contacts":        "#CCCCCC"
+};
+
+/** Colors every tab listed in TAB_COLORS_ (Debug menu: 🎨 Color Tabs). */
+function colorTabs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let count = 0;
+  Object.keys(TAB_COLORS_).forEach(function(name) {
+    const sheet = ss.getSheetByName(name);
+    if (sheet) { sheet.setTabColor(TAB_COLORS_[name]); count++; }
+  });
+  ss.toast(count + " tabs colored.", "🎨 Color Tabs", 5);
+}
