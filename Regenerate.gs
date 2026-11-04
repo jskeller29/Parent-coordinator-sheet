@@ -674,6 +674,19 @@ SEND OUT TAB (a Sheets Table: A Date, B Send Out Title, C Send Out Type, D On Be
 E Where Did You Send, F Population, G # Reached, H Attachments; I:J = the dropdown lists)
 ========================= */
 
+// Backend BH3:BJ3 (Send Out list): the options for the Send Out tab's dropdowns, as
+// formulas = fixed options + every value already typed in that column. Every reset
+// clears BH:BJ rows 3+ and writes these back. (BJ3 reads E2:E8, as the owner wrote it.)
+var SEND_OUT_LIST_FORMULAS_ = [
+  "=UNIQUE(VSTACK(\"Events\", \"Services\",UNIQUE('Send Out'!C2:C)))",
+  "=UNIQUE(VSTACK(\"Parent Coordinator\",\"Principal\",\"PTA\",\"School\",UNIQUE('Send Out'!D2:D)))",
+  "=UNIQUE(VSTACK(\"Backpack\",\"DOE Messaging\",\"Parents Square\",UNIQUE('Send Out'!E2:E8)))"
+];
+
+function writeSendOutListFormulas_(ss) {
+  backendBlockRange_(ss, "SEND_OUT", 1, 0, 1, 3).setFormulas([SEND_OUT_LIST_FORMULAS_]);
+}
+
 // Clears the Send Out log (A:H, row 2 down). The lists in I:J ("Behalf of List",
 // "Sending Location List") are settings, so they are kept. Only contents are cleared:
 // the Table's column types, dropdowns and formats stay.
@@ -692,16 +705,17 @@ function loadFakeSendOut_(ss) {
   const day = (n) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
   // [days ago, Title, Type, On Behalf Of, Where Did You Send, Population, # Reached]
   const rows = [
-    [40, "Welcome Back Letter",            "Letter",       "School",             "Backpack",     "All families",        312],
-    [33, "Back to School Night Invite",    "Flyer",        "School",             "ParentSquare", "All families",        298],
-    [26, "Picture Day Reminder",           "Text Message", "School",             "ParentSquare", "All families",        305],
-    [21, "Fall PTC Sign-Up",               "Email",        "Parent Coordinator", "Email",        "All families",        241],
-    [14, "Graduation Workshop Invite",     "Flyer",        "Parent Coordinator", "ParentSquare", "Grade 6 families",     58],
-    [10, "Site 51 Schedule Change",        "Letter",       "Principal",          "Backpack",     "Site 51 families",     44],
-    [7,  "Family Literacy Workshop",       "Flyer",        "PTA",                "ParentSquare", "Grades 3-5 families", 122],
-    [3,  "Spring Festival Volunteers",     "Email",        "PTA",                "Email",        "All families",        236],
-    [1,  "Attendance Reminder",            "Text Message", "Principal",          "ParentSquare", "Site 281 families",    61]
+    [40, "Welcome Back Letter",            "Services", "School",             "Backpack",       "All families",        312],
+    [33, "Back to School Night Invite",    "Events",   "School",             "Parents Square", "All families",        298],
+    [26, "Picture Day Reminder",           "Events",   "School",             "DOE Messaging",  "All families",        305],
+    [21, "Fall PTC Sign-Up",               "Events",   "Parent Coordinator", "Parents Square", "All families",        241],
+    [14, "Graduation Workshop Invite",     "Events",   "Parent Coordinator", "Backpack",       "Grade 6 families",     58],
+    [10, "Site 51 Schedule Change",        "Services", "Principal",          "DOE Messaging",  "Site 51 families",     44],
+    [7,  "Family Literacy Workshop",       "Events",   "PTA",                "Parents Square", "Grades 3-5 families", 122],
+    [3,  "Tutoring Program Sign-Up",       "Services", "PTA",                "Backpack",       "All families",        236],
+    [1,  "Attendance Reminder",            "Services", "Principal",          "Parents Square", "Site 281 families",    61]
   ];
+
   for (let c = 0; c < 7; c++) {
     const values = rows.map(r => [c === 0 ? day(r[0]) : r[c]]);
     try {
@@ -920,6 +934,7 @@ function resetDerivedSheets_(ss) {
   // Backend tab sections: clear New/Edit Student and the Send Out list rows (keep their headers)
   backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
   backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
+  writeSendOutListFormulas_(ss); // put the Send Out dropdown lists (BH3:BJ3) back
 
   ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);

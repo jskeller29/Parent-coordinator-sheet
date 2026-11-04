@@ -87,7 +87,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
 - Send Out tab = a Sheets Table "Table1": A Date, B Send Out Title, C Send Out Type, D On Behalf Of, E Where Did You
   Send (dropdowns C:E), F Population, G # Reached, H Attachments (file chips); I "Behalf of List", J "Sending Location
-  List" (dropdown sources, kept). Resets clear A:H rows 2+ (resetSendOut_, clearContent only); fake data writes 9 rows
+  List" (kept). Dropdown options come from Backend BH3:BJ3 formulas (fixed options + values already typed:
+  C Events / Services, D Parent Coordinator / Principal / PTA / School, E Backpack / DOE Messaging / Parents Square).
+  Resets clear A:H rows 2+ (resetSendOut_, clearContent only); fake data writes 9 rows
   A:G column by column (loadFakeSendOut_; a refused column is skipped with console.warn).
 - Contact Log Follow-up (N): options No Followup Needed / Followup Needed / Followup Needed - ASAP / Followed Up /
   Resolved / Skipped / Newer Interaction. The Contact Log is a Sheets Table and N a "Dropdown" typed column: Apps
@@ -121,7 +123,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
   Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
-  AX:BF Event Log, BH:BJ Send Out list (not used by code; cleared on reset), BL Type List.
+  AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
+  clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List.
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
   Use the backend* helpers in Core.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.
