@@ -207,6 +207,8 @@ function buildMenus_() {
     getStartedMenu.addItem("🐞 Report a Bug", "reportABug");
     getStartedMenu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
     getStartedMenu.addSeparator();
+    // Optional module (Z#InputDataMode.gs); a no-op without that file
+    if (typeof addInputDataModeMenuItem_ === "function") addInputDataModeMenuItem_(getStartedMenu);
     getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
     getStartedMenu.addToUi();
 
@@ -230,6 +232,8 @@ function buildMenus_() {
     }
     
     menu.addItem("🏗️ Build Sheets Only (No Push to Google Contacts)", "runBuildOnly"); 
+    // Optional module (Z#InputDataMode.gs); a no-op without that file
+    if (typeof addInputDataModeMenuItem_ === "function") addInputDataModeMenuItem_(menu);
     menu.addSeparator(); 
     menu.addItem("⚙️ Settings", "openSettingsDialog"); 
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");

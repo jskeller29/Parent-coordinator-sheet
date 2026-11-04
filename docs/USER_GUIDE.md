@@ -170,6 +170,16 @@ your standard systems and paste it into the brightly-colored "PASTE" boxes on th
 3. Export the "Students with Non-NYCSA Account" report.
 4. Copy the data and paste it into **cell AP2**.
 
+**Easier way: 📥 Input Data Mode.** Open **🚀 App Menu → 📥 Input Data Mode** and the sheet
+walks you through all three exports, one at a time. Your other tabs are hidden while you
+work. For each export, either click **📂 Upload file** and pick the file you downloaded,
+or open the file, press Ctrl+A (Mac: ⌘+A), copy (Ctrl+C / ⌘+C), and paste anywhere on the
+temporary tab with Ctrl+Shift+V (Mac: ⌘+Shift+V). The data moves into RAW Data by itself,
+and the sidebar shows when each one was last updated. It warns you, without changing RAW Data,
+if you pasted the wrong export or if Excel cut numbers off (like 7.19E+09). Use **Skip** to
+keep the old data for an export, or **Exit** to stop and get your tabs back. When you're done,
+click **🏗️ Build Sheets Now**.
+
 **Missing or wrong data? Use the New/Edit Student override.** District databases like
 ATS can lag behind real enrollment. If you need to add a student or fix contact info
 before it hits ATS, use **👤 Student Overrides → New / Edit Student**. When you build,

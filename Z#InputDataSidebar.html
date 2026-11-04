@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <!-- Reads uploaded Excel files in the browser (no extra Google permissions) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 14px 14px 120px; color: #0F172A; font-size: 13px; line-height: 1.45; }
+    h2 { font-size: 17px; margin: 0 0 4px; }
+    h3 { font-size: 14px; margin: 14px 0 6px; }
+    .muted { color: #64748B; font-size: 12px; }
+    .pill { display: inline-block; background: #E0F2FE; color: #075985; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+    .pill.opt { background: #F1F5F9; color: #475569; }
+    .card { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: #fff; }
+    .card.yellow { background: #FFFBEB; border-color: #FDE68A; }
+    ol { margin: 4px 0 0 18px; padding: 0; }
+    li { margin-bottom: 3px; }
+    kbd { background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 4px; font-size: 11px; font-family: inherit; }
+    .status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; background: #F0F9FF; color: #075985; margin: 10px 0; }
+    .spinner { width: 14px; height: 14px; border: 2px solid #BAE6FD; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.9s linear infinite; flex: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+    button { font-family: inherit; font-size: 13px; border-radius: 6px; padding: 7px 12px; cursor: pointer; border: 1px solid #CBD5E1; background: #fff; color: #0F172A; }
+    button.primary { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
+    button.danger { color: #B91C1C; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 10px 14px; display: flex; gap: 8px; }
+    .footer button { flex: 1; }
+    .hidden { display: none !important; }
+    a { color: #1D4ED8; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>📥 Welcome to Input Data Mode</h2>
+  <div class="muted">Load each export one at a time. The other tabs are hidden until you finish or exit.</div>
+
+  <div id="loading" class="status"><div class="spinner"></div><div>Loading…</div></div>
+
+  <!-- ACTIVE STEP -->
+  <div id="stepView" class="hidden">
+    <h3 id="stepTitle"></h3>
+    <div><span id="stepPill" class="pill"></span> <span class="muted" id="lastUpdated"></span></div>
+
+    <div id="notice" class="ok hidden"></div>
+
+    <div class="card">
+      <b>Where to get it</b>
+      <ol id="howTo"></ol>
+    </div>
+
+    <div class="card">
+      <b>Option 1 — Upload the file (easiest)</b>
+      <div class="muted">Pick the file you downloaded (CSV or Excel). Numbers come in exactly as they are in the file.</div>
+      <div class="row">
+        <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" class="hidden">
+        <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">📂 Upload file</button>
+      </div>
+    </div>
+
+    <div class="card yellow">
+      <b>Option 2 — Copy &amp; paste</b>
+      <ol>
+        <li>Open the file you downloaded.</li>
+        <li>Click any cell, then press <kbd>Ctrl</kbd>+<kbd>A</kbd> (Mac: <kbd>⌘</kbd>+<kbd>A</kbd>) to select everything, including the top row.</li>
+        <li>Press <kbd>Ctrl</kbd>+<kbd>C</kbd> (Mac: <kbd>⌘</kbd>+<kbd>C</kbd>) to copy.</li>
+        <li>Come back to the <b id="tabName"></b> tab, click any cell, and paste <b>values only</b>: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>).</li>
+      </ol>
+      <div class="muted" style="margin-top:6px">⚠️ If Excel shows numbers like <b>7.19E+09</b> or <b>####</b>, widen the columns first: after <kbd>Ctrl</kbd>+<kbd>A</kbd>, double-click the line between any two column letters. Otherwise the real digits get lost.</div>
+      <div class="row"><a onclick="call('idm_goToTempSheet')">Go to the paste tab</a></div>
+    </div>
+
+    <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
+
+    <div id="errorBox" class="error hidden">
+      <div id="errorText"></div>
+      <div class="row">
+        <button id="retryBtn" onclick="retry()">🧹 Clear &amp; try again</button>
+        <button id="anywayBtn" class="hidden" onclick="useAnyway()">Use it anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINISHED -->
+  <div id="doneView" class="hidden">
+    <h3 id="doneTitle">🎉 All done!</h3>
+    <div id="doneNotice" class="ok hidden"></div>
+    <div class="card"><div id="summary"></div></div>
+    <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Master Table, Directory and the other tabs use the new data.</span></div>
+    <div class="row">
+      <button class="primary" id="buildBtn" onclick="build()">🏗️ Build Sheets Now</button>
+      <button onclick="google.script.host.close()">Close</button>
+    </div>
+  </div>
+
+  <div class="footer" id="footer">
+    <button id="skipBtn" onclick="skip()">⏭️ Skip</button>
+    <button id="exitBtn" class="danger" onclick="exitMode()">🚪 Exit Input Data Mode</button>
+  </div>
+
+<script>
+  var POLL_MS = 2000;
+  var pollTimer = null;
+  var busy = false;          // a server call is running
+  var paused = false;        // an error is showing: wait for the user
+  var pendingUpload = null;  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
+
+  function $(id) { return document.getElementById(id); }
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+
+  function render(v) {
+    busy = false;
+    show('loading', false);
+    if (!v || !v.active) {
+      if (v && v.finished) return renderDone(v);
+      show('stepView', false); show('footer', false);
+      $('loading').innerHTML = '<div>Input Data Mode is not on. Open 🚀 App Menu → 📥 Input Data Mode to start.</div>';
+      show('loading', true);
+      return;
+    }
+    show('stepView', true); show('doneView', false); show('footer', true);
+    $('stepTitle').textContent = 'Data ' + (v.stepIndex + 1) + ' of ' + v.stepCount + ': ' + v.step.zone;
+    $('stepPill').textContent = v.step.required ? 'Required' : 'Optional';
+    $('stepPill').className = 'pill' + (v.step.required ? '' : ' opt');
+    $('lastUpdated').textContent = v.lastUpdated
+      ? 'Last updated ' + v.lastUpdated.text + (v.lastUpdated.days === null ? '' : ' (' + daysText(v.lastUpdated.days) + ')')
+      : 'Never updated';
+    $('howTo').innerHTML = v.step.howTo.map(function (h) { return '<li>' + h + '</li>'; }).join('');
+    $('tabName').textContent = '"' + v.tabName + '"';
+    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip & finish';
+
+    var n = v.notice;
+    if (n && n.type === 'imported') { $('notice').textContent = n.message; show('notice', true); }
+    else if (!n || n.type !== 'error') show('notice', false);
+
+    if (n && n.type === 'error') {
+      paused = true;
+      $('errorText').innerHTML = n.message;
+      $('retryBtn').textContent = n.fromUpload ? 'OK' : '🧹 Clear & try again';
+      show('anywayBtn', !!n.canUseAnyway);
+      show('errorBox', true);
+      show('waiting', false);
+    } else {
+      paused = false;
+      pendingUpload = null;
+      show('errorBox', false);
+      $('waitingText').textContent = 'Waiting for your paste or upload…';
+      show('waiting', true);
+    }
+    setButtons(true);
+    schedule();
+  }
+
+  function renderDone(v) {
+    stopPolling();
+    show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
+    $('doneTitle').textContent = v.exited ? '🚪 Input Data Mode closed' : '🎉 All done!';
+    if (v.notice && v.notice.message) { $('doneNotice').textContent = v.notice.message; show('doneNotice', true); }
+    show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported);
+    $('summary').innerHTML = (v.summary || []).map(function (s) { return '<div>' + s + '</div>'; }).join('');
+  }
+
+  function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
+
+  function setButtons(on) {
+    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn'].forEach(function (id) { $(id).disabled = !on; });
+  }
+
+  function working(text) {
+    busy = true;
+    stopPolling();
+    setButtons(false);
+    show('errorBox', false);
+    $('waitingText').textContent = text;
+    show('waiting', true);
+  }
+
+  function onFail(err) {
+    busy = false;
+    setButtons(true);
+    paused = true;
+    $('errorText').textContent = '❌ ' + (err && err.message ? err.message : err);
+    $('retryBtn').textContent = 'OK';
+    show('anywayBtn', false);
+    show('errorBox', true);
+    show('waiting', false);
+  }
+
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var runner = google.script.run.withSuccessHandler(render).withFailureHandler(onFail);
+    runner[fn].apply(runner, args);
+  }
+
+  // --- polling: the sidebar can't be told about a paste, so it checks every 2s ---
+  function schedule() {
+    stopPolling();
+    if (paused || busy) return;
+    pollTimer = setTimeout(poll, POLL_MS);
+  }
+  function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+  function poll() {
+    if (paused || busy) return;
+    busy = true;
+    google.script.run
+      .withSuccessHandler(render)
+      .withFailureHandler(function (e) { busy = false; schedule(); console.error(e); })
+      .idm_check();
+  }
+
+  // --- buttons ---
+  function skip() { working('Skipping…'); call('idm_skip'); }
+  function exitMode() { working('Bringing your tabs back…'); call('idm_exit'); }
+  function retry() {
+    if ($('retryBtn').textContent === 'OK') { paused = false; pendingUpload = null; show('errorBox', false); show('waiting', true); schedule(); return; }
+    working('Clearing the tab…'); call('idm_retry');
+  }
+  function useAnyway() {
+    working('Moving data to Raw Data…');
+    if (pendingUpload) {
+      var p = pendingUpload;
+      call(p.kind === 'csv' ? 'idm_submitCsv' : 'idm_submitRows', p.data, true);
+    } else {
+      call('idm_useAnyway');
+    }
+  }
+  function build() {
+    google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
+  }
+
+  // --- upload ---
+  $('fileInput').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    this.value = '';
+    if (!file) return;
+    var name = file.name.toLowerCase();
+    var reader = new FileReader();
+    working('Reading ' + file.name + '…');
+
+    if (/\.(csv|txt)$/.test(name)) {
+      reader.onload = function () {
+        pendingUpload = { kind: 'csv', data: reader.result };
+        $('waitingText').textContent = 'Moving data to Raw Data…';
+        call('idm_submitCsv', reader.result, false);
+      };
+      reader.onerror = function () { onFail('Could not read that file.'); };
+      reader.readAsText(file);
+    } else if (/\.(xlsx|xls)$/.test(name)) {
+      if (typeof XLSX === 'undefined') { onFail('The Excel reader did not load. Save the file as CSV and upload that, or use copy & paste.'); return; }
+      reader.onload = function () {
+        try {
+          var wb = XLSX.read(new Uint8Array(reader.result), { type: 'array', cellDates: true });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }).map(function (r) {
+            return r.map(function (c) {
+              if (c instanceof Date) return (c.getMonth() + 1) + '/' + c.getDate() + '/' + c.getFullYear();
+              return c;
+            });
+          });
+          pendingUpload = { kind: 'rows', data: rows };
+          $('waitingText').textContent = 'Moving data to Raw Data…';
+          call('idm_submitRows', rows, false);
+        } catch (e) { onFail('Could not read that Excel file: ' + e.message); }
+      };
+      reader.onerror = function () { onFail('Could not read that file.'); };
+      reader.readAsArrayBuffer(file);
+    } else {
+      onFail('Please pick a .csv, .xlsx or .xls file.');
+    }
+  });
+
+  call('idm_getState');
+</script>
+</body>
+</html>

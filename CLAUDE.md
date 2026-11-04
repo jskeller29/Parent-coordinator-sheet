@@ -26,6 +26,14 @@ Files (shared = every school's sheet):
 - Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool; left as is.
   "Z#" = a temporary file for trying out a new feature: no other code may rely on Z# files (the only link is the
   guarded `if (typeof buildContactLogMenu_ === "function")` line in onOpen, a no-op without the file).
+- Z#InputDataMode.gs (+ Z#InputDataSidebar.html): optional "📥 Input Data Mode" (🚀 App Menu, both the getting-started
+  and full menus, via 2 guarded `addInputDataModeMenuItem_` lines in onOpen). Hides all visible tabs (remembered),
+  then one temp tab at a time ("Student Data", "Parent Square Data", "NYCSA Data"); paste anywhere or upload the
+  CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Sidebar polls every 2s, finds the header row, refuses the
+  wrong export and numbers Excel cut off (E+ / #### / ID-phone columns ending in 000; "Use it anyway" allowed),
+  then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
+  updateRawDataTimestamp_). Skip keeps old data. Never touches BH:BI (MAKE OWN DATA). State in doc property
+  INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
@@ -52,6 +60,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
   Regenerate, the other HTML files and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
+- Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
+  with them.
 
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
