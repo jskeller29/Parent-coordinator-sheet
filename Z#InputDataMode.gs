@@ -22,6 +22,16 @@
 // ======================================================================
 
 var IDM_STATE_KEY = 'INPUT_DATA_MODE_STATE';
+
+// 🐞 TEMPORARY DEBUG: every sidebar call returns a step-by-step log (shown in the
+// sidebar's Debug panel) and script errors are shown instead of retried silently.
+// Set to false (or delete the idm_log_ lines) once Input Data Mode works.
+var IDM_DEBUG = true;
+var IDM_DBG = null;
+function idm_log_(msg) {
+  if (!IDM_DBG) return;
+  IDM_DBG.push("+" + (Date.now() - IDM_DBG.t0) + "ms " + msg);
+}
 var IDM_PLACEHOLDER = 'PASTE HERE';
 
 // Same headers / columns / date stamps as cleanRawDataPasteZone_ and
@@ -116,7 +126,10 @@ function idm_getState() {
   return idm_withLock_(() => idm_view_(SpreadsheetApp.getActiveSpreadsheet(), idm_loadState_()));
 }
 
-/** Polled every ~2s: if the temp tab has data, move it to Raw Data. */
+/**
+ * Polled every ~2s. Only LOOKS at the temp tab (fast); when there is data it
+ * answers pending=true and the sidebar shows "moving…" and calls idm_processPaste.
+ */
 function idm_check() {
   return idm_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -124,6 +137,22 @@ function idm_check() {
     if (!state) return idm_view_(ss, null);
     const temp = idm_ensureTempSheet_(ss, state);
     idm_saveState_(state);
+    idm_debugSheets_(ss, state, temp);
+    const hasData = idm_tempHasData_(temp);
+    idm_log_("temp tab has data: " + hasData);
+    const view = idm_view_(ss, state);
+    view.pending = hasData;
+    return view;
+  });
+}
+
+/** Moves the pasted data on the temp tab to Raw Data (can take a while). */
+function idm_processPaste() {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const temp = idm_ensureTempSheet_(ss, state);
     if (!idm_tempHasData_(temp)) return idm_view_(ss, state);
     return idm_processTemp_(ss, state, temp, false);
   });
@@ -232,6 +261,7 @@ function idm_processTemp_(ss, state, temp, ignoreCutoff) {
   const displays = range.getDisplayValues();
   // The "PASTE HERE" label is not data
   if (values.length && String(values[0][0]).trim() === IDM_PLACEHOLDER) { values[0][0] = ""; displays[0][0] = ""; }
+  idm_log_("read temp tab: " + values.length + " rows x " + (values[0] ? values[0].length : 0) + " cols");
   return idm_processRows_(ss, state, values, displays, ignoreCutoff, false);
 }
 
@@ -244,8 +274,11 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   const step = IDM_STEPS[state.step];
   const fail = (code, message, extra) => idm_view_(ss, state, Object.assign({ type: 'error', code: code, message: message, fromUpload: fromUpload }, extra || {}));
 
+  idm_log_("step " + state.step + " (" + step.key + "), " + values.length + " rows in, fromUpload=" + fromUpload + ", ignoreCutoff=" + ignoreCutoff);
   const found = idm_findHeader_(values);
+  idm_log_("header: " + (found ? found.step.key + " at row " + (found.row + 1) + " (" + found.count + " of " + found.step.headers.length + " names match)" : "NOT FOUND"));
   if (!found) {
+    for (let i = 0; i < Math.min(5, values.length); i++) idm_log_("row " + (i + 1) + ": " + JSON.stringify(values[i].slice(0, 8)));
     return fail('noHeader', "I couldn't find the top row with the column names (like \"" + step.headers[2] + "\"). " +
       "Make sure you select everything with Ctrl+A (Mac: ⌘+A) before copying, so the header row comes too.");
   }
@@ -255,12 +288,15 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   }
 
   const mapped = idm_mapRows_(step, values, displays, found.row);
+  idm_log_("mapped " + mapped.rows.length + " data rows; missing columns: " +
+    (step.headers.filter(h => values[found.row].map(idm_norm_).indexOf(idm_norm_(h)) === -1).join(", ") || "none"));
   if (!mapped.rows.length) {
     return fail('noRows', "I found the header row, but no rows of data under it.");
   }
 
   if (!ignoreCutoff) {
     const problems = idm_findCutoffNumbers_(step, mapped.rows, mapped.displays);
+    idm_log_("cut-off check: " + (problems.length ? JSON.stringify(problems) : "ok"));
     if (problems.length) {
       const list = problems.map(p => "<b>" + p.column + "</b> (e.g. " + p.examples.join(", ") + ")").join("<br>");
       return fail('cutoff', "Some numbers look cut off by Excel, so the real digits are missing:<br>" + list +
@@ -272,7 +308,9 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
 
   const raw = idm_rawSheet_(ss);
   if (!raw) return fail('noRaw', 'The "Raw Data" tab is missing.');
+  idm_log_("writing to " + raw.getName() + " (maxRows=" + raw.getMaxRows() + ", maxCols=" + raw.getMaxColumns() + ")");
   idm_writeSection_(raw, step, mapped.rows);
+  idm_log_("Raw Data written");
 
   state.results[step.key] = { rows: mapped.rows.length };
   return idm_advance_(ss, state, { type: 'imported', message: "✅ " + step.zone + ": " + mapped.rows.length + " row(s) moved to Raw Data." });
@@ -354,15 +392,19 @@ function idm_writeSection_(raw, step, rows) {
   if (raw.getMaxRows() < need) raw.insertRowsAfter(raw.getMaxRows(), need - raw.getMaxRows());
 
   const maxRows = raw.getMaxRows();
+  idm_log_("clearing old rows 7-" + maxRows);
   raw.getRange(7, step.col, maxRows - 6, width).clearContent();
   raw.getRange(6, step.col, 1, width).setValues([step.headers]);
   fixRawDataNumberFormatting_(raw);
+  idm_log_("setValues " + rows.length + " x " + width);
   raw.getRange(7, step.col, rows.length, width).setValues(rows);
 
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
   raw.getRange(step.stampCell).setValue(step.stampPrefix + today);
 
+  idm_log_("stamp set; repainting colors");
   forceVibrantColors_(raw);
+  idm_log_("banding");
   applyBandingToRawData_(raw);
   SpreadsheetApp.flush();
 }
@@ -375,6 +417,7 @@ function idm_writeSection_(raw, step, rows) {
 function idm_advance_(ss, state, notice) {
   const oldTemp = idm_sheetById_(ss, state.tempId);
   state.step++;
+  idm_log_("advance to step " + state.step);
   if (state.step >= IDM_STEPS.length) {
     const results = state.results;
     idm_cleanup_(ss, state, true);
@@ -390,6 +433,7 @@ function idm_advance_(ss, state, notice) {
 /** The current step's temp tab; (re)created if missing. */
 function idm_ensureTempSheet_(ss, state) {
   let sheet = idm_sheetById_(ss, state.tempId);
+  idm_log_("temp tab id " + state.tempId + (sheet ? " found" : " missing -> creating"));
   if (sheet) {
     if (sheet.isSheetHidden()) sheet.showSheet();
     return sheet;
@@ -522,7 +566,56 @@ function idm_saveState_(state) {
 }
 
 function idm_withLock_(fn) {
+  IDM_DBG = [];
+  IDM_DBG.t0 = Date.now();
+  let result;
   const lock = LockService.getDocumentLock();
-  if (!lock.tryLock(20000)) throw new Error("The sheet is busy — try again in a moment.");
-  try { return fn(); } finally { lock.releaseLock(); }
+  if (!lock.tryLock(20000)) {
+    idm_log_("could not get the document lock in 20s");
+    result = idm_errorView_(new Error("The sheet is busy — try again in a moment."));
+  } else {
+    try {
+      idm_log_("lock ok");
+      result = fn();
+    } catch (e) {
+      idm_log_("EXCEPTION: " + (e && e.stack ? e.stack : e));
+      result = idm_errorView_(e);
+    } finally {
+      lock.releaseLock();
+    }
+  }
+  if (IDM_DEBUG && result && typeof result === "object") {
+    idm_log_("done");
+    result.debug = IDM_DBG.slice();
+  }
+  IDM_DBG = null;
+  return result;
+}
+
+/** A script error as a sidebar error (instead of a silent retry). */
+function idm_errorView_(e) {
+  const notice = { type: 'error', code: 'exception', message: "❌ Script error: " + (e && e.message ? e.message : e), fromUpload: true };
+  try {
+    return idm_view_(SpreadsheetApp.getActiveSpreadsheet(), idm_loadState_(), notice);
+  } catch (e2) {
+    idm_log_("idm_view_ also failed: " + e2.message);
+    return { active: true, stepIndex: 0, stepCount: IDM_STEPS.length,
+             step: { key: '', zone: '(unknown)', required: false, howTo: [] }, tabName: '?', lastUpdated: null, notice: notice };
+  }
+}
+
+/** Snapshot of what the server sees, for the Debug panel. */
+function idm_debugSheets_(ss, state, temp) {
+  if (!IDM_DBG) return;
+  try {
+    const active = ss.getActiveSheet();
+    idm_log_("state: " + JSON.stringify(state));
+    idm_log_("active tab (as the script sees it): " + (active ? active.getName() + " #" + active.getSheetId() : "none"));
+    idm_log_("tabs: " + ss.getSheets().map(s => s.getName() + " #" + s.getSheetId() + (s.isSheetHidden() ? " (hidden)" : "")).join(" | "));
+    if (temp) {
+      idm_log_("temp tab: " + temp.getName() + " #" + temp.getSheetId() + " lastRow=" + temp.getLastRow() +
+        " lastCol=" + temp.getLastColumn() + " maxRows=" + temp.getMaxRows() + " maxCols=" + temp.getMaxColumns() +
+        " A1=" + JSON.stringify(String(temp.getRange("A1").getValue())));
+    }
+  } catch (e) { idm_log_("debug snapshot failed: " + e.message); }
 }
