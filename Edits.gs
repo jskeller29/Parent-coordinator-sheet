@@ -302,42 +302,66 @@ function sheetsTrim_(text) {
 }
 
 /**
- * Exact-match lookup on one column, like VLOOKUP(..., FALSE) tried as a number
- * and as text: compares the trimmed display text, case-insensitive, first hit.
+ * Row index of VLOOKUP(oNum, col, …, FALSE), then VLOOKUP(oText, …) like the
+ * formula: oNum = VALUE(oText) when it is a number (matches number cells), and
+ * oText matches text cells exactly, ignoring case. -1 when neither matches.
  */
-function searchBarRowOf_(displayColumn, osis) {
-  const key = String(osis).trim().toLowerCase();
-  if (!key) return -1;
-  for (let i = 0; i < displayColumn.length; i++) {
-    if (String(displayColumn[i][0]).trim().toLowerCase() === key) return i;
+function searchBarLookup_(values, oText) {
+  const isNum = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(oText);
+  const num = isNum ? Number(oText) : null;
+  const text = oText.toLowerCase();
+  if (isNum) {
+    for (let i = 0; i < values.length; i++) if (values[i][0] === num) return i;
+  }
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i][0];
+    if (typeof v === "string" && v.toLowerCase() === text) return i;
   }
   return -1;
 }
 
-/** The Communications text for an OSIS box value (same result the formula gave). */
+/** Whole-column read of one tab (values of A, display text of `col`), or null. */
+function searchBarColumns_(ss, name, col) {
+  const sh = ss.getSheetByName(name);
+  const last = sh ? sh.getLastRow() : 0;
+  if (!last) return null;
+  return { keys: sh.getRange(1, 1, last, 1).getValues(), sheet: sh, col, cache: {} };
+}
+
+function searchBarValue_(table, i) {
+  if (!table || i === -1) return null;
+  if (!(i in table.cache)) table.cache[i] = String(table.sheet.getRange(i + 1, table.col).getDisplayValue());
+  return table.cache[i];
+}
+
+/**
+ * The Communications text for an OSIS box value — the same result the old
+ * formula gave: every note line Combined Contact Tracking holds for the
+ * student (Contact Log calls, events and the "𝑵𝒐𝒕𝒆𝒔:" block from the Notes tab).
+ */
 function buildSearchBarCommunications_(ss, osisBox, showNames) {
+  // IF(targetE="", "", …)
   if (String(osisBox) === "") return "";
+  // SPLIT(targetE, ",", FALSE, TRUE) -> TO_TEXT(TRIM(osis))
   const osisList = String(osisBox).split(",").filter(o => o !== "").map(o => sheetsTrim_(o));
 
-  const master = ss.getSheetByName("Master Table");
-  const combined = ss.getSheetByName("Combined Contact Tracking");
-  const masterRows = master && master.getLastRow() > 0 ? master.getRange(1, 1, master.getLastRow(), 2).getDisplayValues() : [];
-  const combinedOsis = combined && combined.getLastRow() > 0 ? combined.getRange(1, 1, combined.getLastRow(), 1).getDisplayValues() : [];
+  const master = searchBarColumns_(ss, "Master Table", 2);                 // 'Master Table'!A:B, col 2
+  const combined = searchBarColumns_(ss, "Combined Contact Tracking", 4);  // 'Combined Contact Tracking'!A:D, col 4
 
   const blocks = [];
-  osisList.forEach(osis => {
-    const c = searchBarRowOf_(combinedOsis, osis);
-    const notes = c === -1 ? "" : String(combined.getRange(c + 1, 4).getDisplayValue());
-    if (notes === "") return;
-    if (!showNames) { blocks.push(notes); return; }
-    const m = searchBarRowOf_(masterRows.map(r => [r[0]]), osis);
-    const name = m === -1 ? "Unknown" : masterRows[m][1];
-    blocks.push("▶ " + name + "\n" + notes);
+  osisList.forEach(oText => {
+    const notesVal = combined ? searchBarValue_(combined, searchBarLookup_(combined.keys, oText)) : null;
+    const notes = notesVal === null ? "" : notesVal;
+    if (notes === "") return;                                  // IF(notes="", "", …)
+    if (!showNames) { blocks.push(notes); return; }            // IF(targetF="", notes, …)
+    const nameVal = master ? searchBarValue_(master, searchBarLookup_(master.keys, oText)) : null;
+    blocks.push("▶ " + (nameVal === null ? "Unknown" : nameVal) + "\n" + notes);
   });
 
-  const joined = blocks.join("\n\n");
-  const cleaned = sheetsTrim_(joined.replace(/^notes:\s*[\r\n]*/i, ""));
-  if (joined === "" || joined === "0" || cleaned === "" || cleaned === "0") return "No Notes";
+  const n = blocks.join("\n\n");                                // TEXTJOIN(CHAR(10)&CHAR(10), TRUE, …)
+  const cleaned = sheetsTrim_(n.replace(/^notes:[\t\n\f\r ]*[\r\n]*/i, "")); // TRIM(REGEXREPLACE(n, "(?i)^notes:\s*[\r\n]*", ""))
+  if (n === "" || n === "0" || cleaned === "" || cleaned === "0") return "No Notes";
+  // A cell holds at most 50,000 characters (the formula showed an error past that)
   return cleaned.length > SHEETS_CELL_LIMIT ? cleaned.slice(0, SHEETS_CELL_LIMIT - 1) + "…" : cleaned;
 }
 
@@ -345,24 +369,27 @@ function buildSearchBarCommunications_(ss, osisBox, showNames) {
 function refreshSearchBarCommunications_(sheet, endRow) {
   try {
     if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") return;
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    sheet = sheet || ss.getSheetByName("Contact Log");
+    sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
     if (!sheet) return;
+    const ss = sheet.getParent();
     SpreadsheetApp.flush(); // the OSIS box is a formula: let it catch up first
     endRow = endRow || findEndRowInColumnE_(sheet);
     if (!endRow) return;
     const row = findSearchBarCommsRow_(sheet, endRow);
     if (!row || row - 2 <= endRow) return;
 
-    const osisBox = sheet.getRange(row - 1, 5).getDisplayValue();     // E, row above
-    const showNames = sheet.getRange(row - 2, 6).getDisplayValue() !== ""; // F, two rows above
+    const osisBox = sheet.getRange(row - 1, 5).getDisplayValue();          // targetE: E, row above
+    const showNames = sheet.getRange(row - 2, 6).getDisplayValue() !== "";  // targetF: F, two rows above
     const text = buildSearchBarCommunications_(ss, osisBox, showNames);
 
     // Label first (this replaces the old formula), then the notes beside it
     const label = sheet.getRange(row, 4);
     if (label.getFormula() !== "" || label.getValue() !== SEARCH_BAR_COMMS_LABEL) label.setValue(SEARCH_BAR_COMMS_LABEL);
     const box = sheet.getRange(row, 5);
-    if (box.getFormula() !== "" || box.getDisplayValue() !== text) box.setValue(text);
+    if (box.getFormula() !== "" || box.getDisplayValue() !== text) {
+      // Plain text, so a note that looks like a number, date or formula is shown as typed
+      box.setNumberFormat("@").setValue(text);
+    }
   } catch (err) {
     console.error("Search bar Communications not updated: " + err.message);
   }
