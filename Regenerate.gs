@@ -144,11 +144,11 @@ RESET & HEADER FUNCTIONS
 
 // The only tabs a clean template keeps. Reset to Display Mode and Reset + Load
 // Fake Data delete EVERY other tab (Old Master Table, Old Phone Contacts,
-// *Families, Transport call, Site Info, ...). Add a name here to keep a tab.
+// New Students, *Families, Transport call, Site Info, ...). Add a name here to keep a tab.
 var KEEP_TABS_ = [
   "Raw Data", "RAW Data", "Contact Log", "Notes", "Events", "PCAR", "Send Out",
   "Master Table", "Combined Contact Tracking", "Parents Divided", "Directory",
-  "Phone Contacts", "New Students", "Students Override Report", "Backend"
+  "Phone Contacts", "Students Override Report", "Backend"
 ];
 
 // Deletes every tab that is not in KEEP_TABS_.

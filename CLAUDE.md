@@ -76,8 +76,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   for it) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
   RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
-  Directory, Phone Contacts, New Students, Students Override Report, Backend), incl. Old Master Table / Old Phone
-  Contacts. It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
+  Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
+  Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 
