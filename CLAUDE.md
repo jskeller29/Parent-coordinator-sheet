@@ -71,8 +71,8 @@ New Students tab (see the NEW STUDENTS TAB section of Build.gs):
   the last build, and no longer in Raw Data. The snapshot is saved at the end of the build.
 
 Workflow:
-- The owner wants every finished change merged into main: after pushing the working branch, also push it to main.
-  Exception: the cleanup stays on Test-Version only until the owner says to merge it.
+- Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
+  changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
 
 Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
 - Each line is "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧} note [follow-up]" (event: "... - {𝐄𝐯𝐞𝐧𝐭 - [𝐏𝐞𝐫𝐬𝐨𝐧]} |Event|"), no bullet.
