@@ -23,6 +23,8 @@ Files (shared = every school's sheet):
 - Menus.gs: onOpen menus, setup, Settings, Student Overrides + report, Rollover, Migration, Version Check, links.
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
+- Sheet Lock.gs: "baby-proofing" (see SHEET LOCK below): warning protections + undo of locked cells, the
+  "clear 2+ rows?" check, onSelectionChange, toggleSheetLock (App Menu "🔓 Unlock Sheet" / "🔒 Lock Sheet").
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
   Owner asked to keep it as is (not moved, not cleaned); change it only when the owner asks (e.g. KEEP_TABS_).
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
@@ -112,7 +114,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Build.gs beginning, Constants, Event, LinkResolver, MigrationAssistant, New Copy & On Open, NewStudents, Phone,
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
-- Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
+- Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync, Sheet Lock (new); owner sheet also z_MINE.
   UI refresh: also add Styles.html (new) and re-paste SettingsDialog, ProgressSidebar, NewStudentDialog,
   ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (re-paste: KEEP_TABS_ tab clean-up, Color Tabs removed), the Z# files
   and the manifest are unchanged. The Contact Log tool is now named
@@ -156,6 +158,23 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 - Create Event: type buttons (PTC, Workshop, Family event, Meeting) only fill the Type box. New/Edit Student: one grouped
   form, entry type as two buttons over a hidden #entryType input. Manage Overrides: cards. Rollover: step markers.
 
+SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" turns it off):
+- Locked: row 1 of Contact Log / Notes / Send Out; Contact Log END bar row (except O, the FILTER? checkbox) and
+  everything below it; row 2 (headers) of every Events table; PCAR except H2:I2; the whole built tabs (Master Table,
+  Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report, New Students).
+  Not locked: Raw Data, Backend, owner-only tabs, and every place fake data loads (Contact Log rows above END,
+  Notes / Send Out rows 2+, Events row 1 and rows 3+).
+- Layer 1: Google warning-only protections (description starts "🔒 Sheet Lock"; scripts are not blocked).
+  applySheetLocks_ adds/refreshes them (only our tagged ones; unchanged ones kept) at the end of every build, at
+  Initial Setup, after buildEventTable / an event delete (Events only) and buildOverrideReport.
+- Layer 2: sheetLockGuard_ (first thing in handleEdit_ after Raw Data) puts locked cells back: headers / END bar +
+  below / PCAR from snapshots in doc properties (SHEET_LOCK_SNAP_<zone>_<n>, chunked; END bar snapshot tied to
+  SHEET_LOCK_CL_END and retaken when END moves), Events headers from EVENT_TABLE_HEADERS, built tabs via oldValue
+  (one cell only; otherwise a toast says Ctrl+Z / Build Sheets Only).
+- Clearing 2+ rows at once (Contact Log above END, Notes, Send Out, Events rows 3+) asks Yes/No first. No puts the rows
+  back from the onSelectionChange copy (document cache SHEET_LOCK_SEL_<sheetId>), or says "press Ctrl+Z" without one.
+  Rows that were already empty, pastes and checkbox-only unticks do not ask.
+
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
   changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
@@ -191,8 +210,9 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   owner's sheet rebuilds once per edit instead of once per OSIS; owner Phone Contacts groups guardians once; Notes /
   Events typist reads the 3 identity cells in one call; sync reads header positions once.
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
-Must keep: 15 menu handler names (+5 owner Debug items), 39 google.script.run endpoints, trigger handlers
-(installedOnEdit, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts), all sheet names, Backend cells,
+Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
+handlers (installedOnEdit, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts, simple onSelectionChange),
+all sheet names, Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
 to owner sync?; owner hides Contact Log col K (11) vs shared H (8) when no site (K looks stale); Montserrat on New

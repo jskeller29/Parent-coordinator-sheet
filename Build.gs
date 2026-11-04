@@ -211,6 +211,10 @@ function buildAllDerivedSheets() {
     const sh = ss.getSheetByName(name);
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
   });
+
+  // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
+  // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
+  try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */

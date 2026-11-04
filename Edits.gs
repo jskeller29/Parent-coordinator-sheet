@@ -34,6 +34,12 @@ function handleEdit_(e) {
     return; 
   }
 
+  // --- SHEET LOCK (Sheet Lock.gs) ---
+  // Puts back locked cells (headers, the END bar and below, PCAR, built tabs)
+  // and asks before 2+ rows are cleared at once. Runs before every handler.
+  const lock = sheetLockGuard_(e, sheet, sheetName);
+  if (lock.stop) return;
+
   // --- TRIGGER THE EVENTS GHOST TYPIST & BACKEND ---
   if (sheetName === "Events") {
     watchEventsSheet_(e);
@@ -57,8 +63,8 @@ function handleEdit_(e) {
 
   if (row < 2) return;
 
-  // 1. Shifted End Row Finder (Now Col E / 5)
-  let endRow = findEndRowInColumnE_(sheet);
+  // 1. Shifted End Row Finder (Now Col E / 5) — the sheet lock already looked it up
+  let endRow = lock.endRow !== undefined ? lock.endRow : findEndRowInColumnE_(sheet);
 
   // --- NEW FILTER LOGIC ---
   // The Master Toggle lives on the end bar row in Col O
@@ -194,6 +200,8 @@ function handleEdit_(e) {
   // --- FORCE END BAR FORMATTING & SWEEP ---
   // ==================================================
   let finalEndRow = findEndRowInColumnE_(sheet);
+  // A row was added above the END bar: retake the sheet lock's END bar snapshot
+  if (finalEndRow && endRow && finalEndRow !== endRow) refreshContactLogEndSnapshot_(sheet, finalEndRow);
   if (finalEndRow) {
     sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -1338,7 +1346,7 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   sheet.getRange(1, 6).insertCheckboxes().setBackground("#ea9999");
   
   // Set Row 2 Headers
-  const headers = ["OSIS", "Guardian(s)", "Parent Attendee", "Student Name", "# of Indv", "Notes"];
+  const headers = EVENT_TABLE_HEADERS; // Sheet Lock.gs keeps row 2 of every table set to these
   sheet.getRange("A2:F2").setValues([headers]).setFontWeight("bold").setBackground("#efefef");
 
   // Format Column Widths
@@ -1374,6 +1382,9 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   if (backendReadBlock_(ss, "EVENT_LOG").length === 0) {
     backendWriteBlock_(ss, "EVENT_LOG", [["Date", "Event Name", "Category", "OSIS", "Student Name", "Guardian(s)", "Parent Attendee", "# of Indv", "Notes"]]);
   }
+
+  // The tables moved right: re-lock every table's header row (Sheet Lock.gs)
+  try { applySheetLocks_(ss, ["Events"]); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
 }
 
 // ==============================================================
@@ -1561,6 +1572,7 @@ function watchEventsSheet_(e) {
       if (response === ui.Button.YES) {
         sheet.deleteColumns(tableStartCol, 7);
         SpreadsheetApp.flush();
+        try { applySheetLocks_(e.source, ["Events"]); } catch (err) { console.warn("Sheet lock skipped: " + err.message); }
         
         const freshData = buildBackendEventLogData_(e.source);
         backendWriteBlock_(e.source, "EVENT_LOG", freshData);

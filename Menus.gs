@@ -246,6 +246,8 @@ function buildMenus_() {
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");
     menu.addItem("🐞 Report a Bug", "reportABug");
     menu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
+    // Sheet Lock.gs: turn the baby-proofing off for layout changes, then back on
+    menu.addItem(isSheetLockOn_() ? "🔓 Unlock Sheet (change headers / layout)" : "🔒 Lock Sheet", "toggleSheetLock");
     
     // --- NEW: END OF YEAR ROLLOVER ---
     menu.addSeparator();
@@ -462,6 +464,9 @@ function runInitialSetupWrapper() {
 
   // ...then reveal the optional tabs/columns the inherited settings ask for.
   try { updateVisualSettings_(getSettings()); } catch (e) { console.error(e); }
+
+  // Baby-proof the tabs (headers, Contact Log END bar, PCAR, built tabs) — Sheet Lock.gs
+  try { applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
 
   // Instant UI swap without refresh! Suppress onOpen's own auto-migrate open
   // for this synchronous call so the wizard isn't opened twice — the
@@ -1324,6 +1329,9 @@ function buildOverrideReport() {
   reportSheet.setFrozenRows(1);
   reportSheet.showSheet(); 
   reportSheet.activate(); 
+
+  // Lock the report like the other built tabs (Sheet Lock.gs)
+  try { applySheetLocks_(ss, [reportSheetName]); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
 
   ss.toast("Delta Override Report generated successfully!", "Report Ready", 5);
 }
