@@ -39,7 +39,8 @@ Files (shared = every school's sheet):
   teacher); sites in number order, no-site classes last. Read by parseClassCell_ (Build.gs, used by
   buildClassReferenceMap_ and Z#): one class per line, a line may still hold the old "Y41: Tessa Y25: Sam" (read
   exactly as before; bare-code lines are the only addition). ":" stripped from names, classes with no teacher and
-  no site dropped, codes must be letters/digits; date in doc property
+  no site dropped, codes must be letters/digits. Raw Data rows 7+ are forced to 21px (lockRawDataRowHeights_, Edits.gs:
+  after every Raw Data edit/paste and Input Data Mode write) so multi-line BI cells do not make rows tall; date in doc property
   INPUT_DATA_MODE_SITECLASS_UPDATED. Progress bar at the top (idm_goToStep) jumps to any step; the one temp tab is
   renamed + reset for it; finishing a step goes to the next index (the last one finishes). Exit always asks: Save & exit
   (idm_saveAndExit: saves Site / Class or moves an unmoved paste first; a problem keeps the mode on) / Exit without

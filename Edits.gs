@@ -27,6 +27,7 @@ function handleEdit_(e) {
     }
     fixRawDataNumberFormatting_(sheet);
     updateRawDataTimestamp_(range);
+    lockRawDataRowHeights_(sheet);
     return; 
   }
 
@@ -938,6 +939,16 @@ function cleanRawDataPasteZone_(sheet, range) {
   applyBandingToRawData_(sheet);
   
   SpreadsheetApp.getActiveSpreadsheet().toast(`Global headers locked. Data mapped to Row ${targetRow}.`, `${targetZone} Cleaned ✨`, 6);
+}
+
+/**
+ * Keeps Raw Data rows 7+ at the normal height. A Site / Class cell (BI) holds one
+ * class per line, and Sheets would otherwise make the whole row (ATS, Parent
+ * Square, NYCSA too) as tall as that cell. The extra lines stay in the cell.
+ */
+function lockRawDataRowHeights_(sheet) {
+  const rows = sheet.getMaxRows() - 6;
+  if (rows > 0) sheet.setRowHeightsForced(7, rows, 21);
 }
 
 function fixRawDataNumberFormatting_(sheet) {

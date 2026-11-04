@@ -520,6 +520,7 @@ function idm_writeSection_(raw, step, rows) {
   forceVibrantColors_(raw);
   idm_log_("banding");
   applyBandingToRawData_(raw);
+  lockRawDataRowHeights_(raw);
   SpreadsheetApp.flush();
 }
 
@@ -645,6 +646,7 @@ function idm_saveSiteClass_(ss, state) {
     if (out.length) raw.getRange(7, 60, out.length, 2).setValues(out);
     forceVibrantColors_(raw);
     applyBandingToRawData_(raw);
+    lockRawDataRowHeights_(raw); // one class per line in BI must not make rows tall
     SpreadsheetApp.flush();
 
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
