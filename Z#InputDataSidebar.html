@@ -21,6 +21,8 @@
     .spinner { width: 14px; height: 14px; border: 2px solid #BAE6FD; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.9s linear infinite; flex: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .done-line { font-weight: 600; margin: 2px 0; }
+    .done-line.skip { color: #64748B; font-weight: 400; }
     .ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
     button { font-family: inherit; font-size: 13px; border-radius: 6px; padding: 7px 12px; cursor: pointer; border: 1px solid #CBD5E1; background: #fff; color: #0F172A; }
     button.primary { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
@@ -63,6 +65,8 @@
         <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">📂 Upload file</button>
       </div>
     </div>
+
+    <div id="doneList" class="ok hidden"></div>
 
     <div class="card yellow">
       <b>Option 2 — Copy &amp; paste</b>
@@ -181,8 +185,14 @@
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip & finish';
 
     var n = v.notice;
-    if (n && n.type === 'imported') { $('notice').textContent = n.message; show('notice', true); }
-    else if (!n || n.type !== 'error') show('notice', false);
+    show('notice', false); // success now shows in the list under Option 1
+    var done = v.done || [];
+    $('doneList').innerHTML = done.map(function (d) {
+      return d.skipped
+        ? '<div class="done-line skip">⏭️ "' + d.name + '" skipped (old data kept)</div>'
+        : '<div class="done-line">✅ "' + d.name + '" Successful (' + d.rows + ' rows)</div>';
+    }).join('');
+    show('doneList', done.length > 0);
 
     if (n && n.type === 'error') {
       paused = true;

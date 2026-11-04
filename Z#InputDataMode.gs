@@ -551,6 +551,11 @@ function idm_view_(ss, state, notice) {
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo },
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
+    // Earlier steps, for the "✅ "Student Data" Successful" lines under Option 1
+    done: IDM_STEPS.slice(0, state.step).map(st => {
+      const r = (state.results || {})[st.key] || {};
+      return { name: st.tab, rows: r.rows || 0, skipped: !r.rows };
+    }),
     notice: notice || null
   };
 }
