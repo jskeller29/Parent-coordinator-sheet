@@ -5,10 +5,11 @@ This is a Google Apps Script project (a Google Sheets add-on for student/roster 
 - There is no build step and no modules — all .gs files share one global scope
 
 Branches:
-- main: default branch (last merged state; does not have the 5 commits that are on claude/inspiring-knuth-s4a9ve).
-- claude/inspiring-knuth-s4a9ve: the live code BEFORE the cleanup (old file layout), kept as the reference.
-- Test-Version: the cleanup (plan stages 1-3 below) + the owner's 🐞 Debug menu. It stays here until the owner
-  has tested it on a copy of the sheet and says to merge it into main.
+- main: the live code BEFORE the cleanup (old file layout, 22 .gs files), incl. the Z# Contact Log rename.
+- Test-Version: main + the cleanup (plan stages 1-3 below) + the owner's 🐞 Debug menu. It stays here until the
+  owner has tested it on a copy of the sheet and says to merge it into main (it is ahead of main, so the merge is
+  a fast-forward).
+- Old claude/* session branches are deleted once everything in them is in main.
 
 Files (shared = every school's sheet):
 - Core.gs: Contact Log column constants, findEndRowInColumnE_, Backend tab helpers, owner hook point
