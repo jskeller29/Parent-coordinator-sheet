@@ -85,6 +85,10 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
   Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
+- Send Out tab = a Sheets Table "Table1": A Date, B Send Out Title, C Send Out Type, D On Behalf Of, E Where Did You
+  Send (dropdowns C:E), F Population, G # Reached, H Attachments (file chips); I "Behalf of List", J "Sending Location
+  List" (dropdown sources, kept). Resets clear A:H rows 2+ (resetSendOut_, clearContent only); fake data writes 9 rows
+  A:G column by column (loadFakeSendOut_; a refused column is skipped with console.warn).
 - Contact Log Follow-up (N): options No Followup Needed / Followup Needed / Followup Needed - ASAP / Followed Up /
   Resolved / Skipped / Newer Interaction. The Contact Log is a Sheets Table and N a "Dropdown" typed column: Apps
   Script may not change its options ("not allowed on cells in typed columns"), so code never touches N's dropdown
@@ -97,7 +101,7 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   26 Contact Log rows (30-row log; each row carries its Type / Follow-up / Follow-up note), 3 events (Fall PTC,
   Graduation Workshop, Spring Festival; Backend Event Log rows now in the real column order), 5 Notes rows, 3
   New/Edit Student overrides (New Student Tina Belcher, Peter Parker + guardian, Diana Prince hidden from report),
-  then the Students Override Report. PCAR and Send Out get no fake data (built from other tabs / not used by code).
+  then the Students Override Report. PCAR gets no fake data (built from other tabs); Send Out: see below.
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 

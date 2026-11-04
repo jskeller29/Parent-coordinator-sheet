@@ -37,6 +37,7 @@ function resetToDisplayModeSteps_(ss) {
   clearTypeDropdownColors_(ss); // Wipe the dropdown colors!
   resetMasterTable_(ss);
   resetNotes_(ss);
+  resetSendOut_(ss);
   fillContactLogHstackFormulas_(ss);
 
   // Stamp this template's build date so the Version Checker knows how old
@@ -136,6 +137,7 @@ function loadFakeDataSteps_(ss) {
   clearTypeDropdownColors_(ss); // Wipe the old colors before loading new data!
   resetMasterTable_(ss);
   resetNotes_(ss);
+  resetSendOut_(ss);
 
   // Load All Data (Row 7 Start)
   loadFakeATS_(ss);
@@ -145,6 +147,7 @@ function loadFakeDataSteps_(ss) {
   loadFakeContactLog_(ss);
   loadFakeEvents_(ss); // NEW: Builds event tables and populates backend
   loadFakeNotes_(ss);
+  loadFakeSendOut_(ss);
   loadFakeOverrides_(ss); // New / Edit Student (Backend tab), read by the build below
 
   fillContactLogHstackFormulas_(ss);
@@ -663,6 +666,49 @@ function resetNotes_(ss) {
   const sheet = ss.getSheetByName("Notes");
   if (sheet && sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).clearContent();
+  }
+}
+
+/* =========================
+SEND OUT TAB (a Sheets Table: A Date, B Send Out Title, C Send Out Type, D On Behalf Of,
+E Where Did You Send, F Population, G # Reached, H Attachments; I:J = the dropdown lists)
+========================= */
+
+// Clears the Send Out log (A:H, row 2 down). The lists in I:J ("Behalf of List",
+// "Sending Location List") are settings, so they are kept. Only contents are cleared:
+// the Table's column types, dropdowns and formats stay.
+function resetSendOut_(ss) {
+  const sheet = ss.getSheetByName("Send Out");
+  if (sheet && sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).clearContent();
+  }
+}
+
+// Fake send-outs (A:G; H Attachments is a file-chip column, left empty). Written one
+// column at a time so a value a Table dropdown column refuses only skips that column.
+function loadFakeSendOut_(ss) {
+  const sheet = ss.getSheetByName("Send Out");
+  if (!sheet) return;
+  const day = (n) => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - n); return d; };
+  // [days ago, Title, Type, On Behalf Of, Where Did You Send, Population, # Reached]
+  const rows = [
+    [40, "Welcome Back Letter",            "Letter",       "School",             "Backpack",     "All families",        312],
+    [33, "Back to School Night Invite",    "Flyer",        "School",             "ParentSquare", "All families",        298],
+    [26, "Picture Day Reminder",           "Text Message", "School",             "ParentSquare", "All families",        305],
+    [21, "Fall PTC Sign-Up",               "Email",        "Parent Coordinator", "Email",        "All families",        241],
+    [14, "Graduation Workshop Invite",     "Flyer",        "Parent Coordinator", "ParentSquare", "Grade 6 families",     58],
+    [10, "Site 51 Schedule Change",        "Letter",       "Principal",          "Backpack",     "Site 51 families",     44],
+    [7,  "Family Literacy Workshop",       "Flyer",        "PTA",                "ParentSquare", "Grades 3-5 families", 122],
+    [3,  "Spring Festival Volunteers",     "Email",        "PTA",                "Email",        "All families",        236],
+    [1,  "Attendance Reminder",            "Text Message", "Principal",          "ParentSquare", "Site 281 families",    61]
+  ];
+  for (let c = 0; c < 7; c++) {
+    const values = rows.map(r => [c === 0 ? day(r[0]) : r[c]]);
+    try {
+      sheet.getRange(2, c + 1, values.length, 1).setValues(values);
+    } catch (e) {
+      console.warn("Send Out column " + (c + 1) + " fake data skipped: " + e.message);
+    }
   }
 }
 
