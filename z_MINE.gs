@@ -62,7 +62,6 @@ function ownerAddMenus_(ui) {
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
-    .addItem("🎨 Color Tabs", "ownerMenuColorTabs")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug")
     .addToUi();
@@ -74,10 +73,6 @@ function ownerMenuResetAndLoadFakeData() {
 
 function ownerMenuResetToDisplayMode() {
   if (ownerConfirmWipe_("Reset to Display Mode")) runAction_("Reset to Display Mode", () => resetToDisplayMode());
-}
-
-function ownerMenuColorTabs() {
-  runAction_("Color Tabs", () => colorTabs());
 }
 
 /**
@@ -94,7 +89,7 @@ function ownerMenuCopyAndResetToDisplayMode() {
   const resp = ui.alert(
     "📄 Copy Sheet, Then Reset the Copy",
     "This makes a copy of this sheet in the same Drive folder and wipes the COPY to Display Mode " +
-    "(empty Raw Data, Contact Log, Events and built tabs; Old Master Table / Old Phone Contacts deleted).\n\n" +
+    "(empty Raw Data, Contact Log, Events and built tabs; every tab not on the keep list is deleted).\n\n" +
     "THIS sheet is not changed. Continue?",
     ui.ButtonSet.YES_NO);
   if (resp !== ui.Button.YES) return;
@@ -161,8 +156,9 @@ function ownerConfirmWipe_(what) {
   const ui = SpreadsheetApp.getUi();
   const res = ui.prompt(
     `⚠️ ${what}`,
-    "This wipes the data on THIS sheet (Raw Data, Contact Log, Events and every built tab) and deletes the " +
-    "Old Master Table and Old Phone Contacts tabs. Only use it on a test copy.\n\nType RESET to continue.",
+    "This wipes the data on THIS sheet (Raw Data, Contact Log, Events and every built tab) and deletes every " +
+    "tab not on the keep list (KEEP_TABS_ in Regenerate.gs), incl. Old Master Table and Old Phone Contacts. " +
+    "Only use it on a test copy.\n\nType RESET to continue.",
     ui.ButtonSet.OK_CANCEL);
   return res.getSelectedButton() === ui.Button.OK && res.getResponseText().trim().toUpperCase() === "RESET";
 }

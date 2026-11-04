@@ -13,7 +13,7 @@ function resetToDisplayMode() {
   );
   if (resp !== ui.Button.YES) return;
 
-  deleteLegacySheets_(ss); // NEW: Clean up old tabs
+  deleteLegacySheets_(ss); // Delete every tab not in KEEP_TABS_
 
   resetRawData_(ss);
   writeRawDataHeaders_(ss);
@@ -84,7 +84,7 @@ function resetAndLoadFakeData() {
   );
   if (resp !== ui.Button.YES) return;
 
-  deleteLegacySheets_(ss); // NEW: Clean up old tabs
+  deleteLegacySheets_(ss); // Delete every tab not in KEEP_TABS_
 
   const sheet = ss.getSheetByName("Raw Data");
 
@@ -142,15 +142,31 @@ function resetAndLoadFakeData() {
 RESET & HEADER FUNCTIONS
 ========================= */
 
-// Deletes legacy / leftover tabs that should never ship in a clean template.
+// The only tabs a clean template keeps. Reset to Display Mode and Reset + Load
+// Fake Data delete EVERY other tab (Old Master Table, Old Phone Contacts,
+// *Families, Transport call, Site Info, ...). Add a name here to keep a tab.
+var KEEP_TABS_ = [
+  "Raw Data", "RAW Data", "Contact Log", "Notes", "Events", "PCAR", "Send Out",
+  "Master Table", "Combined Contact Tracking", "Parents Divided", "Directory",
+  "Phone Contacts", "New Students", "Students Override Report", "Backend"
+];
+
+// Deletes every tab that is not in KEEP_TABS_.
 function deleteLegacySheets_(ss) {
-  const legacy = [
-    "Old Phone Contacts", "Old Master Table",
-    "Regular year site info", "Families", "FollowUps", "Site Info"
-  ];
-  legacy.forEach(function(name) {
-    const sheet = ss.getSheetByName(name);
-    if (sheet) ss.deleteSheet(sheet);
+  // First move any old Version / New/Edit Student / Backend_Event_Log / Type List
+  // tabs into the Backend tab, so their contents are kept before the old tabs go.
+  getBackendSheet_(ss);
+
+  // Never leave the user standing on a tab that is about to be deleted.
+  try {
+    if (KEEP_TABS_.indexOf(ss.getActiveSheet().getName()) === -1) {
+      const contactLog = ss.getSheetByName("Contact Log");
+      if (contactLog) ss.setActiveSheet(contactLog);
+    }
+  } catch (e) { /* no active tab (e.g. a copy opened by ID) */ }
+
+  ss.getSheets().forEach(function(sheet) {
+    if (KEEP_TABS_.indexOf(sheet.getName()) === -1) ss.deleteSheet(sheet);
   });
 }
 
@@ -823,45 +839,4 @@ function resetContactLogFormatting() {
   if (typeof applyTypeDropdownColors === "function") {
     applyTypeDropdownColors();
   }
-}
-
-/* =========================
-TAB COLORS
-========================= */
-
-// One color per tab, grouped by what the tab is for:
-//   yellow = data you paste in (like the yellow paste zones on Raw Data)
-//   green / orange = tabs you type in every day
-//   blues / teals  = tabs the build makes for you (read-only)
-//   purples        = reports / new-student lists
-//   greys          = behind-the-scenes and old history tabs
-// Tabs missing from this sheet are skipped; tabs not listed keep their color.
-var TAB_COLORS_ = {
-  "Raw Data":                  "#F1C232", // yellow  - paste ATS / ParentSquare / NYCSA here
-  "RAW Data":                  "#F1C232",
-  "Contact Log":               "#6AA84F", // green   - daily typing
-  "Notes":                     "#93C47D", // light green - typed notes
-  "Events":                    "#E69138", // orange  - event attendance
-  "PCAR":                      "#CC4125", // red     - report to hand in
-  "Combined Contact Tracking": "#3C78D8", // blue    - built
-  "Directory":                 "#6D9EEB", // light blue - built
-  "Master Table":              "#1C4587", // dark blue  - built
-  "Phone Contacts":            "#45818E", // teal    - built
-  "Parents Divided":           "#76A5AF", // light teal - built
-  "New Students":              "#8E7CC3", // purple  - new / re-entered students
-  "Students Override Report":  "#B4A7D6", // light purple - report
-  "Backend":                   "#999999", // grey    - hidden settings
-  "Old Master Table":          "#CCCCCC", // light grey - old history
-  "Old Phone Contacts":        "#CCCCCC"
-};
-
-/** Colors every tab listed in TAB_COLORS_ (Debug menu: 🎨 Color Tabs). */
-function colorTabs() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let count = 0;
-  Object.keys(TAB_COLORS_).forEach(function(name) {
-    const sheet = ss.getSheetByName(name);
-    if (sheet) { sheet.setTabColor(TAB_COLORS_[name]); count++; }
-  });
-  ss.toast(count + " tabs colored.", "🎨 Color Tabs", 5);
 }

@@ -24,7 +24,7 @@ Files (shared = every school's sheet):
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
-  Owner asked to keep it exactly as is (not moved, not cleaned).
+  Owner asked to keep it as is (not moved, not cleaned); change it only when the owner asks (e.g. KEEP_TABS_).
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -71,11 +71,13 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm; they also delete Old Master Table / Old Phone Contacts), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
-  in the same folder and runs resetToDisplayMode's steps on the copy only; keep its step list in sync with
-  resetToDisplayMode; saveSettingsToVersionSheet_ takes an optional ss for it), "Color Tabs" (colorTabs in Regenerate.gs,
-  colors from TAB_COLORS_: yellow = paste-in data, green/orange = typed tabs, blues/teals = built, purples = reports,
-  greys = backend/old) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS).
+  confirm), "Copy Sheet, Then Reset the Copy" (makes a Drive copy in the same folder and runs resetToDisplayMode's steps
+  on the copy only; keep its step list in sync with resetToDisplayMode; saveSettingsToVersionSheet_ takes an optional ss
+  for it) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
+- All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
+  RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
+  Directory, Phone Contacts, New Students, Students Override Report, Backend), incl. Old Master Table / Old Phone
+  Contacts. It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 
@@ -86,7 +88,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync; owner sheet also z_MINE.
   UI refresh: also add Styles.html (new) and re-paste SettingsDialog, ProgressSidebar, NewStudentDialog,
-  ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (now also has colorTabs), the Z# files
+  ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (re-paste: KEEP_TABS_ tab clean-up, Color Tabs removed), the Z# files
   and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
@@ -162,7 +164,7 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   owner's sheet rebuilds once per edit instead of once per OSIS; owner Phone Contacts groups guardians once; Notes /
   Events typist reads the 3 identity cells in one call; sync reads header positions once.
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
-Must keep: 15 menu handler names (+3 owner Debug items), 39 google.script.run endpoints, trigger handlers
+Must keep: 15 menu handler names (+4 owner Debug items), 39 google.script.run endpoints, trigger handlers
 (installedOnEdit, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts), all sheet names, Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
