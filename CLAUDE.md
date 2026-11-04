@@ -34,9 +34,12 @@ Files (shared = every school's sheet):
   then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
   updateRawDataTimestamp_). Skip keeps old data. Step 4 "Site / Class" (manual, Save button): Class | Teacher Name |
   Site (Optional), one row per ATS class code (Raw Data R) + classes already in BH:BI, prefilled from BH:BI; Site
-  dropdown = hidden col Z formula of every typed site (other values allowed). Save rewrites BH:BI rows 7+ as one class
-  per row: BH = site, BI = "CODE: Teacher" (what buildClassReferenceMap_ reads; ":" stripped from names, rows with
-  no teacher and no site dropped, codes must be letters/digits); date in doc property
+  dropdown = hidden col Z formula of every typed site (other values allowed). Save rewrites BH:BI rows 7+ as ONE ROW
+  PER SITE (owner's format): BH = site, BI = that site's classes, one per line, "Y25: Carl" or bare "Y24" (no
+  teacher); sites in number order, no-site classes last. Read by parseClassCell_ (Build.gs, used by
+  buildClassReferenceMap_ and Z#): one class per line, a line may still hold the old "Y41: Tessa Y25: Sam" (read
+  exactly as before; bare-code lines are the only addition). ":" stripped from names, classes with no teacher and
+  no site dropped, codes must be letters/digits; date in doc property
   INPUT_DATA_MODE_SITECLASS_UPDATED. Progress bar at the top (idm_goToStep) jumps to any step; the one temp tab is
   renamed + reset for it; finishing a step goes to the next index (the last one finishes). Exit always asks: Save & exit
   (idm_saveAndExit: saves Site / Class or moves an unmoved paste first; a problem keeps the mode on) / Exit without

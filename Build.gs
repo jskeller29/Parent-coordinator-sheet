@@ -494,7 +494,6 @@ function buildGuardianObject_(studentId, fullName, relationship, spokenLanguage,
 
 function buildClassReferenceMap_(rawData) {
   const map = new Map();
-  const regex = /([A-Za-z0-9]+):([^:]*?)(?=\s+[A-Za-z0-9]+:|$)/g;
 
   for (let i = 0; i < rawData.length; i++) {
     const siteVal = toText_(rawData[i][59]);
@@ -502,19 +501,34 @@ function buildClassReferenceMap_(rawData) {
 
     if (!classesVal) continue; 
 
-    const matches = [...classesVal.matchAll(regex)];
-    
-    for (const m of matches) {
-      const classCode = m[1].trim().toUpperCase();
-      const teacher = m[2].trim();
-      
-      map.set(classCode, { 
+    for (const c of parseClassCell_(classesVal)) {
+      map.set(c.code, { 
         site: siteVal, 
-        teacher: teacher 
+        teacher: c.teacher 
       });
     }
   }
   return map;
+}
+
+/**
+ * Raw Data BI ("Class") cell -> [{ code, teacher }]. One class per line:
+ * "Y25: Carl" or just "Y24" (no teacher). A line can also hold several classes
+ * the old way, "Y41: Tessa Y25: Sam" (read exactly as before).
+ * Also used by Input Data Mode (Z#InputDataMode.gs) to read / write BH:BI.
+ */
+function parseClassCell_(text) {
+  const out = [];
+  const regex = /([A-Za-z0-9]+):([^:]*?)(?=\s+[A-Za-z0-9]+:|$)/g;
+  String(text == null ? "" : text).split(/\r?\n/).forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    if (/^[A-Za-z0-9]+$/.test(line)) { out.push({ code: line.toUpperCase(), teacher: "" }); return; }
+    for (const m of line.matchAll(regex)) {
+      out.push({ code: m[1].trim().toUpperCase(), teacher: m[2].trim() });
+    }
+  });
+  return out;
 }
 
 /* =========================

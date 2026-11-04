@@ -13,8 +13,9 @@
 //   5. At the end (or on Exit) temp tabs are deleted and the hidden tabs come back.
 // Step 4 "Site / Class" is filled in by hand instead: one row per class code
 // (from the ATS data), with Teacher Name and Site (optional, dropdown that grows
-// as new sites are typed). Save writes Raw Data BH:BI (MAKE OWN DATA) in the
-// format the build reads: BH = site, BI = "Y41: Teacher".
+// as new sites are typed). Save writes Raw Data BH:BI (MAKE OWN DATA) as one row
+// per site: BH = site, BI = that site's classes, one per line ("Y25: Carl" or
+// just "Y24" with no teacher); read by parseClassCell_ (Build.gs).
 //
 // SELF-CONTAINED ("Z#" = trying out a new feature): the only hooks into the rest
 // of the app are two guarded lines in onOpen (Menus.gs):
@@ -91,8 +92,6 @@ var IDM_STEPS = [
   }
 ];
 var IDM_SITECLASS_UPDATED_KEY = 'INPUT_DATA_MODE_SITECLASS_UPDATED';
-// Same pattern as buildClassReferenceMap_ (Build.gs): "Y41: Tessa Y25: Sam"
-var IDM_CLASS_REGEX = /([A-Za-z0-9]+):([^:]*?)(?=\s+[A-Za-z0-9]+:|$)/g;
 
 // ---------------------------------------------------------------------
 // MENU + LAUNCHER
@@ -536,9 +535,7 @@ function idm_readSiteClass_(raw) {
     const site = String(r[0]).trim();
     const classes = String(r[1]).trim();
     if (!classes) return;
-    [...classes.matchAll(IDM_CLASS_REGEX)].forEach(m => {
-      map.set(m[1].trim().toUpperCase(), { site: site, teacher: m[2].trim() });
-    });
+    parseClassCell_(classes).forEach(c => map.set(c.code, { site: site, teacher: c.teacher }));
   });
   return map;
 }
@@ -614,21 +611,27 @@ function idm_saveSiteClass_(ss, state) {
 
     const last = temp.getLastRow();
     const values = last >= 2 ? temp.getRange(2, 1, last - 1, 3).getDisplayValues() : [];
-    const out = [];
+    const bySite = new Map(); // site -> ["Y25: Carl", "Y24", ...] in the tab's order
+    let classCount = 0;
     const bad = [];
     const seen = new Set();
     values.forEach(r => {
       const code = String(r[0]).trim().toUpperCase();
-      const teacher = String(r[1]).replace(/:/g, " ").replace(/\s+/g, " ").trim(); // ":" would break "Y41: Teacher"
+      const teacher = String(r[1]).replace(/:/g, " ").replace(/\s+/g, " ").trim(); // ":" / line breaks would break the cell
       const site = String(r[2]).trim();
       if (!code) return;
       if (!/^[A-Z0-9]+$/.test(code)) { bad.push(code); return; }
       if (seen.has(code)) return;
       seen.add(code);
       if (!teacher && !site) return; // nothing to save for this class
-      out.push([site, code + ": " + teacher]);
+      if (!bySite.has(site)) bySite.set(site, []);
+      bySite.get(site).push(teacher ? code + ": " + teacher : code);
+      classCount++;
     });
-    idm_log_("site/class save: " + out.length + " rows, " + bad.length + " bad codes");
+    // One row per site (sites in number order, classes with no site last)
+    const sites = [...bySite.keys()].sort((a, b) => (a === "") - (b === "") || a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    const out = sites.map(site => [site, bySite.get(site).join("\n")]);
+    idm_log_("site/class save: " + classCount + " classes in " + out.length + " site rows, " + bad.length + " bad codes");
     if (bad.length) {
       return idm_view_(ss, state, { type: 'error', code: 'badClass', fromUpload: true,
         message: "Class codes can only have letters and numbers (no spaces or dashes): <b>" + bad.slice(0, 5).join(", ") + "</b>. Fix them on the tab, then save again." });
@@ -646,8 +649,8 @@ function idm_saveSiteClass_(ss, state) {
 
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
     PropertiesService.getDocumentProperties().setProperty(IDM_SITECLASS_UPDATED_KEY, today);
-    state.results[step.key] = { rows: out.length, saved: true };
-    return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + out.length + " class(es) saved to Raw Data." });
+    state.results[step.key] = { rows: classCount, saved: true };
+    return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + classCount + " class(es) saved to Raw Data." });
   }
 }
 
