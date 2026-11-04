@@ -1093,11 +1093,17 @@ function eventNoteLine_(row) {
   return { dateObj: dateObj, text: line.trim() };
 }
 
-/** Manual notes ("𝑵𝒐𝒕𝒆𝒔: ...") first, then the dated lines oldest to newest. */
+/**
+ * Manual notes ("𝑵𝒐𝒕𝒆𝒔: ...") first, then the dated lines NEWEST at the top,
+ * oldest at the bottom (the exact reverse of oldest-first: same-day lines too,
+ * the one logged last comes first). Used by the full build and the quick
+ * update, so Combined Contact Tracking, Phone Contacts and Google Contacts
+ * notes all follow it.
+ */
 function joinNoteLines_(manualNotesText, interactions) {
   let baseNotes = "";
   if (interactions.length > 0) {
-    interactions.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+    interactions.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).reverse();
     baseNotes = interactions.map(interaction => interaction.text).join("\n");
   }
 

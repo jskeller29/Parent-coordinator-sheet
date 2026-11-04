@@ -104,6 +104,8 @@ Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
   noteLineHeader_ (Core.gs).
 - Built in ONE place: contactLogNoteLine_ / eventNoteLine_ / joinNoteLines_ (Build.gs), used by both the full build
   (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_).
+- Order (owner's change, 2026-11-04): manual "𝑵𝒐𝒕𝒆𝒔:" block first, then dated lines NEWEST first (joinNoteLines_ sorts
+  oldest-first then reverses, so same-day ties flip too). Was oldest first.
 
 CODE CLEANUP (the old "POSSIBLE FUTURE PLAN"): stages 1-3 done on Test-Version (2026-11-04), stage 4 not started.
 Goal was same exact functionality, cleaner files. 22 old .gs files -> 7 shared + z_MINE.gs. Verified with an offline
