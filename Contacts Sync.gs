@@ -1,8 +1,79 @@
-// File: Phone.gs
+// ======================================================================
+// FILE: Contacts Sync.gs
+// PURPOSE: Pushes the Phone Contacts tab into Google Contacts ("School
+// Directory" label): the resumable bulk sync, the single-contact upsert, the
+// Full Sync sidebar endpoints, and the stop / restart controls.
+// ======================================================================
+
+// ==========================================
+// 5. RESILIENT SIDEBAR BACKEND
+// ==========================================
+function startResilientSync() {
+  return runAction_("Full Sync", () => startResilientSyncRun_());
+}
+
+function startResilientSyncRun_() {
+  const cache = CacheService.getScriptCache();
+  const currentState = cache.get('SYNC_UI_STATE');
+  
+  if (currentState) {
+    const phase = JSON.parse(currentState).phase;
+    if (phase !== 'idle' && phase !== 'done' && phase !== 'killed') {
+      return; 
+    }
+  }
+
+  cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building', progress: 0, total: 0 }), 21600);
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  buildAllDerivedSheets();
+  formatDirectoryAuto_(ss.getSheetByName("Directory"));
+  const psSheet = ss.getSheetByName("Parents Divided");
+  if (psSheet) psSheet.hideSheet();
+
+  const phoneSheet = ss.getSheetByName("Phone Contacts");
+  const total = phoneSheet ? Math.max(0, phoneSheet.getLastRow() - 1) : 0;
+
+  cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'syncing', progress: 0, total: total }), 21600);
+  
+  // ==============================================================
+  // ✨ FIRST BUILD UNLOCK DETECTOR ✨
+  // Triggers ONLY when the builder successfully finishes the very first time!
+  // ==============================================================
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty('SETUP_COMPLETE') === 'true' && props.getProperty('FULL_MENU_UNLOCKED') !== 'true') {
+    props.setProperty('FULL_MENU_UNLOCKED', 'true');
+    try { onOpen(); } catch(e) { console.error(e); } // Attempt silent UI refresh
+    
+    // Send a long-lasting toast notification to refresh the page
+    ss.toast("All sheets are built! Please refresh your webpage (Press F5) to explore and see your new menu options.", "🎉 Build Complete!", 15);
+  }
+
+  syncToGoogleContacts();
+}
+
+function getSyncStatus() {
+  const cache = CacheService.getScriptCache();
+  const stateStr = cache.get('SYNC_UI_STATE');
+  return stateStr ? JSON.parse(stateStr) : { phase: 'idle' };
+}
+
+function resetSyncStatus() {
+  CacheService.getScriptCache().remove('SYNC_UI_STATE');
+}
+
 // ==========================================
 // 1. BULK NIGHTLY SYNC (Enterprise Mirror Mode)
+// Resumable: stops before the 6-minute limit and schedules itself to carry on.
+// The owner's sheet (z_MINE.gs) reads up to 4 phones / 3 emails per row, finds
+// the label without a page size, skips the 50% deletion check and emails a
+// summary at the end (see ownerHooks_().contactsSync).
 // ==========================================
 function syncToGoogleContacts() {
+  return runAction_("Google Contacts sync", () => syncToGoogleContactsRun_());
+}
+
+function syncToGoogleContactsRun_() {
   const startTime = Date.now();
   const MAX_RUN_TIME = 4.5 * 60 * 1000; 
   
@@ -11,6 +82,9 @@ function syncToGoogleContacts() {
   
   const sheet = ss.getSheetByName("Phone Contacts");
   if (!sheet) return;
+
+  const owner = getOwnerHooks_();
+  const ownerSync = owner ? owner.contactsSync : null;
   
   const data = sheet.getDataRange().getValues();
   const props = PropertiesService.getScriptProperties();
@@ -35,7 +109,7 @@ function syncToGoogleContacts() {
   // pageSize matters: the default page is small, so without it a user with many
   // contact groups may not find "School Directory" and we'd create a duplicate.
   let resourceName = "";
-  const groups = People.ContactGroups.list({ pageSize: 1000 }).contactGroups || [];
+  const groups = (ownerSync ? ownerSync.listContactGroups() : People.ContactGroups.list({ pageSize: 1000 })).contactGroups || [];
   const existingGroup = groups.find(g => g.name === "School Directory");
   
   if (existingGroup) {
@@ -89,6 +163,9 @@ function syncToGoogleContacts() {
       if (chunkData) JSON.parse(chunkData).forEach(([id, name]) => staleMap[id] = name);
     }
   }
+
+  // Column positions are read once from the header row
+  const readRow = ownerSync ? ownerSync.rowReader(data[0]) : phoneContactsRowReader_(data[0]);
   
   // 3. Sync Rows
   ss.toast("Phase 2/3: Syncing spreadsheet rows... Safe to close sidebar.", "Syncing", 10);
@@ -118,30 +195,12 @@ function syncToGoogleContacts() {
       if (currentStateStr && JSON.parse(currentStateStr).phase === 'killed') return; 
       cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'syncing', progress: i, total: data.length - 1 }), 21600);
     }
-    
-    const headers = data[0];
-    const idxFirst = headers.indexOf("First Name") !== -1 ? headers.indexOf("First Name") : 0;
-    const idxLast = headers.indexOf("Last Name") !== -1 ? headers.indexOf("Last Name") : 1;
-    const idxEmail = headers.indexOf("E-mail 1 - Value") !== -1 ? headers.indexOf("E-mail 1 - Value") : 2;
-    const idxPhoneLabel = headers.indexOf("Phone 1 - Type") !== -1 ? headers.indexOf("Phone 1 - Type") : 12;
-    const idxPhone = headers.indexOf("Phone 1 - Value") !== -1 ? headers.indexOf("Phone 1 - Value") : 13;
-    const idxNotes = headers.indexOf("Notes") !== -1 ? headers.indexOf("Notes") : 33;
-    const idxOrgName = headers.indexOf("Organization Name") !== -1 ? headers.indexOf("Organization Name") : 22;
-    const idxOrgTitle = headers.indexOf("Organization Department") !== -1 ? headers.indexOf("Organization Department") : 23;
 
-    const parentName = data[i][idxFirst];
-    const studentNames = data[i][idxLast];
-    const email = data[i][idxEmail];
-    const phoneLabel = data[i][idxPhoneLabel];
-    const phone = data[i][idxPhone];
-    const notes = data[i][idxNotes];
-    const orgName = data[i][idxOrgName];
-    const orgTitle = data[i][idxOrgTitle];
-
-    if (!parentName || String(parentName).trim() === "") continue;
+    const contactRow = readRow(data[i]);
+    if (!contactRow.parentName || String(contactRow.parentName).trim() === "") continue;
     
     try {
-      const result = searchAndUpsertSingleContact(parentName, studentNames, email, phone, phoneLabel, notes, orgName, orgTitle, resourceName);
+      const result = contactRow.upsert(resourceName);
       
       if (result) {
         delete staleMap[result.resourceName]; 
@@ -184,7 +243,7 @@ function syncToGoogleContacts() {
   const staleEntries = Object.entries(staleMap);
   const deletedCount = staleEntries.length; 
   
-  if (startRow === 1 && deletedCount > (data.length * 0.5) && data.length > 10) {
+  if (!ownerSync && startRow === 1 && deletedCount > (data.length * 0.5) && data.length > 10) {
      // getUi() throws when this runs from a time-based / auto-resume trigger
      // (nightly sync, quota resume). Probe for a UI; if there isn't one we must
      // NOT guess our way into deleting most of the list unattended.
@@ -257,6 +316,32 @@ function syncToGoogleContacts() {
   const toastMessage = `🗑️ Del: ${deletedCount} | ☎️ New: ${createdCount} | ✏️ Edited: ${editedCount}`;
   ss.toast(toastMessage, "🎉 Sync Complete!", 15);
   PropertiesService.getDocumentProperties().setProperty('MISSED_SYNC_MSG', toastMessage);
+
+  if (ownerSync) ownerSync.afterSync(deletedCount, createdCount, editedCount);
+}
+
+/**
+ * Reads one Phone Contacts row (one phone + one email per row) for the sync.
+ * Columns are found by header once; the numbers are the old fixed positions.
+ */
+function phoneContactsRowReader_(headers) {
+  const idx = (name, fallback) => headers.indexOf(name) !== -1 ? headers.indexOf(name) : fallback;
+  const idxFirst = idx("First Name", 0);
+  const idxLast = idx("Last Name", 1);
+  const idxEmail = idx("E-mail 1 - Value", 2);
+  const idxPhoneLabel = idx("Phone 1 - Type", 12);
+  const idxPhone = idx("Phone 1 - Value", 13);
+  const idxNotes = idx("Notes", 33);
+  const idxOrgName = idx("Organization Name", 22);
+  const idxOrgTitle = idx("Organization Department", 23);
+
+  return row => {
+    const parentName = row[idxFirst];
+    return {
+      parentName: parentName,
+      upsert: directoryResourceName => searchAndUpsertSingleContact(parentName, row[idxLast], row[idxEmail], row[idxPhone], row[idxPhoneLabel], row[idxNotes], row[idxOrgName], row[idxOrgTitle], directoryResourceName)
+    };
+  };
 }
 
 // ==========================================
@@ -408,23 +493,39 @@ function searchAndUpsertSingleContact(parentName, studentNames, email, phone, ph
   }
 }
 
-// ==========================================
-// 3. UI TRIGGER & SIDEBAR HELPERS
-// ==========================================
-function runInitialBulkContactSync() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast("Starting Mirror Sync. This may take several minutes for large lists.", "Syncing", 8);
-  syncToGoogleContacts();
-}
-
-function showSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile('Sidebar').setTitle('Persistent Info');
-  SpreadsheetApp.getUi().showSidebar(html);
-}
-
 function getSyncLogData() {
   const cache = CacheService.getScriptCache();
   const logStr = cache.get('SYNC_LOG');
   if (logStr) return JSON.parse(logStr);
   return { created: [], edited: [], deleted: [] };
+}
+
+// ==========================================
+// 🛑 BACKGROUND CONTROLS (Stop & Restart)
+// ==========================================
+function EMERGENCY_STOP_SYNC(isSilent) {
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === "syncToGoogleContacts") {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  const cache = CacheService.getScriptCache();
+  cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed' }), 21600); 
+  cache.remove('STALE_CHUNKS_COUNT');
+  cache.remove('DIR_LABEL'); 
+
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty('SYNC_START_ROW');
+  props.deleteProperty('SYNC_CREATED_COUNT');
+
+  if (isSilent !== true) {
+    SpreadsheetApp.getActiveSpreadsheet().toast("Sync has been safely cancelled.", "🛑 Stopped", 5);
+  }
+}
+
+function RESTART_SYNC() {
+  EMERGENCY_STOP_SYNC(true); 
+  startResilientSync();
 }

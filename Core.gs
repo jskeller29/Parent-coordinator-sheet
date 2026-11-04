@@ -1,3 +1,55 @@
+// ======================================================================
+// FILE: Core.gs
+// PURPOSE: Shared foundation used by every other file: the Contact Log column
+// numbers, the hidden Backend tab helpers, the owner hook point, and the small
+// text / phone / OSIS / date helpers.
+// ======================================================================
+
+// ======================================================================
+// CONTACT LOG SCHEMA
+// Single source of truth for the Contact Log columns (1-based), plus the
+// shared data-row formatter, so a future column shift is changed here only.
+// ======================================================================
+const CL_WIDTH = 16;                // Full row width, A:P
+const CL_COL_GUARDIAN = 3;          // C — Guardian name
+const CL_COL_SPOKE_WITH = 4;        // D — Person spoken with
+const CL_COL_OSIS = 5;              // E — OSIS (also holds the "END" marker on the end bar row)
+const CL_COL_STUDENT = 6;           // F — Student name
+const CL_COL_TYPE = 12;             // L — Type dropdown
+const CL_COL_DIVIDER_NOTES = 13;    // M — divider line before Notes
+const CL_COL_FILTER_TOGGLE = 15;    // O — master hide-filter checkbox on the end bar row
+const CL_COL_DIVIDER_FOLLOWUP = 15; // O — divider line before Followup Notes
+const CL_COL_CHECKBOX = 16;         // P — row checkbox
+
+/**
+ * Applies the standard Contact Log data-row formatting:
+ * - no borders on the Guardian/Spoke With pair (C:D)
+ * - no horizontal borders anywhere (only the dark brown end bar carries one)
+ * - divider lines before Notes (M) and Followup Notes (O)
+ * - checkboxes planted in P
+ */
+function formatContactLogRows_(sheet, startRow, numRows) {
+  if (!numRows || numRows < 1) return;
+  sheet.getRange(startRow, CL_COL_GUARDIAN, numRows, 2).setBorder(false, false, false, false, false, false);
+  sheet.getRange(startRow, 1, numRows, CL_WIDTH).setBorder(false, null, false, null, null, false);
+  sheet.getRange(startRow, CL_COL_DIVIDER_NOTES, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(startRow, CL_COL_DIVIDER_FOLLOWUP, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(startRow, CL_COL_CHECKBOX, numRows, 1).insertCheckboxes().setFontColor("#000000");
+}
+
+/** Row number of the Contact Log's "END" bar (Column E), or null. */
+function findEndRowInColumnE_(sheet) {
+  // Only read down to the last data row — this runs twice per edit, and
+  // "E:E" pulls every row in the sheet.
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 1) return null;
+  const values = sheet.getRange(1, CL_COL_OSIS, lastRow, 1).getDisplayValues();
+  for (let i = 0; i < values.length; i++) {
+    if (values[i][0].trim().toUpperCase() === "END") return i + 1;
+  }
+  return null;
+}
+
 /**
  * ==============================================================================
  * BACKEND SHEET
@@ -16,7 +68,6 @@
  * through the helpers below, which only ever touch one section's columns.
  * ==============================================================================
  */
-
 var BACKEND_SHEET_NAME = "Backend";
 var BACKEND_HEADER_ROW = 2; // table sections: header row; data starts on row 3
 
@@ -253,4 +304,203 @@ function padRow_(row, width) {
   const out = row.slice(0, width);
   while (out.length < width) out.push("");
   return out;
+}
+
+// ======================================================================
+// OWNER HOOKS
+// The owner's own sheet also has z_MINE.gs, which defines ownerHooks_().
+// Shared code asks getOwnerHooks_() and, only when it returns something,
+// calls the owner's version of that one step (history from "Old Master
+// Table" / "Old Phone Contacts", the tall Phone Contacts layout, and so on).
+// Every other school's sheet has no z_MINE.gs, so the shared path runs.
+// No function is defined twice, so file load order no longer matters.
+// ======================================================================
+var OWNER_HOOKS_CACHE_; // looked up once per run
+
+function getOwnerHooks_() {
+  if (OWNER_HOOKS_CACHE_ === undefined) {
+    OWNER_HOOKS_CACHE_ = typeof ownerHooks_ === "function" ? ownerHooks_() : null;
+  }
+  return OWNER_HOOKS_CACHE_;
+}
+
+/**
+ * Runs one user-facing action (an edit, a build, a sync, opening the sheet).
+ * Normally it just calls fn. On the owner's sheet with "Toggle Debug" on, it
+ * also toasts whether the action worked (see ownerDebugRun_ in z_MINE.gs).
+ * label may be a function so the name is only worked out when it is shown.
+ */
+function runAction_(label, fn) {
+  const owner = getOwnerHooks_();
+  if (owner && owner.debugOn()) return owner.debugRun(label, fn);
+  return fn();
+}
+
+// ======================================================================
+// SMALL HELPERS (text, names, phones, OSIS, dates)
+// ======================================================================
+function writeSheet_(ss, name, values, startRow = 1, startCol = 1) {
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
+
+  // Guard: never crash on an empty payload. A builder that returns [] (or only
+  // filtered everything out) would otherwise throw on values[0].length below.
+  if (!Array.isArray(values) || values.length === 0 || !Array.isArray(values[0]) || values[0].length === 0) {
+    return;
+  }
+
+  const neededRows = startRow - 1 + values.length;
+  const neededCols = startCol - 1 + values[0].length;
+
+  if (sheet.getMaxRows() < neededRows) {
+    sheet.insertRowsAfter(sheet.getMaxRows(), neededRows - sheet.getMaxRows());
+  }
+  if (sheet.getMaxColumns() < neededCols) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), neededCols - sheet.getMaxColumns());
+  }
+
+  const clearRows = sheet.getMaxRows() - startRow + 1;
+  const clearCols = sheet.getMaxColumns() - startCol + 1;
+  if (clearRows > 0 && clearCols > 0) {
+    sheet.getRange(startRow, startCol, clearRows, clearCols).clearContent();
+  }
+
+  sheet.getRange(startRow, startCol, values.length, values[0].length).setValues(values);
+}
+
+// Same result as a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+// but the collator is built once instead of on every comparison (faster sorts).
+const NATURAL_COLLATOR_ = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+function compareNatural_(a, b) {
+  return NATURAL_COLLATOR_.compare(a, b);
+}
+
+function toText_(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+function firstWord_(text) {
+  return toText_(text).split(/\s+/)[0] || "";
+}
+
+function isRealStudentId_(value) {
+  return toText_(value).replace(/\D/g, "").length >= 6;
+}
+
+function stripTrailingParenthetical_(text) {
+  return toText_(text).replace(/\s*\([^)]+\)\s*$/, "").trim();
+}
+
+function properCase_(text) {
+  const raw = toText_(text);
+  if (!raw) return "";
+
+  // If the input already has intentional internal capitals (McDonald, DiMarco,
+  // O'Brien, DeShawn), leave it exactly as typed. Only normalize inputs that are
+  // clearly un-cased: ALL CAPS ("SMITH") or all lowercase ("smith").
+  const hasLower = /\p{Ll}/u.test(raw);
+  const hasUpper = /\p{Lu}/u.test(raw);
+  if (hasLower && hasUpper) return raw;
+
+  // \p{L} + u flag so accented initials (Ángel, Óscar) capitalize correctly.
+  return raw.toLowerCase().replace(/(^|[\s\-'’])(\p{L})/gu, (m, sep, ch) => sep + ch.toUpperCase());
+}
+
+function splitFullName_(name) {
+  // The owner's sheet splits off the LAST word as the last name instead
+  const owner = getOwnerHooks_();
+  if (owner) return owner.splitFullName(name);
+
+  const parts = toText_(name).split(/\s+/).filter(Boolean);
+  return {
+    first: parts[0] || "",
+    last: parts.slice(1).join(" ")
+  };
+}
+
+function normalizeEmail_(value) {
+  return toText_(value).toLowerCase().replace(/\s+/g, "");
+}
+
+function normalizePhoneForMatch_(value) {
+  // Drop an extension ("x12", "ext. 12") so its digits don't make the number unmatchable
+  const digits = toText_(value).replace(/\s*(?:ext\.?|extension|x)\s*\d+\s*$/i, "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
+function formatPhone_(value) {
+  const digits = normalizePhoneForMatch_(value);
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  return "";
+}
+
+/* =========================
+   OSIS MATCHING (shared)
+   Tokenize a cell into whole OSIS numbers and match EXACTLY, so a short id can
+   never substring-match inside a longer one (e.g. "123456" inside "812345678").
+========================= */
+function extractOsisTokens_(value) {
+  const str = value == null ? "" : String(value);
+  const matches = str.match(/\b\d{6,}\b/g);
+  if (matches && matches.length) return matches;
+  // Fallback for any stray formats that aren't purely numeric.
+  return str.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function osisCellIncludes_(cellValue, targetOsis) {
+  const target = String(targetOsis == null ? "" : targetOsis).trim();
+  if (!target) return false;
+  return extractOsisTokens_(cellValue).indexOf(target) !== -1;
+}
+
+function groupGuardiansByStudent_(guardianRows) {
+  const map = new Map();
+  for (const g of guardianRows) {
+    if (!map.has(g.student_id)) map.set(g.student_id, []);
+    map.get(g.student_id).push(g);
+  }
+  return map;
+}
+
+function formatDateFull_(value) {
+  if (Object.prototype.toString.call(value) === "[object Date]" && !isNaN(value)) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "MMMM d, yyyy");
+  }
+
+  const text = toText_(value);
+  if (!text) return "";
+
+  const parsed = new Date(text);
+  if (!isNaN(parsed)) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), "MMMM d, yyyy");
+  }
+
+  return text;
+}
+
+/**
+ * Bold Unicode text (same characters as lingojam.com/BoldTextGenerator):
+ * A-Z, a-z and 0-9 become Mathematical Bold letters/digits; everything else
+ * (spaces, punctuation, accented letters) is left as is.
+ * italic = true uses Bold Italic (serif) letters; Unicode has no italic digits,
+ * so digits stay bold.
+ */
+function boldText_(text, italic) {
+  const upper = italic ? 0x1D468 : 0x1D400;
+  const lower = italic ? 0x1D482 : 0x1D41A;
+  return String(text == null ? "" : text).replace(/[A-Za-z0-9]/g, ch => {
+    const c = ch.charCodeAt(0);
+    if (c >= 65 && c <= 90) return String.fromCodePoint(upper + c - 65);   // A-Z
+    if (c >= 97 && c <= 122) return String.fromCodePoint(lower + c - 97);  // a-z
+    return String.fromCodePoint(0x1D7CE + c - 48);                         // 0-9
+  });
+}
+
+/** Header of one notes line: "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧}" (date bold italic, braces bold). */
+function noteLineHeader_(dateText, braceText) {
+  return `${boldText_(dateText, true)} - {${boldText_(braceText)}}`;
 }
