@@ -53,11 +53,11 @@
     <div id="notice" class="ok hidden"></div>
 
     <div class="card">
-      <b>Where to get it</b>
+      <b id="howToTitle">Where to get it</b>
       <ol id="howTo"></ol>
     </div>
 
-    <div class="card">
+    <div class="card" id="uploadCard">
       <b>Option 1 — Upload the file (easiest)</b>
       <div class="muted">Pick the file you downloaded (CSV or Excel). Numbers come in exactly as they are in the file.</div>
       <div class="row">
@@ -68,7 +68,7 @@
 
     <div id="doneList" class="ok hidden"></div>
 
-    <div class="card yellow">
+    <div class="card yellow" id="pasteCard">
       <b>Option 2 — Copy &amp; paste</b>
       <ol>
         <li>Open the file you downloaded.</li>
@@ -78,6 +78,15 @@
       </ol>
       <div class="muted" style="margin-top:6px">⚠️ If Excel shows numbers like <b>7.19E+09</b> or <b>####</b>, widen the columns first: after <kbd>Ctrl</kbd>+<kbd>A</kbd>, double-click the line between any two column letters. Otherwise the real digits get lost.</div>
       <div class="row"><a onclick="call('idm_goToTempSheet')">Go to the paste tab</a></div>
+    </div>
+
+    <div class="card" id="siteCard">
+      <b>Fill in the <span id="siteTabName"></span> tab</b>
+      <div class="muted">Your entries are only saved to Raw Data when you click Save.</div>
+      <div class="row">
+        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class</button>
+        <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
+      </div>
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
@@ -125,7 +134,8 @@
   var pollTimer = null;
   var busy = false;          // a server call is running
   var paused = false;        // an error is showing: wait for the user
-  var pendingUpload = null;  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
+  var pendingUpload = null;
+  var currentManual = false; // on the Site / Class step (no polling)  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
 
   function $(id) { return document.getElementById(id); }
 
@@ -182,6 +192,11 @@
       : 'Never updated';
     $('howTo').innerHTML = v.step.howTo.map(function (h) { return '<li>' + h + '</li>'; }).join('');
     $('tabName').textContent = '"' + v.tabName + '"';
+    var manual = !!v.step.manual;
+    currentManual = manual;
+    show('uploadCard', !manual); show('pasteCard', !manual); show('siteCard', manual);
+    $('howToTitle').textContent = manual ? 'What to do' : 'Where to get it';
+    $('siteTabName').textContent = '"' + v.tabName + '"';
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip & finish';
 
     var n = v.notice;
@@ -206,10 +221,11 @@
       pendingUpload = null;
       show('errorBox', false);
       $('waitingText').textContent = 'Waiting for your paste or upload…';
-      show('waiting', true);
+      show('waiting', !manual);
     }
     setButtons(true);
-    schedule();
+    if (manual) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks Save
+    else schedule();
   }
 
   function renderDone(v) {
@@ -232,7 +248,7 @@
   function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
 
   function setButtons(on) {
-    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn'].forEach(function (id) { $(id).disabled = !on; });
+    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn'].forEach(function (id) { $(id).disabled = !on; });
   }
 
   function working(text) {
@@ -299,10 +315,15 @@
   }
 
   // --- buttons ---
+  function saveSiteClass() { working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
   function skip() { working('Skipping…'); call('idm_skip'); }
   function exitMode() { working('Bringing your tabs back…'); call('idm_exit'); }
   function retry() {
-    if ($('retryBtn').textContent === 'OK') { paused = false; pendingUpload = null; show('errorBox', false); show('waiting', true); schedule(); return; }
+    if ($('retryBtn').textContent === 'OK') {
+      pendingUpload = null; show('errorBox', false);
+      if (currentManual) return;  // Site / Class: just fix the tab and click Save again
+      paused = false; show('waiting', true); schedule(); return;
+    }
     working('Clearing the tab…'); call('idm_retry');
   }
   function useAnyway() {

@@ -32,7 +32,12 @@ Files (shared = every school's sheet):
   CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Sidebar polls every 2s, finds the header row, refuses the
   wrong export and numbers Excel cut off (E+ / #### / ID-phone columns ending in 000; "Use it anyway" allowed),
   then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
-  updateRawDataTimestamp_). Skip keeps old data. Never touches BH:BI (MAKE OWN DATA). State in doc property
+  updateRawDataTimestamp_). Skip keeps old data. Step 4 "Site / Class" (manual, Save button): Class | Teacher Name |
+  Site (Optional), one row per ATS class code (Raw Data R) + classes already in BH:BI, prefilled from BH:BI; Site
+  dropdown = hidden col Z formula of every typed site (other values allowed). Save rewrites BH:BI rows 7+ as one class
+  per row: BH = site, BI = "CODE: Teacher" (what buildClassReferenceMap_ reads; ":" stripped from names, rows with
+  no teacher and no site dropped, codes must be letters/digits); date in doc property
+  INPUT_DATA_MODE_SITECLASS_UPDATED. State in doc property
   INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call

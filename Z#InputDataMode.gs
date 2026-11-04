@@ -11,7 +11,10 @@
 //      (7.19E+09 / ####), and replaces that section of Raw Data.
 //   4. The temp tab is deleted and the next one is created.
 //   5. At the end (or on Exit) temp tabs are deleted and the hidden tabs come back.
-// Raw Data BH:BI (MAKE OWN DATA: Site / Class) is never touched.
+// Step 4 "Site / Class" is filled in by hand instead: one row per class code
+// (from the ATS data), with Teacher Name and Site (optional, dropdown that grows
+// as new sites are typed). Save writes Raw Data BH:BI (MAKE OWN DATA) in the
+// format the build reads: BH = site, BI = "Y41: Teacher".
 //
 // SELF-CONTAINED ("Z#" = trying out a new feature): the only hooks into the rest
 // of the app are two guarded lines in onOpen (Menus.gs):
@@ -75,8 +78,21 @@ var IDM_STEPS = [
       "Open <b>Family Access Management</b>.",
       "Export the <b>\"Students with Non-NYCSA Account\"</b> report."
     ]
+  },
+  {
+    key: 'siteclass', tab: 'Site / Class', zone: 'Site / Class', required: false, manual: true,
+    howTo: [
+      "The <b>Site / Class</b> tab lists every class code from your Student Data.",
+      "Type each class's <b>Teacher Name</b>.",
+      "<b>Site</b> is optional: pick one from the dropdown or type a new one (it's added to the dropdown).",
+      "Add a class that isn't listed by typing its code at the bottom of column A.",
+      "Click <b>✅ Save Site / Class</b> below when you're done."
+    ]
   }
 ];
+var IDM_SITECLASS_UPDATED_KEY = 'INPUT_DATA_MODE_SITECLASS_UPDATED';
+// Same pattern as buildClassReferenceMap_ (Build.gs): "Y41: Tessa Y25: Sam"
+var IDM_CLASS_REGEX = /([A-Za-z0-9]+):([^:]*?)(?=\s+[A-Za-z0-9]+:|$)/g;
 
 // ---------------------------------------------------------------------
 // MENU + LAUNCHER
@@ -145,6 +161,7 @@ function idm_check() {
     const temp = idm_ensureTempSheet_(ss, state);
     idm_saveState_(state);
     idm_debugSheets_(ss, state, temp);
+    if (IDM_STEPS[state.step].manual) return idm_view_(ss, state);
     const hasData = idm_tempHasData_(temp);
     idm_log_("temp tab has data: " + hasData);
     const view = idm_view_(ss, state);
@@ -301,6 +318,7 @@ function idm_processTemp_(ss, state, temp, ignoreCutoff) {
  */
 function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload) {
   const step = IDM_STEPS[state.step];
+  if (step.manual) return idm_view_(ss, state, { type: 'error', code: 'manual', message: "This step is filled in on the tab — no file needed.", fromUpload: true });
   const fail = (code, message, extra) => idm_view_(ss, state, Object.assign({ type: 'error', code: code, message: message, fromUpload: fromUpload }, extra || {}));
 
   idm_log_("step " + state.step + " (" + step.key + "), " + values.length + " rows in, fromUpload=" + fromUpload + ", ignoreCutoff=" + ignoreCutoff);
@@ -353,6 +371,7 @@ function idm_findHeader_(values) {
     const cells = {};
     values[i].forEach(c => { const n = idm_norm_(c); if (n) cells[n] = true; });
     IDM_STEPS.forEach(step => {
+      if (!step.headers) return;
       const count = step.headers.filter(h => cells[idm_norm_(h)]).length;
       if (count >= step.minMatch && (!best || count > best.count)) best = { step: step, row: i, count: count };
     });
@@ -439,6 +458,127 @@ function idm_writeSection_(raw, step, rows) {
 }
 
 // ---------------------------------------------------------------------
+// SITE / CLASS STEP (filled in by hand, saved to Raw Data BH:BI)
+// ---------------------------------------------------------------------
+
+/** Current Raw Data BH:BI as class code -> { site, teacher } (same reading as the build). */
+function idm_readSiteClass_(raw) {
+  const map = new Map();
+  if (raw.getMaxRows() < 7 || raw.getMaxColumns() < 61) return map;
+  raw.getRange(7, 60, raw.getMaxRows() - 6, 2).getValues().forEach(r => {
+    const site = String(r[0]).trim();
+    const classes = String(r[1]).trim();
+    if (!classes) return;
+    [...classes.matchAll(IDM_CLASS_REGEX)].forEach(m => {
+      map.set(m[1].trim().toUpperCase(), { site: site, teacher: m[2].trim() });
+    });
+  });
+  return map;
+}
+
+/**
+ * Class | Teacher Name | Site (Optional): one row per ATS class code (Raw Data R),
+ * plus classes only in the current BH:BI, prefilled from BH:BI. The Site dropdown
+ * reads a hidden list (column Z = every site typed in column C), so a new site is
+ * offered in the dropdown as soon as it is typed; other values are allowed (warning only).
+ */
+function idm_fillSiteClassTab_(ss, sheet) {
+  const raw = idm_rawSheet_(ss);
+  const existing = raw ? idm_readSiteClass_(raw) : new Map();
+  const codes = new Set();
+  if (raw && raw.getMaxRows() >= 7) {
+    raw.getRange(7, 18, raw.getMaxRows() - 6, 1).getValues().forEach(r => {
+      const c = String(r[0]).trim().toUpperCase();
+      if (c) codes.add(c);
+    });
+  }
+  existing.forEach((v, code) => codes.add(code));
+  const sorted = [...codes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  idm_log_("site/class tab: " + sorted.length + " class codes (" + existing.size + " already in BH:BI)");
+
+  sheet.clear();
+  sheet.getDataRange().clearDataValidations();
+  const rows = sorted.map(code => {
+    const e = existing.get(code) || { site: "", teacher: "" };
+    return [code, e.teacher, e.site];
+  });
+  const total = Math.max(rows.length + 50, 100); // room to add classes by hand
+  if (sheet.getMaxRows() < total + 1) sheet.insertRowsAfter(sheet.getMaxRows(), total + 1 - sheet.getMaxRows());
+
+  sheet.getRange(1, 1, 1, 3).setValues([["Class", "Teacher Name", "Site (Optional)"]])
+    .setFontWeight("bold").setBackground("#d9ead3").setFontSize(11);
+  if (rows.length) sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  sheet.getRange(2, 1, total, 1).setFontWeight("bold");
+  sheet.getRange(1, 1, total + 1, 3).setBorder(true, true, true, true, true, true, "#cccccc", SpreadsheetApp.BorderStyle.SOLID);
+  sheet.setFrozenRows(1);
+  sheet.setColumnWidth(1, 110);
+  sheet.setColumnWidth(2, 200);
+  sheet.setColumnWidth(3, 150);
+
+  // Hidden site list (column Z) that feeds the dropdown
+  sheet.getRange("Z1").setValue("Site list (for the dropdown)");
+  sheet.getRange("Z2").setFormula('=IFERROR(SORT(UNIQUE(FILTER(C2:C, C2:C<>""))), "")');
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(sheet.getRange("Z2:Z"), true)
+    .setAllowInvalid(true)
+    .setHelpText("Pick a site, or type a new one (it's added to this list).")
+    .build();
+  sheet.getRange(2, 3, total, 1).setDataValidation(rule).setHorizontalAlignment("right");
+  try { sheet.hideColumns(26); } catch (e) { idm_log_("could not hide column Z: " + e.message); }
+}
+
+/** "✅ Save Site / Class": writes Raw Data BH:BI (rows 7+) and finishes the step. */
+function idm_saveSiteClass() {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const step = IDM_STEPS[state.step];
+    if (!step.manual) return idm_view_(ss, state);
+    const temp = idm_ensureTempSheet_(ss, state);
+    const raw = idm_rawSheet_(ss);
+    if (!raw) return idm_view_(ss, state, { type: 'error', code: 'noRaw', message: 'The "Raw Data" tab is missing.', fromUpload: true });
+
+    const last = temp.getLastRow();
+    const values = last >= 2 ? temp.getRange(2, 1, last - 1, 3).getDisplayValues() : [];
+    const out = [];
+    const bad = [];
+    const seen = new Set();
+    values.forEach(r => {
+      const code = String(r[0]).trim().toUpperCase();
+      const teacher = String(r[1]).replace(/:/g, " ").replace(/\s+/g, " ").trim(); // ":" would break "Y41: Teacher"
+      const site = String(r[2]).trim();
+      if (!code) return;
+      if (!/^[A-Z0-9]+$/.test(code)) { bad.push(code); return; }
+      if (seen.has(code)) return;
+      seen.add(code);
+      if (!teacher && !site) return; // nothing to save for this class
+      out.push([site, code + ": " + teacher]);
+    });
+    idm_log_("site/class save: " + out.length + " rows, " + bad.length + " bad codes");
+    if (bad.length) {
+      return idm_view_(ss, state, { type: 'error', code: 'badClass', fromUpload: true,
+        message: "Class codes can only have letters and numbers (no spaces or dashes): <b>" + bad.slice(0, 5).join(", ") + "</b>. Fix them on the tab, then save again." });
+    }
+
+    if (raw.getMaxColumns() < 61) raw.insertColumnsAfter(raw.getMaxColumns(), 61 - raw.getMaxColumns());
+    const need = 6 + out.length;
+    if (raw.getMaxRows() < need) raw.insertRowsAfter(raw.getMaxRows(), need - raw.getMaxRows());
+    raw.getRange(7, 60, raw.getMaxRows() - 6, 2).clearContent();
+    raw.getRange(6, 60, 1, 2).setValues([["Site", "Class"]]);
+    if (out.length) raw.getRange(7, 60, out.length, 2).setValues(out);
+    forceVibrantColors_(raw);
+    applyBandingToRawData_(raw);
+    SpreadsheetApp.flush();
+
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
+    PropertiesService.getDocumentProperties().setProperty(IDM_SITECLASS_UPDATED_KEY, today);
+    state.results[step.key] = { rows: out.length, saved: true };
+    return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + out.length + " class(es) saved to Raw Data." });
+  });
+}
+
+// ---------------------------------------------------------------------
 // STEPS, TABS, HIDING
 // ---------------------------------------------------------------------
 
@@ -454,8 +594,8 @@ function idm_advance_(ss, state, notice) {
   }
   if (oldTemp) {
     // Same tab, cleared and renamed for the next export (never deleted while the user is on it)
-    oldTemp.setName(idm_uniqueTabName_(ss, IDM_STEPS[state.step].tab, oldTemp));
-    idm_resetTempSheet_(oldTemp);
+    idm_renameTab_(ss, oldTemp, IDM_STEPS[state.step].tab);
+    idm_prepareTab_(ss, oldTemp, IDM_STEPS[state.step]);
     oldTemp.activate();
     idm_log_("temp tab reused as " + oldTemp.getName());
   } else {
@@ -475,10 +615,11 @@ function idm_ensureTempSheet_(ss, state) {
     return sheet;
   }
   const step = IDM_STEPS[state.step];
-  sheet = ss.insertSheet(idm_uniqueTabName_(ss, step.tab, null), 0);
+  sheet = ss.insertSheet(0);
+  idm_renameTab_(ss, sheet, step.tab);
   if (sheet.getMaxColumns() < 40) sheet.insertColumnsAfter(sheet.getMaxColumns(), 40 - sheet.getMaxColumns());
   sheet.setTabColor("#f1c232");
-  idm_resetTempSheet_(sheet);
+  idm_prepareTab_(ss, sheet, step);
   sheet.activate();
   state.tempId = sheet.getSheetId();
   return sheet;
@@ -494,7 +635,24 @@ function idm_uniqueTabName_(ss, base, self) {
   }
 }
 
+/** Renames the temp tab (falls back to "Site & Class" if "/" isn't allowed in a tab name). */
+function idm_renameTab_(ss, sheet, base) {
+  try {
+    sheet.setName(idm_uniqueTabName_(ss, base, sheet));
+  } catch (e) {
+    idm_log_("tab name '" + base + "' refused (" + e.message + ")");
+    sheet.setName(idm_uniqueTabName_(ss, base.replace(/\s*\/\s*/g, " & "), sheet));
+  }
+}
+
+/** Paste tab ("PASTE HERE") or the Site / Class form. */
+function idm_prepareTab_(ss, sheet, step) {
+  if (step.manual) idm_fillSiteClassTab_(ss, sheet);
+  else idm_resetTempSheet_(sheet);
+}
+
 function idm_resetTempSheet_(sheet) {
+  sheet.getDataRange().clearDataValidations();
   sheet.clear();
   sheet.getRange("A1").setValue(IDM_PLACEHOLDER)
     .setBackground("#FFF2CC").setFontWeight("bold").setFontSize(14)
@@ -548,13 +706,13 @@ function idm_view_(ss, state, notice) {
     active: true,
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
-    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo },
+    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual },
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
     // Earlier steps, for the "✅ "Student Data" Successful" lines under Option 1
     done: IDM_STEPS.slice(0, state.step).map(st => {
       const r = (state.results || {})[st.key] || {};
-      return { name: st.tab, rows: r.rows || 0, skipped: !r.rows };
+      return { name: st.tab, rows: r.rows || 0, skipped: !r.rows && !r.saved };
     }),
     notice: notice || null
   };
@@ -562,9 +720,19 @@ function idm_view_(ss, state, notice) {
 
 /** "MM/dd/yy" from the section's DATE UPDATED stamp, plus how many days ago (null = never). */
 function idm_lastUpdated_(raw, step) {
+  if (step.manual) {
+    const saved = PropertiesService.getDocumentProperties().getProperty(IDM_SITECLASS_UPDATED_KEY);
+    return saved ? idm_dateInfo_(saved) : null;
+  }
   const text = String(raw.getRange(step.stampCell).getDisplayValue());
-  const m = text.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (!m || /00\/00\/00/.test(text)) return null;
+  if (/00\/00\/00/.test(text)) return null;
+  return idm_dateInfo_(text);
+}
+
+/** { text: "MM/dd/yy", days } from the first date in a string (null if none). */
+function idm_dateInfo_(text) {
+  const m = String(text).match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
   let year = Number(m[3]);
   if (year < 100) year += 2000;
   const date = new Date(year, Number(m[1]) - 1, Number(m[2]));
@@ -576,6 +744,7 @@ function idm_lastUpdated_(raw, step) {
 function idm_summary_(results) {
   return IDM_STEPS.map(step => {
     const r = (results || {})[step.key];
+    if (r && r.saved) return "✅ " + step.zone + ": " + r.rows + " class(es) saved";
     if (r && r.rows) return "✅ " + step.zone + ": " + r.rows + " row(s) imported";
     if (r && r.skipped) return "⏭️ " + step.zone + ": skipped (old data kept)";
     return "— " + step.zone + ": not loaded (old data kept)";
@@ -583,7 +752,7 @@ function idm_summary_(results) {
 }
 
 function idm_anyImported_(results) {
-  return IDM_STEPS.some(step => (results || {})[step.key] && results[step.key].rows > 0);
+  return IDM_STEPS.some(step => (results || {})[step.key] && (results[step.key].rows > 0 || results[step.key].saved));
 }
 
 function idm_parseCsv_(text) {
