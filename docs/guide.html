@@ -50,11 +50,6 @@
   .info{ background:#eef4ff; border-left:5px solid var(--blue); } .info .t{ color:var(--blue); }
   .warn{ background:#fef2f2; border-left:5px solid var(--red); } .warn .t{ color:var(--red); }
   .ok{ background:#f0fdf4; border-left:5px solid var(--green); } .ok .t{ color:var(--green); }
-  /* screenshot placeholder */
-  .shot{ border:2px dashed #94a3b8; background:var(--rowshade); border-radius:6px;
-    text-align:center; padding:26px 14px; margin:12px 0; color:var(--mute); }
-  .shot .lbl{ font-weight:700; font-size:10pt; letter-spacing:.5px; }
-  .shot .cap{ font-style:italic; font-size:9.5pt; margin-top:4px; }
   /* tables */
   table{ border-collapse:collapse; width:100%; margin:10px 0; font-size:9.7pt; }
   th,td{ border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
@@ -139,10 +134,10 @@
     of the directory pushed into your phone through Google Contacts.</p>
   <p>It's organized into three kinds of sheets:</p>
   <ul>
-    <li><b>The Engine</b> — RAW Data and Type List, where you paste your system exports and customize your dropdowns.</li>
+    <li><b>The Engine</b> — RAW Data and the Backend tab's Type List, where you paste your system exports and customize your dropdowns.</li>
     <li><b>The Workspaces</b> — Contact Log and Events, where you'll spend most of your day logging calls and workshops.</li>
     <li><b>The Output</b> — automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided,
-      PCAR, and Phone Contacts. You never type into these — they build themselves.</li>
+      PCAR, Phone Contacts, and New Students. You never type into these — they build themselves.</li>
   </ul>
   <div class="box info"><span class="t">New here?</span> Do the one-time setup in Part 1, load your data,
     run Build, and you're running in a few minutes.</div>
@@ -170,12 +165,10 @@
     Then click <b>🚀 App Menu → 🚨 Initial Setup (Run Once)</b>. This does the behind-the-scenes wiring:</p>
   <ul>
     <li>Authorizes the script to run as you.</li>
-    <li>Installs the automatic triggers — instant Contact Log updates, a nightly refresh/sync (~11 PM), and a periodic update check.</li>
+    <li>Installs the automatic triggers — instant Contact Log updates, a nightly refresh/sync (overnight), and a periodic update check.</li>
     <li>Records this copy as your original (a clone-detector so a later copy starts clean).</li>
     <li>Applies the default tab layout and opens this User Guide.</li>
   </ul>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The 🚀 App Menu open, showing "🚨 Initial Setup (Run Once)."</div></div>
   <div class="box warn"><span class="t">Until setup is done, the sheet is intentionally locked.</span>
     If you type before running Initial Setup, you'll see "🔒 Action Blocked — Initialization process needs to occur first." That's expected.</div>
 
@@ -185,8 +178,6 @@
     choose your account → Allow</b>.</p>
   <p>"Unverified" means Google hasn't done a formal brand review — <i>not</i> that anything is wrong.
     You are granting permission to a script that runs entirely inside <b>your own</b> account.</p>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The Google consent screen: "Google hasn't verified this app" → Advanced → Go to … (unsafe) → Allow.</div></div>
 
   <h3>What each authorization actually does</h3>
   <p>On the Allow screen, Google lists the permissions below. The tool asks only for what it needs — and
@@ -234,21 +225,25 @@
     <li>Export the "Students with Non-NYCSA Account" report.</li>
     <li>Copy the data and paste it into <b>cell AP2</b>.</li>
   </ol>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The RAW Data tab showing the colored PASTE boxes (Blue A5 / Orange AG6 / Green AP2).</div></div>
 
   <h3>Missing or wrong data? Use the New/Edit Student override</h3>
   <p>District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact
-    info before it hits ATS, use <b>👤 Student Overrides → New / Edit Student</b>. When you build, the script
-    checks your overrides first and applies them across the entire directory. (More in Part 2.)</p>
+    info before it hits ATS, use <b>👤 Student Overrides → New / Edit Student</b>. When you build, your overrides
+    are applied to the Master Table, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist.
+    The <b>Directory</b> and <b>New Students</b> tabs always show ATS (RAW Data) only. Overrides also tidy themselves
+    up: a "New Student" override is removed once ATS has that student, an edit that ATS now matches exactly is
+    removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)</p>
 
-  <h3>Customizing dropdowns — the Type List tab</h3>
-  <p>The optional <b>Type</b> column in the Contact Log is driven by the <b>Type List</b> tab. Edit that tab to
-    set your own conversation-topic categories (for example: Attendance, Behavior, Enrollment, IEP).</p>
+  <h3>Customizing dropdowns — the Type List</h3>
+  <p>The optional <b>Type</b> column in the Contact Log is driven by the Type List in the hidden <b>Backend</b> tab
+    (column BL). Unhide Backend and edit that column to set your own conversation-topic categories (for example:
+    Attendance, Behavior, Enrollment, IEP).</p>
 
   <h2>Step 5 — Build the sheets</h2>
-  <p>Run <b>🚀 App Menu → 🏗️ Build Sheets Only</b>. A progress sidebar generates every derived tab. The
-    <i>first</i> successful build unlocks the full menu — a toast asks you to press <b>F5</b> to refresh.</p>
+  <p>Run <b>🚀 App Menu → 🏗️ Build Sheets Only</b>. A progress sidebar generates every derived tab. When it
+    finishes, the sidebar shows a short report — new students, discharged students, and families newly signed up
+    for NYCSA or ParentSquare (click a count to see the names). The <i>first</i> successful build unlocks the full
+    menu — a toast asks you to press <b>F5</b> to refresh.</p>
   <div class="box ok"><span class="t">The golden rule of this sheet</span>
     RAW Data is the only tab you paste into. Everything else is generated — so re-running Build always safely
     rebuilds it. Never hand-type into Master Table, Directory, or other generated tabs.</div>
@@ -279,7 +274,7 @@
   <table>
     <thead><tr><th style="width:35%">Menu item</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td>✨ New / Edit Student</td><td>Add a student who isn't in ATS, or correct a name, phone, email, language, class, grade, or up to 5 guardians. Also set a status Label and "Hide from Report (Stealth Mode)." Rebuilds in the background (~1 min).</td></tr>
+      <tr><td>✨ New / Edit Student</td><td>Add a student who isn't in ATS, or correct a name, phone, email, language, grade, or up to 5 guardians (a student's class always follows RAW Data once they're in ATS). Also set a status Label and "Hide from Report (Stealth Mode)." Saving opens the Build sidebar and rebuilds the sheets (if rebuilds are paused in Settings, it just saves).</td></tr>
       <tr><td>🗂️ Manage Overrides</td><td>See every override you've made; edit or delete any of them.</td></tr>
       <tr><td>📄 Override Report</td><td>A side-by-side "Students Override Report" comparing raw ATS data against your overrides. Stealth-mode students are skipped.</td></tr>
     </tbody>
@@ -289,25 +284,26 @@
   <p>Use the Events tab for large-scale attendances (workshops, graduations, fairs) so they don't clutter your
     daily Contact Log. Click <b>📆 Events → 📋 New Event</b>. A pop-up with a calendar picker asks for the event
     name, type/category (with a <b>PTC Quick Fill</b> button for "Parent Teacher Conference"), and location, then
-    builds an attendance table. Log attendees by OSIS — they map back to each student's Combined Contact Tracking
-    and tally automatically in PCAR.</p>
+    builds an attendance table. Log attendees by OSIS, student name, or guardian name — type one, paste a whole
+    column, or put several OSIS numbers in one cell separated by commas — and the Ghost Typist fills in the rest.
+    Attendees map back to each student's Combined Contact Tracking and tally automatically in PCAR.</p>
 
   <h2>The tabs — what each one is for</h2>
   <table>
     <thead><tr><th style="width:24%">Tab</th><th>Purpose</th><th style="width:20%">Visible by default?</th></tr></thead>
     <tbody>
       <tr><td>RAW Data</td><td>Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA).</td><td>Yes</td></tr>
-      <tr><td>Type List</td><td>Drives the optional Type dropdown in the Contact Log. Edit it to set your own categories.</td><td>Yes</td></tr>
       <tr><td>Contact Log</td><td>The heart of the tool. Log every guardian contact here (deep dive below).</td><td>Yes</td></tr>
-      <tr><td>Master Table</td><td>The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.</td><td>Yes (generated)</td></tr>
-      <tr><td>Directory</td><td>A clean, printable class directory merging ATS, ParentSquare, and NYCSA data.</td><td>Yes (generated)</td></tr>
+      <tr><td>Master Table</td><td>The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.</td><td>Hidden (generated)</td></tr>
+      <tr><td>Directory</td><td>A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.</td><td>Yes (generated)</td></tr>
       <tr><td>Combined Contact Tracking</td><td>One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting.</td><td>Yes (generated)</td></tr>
+      <tr><td>New Students</td><td>A running log of students who are new to ATS (or came back from Discharged): date entered, OSIS, student, guardian, site, class, and language. Each build adds to it.</td><td>Yes (generated)</td></tr>
       <tr><td>PCAR</td><td>Your auto-compiled PCAR numbers (Phone, Walk-In, Workshops, PTCs, totals).</td><td>Yes (generated)</td></tr>
       <tr><td>Phone Contacts</td><td>The exact data pushed to Google Contacts.</td><td>Hidden (optional)</td></tr>
       <tr><td>Parents Divided</td><td>One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges.</td><td>Hidden (optional)</td></tr>
-      <tr><td>Notes</td><td>An optional manual notes tab with its own auto-fill and duplicate protection.</td><td>Hidden (optional)</td></tr>
+      <tr><td>Notes</td><td>An optional manual notes tab (one row per family) with its own auto-fill and duplicate protection. Its notes show at the top of that student's Combined Contact Tracking.</td><td>Hidden (optional)</td></tr>
       <tr><td>Send Out</td><td>Optional tab tied to extra PCAR rows.</td><td>Hidden (optional)</td></tr>
-      <tr><td>Version / Backend_Event_Log</td><td>Behind-the-scenes tabs (build date, saved settings, event data). Leave them alone.</td><td>Hidden (system)</td></tr>
+      <tr><td>Backend</td><td>Behind-the-scenes sections side by side: Version &amp; saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ) and the Type List that drives the Contact Log Type dropdown (BL). Only edit the Type List.</td><td>Hidden (system)</td></tr>
     </tbody>
   </table>
 
@@ -327,24 +323,24 @@
       <tr><td>Site &amp; Class</td><td>(Optional) Auto-fills from the student's profile; can be hidden in Settings.</td></tr>
       <tr><td>📱🚶 Category</td><td>Categorize for PCAR — e.g., Phone, Walk-In, Parent-Teacher.</td></tr>
       <tr><td>Method</td><td>The exact method — Call, Email, In School, etc.</td></tr>
-      <tr><td>Type</td><td>(Optional) A custom topic dropdown driven by the Type List tab; can be hidden in Settings.</td></tr>
+      <tr><td>Type</td><td>(Optional) A custom topic dropdown driven by the Backend tab's Type List; can be hidden in Settings.</td></tr>
       <tr><td>Notes</td><td>Detailed notes about the conversation.</td></tr>
       <tr><td>⁉️ Follow-Up Needed</td><td>A visual flag: Yes · Yes – Important · No · Waiting on Someone · Completed. Auto-fills to "No" if blank.</td></tr>
       <tr><td>Followup Notes</td><td>Next steps or what you did after the initial contact (e.g., "Teacher will reach out").</td></tr>
-      <tr><td>Hide</td><td>Check this box to hide the row from view while keeping its data active for PCAR counting.</td></tr>
+      <tr><td>Hide</td><td>Check this box to keep this note out of the compiled notes (Combined Contact Tracking and Phone Contacts). The row stays in the Contact Log and still counts for PCAR.</td></tr>
     </tbody>
   </table>
   <p>Three things the Contact Log does for you automatically:</p>
   <ul>
-    <li><b>Ghost Typist.</b> Type an OSIS, student name, or guardian name and the other identity columns
-      (plus Site and Class, including for siblings) fill in. If it can't match, it warns "Could not find … in the Master Table."</li>
+    <li><b>Ghost Typist.</b> Type — or paste a whole column of — OSIS numbers, student names, or guardian names, and
+      the other identity columns (plus Site and Class, including for siblings) fill in for every row. If it can't match,
+      it warns "Could not find … in the Master Table" (after a paste, it lists the ones it couldn't find).</li>
     <li><b>Smart auto-fill.</b> Entering real content stamps today's Date, sets # to 1, and Follow-up to "No" —
       but only where you left them blank. Anything you typed yourself is never overwritten.</li>
     <li><b>Auto-adding rows + the master hide filter.</b> A fresh blank row is always kept above the dark "END"
-      bar, and the checkbox on the END-bar row toggles hiding of your hidden rows.</li>
+      bar. The checkbox on the END-bar row turns on a filter that shows only this and last week's rows (or only
+      today's — see Settings), plus anything still marked for follow-up.</li>
   </ul>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The Contact Log: the pre-call search bar up top and a row being auto-filled by the Ghost Typist.</div></div>
   <div class="box info"><span class="t">If the Ghost Typist says "Could not find … in the Master Table"</span>
     That family isn't compiled yet. Run 🏗️ Build Sheets Only once, then try again.</div>
 
@@ -360,6 +356,7 @@
       <tr><td>Disable Nightly Sync Entirely</td><td>Turns off the automatic nightly rebuild and phone sync completely.</td></tr>
       <tr><td>Update Contact Log only on Build</td><td>Notes stop syncing on every edit and update only when you run Build.</td></tr>
       <tr><td>Disable Contact Log Auto-Fill</td><td>Stops auto-stamping Date, #, and Follow-up. The parent/student/OSIS lookup still fills in.</td></tr>
+      <tr><td>Contact Log: Show Today Only</td><td>Off shows this and last week's rows in the Contact Log; on shows only today's. Important notes and open follow-ups always show.</td></tr>
       <tr><td>Date Range for Compiled Notes</td><td>Limits compiled notes to a window (Last Month / 6 Months / Year presets). Blank = all time.</td></tr>
       <tr><td>Disable Hidden Notes (Show All)</td><td>Includes notes you've hidden with the row checkbox in the compiled output.</td></tr>
       <tr><td>Hide "Discharged" in Master Table</td><td>Visual only — filters discharged students out of view.</td></tr>
@@ -367,10 +364,8 @@
       <tr><td>Reset to Default Settings</td><td>Returns every toggle to its default (optional tabs/columns hidden, features on).</td></tr>
     </tbody>
   </table>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The ⚙️ Settings dialog with its toggle switches.</div></div>
   <div class="box ok"><span class="t">Settings travel with your copy.</span>
-    Your choices are saved into the hidden Version tab, so a future upgrade copy inherits them automatically.</div>
+    Your choices are saved into the hidden Backend tab, so a future upgrade copy inherits them automatically.</div>
 
   <h2>Build vs. Full Sync — know the difference</h2>
   <table>
@@ -400,8 +395,6 @@
     <li>Smart-map the Contact Log — it matches columns by their headers, so it still works even if the layout changed, and strips blank/"ghost" rows.</li>
     <li>Finalize and rebuild all directories.</li>
   </ol>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The System Upgrade Wizard with the old-sheet URL box and the six-step checklist.</div></div>
   <div class="box ok"><span class="t">Migration is one-directional and non-destructive.</span>
     It reads your old sheet and writes into the new one. Nothing is deleted from the old sheet — keep it as a backup.</div>
 
@@ -411,7 +404,8 @@
     a link to the newest copy. You can also check any time with <b>🚀 App Menu → 🔔 Check for Updates</b>.</p>
   <p>Inside that dialog you can:</p>
   <ul>
-    <li><b>Dismiss</b> — hide this update until something even newer ships.</li>
+    <li><b>Dismiss for now</b> — close it; it pops up again on the next check.</li>
+    <li><b>Dismiss this update</b> — hide this update until something even newer ships.</li>
     <li><b>Major updates only</b> — automatic pop-ups only for big releases (a manual check still shows everything).</li>
     <li><b>Stop automatic update checks</b> — silence the on-open checks; the manual menu check always still works.</li>
   </ul>
@@ -427,8 +421,6 @@
     <li>Freezes the sheet — turns off nightly and phone sync so it won't overwrite next year's data — and renames it "… – Retired on [date]."</li>
     <li>Hands you the link to next year's fresh, fast template.</li>
   </ul>
-  <div class="shot"><div class="lbl">📷 SCREENSHOT PLACEHOLDER</div>
-    <div class="cap">The End of Year Rollover wizard: archive summary and the "Get New Template" button.</div></div>
   <div class="box info"><span class="t">Rollover is safe to run once you're done for the year.</span>
     It archives and freezes the OLD sheet; you then set up a brand-new copy for the new year. Keep the retired sheet and its PDF as your record.</div>
 </section>
@@ -482,6 +474,7 @@
     <li><b>Back-dating works.</b> Type your own date, count, or follow-up status and the auto-fill leaves it alone.</li>
     <li><b>Hide vs. Purge discharged.</b> "Hide Discharged" is a reversible view filter; "Purge" permanently deletes.</li>
     <li><b>Refresh if a menu looks stale.</b> Pressing F5 always reloads the latest menu.</li>
+    <li><b>Fresh-data reminder.</b> If the ATS data in RAW Data is more than 30 days old, the sheet reminds you (once a day) when you open it to paste a fresh export.</li>
   </ul>
 
   <h2>Troubleshooting / FAQ</h2>
@@ -504,8 +497,8 @@
     <thead><tr><th>✅ Do</th><th>🚫 Don't</th></tr></thead>
     <tbody>
       <tr><td class="do">Paste raw data only into RAW Data — as Values Only.</td><td class="dont">Type into Master Table, Directory, or other generated tabs — they're overwritten on build.</td></tr>
-      <tr><td class="do">Use Overrides to fix names, phones, or add students.</td><td class="dont">Rename or delete the generated / hidden tabs (including Version).</td></tr>
-      <tr><td class="do">Run Build after big changes.</td><td class="dont">Hand-edit the hidden Version tab's saved settings.</td></tr>
+      <tr><td class="do">Use Overrides to fix names, phones, or add students.</td><td class="dont">Rename or delete the generated / hidden tabs (including Backend).</td></tr>
+      <tr><td class="do">Run Build after big changes.</td><td class="dont">Hand-edit the hidden Backend tab's saved settings.</td></tr>
       <tr><td class="do">Keep your old / retired sheet as a backup until the new one is verified.</td><td class="dont">Purge discharged students unless you're certain.</td></tr>
     </tbody>
   </table>
@@ -517,10 +510,10 @@
       <tr><td>OSIS</td><td>The unique student ID number from ATS. Used to match students, siblings, and contacts.</td></tr>
       <tr><td>ATS / Insight</td><td>The NYC DOE student data systems your Raw Data export comes from (via TeachHub).</td></tr>
       <tr><td>PCAR</td><td>Parent Coordinator Activity Report — the reporting numbers this tool compiles.</td></tr>
-      <tr><td>Ghost Typist</td><td>The auto-fill that completes a Contact Log (or Notes) row from a single OSIS or name.</td></tr>
+      <tr><td>Ghost Typist</td><td>The auto-fill that completes a Contact Log, Notes, or Events row from a single OSIS or name.</td></tr>
       <tr><td>Override</td><td>A correction or addition to student/guardian info without changing raw ATS data.</td></tr>
       <tr><td>Stealth Mode</td><td>An override flag that keeps a student out of the Override Report.</td></tr>
-      <tr><td>NYCSA / ParentSquare</td><td>Parent account/communication systems whose exports feed the directory.</td></tr>
+      <tr><td>NYCSA / ParentSquare</td><td>Parent account/communication systems whose exports show each family's sign-up status in Parents Divided and Phone Contacts.</td></tr>
       <tr><td>Build</td><td>Regenerating all derived tabs from your current data (🏗️ Build Sheets Only).</td></tr>
     </tbody>
   </table>
