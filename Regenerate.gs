@@ -34,6 +34,7 @@ function resetToDisplayModeSteps_(ss) {
   resizeContactLog_(ss, 3);
   
   resetContactLog_(ss);
+  setFollowupDropdown_(ss); // Column N: only the 5 follow-up options
   clearTypeDropdownColors_(ss); // Wipe the dropdown colors!
   resetMasterTable_(ss);
   resetNotes_(ss);
@@ -133,6 +134,7 @@ function loadFakeDataSteps_(ss) {
   resizeContactLog_(ss, 30);
   
   resetContactLog_(ss);
+  setFollowupDropdown_(ss); // Column N: only the 5 follow-up options
   clearTypeDropdownColors_(ss); // Wipe the old colors before loading new data!
   resetMasterTable_(ss);
   resetNotes_(ss);
@@ -502,34 +504,34 @@ function loadFakeContactLog_(ss) {
     return fmtDate(d);
   };
 
-  // [days ago, Guardian, Spoke with, OSIS, Student, Method 1, Method 2, Type, Notes, Follow-up (N), Follow-up notes (O), checkbox (P)]
+  // [days ago, Guardian, Spoke with, OSIS, Student, Method 1, Method 2, Type, Notes, Follow-up (N: FOLLOWUP_OPTIONS_), Follow-up notes (O), checkbox (P)]
   const rows = [
-    [20,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Call","Student Activities","Asked about after-school programs","No","",false],
-    [17,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Call","School Schedule","Homer asked about start of school year","No","",false],
-    [16,"Linda Belcher and Bob Belcher","Bob Belcher",967891234,"Gene Belcher","Walk In","Meeting","School Meeting","Discussed music class schedule","Waiting For Response","Teacher checking the band list",false],
-    [15,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Walk In","Intake","Enrollment Documents","Submitted documents for enrollment","No","",true],
-    [14,"Mr. Incredible and Mrs. Incredible","Mrs. Incredible",345678912,"Dash Incredible","Parent-Teacher","In School","School Meeting","Attended parent-teacher conference","No","",false],
-    [13,"Mr. Incredible and Mrs. Incredible","Mr. Incredible",456789123,"Violet Incredible","Phone","Parent Meeting","Academic Inquiry","Asked about academic progress","Yes","",false],
-    [12,"Homer Simpson and Marge Simpson","Marge Simpson",123456789,"Bart Simpson","Phone","Email","Contact Request","Requesting teacher contact info","No","",true],
-    [11,"Morticia Addams and Gomez Addams","Gomez Addams",245678912,"Pugsley Addams","Phone","Call","Academic Support","Discussed science fair project","Need To Follow Up","",true],
-    [10,"Ann Possible and James Possible","Ann Possible",978912345,"Kim Possible","Phone","Email","Records Request","Requested volunteer forms","Yes","",false],
-    [9,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Email","Email Request","Requested teacher email again","Yes - Important","",true],
-    [8,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Phone","Call","Progress Review","Discussed student progress","No","Called principal",false],
-    [7,"Rio Morales and Jefferson Morales","Rio Morales",789123456,"Miles Morales","Phone","Call","Attendance Meeting","Discussed attendance concerns","No","",true],
-    [6,"Rio Morales and Jefferson Morales","Jefferson Morales",789123456,"Miles Morales","Phone","Email","Records Request","Requested IEP documents","Yes","",false],
-    [6,"Fa Zhou","Fa Zhou",989123456,"Mulan Fa","Phone","Call","Meeting Request","Needs a Chinese interpreter for meetings","Followup ASAP","Ask the office for an interpreter",true],
-    [5,"May Parker","May Parker",678912345,"Peter Parker","Phone","Call","Academic Support","Asked about tutoring options","Newer Interaction","",false],
-    [4,"Martha Kent and Jonathan Kent","Martha Kent",891234567,"Clark Kent","Phone","Call","College Planning","Discussed college readiness","Yes - Important","",true],
-    [3,"Martha Kent and Jonathan Kent","Jonathan Kent",891234567,"Clark Kent","Phone","Call","Attendance Progress","Confirmed attendance improvement","No","",false],
-    [3,"Julieta Madrigal and Agustin Madrigal","Julieta Madrigal",991234567,"Mirabel Madrigal","Workshop","In School","Student Activities","Attended family literacy workshop","No","",false],
-    [2,"Alfred Pennyworth","Alfred Pennyworth",912345678,"Bruce Wayne","Walk In","Meeting","Behavioral Consultation","Discussed behavioral concerns","Yes","",true],
-    [2,"Pepper Potts","Pepper Potts",923456789,"Tony Stark","Phone","Email","Student Records","Requested report card copy","No","",false],
-    [1,"Betty Ross","Betty Ross",934567891,"Bruce Banner","Phone","Call","Housing Situation","Discussed housing situation","No","",true],
-    [1,"Hippolyta","Hippolyta",945678912,"Diana Prince","Phone","Call","Student Activities","Asked about extracurriculars","No","",false],
-    [1,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Email","Contact Request","Asked for a callback about the bus route","Need to respond","",false],
-    [0,"Homer Simpson and Marge Simpson","Homer Simpson",567891234,"Lisa Simpson","Phone","Call","Academic Advising","Discussed academic performance","No","",false],
-    [0,"Homer Simpson and Marge Simpson","Marge Simpson",567891234,"Lisa Simpson","Phone","Email","Meeting Request","Requested meeting with teacher","No","Teacher will reach out",false],
-    [0,"Ann Possible and James Possible","James Possible",978912345,"Kim Possible","Phone","Call","School Meeting","Confirmed attendance at PTC","Waiting - Check Up","",false]
+    [20,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Call","Student Activities","Asked about after-school programs","No Followup Needed","",false],
+    [17,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Call","School Schedule","Homer asked about start of school year","Skipped / Newer Interaction","",false],
+    [16,"Linda Belcher and Bob Belcher","Bob Belcher",967891234,"Gene Belcher","Walk In","Meeting","School Meeting","Discussed music class schedule","Followed Up / Resolved","Teacher checking the band list",false],
+    [15,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Walk In","Intake","Enrollment Documents","Submitted documents for enrollment","No Followup Needed","",true],
+    [14,"Mr. Incredible and Mrs. Incredible","Mrs. Incredible",345678912,"Dash Incredible","Parent-Teacher","In School","School Meeting","Attended parent-teacher conference","No Followup Needed","",false],
+    [13,"Mr. Incredible and Mrs. Incredible","Mr. Incredible",456789123,"Violet Incredible","Phone","Parent Meeting","Academic Inquiry","Asked about academic progress","Followed Up / Resolved","",false],
+    [12,"Homer Simpson and Marge Simpson","Marge Simpson",123456789,"Bart Simpson","Phone","Email","Contact Request","Requesting teacher contact info","No Followup Needed","",true],
+    [11,"Morticia Addams and Gomez Addams","Gomez Addams",245678912,"Pugsley Addams","Phone","Call","Academic Support","Discussed science fair project","Followup Needed","",true],
+    [10,"Ann Possible and James Possible","Ann Possible",978912345,"Kim Possible","Phone","Email","Records Request","Requested volunteer forms","Followed Up / Resolved","",false],
+    [9,"Homer Simpson and Marge Simpson","Homer Simpson",123456789,"Bart Simpson","Phone","Email","Email Request","Requested teacher email again","Followup Needed - ASAP","",true],
+    [8,"Morticia Addams and Gomez Addams","Morticia Addams",234567891,"Wednesday Addams","Phone","Call","Progress Review","Discussed student progress","No Followup Needed","Called principal",false],
+    [7,"Rio Morales and Jefferson Morales","Rio Morales",789123456,"Miles Morales","Phone","Call","Attendance Meeting","Discussed attendance concerns","No Followup Needed","",true],
+    [6,"Rio Morales and Jefferson Morales","Jefferson Morales",789123456,"Miles Morales","Phone","Email","Records Request","Requested IEP documents","Followup Needed","",false],
+    [6,"Fa Zhou","Fa Zhou",989123456,"Mulan Fa","Phone","Call","Meeting Request","Needs a Chinese interpreter for meetings","Followup Needed - ASAP","Ask the office for an interpreter",true],
+    [5,"May Parker","May Parker",678912345,"Peter Parker","Phone","Call","Academic Support","Asked about tutoring options","Skipped / Newer Interaction","",false],
+    [4,"Martha Kent and Jonathan Kent","Martha Kent",891234567,"Clark Kent","Phone","Call","College Planning","Discussed college readiness","Followup Needed - ASAP","",true],
+    [3,"Martha Kent and Jonathan Kent","Jonathan Kent",891234567,"Clark Kent","Phone","Call","Attendance Progress","Confirmed attendance improvement","No Followup Needed","",false],
+    [3,"Julieta Madrigal and Agustin Madrigal","Julieta Madrigal",991234567,"Mirabel Madrigal","Workshop","In School","Student Activities","Attended family literacy workshop","No Followup Needed","",false],
+    [2,"Alfred Pennyworth","Alfred Pennyworth",912345678,"Bruce Wayne","Walk In","Meeting","Behavioral Consultation","Discussed behavioral concerns","Followup Needed","",true],
+    [2,"Pepper Potts","Pepper Potts",923456789,"Tony Stark","Phone","Email","Student Records","Requested report card copy","Followed Up / Resolved","",false],
+    [1,"Betty Ross","Betty Ross",934567891,"Bruce Banner","Phone","Call","Housing Situation","Discussed housing situation","No Followup Needed","",true],
+    [1,"Hippolyta","Hippolyta",945678912,"Diana Prince","Phone","Call","Student Activities","Asked about extracurriculars","No Followup Needed","",false],
+    [1,"Linda Belcher and Bob Belcher","Linda Belcher",956789123,"Louise Belcher","Phone","Email","Contact Request","Asked for a callback about the bus route","Followup Needed","",false],
+    [0,"Homer Simpson and Marge Simpson","Homer Simpson",567891234,"Lisa Simpson","Phone","Call","Academic Advising","Discussed academic performance","No Followup Needed","",false],
+    [0,"Homer Simpson and Marge Simpson","Marge Simpson",567891234,"Lisa Simpson","Phone","Email","Meeting Request","Requested meeting with teacher","Followup Needed","Teacher will reach out",false],
+    [0,"Ann Possible and James Possible","James Possible",978912345,"Kim Possible","Phone","Call","School Meeting","Confirmed attendance at PTC","No Followup Needed","",false]
   ];
 
   const writeRows = rows.slice(0, maxRows);
@@ -754,6 +756,35 @@ function resetContactLog_(ss) {
   }
 }
 
+// Contact Log column N (Follow-up) dropdown options. Reset replaces N's dropdown
+// with exactly these, which deletes every other option.
+var FOLLOWUP_OPTIONS_ = [
+  "No Followup Needed", "Followup Needed", "Followup Needed - ASAP",
+  "Followed Up / Resolved", "Skipped / Newer Interaction"
+];
+
+/**
+ * Sets the Follow-up dropdown (N, rows 2 to above END) to FOLLOWUP_OPTIONS_. Rows
+ * that already have exactly that list are left alone, so chip colors set by hand
+ * survive; replacing a list resets its chips to gray (Apps Script can't set them).
+ */
+function setFollowupDropdown_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) return;
+  const endRow = findEndRowInColumnE_(sheet);
+  if (!endRow || endRow <= 2) return;
+  const range = sheet.getRange(2, 14, endRow - 2, 1);
+  const wanted = FOLLOWUP_OPTIONS_.join("\u0001");
+  const alreadyRight = range.getDataValidations().every(r => {
+    const rule = r[0];
+    return rule && rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST &&
+      rule.getCriteriaValues()[0].join("\u0001") === wanted;
+  });
+  if (alreadyRight) return;
+  range.setDataValidation(SpreadsheetApp.newDataValidation()
+    .requireValueInList(FOLLOWUP_OPTIONS_, true).build());
+}
+
 function resetMasterTable_(ss) {
   const sheet = ss.getSheetByName("Master Table");
   if (sheet && sheet.getMaxRows() >= 5) {
@@ -896,11 +927,13 @@ function resetDerivedSheets_(ss) {
  */
 function getContactLogHideFormula_() {
   const todayOnly = PropertiesService.getDocumentProperties().getProperty('contactLogTodayOnly') === 'true';
-  const dateCheck = todayOnly ? '$B2 = TODAY()' : 'AND($A2 >= TODAY() - 7, $A2 <= TODAY())';
-  return '=NOT(OR(' + dateCheck + ', $B2 = "", ' +
-    'REGEXMATCH($N2, "(?i)\\bYes\\b(\\s*-\\s*Important)?"), ' +
-    '$N2 = "Need To Follow Up", $N2 = "Followup ASAP", $N2 = "Need to respond", ' +
-    '$N2 = "Waiting For Response", $N2 = "Waiting - Check Up"))';
+  // Owner's rule (2026-11-04): a dated row greys out (and the filter hides it) once it is
+  // no longer today's (or this week's, when Settings shows the week) unless Follow-up
+  // still needs action.
+  const notInWindow = todayOnly ? 'INT($B2)<>TODAY()' : 'NOT(AND($A2 >= TODAY() - 7, $A2 <= TODAY()))';
+  return '=AND($B2<>"", ' + notInWindow + ', ' +
+    'TRIM($N2)<>"Followup Needed", TRIM($N2)<>"Followup Needed - ASAP", TRIM($N2)<>"Need to respond", ' +
+    'TRIM($N2)<>"Waiting For Response", TRIM($N2)<>"Waiting - Check Up")';
 }
 
 function resetContactLogFormatting() {

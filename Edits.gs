@@ -426,11 +426,11 @@ function createContactLogHideFilter_(sheet, lastRow) {
 //   B (2)  = today's date (a real midnight Date, so the week formula in Col A and
 //            the "today = green" / week-band conditional formatting all work)
 //   G (7)  = 1  (# of interactions; this also clears the red "missing" flag)
-//   N (14) = "No"  (the follow-up status dropdown's default)
+//   N (14) = "No Followup Needed"  (the follow-up status dropdown's default)
 //
 // Rules:
 //   • FILL-IF-BLANK: never overwrite a cell the user already filled. Back-dating a
-//     date, setting G to 3, or choosing "Yes - Important" in N is all preserved.
+//     date, setting G to 3, or choosing "Followup Needed - ASAP" in N is all preserved.
 //   • Skipped entirely when 'disableContactAutofill' is set in Settings. The
 //     separate parent/student/OSIS lookup is NOT affected by that switch.
 //   • Only fires on genuine single-cell content edits inside the live table
@@ -465,7 +465,7 @@ function autofillContactLogDefaults_(sheet, row, col, endRow, editedValue) {
   if (String(rowVals[5]).trim() === "") sheet.getRange(row, 7).setValue(1);
 
   // N (14): Follow-up status dropdown — only if empty (never flip a chosen value).
-  if (String(rowVals[12]).trim() === "") sheet.getRange(row, 14).setValue("No");
+  if (String(rowVals[12]).trim() === "") sheet.getRange(row, 14).setValue("No Followup Needed");
 }
 
 // =========================================================
