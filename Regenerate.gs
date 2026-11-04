@@ -926,12 +926,10 @@ function resetDerivedSheets_(ss) {
  * Important or still needing action, regardless of date.
  */
 function getContactLogHideFormula_() {
-  const todayOnly = PropertiesService.getDocumentProperties().getProperty('contactLogTodayOnly') === 'true';
-  // Owner's rule (2026-11-04): a dated row greys out (and the filter hides it) once it is
-  // no longer today's (or this week's, when Settings shows the week) unless Follow-up
-  // still needs action.
-  const notInWindow = todayOnly ? 'INT($B2)<>TODAY()' : 'NOT(AND($A2 >= TODAY() - 7, $A2 <= TODAY()))';
-  return '=AND($B2<>"", ' + notInWindow + ', ' +
+  // Owner's rule (2026-11-04), used as is by every reset, the nightly run and Settings save:
+  // a dated row greys out (and the filter hides it) once it is not today's, unless
+  // Follow-up still needs action. (The "Contact Log shows" setting no longer changes it.)
+  return '=AND($B2<>"", INT($B2)<>TODAY(), ' +
     'TRIM($N2)<>"Followup Needed", TRIM($N2)<>"Followup Needed - ASAP", TRIM($N2)<>"Need to respond", ' +
     'TRIM($N2)<>"Waiting For Response", TRIM($N2)<>"Waiting - Check Up")';
 }

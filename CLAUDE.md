@@ -89,9 +89,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   ASAP / Followed Up / Resolved / Skipped / Newer Interaction. Every reset runs setFollowupDropdown_, which replaces N's
   dropdown with exactly these (deleting other options) unless it already is that list (keeps hand-set chip colors;
   Apps Script cannot set chip colors). Autofill default for N = "No Followup Needed" (Edits.gs). Hide rule for P
-  (getContactLogHideFormula_, owner's 2026-11-04 formula): =AND($B2<>"", INT($B2)<>TODAY() [week setting: not in the
-  last 7 days by col A], TRIM($N2)<> Followup Needed / Followup Needed - ASAP / Need to respond / Waiting For Response /
-  Waiting - Check Up). The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).
+  (getContactLogHideFormula_, owner's 2026-11-04 formula): =AND($B2<>"", INT($B2)<>TODAY(), TRIM($N2)<> Followup Needed / Followup Needed - ASAP / Need to respond / Waiting For Response /
+  Waiting - Check Up), always (contactLogTodayOnly no longer changes it). The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).
 - Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
   Belcher Louise/Gene + override-only Tina, Addams Wednesday/Pugsley), Parent Square, NYCSA, Site/Class in the new
   BH:BI format (one row per site, classes one per line; 5 of 6 sites have 2-3 classes; "Y12"/"Y50" have no teacher),
