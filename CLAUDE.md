@@ -76,7 +76,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   loadFakeDataSteps_ on the copy via ownerRunOnCopy_: SpreadsheetApp.setActiveSpreadsheet(copy) because the build /
   buildEventTable / buildOverrideReport use the active spreadsheet, then switches back and restores this script's
   document properties with setProperties(saved, true), since the build's ATS snapshot lives there; refuses to run if
-  the switch did not happen). resetToDisplayMode / resetAndLoadFakeData = confirm + these *Steps_ functions + alert;
+  the switch did not happen; sets OWNER_HOOKS_CACHE_ = null for the run so the copy is built like a
+  shared sheet, because the owner deletes z_MINE.gs from the copy). resetToDisplayMode / resetAndLoadFakeData = confirm + these *Steps_ functions + alert;
   loadFakeDataSteps_ throws unless ss is the active spreadsheet. buildMenus_ also adds the owner menus before
   Initial Setup (a copy's setup flag is not copied) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /

@@ -158,7 +158,8 @@ function ownerMenuCopyForFakeData() {
     }
 
     ownerShowCopyLink_(copy.getUrl(), "✅ Copy loaded with fake data",
-      "This sheet was not changed.<br><br>The copy has no automatic triggers (edits, nightly): " +
+      "This sheet was not changed. The copy was built like every other school's sheet: delete z_MINE.gs " +
+      "from the copy's Extensions &gt; Apps Script.<br><br>The copy has no automatic triggers (edits, nightly): " +
       "run 🚀 App Menu → Initial Setup there if you want to test typing in it.");
   });
 }
@@ -167,18 +168,24 @@ function ownerMenuCopyForFakeData() {
  * Runs fn with copy as the active spreadsheet, then makes this sheet active again and
  * restores this script's document properties (settings, build snapshot, ...) exactly.
  * Refuses to run fn unless the switch really happened, so this sheet is never wiped.
+ * The copy is built like every other school's sheet (no owner hooks: regular Phone
+ * Contacts layout and name split, no New Students tab), because z_MINE.gs gets deleted
+ * from the copy.
  */
 function ownerRunOnCopy_(copy, fn) {
   const original = SpreadsheetApp.getActiveSpreadsheet();
   const props = PropertiesService.getDocumentProperties();
   const savedProps = props.getProperties();
+  const savedHooks = OWNER_HOOKS_CACHE_;
   SpreadsheetApp.setActiveSpreadsheet(copy);
   try {
     if (SpreadsheetApp.getActiveSpreadsheet().getId() !== copy.getId() || copy.getId() === original.getId()) {
       throw new Error("Could not switch to the copy, so nothing was loaded (this sheet was not touched).");
     }
+    OWNER_HOOKS_CACHE_ = null; // getOwnerHooks_() (Core.gs) now answers "no owner file" for this run
     return fn();
   } finally {
+    OWNER_HOOKS_CACHE_ = savedHooks;
     SpreadsheetApp.setActiveSpreadsheet(original);
     props.setProperties(savedProps, true); // true = also delete keys the run added
   }
