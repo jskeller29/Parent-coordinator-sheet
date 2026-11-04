@@ -74,10 +74,7 @@ function ownerMenuResetAndLoadFakeData() {
 }
 
 function ownerMenuResetToDisplayMode() {
-  if (ownerConfirmWipe_("Reset to Display Mode")) runAction_("Reset to Display Mode", () => {
-    resetToDisplayMode();
-    refreshSearchBarCommunications_(); // the reset emptied Combined Contact Tracking
-  });
+  if (ownerConfirmWipe_("Reset to Display Mode")) runAction_("Reset to Display Mode", () => resetToDisplayMode());
 }
 
 /**
@@ -104,7 +101,6 @@ function ownerMenuCopyAndResetToDisplayMode() {
     ss.toast("Resetting the copy to Display Mode…", "📄 Copy + Reset", 60);
     try {
       resetToDisplayModeSteps_(copy); // Regenerate.gs: same steps as Reset to Display Mode
-      refreshSearchBarCommunications_(copy.getSheetByName("Contact Log"));
       SpreadsheetApp.flush();
     } catch (e) {
       ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but its reset stopped partway",
