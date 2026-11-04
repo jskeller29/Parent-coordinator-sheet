@@ -38,12 +38,7 @@ function handleEdit_(e) {
   // Puts back locked cells (headers, the END bar and below, PCAR, built tabs)
   // and asks before 2+ rows are cleared at once. Runs before every handler.
   const lock = sheetLockGuard_(e, sheet, sheetName);
-  if (lock.stop) {
-    // The lock put the area below END back from its snapshot: redraw the search
-    // bar's Communications box so it doesn't show the snapshot's older notes
-    if (sheetName === "Contact Log" && lock.endRow && range.getLastRow() > lock.endRow) refreshSearchBarCommunications_(sheet, lock.endRow);
-    return;
-  }
+  if (lock.stop) return;
 
   // --- TRIGGER THE EVENTS GHOST TYPIST & BACKEND ---
   if (sheetName === "Events") {
@@ -79,11 +74,7 @@ function handleEdit_(e) {
   }
   // ------------------------
 
-  if (endRow && row >= endRow) {
-    // An edit in the search bar below the END bar (e.g. typing an OSIS)
-    if (row > endRow) refreshSearchBarCommunications_(sheet, endRow);
-    return;
-  }
+  if (endRow && row >= endRow) return;
 
   // =======================================================
   // CONTACT LOG GHOST TYPIST — PASTED COLUMN (fills every pasted row)
@@ -251,169 +242,14 @@ function handleEdit_(e) {
         "⚡ Fast Entry Mode", 
         3
       );
-      refreshSearchBarCommunications_(sheet);
     }
 
   } else {
     if (col === CL_COL_OSIS && !editedValue) {
       updateContactAndPhoneOnly();
     }
-    refreshSearchBarCommunications_(sheet);
   }
 }
-
-// =========================================================
-// CONTACT LOG SEARCH BAR — COMMUNICATIONS (TEST: code instead of formula)
-// The search bar sits a few rows below the END bar. Its "Communications" box
-// used to be one formula in column D (=LET(... HSTACK("Communications", ...)))
-// spilling the notes into E. The script now writes the label into D and the
-// notes into E as plain values, with the same rules the formula used:
-//   - OSIS = column E of the row ABOVE the label (the search bar's OSIS box)
-//   - each OSIS in a "111, 222" group: its notes from Combined Contact
-//     Tracking (A = OSIS, D = notes); name from Master Table (A = OSIS, B)
-//   - "▶ Name" above each student's notes only when F two rows above the
-//     label is not blank (same cell the formula looked at)
-//   - notes joined by a blank line, a leading "Notes:" removed, spaces
-//     trimmed; nothing found = "No Notes"; empty OSIS box = blank
-// Redrawn after every quick update (updateOsisDeltas_), every Build, and every
-// edit in the search bar area. To go back to the formula, run
-// restoreSearchBarCommunicationsFormula from the Apps Script editor.
-// =========================================================
-const SEARCH_BAR_COMMS_LABEL = "Communications";
-const SEARCH_BAR_SCAN_ROWS = 15;          // rows below END searched for the label
-const SEARCH_BAR_COMMS_PROP = "SEARCH_BAR_COMMS_MODE"; // "formula" = left to the old formula
-const SHEETS_CELL_LIMIT = 50000;
-
-/** Row of the "Communications" label (column D) below the END bar, or null. */
-function findSearchBarCommsRow_(sheet, endRow) {
-  const first = endRow + 1;
-  const count = Math.min(SEARCH_BAR_SCAN_ROWS, sheet.getMaxRows() - endRow);
-  if (count < 1) return null;
-  const labels = sheet.getRange(first, 4, count, 1).getDisplayValues();
-  for (let i = 0; i < labels.length; i++) {
-    if (String(labels[i][0]).trim() === SEARCH_BAR_COMMS_LABEL) return first + i;
-  }
-  return null;
-}
-
-/** Same as Sheets' TRIM: drops leading/trailing spaces and collapses repeated spaces. */
-function sheetsTrim_(text) {
-  return String(text).replace(/ {2,}/g, " ").replace(/^ +| +$/g, "");
-}
-
-/**
- * Exact-match lookup on one column, like VLOOKUP(..., FALSE) tried as a number
- * and as text: compares the trimmed display text, case-insensitive, first hit.
- */
-function searchBarRowOf_(displayColumn, osis) {
-  const key = String(osis).trim().toLowerCase();
-  if (!key) return -1;
-  for (let i = 0; i < displayColumn.length; i++) {
-    if (String(displayColumn[i][0]).trim().toLowerCase() === key) return i;
-  }
-  return -1;
-}
-
-/** The Communications text for an OSIS box value (same result the formula gave). */
-function buildSearchBarCommunications_(ss, osisBox, showNames) {
-  if (String(osisBox) === "") return "";
-  const osisList = String(osisBox).split(",").filter(o => o !== "").map(o => sheetsTrim_(o));
-
-  const master = ss.getSheetByName("Master Table");
-  const combined = ss.getSheetByName("Combined Contact Tracking");
-  const masterRows = master && master.getLastRow() > 0 ? master.getRange(1, 1, master.getLastRow(), 2).getDisplayValues() : [];
-  const combinedOsis = combined && combined.getLastRow() > 0 ? combined.getRange(1, 1, combined.getLastRow(), 1).getDisplayValues() : [];
-
-  const blocks = [];
-  osisList.forEach(osis => {
-    const c = searchBarRowOf_(combinedOsis, osis);
-    const notes = c === -1 ? "" : String(combined.getRange(c + 1, 4).getDisplayValue());
-    if (notes === "") return;
-    if (!showNames) { blocks.push(notes); return; }
-    const m = searchBarRowOf_(masterRows.map(r => [r[0]]), osis);
-    const name = m === -1 ? "Unknown" : masterRows[m][1];
-    blocks.push("▶ " + name + "\n" + notes);
-  });
-
-  const joined = blocks.join("\n\n");
-  const cleaned = sheetsTrim_(joined.replace(/^notes:\s*[\r\n]*/i, ""));
-  if (joined === "" || joined === "0" || cleaned === "" || cleaned === "0") return "No Notes";
-  return cleaned.length > SHEETS_CELL_LIMIT ? cleaned.slice(0, SHEETS_CELL_LIMIT - 1) + "…" : cleaned;
-}
-
-/** Redraws the search bar's Communications box. Never throws (it runs inside edits). */
-function refreshSearchBarCommunications_(sheet, endRow) {
-  try {
-    if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") return;
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    sheet = sheet || ss.getSheetByName("Contact Log");
-    if (!sheet) return;
-    SpreadsheetApp.flush(); // the OSIS box is a formula: let it catch up first
-    endRow = endRow || findEndRowInColumnE_(sheet);
-    if (!endRow) return;
-    const row = findSearchBarCommsRow_(sheet, endRow);
-    if (!row || row - 2 <= endRow) return;
-
-    const osisBox = sheet.getRange(row - 1, 5).getDisplayValue();     // E, row above
-    const showNames = sheet.getRange(row - 2, 6).getDisplayValue() !== ""; // F, two rows above
-    const text = buildSearchBarCommunications_(ss, osisBox, showNames);
-
-    // Label first (this replaces the old formula), then the notes beside it
-    const label = sheet.getRange(row, 4);
-    if (label.getFormula() !== "" || label.getValue() !== SEARCH_BAR_COMMS_LABEL) label.setValue(SEARCH_BAR_COMMS_LABEL);
-    const box = sheet.getRange(row, 5);
-    if (box.getFormula() !== "" || box.getDisplayValue() !== text) box.setValue(text);
-  } catch (err) {
-    console.error("Search bar Communications not updated: " + err.message);
-  }
-}
-
-/** Puts the original Communications formula back and stops the script from redrawing it. */
-function restoreSearchBarCommunicationsFormula() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Contact Log");
-  const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
-  const row = endRow ? findSearchBarCommsRow_(sheet, endRow) : null;
-  if (!row) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
-
-  PropertiesService.getDocumentProperties().setProperty(SEARCH_BAR_COMMS_PROP, "formula");
-  sheet.getRange(row, 5).clearContent();
-  sheet.getRange(row, 4).setFormula(SEARCH_BAR_COMMS_FORMULA);
-  ss.toast("Communications is a formula again.", "Search Bar", 5);
-}
-
-/** Lets the script draw Communications again (undoes restoreSearchBarCommunicationsFormula). */
-function useCodeForSearchBarCommunications() {
-  PropertiesService.getDocumentProperties().deleteProperty(SEARCH_BAR_COMMS_PROP);
-  refreshSearchBarCommunications_();
-  SpreadsheetApp.getActiveSpreadsheet().toast("Communications is drawn by the script.", "Search Bar", 5);
-}
-
-/** The original formula (only used to put it back). */
-const SEARCH_BAR_COMMS_FORMULA = `=LET(
-  targetE, INDIRECT(ADDRESS(ROW()-1, COLUMN()+1)),
-  targetF, INDIRECT(ADDRESS(ROW()-2, COLUMN()+2)),
-  HSTACK(
-    "Communications",
-    IF(targetE="","", LET(
-      osisArray, SPLIT(targetE, ",", FALSE, TRUE),
-      allNotes, MAP(osisArray, LAMBDA(osis, 
-         LET(
-           oText, TO_TEXT(TRIM(osis)),
-           oNum, IFERROR(VALUE(oText), oText),
-           
-           name, IFNA(VLOOKUP(oNum, 'Master Table'!A:B, 2, FALSE), IFNA(VLOOKUP(oText, 'Master Table'!A:B, 2, FALSE), "Unknown")),
-           notes, IFNA(VLOOKUP(oNum, 'Combined Contact Tracking'!A:D, 4, FALSE), IFNA(VLOOKUP(oText, 'Combined Contact Tracking'!A:D, 4, FALSE), "")),
-           
-           IF(notes="", "", IF(targetF="", notes, "▶ " & name & CHAR(10) & notes))
-         )
-      )),
-      n, TEXTJOIN(CHAR(10) & CHAR(10), TRUE, allNotes),
-      cleaned, TRIM(REGEXREPLACE(n,"(?i)^notes:\\s*[\\r\\n]*","")),
-      IF(OR(n="", n="0", cleaned="", cleaned="0"), "No Notes", cleaned)
-    ))
-  )
-)`;
 
 // =========================================================
 // HELPER FUNCTIONS FOR TRIGGERS
@@ -1154,14 +990,8 @@ function updateSingleOsisDelta_(targetOsis) {
 function updateOsisDeltas_(osisList) {
   // The owner's sheet also rewrites that student's Phone Contacts rows
   const owner = getOwnerHooks_();
-  if (owner) owner.updateOsisDeltas(osisList);
-  else sharedUpdateOsisDeltas_(osisList);
+  if (owner) return owner.updateOsisDeltas(osisList);
 
-  // The notes just changed, so redraw the search bar's Communications box
-  refreshSearchBarCommunications_();
-}
-
-function sharedUpdateOsisDeltas_(osisList) {
   const targets = osisList.filter(o => o);
   if (!targets.length) return;
   const ss = SpreadsheetApp.getActiveSpreadsheet();

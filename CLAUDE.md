@@ -185,18 +185,6 @@ SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" t
   Pastes and checkbox-only unticks do not ask. An all-empty selection copy is ignored (onSelectionChange can read the
   rows AFTER a fast Delete), so it then asks and offers Ctrl+Z. The column A toast only shows for edits in A alone.
 
-Contact Log search bar (rows below END; formulas typed in the sheet, not in the repo):
-- TEST (Test-Version): the "Communications" box is drawn by code, not a formula (CONTACT LOG SEARCH BAR section of
-  Edits.gs). refreshSearchBarCommunications_ finds the "Communications" label in column D within 15 rows below END,
-  writes the label as text in D and the notes as a value in E, using the old formula's rules (OSIS = E of the row
-  above, "▶ Name" when F two rows above is not blank, Combined Contact Tracking D + Master Table B). Runs after
-  updateOsisDeltas_ (Contact Log / Notes / Events / Contact Log tool), at the end of buildAllDerivedSheets, and on
-  any Contact Log edit below END. restoreSearchBarCommunicationsFormula puts the formula back (doc property
-  SEARCH_BAR_COMMS_MODE = "formula" stops the code); useCodeForSearchBarCommunications switches back.
-  The other search bar cells (OSIS, Student, Student Information, Parent Data) are still formulas.
-  The build redraws it BEFORE applySheetLocks_, so the END-bar snapshot holds fresh notes; when the sheet lock puts the
-  area below END back (lock.stop in handleEdit_), Communications is redrawn right after.
-
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
   changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
