@@ -208,6 +208,14 @@
     $('doneTitle').textContent = v.exited ? '🚪 Input Data Mode closed' : '🎉 All done!';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = v.notice.message; show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported);
+    // Delete the temp tab now that the user has been moved off it (see IDM_PENDING_DELETE_KEY)
+    setTimeout(function () {
+      clog('call idm_deleteLeftoverTab');
+      google.script.run
+        .withSuccessHandler(function (r) { clog('leftover tab deleted: ' + (r && r.deleted)); if (r && r.debug) $('dbgServer').textContent = 'SERVER (delete tab)\n' + r.debug.join('\n'); })
+        .withFailureHandler(function (e) { clog('delete tab FAILED: ' + (e && e.message ? e.message : e)); })
+        .idm_deleteLeftoverTab();
+    }, 1500);
     $('summary').innerHTML = (v.summary || []).map(function (s) { return '<div>' + s + '</div>'; }).join('');
   }
 

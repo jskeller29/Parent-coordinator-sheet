@@ -33,6 +33,11 @@ function idm_log_(msg) {
   IDM_DBG.push("+" + (Date.now() - IDM_DBG.t0) + "ms " + msg);
 }
 var IDM_PLACEHOLDER = 'PASTE HERE';
+// Apps Script breaks ("Sheet 123 not found") for the rest of the session if a
+// call deletes the tab the user is on. So the temp tab is reused (cleared and
+// renamed) between steps, and at the end it is deleted in a SEPARATE call,
+// after the user has been moved off it. Its id waits here until then.
+var IDM_PENDING_DELETE_KEY = 'INPUT_DATA_MODE_DELETE_TAB';
 
 // Same headers / columns / date stamps as cleanRawDataPasteZone_ and
 // updateRawDataTimestamp_ (Edits.gs). Keep them in step.
@@ -80,6 +85,7 @@ var IDM_STEPS = [
 /** Called from onOpen (guarded). Adds the menu item; reminds the user if the mode was left on. */
 function addInputDataModeMenuItem_(menu) {
   menu.addItem("📥 Input Data Mode", "openInputDataMode");
+  try { idm_deleteLeftoverTab_(); } catch (e) { console.warn("Input Data Mode leftover tab: " + e.message); }
   try {
     if (idm_loadState_()) {
       SpreadsheetApp.getActiveSpreadsheet().toast(
@@ -94,6 +100,7 @@ function openInputDataMode() {
   const lock = LockService.getDocumentLock();
   lock.waitLock(20000);
   try {
+    try { idm_deleteLeftoverTab_(); } catch (e) { console.warn("Input Data Mode leftover tab: " + e.message); }
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let state = idm_loadState_();
     if (!state) {
@@ -247,7 +254,29 @@ function idm_goToTempSheet() {
 
 /** Last screen: run the normal Build Sheets Only (opens the Build sidebar). */
 function idm_build() {
+  idm_deleteLeftoverTab_();
   runBuildOnly();
+  return true;
+}
+
+/** Sidebar calls this right after the last screen shows: deletes the finished temp tab. */
+function idm_deleteLeftoverTab() {
+  return idm_withLock_(() => ({ deleted: idm_deleteLeftoverTab_() }));
+}
+
+/** Deletes the finished temp tab unless the user is on it (then it waits for next time). */
+function idm_deleteLeftoverTab_() {
+  const props = PropertiesService.getDocumentProperties();
+  const id = props.getProperty(IDM_PENDING_DELETE_KEY);
+  if (!id) return false;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = idm_sheetById_(ss, Number(id));
+  if (!sheet) { props.deleteProperty(IDM_PENDING_DELETE_KEY); return false; }
+  const active = ss.getActiveSheet();
+  if (active && active.getSheetId() === sheet.getSheetId()) { idm_log_("leftover tab is the active tab; not deleting yet"); return false; }
+  ss.deleteSheet(sheet);
+  props.deleteProperty(IDM_PENDING_DELETE_KEY);
+  idm_log_("leftover temp tab deleted");
   return true;
 }
 
@@ -423,9 +452,16 @@ function idm_advance_(ss, state, notice) {
     idm_cleanup_(ss, state, true);
     return { active: false, finished: true, notice: notice, anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
   }
-  state.tempId = null;
-  const next = idm_ensureTempSheet_(ss, state); // created + activated before the old one goes
-  if (oldTemp && oldTemp.getSheetId() !== next.getSheetId()) ss.deleteSheet(oldTemp);
+  if (oldTemp) {
+    // Same tab, cleared and renamed for the next export (never deleted while the user is on it)
+    oldTemp.setName(idm_uniqueTabName_(ss, IDM_STEPS[state.step].tab, oldTemp));
+    idm_resetTempSheet_(oldTemp);
+    oldTemp.activate();
+    idm_log_("temp tab reused as " + oldTemp.getName());
+  } else {
+    state.tempId = null;
+    idm_ensureTempSheet_(ss, state);
+  }
   idm_saveState_(state);
   return idm_view_(ss, state, notice);
 }
@@ -439,15 +475,23 @@ function idm_ensureTempSheet_(ss, state) {
     return sheet;
   }
   const step = IDM_STEPS[state.step];
-  let name = step.tab, n = 2;
-  while (ss.getSheetByName(name)) name = step.tab + " (" + (n++) + ")";
-  sheet = ss.insertSheet(name, 0);
+  sheet = ss.insertSheet(idm_uniqueTabName_(ss, step.tab, null), 0);
   if (sheet.getMaxColumns() < 40) sheet.insertColumnsAfter(sheet.getMaxColumns(), 40 - sheet.getMaxColumns());
   sheet.setTabColor("#f1c232");
   idm_resetTempSheet_(sheet);
   sheet.activate();
   state.tempId = sheet.getSheetId();
   return sheet;
+}
+
+/** "Student Data", or "Student Data (2)" if the user already has a tab with that name. */
+function idm_uniqueTabName_(ss, base, self) {
+  let name = base, n = 2;
+  for (;;) {
+    const other = ss.getSheetByName(name);
+    if (!other || (self && other.getSheetId() === self.getSheetId())) return name;
+    name = base + " (" + (n++) + ")";
+  }
 }
 
 function idm_resetTempSheet_(sheet) {
@@ -485,8 +529,10 @@ function idm_cleanup_(ss, state, goToRawData) {
   let landing = (target && !target.isSheetHidden() && (!temp || target.getSheetId() !== temp.getSheetId())) ? target : null;
   if (!landing) landing = ss.getSheets().filter(s => !s.isSheetHidden() && (!temp || s.getSheetId() !== temp.getSheetId()))[0] || null;
   if (landing) landing.activate();
-  if (temp && landing) ss.deleteSheet(temp); // a spreadsheet needs at least one visible tab
-  PropertiesService.getDocumentProperties().deleteProperty(IDM_STATE_KEY);
+  const props = PropertiesService.getDocumentProperties();
+  // Deleted by the sidebar's next call (idm_deleteLeftoverTab), once the user is off it
+  if (temp && landing) props.setProperty(IDM_PENDING_DELETE_KEY, String(temp.getSheetId()));
+  props.deleteProperty(IDM_STATE_KEY);
 }
 
 // ---------------------------------------------------------------------

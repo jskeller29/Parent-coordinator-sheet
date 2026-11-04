@@ -34,6 +34,9 @@ Files (shared = every school's sheet):
   then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
   updateRawDataTimestamp_). Skip keeps old data. Never touches BH:BI (MAKE OWN DATA). State in doc property
   INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
+  Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
+  temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
+  (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
