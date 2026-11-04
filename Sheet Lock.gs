@@ -170,13 +170,13 @@ function desiredSheetLocks_(sheet, name) {
     });
   } else if (SHEET_LOCK_HEADER_TABS.indexOf(name) !== -1) {
     sheetLockRects_(sheet, name, name === "Contact Log" ? findEndRowInColumnE_(sheet) : null).forEach(r => {
-      // Column A is protected down to the bottom of the sheet (it overlaps the END bar
-      // lock), so the rows added above END land inside it and it grows with them
-      const r2 = r.zone === "CLWEEK" ? sheet.getMaxRows() : r.r2;
+      // No Google warning on column A: it covers every log row, so deleting or clearing
+      // one row would warn. Column A is only put back by the edit guard (weekFormula_).
+      if (r.zone === "CLWEEK") return;
       out.push({
         kind: "RANGE",
-        range: sheet.getRange(r.r1, r.c1, r2 - r.r1 + 1, r.c2 - r.c1 + 1),
-        desc: desc + (r.zone === "CLEND" ? "Contact Log END bar and below" : r.zone === "CLWEEK" ? "Contact Log column A (Last Sunday formula)" : "header row")
+        range: sheet.getRange(r.r1, r.c1, r.r2 - r.r1 + 1, r.c2 - r.c1 + 1),
+        desc: desc + (r.zone === "CLEND" ? "Contact Log END bar and below" : "header row")
       });
     });
   }

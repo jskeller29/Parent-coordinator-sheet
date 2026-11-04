@@ -164,7 +164,7 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 
 SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" turns it off):
 - Locked: row 1 of Contact Log / Notes / Send Out; Contact Log column A (week formula, put back with weekFormula_;
-  protected A2 to the sheet bottom); Contact Log END bar row (except O, the FILTER? checkbox) and
+  NO Google warning on it, so deleting / clearing one log row never warns; the next applySheetLocks_ removes the old one); Contact Log END bar row (except O, the FILTER? checkbox) and
   everything below it; row 2 (headers) of every Events table; PCAR except H2:I2; the whole built tabs (Master Table,
   Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report, New Students).
   Not locked: Raw Data, Backend, owner-only tabs, and every place fake data loads (Contact Log rows above END,
