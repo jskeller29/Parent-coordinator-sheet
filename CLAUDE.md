@@ -7,6 +7,8 @@ This is a Google Apps Script project (a Google Sheets add-on for student/roster 
 Owner-only files (in the repo, but deployed ONLY to the owner's own sheet):
 - z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On are never copied into other schools' sheets.
   The "z_" prefix makes them load last so they can redefine shared functions for that one sheet.
+- Z#ContactLog.gs + Z#ContactLogSidebar.html: "Z#" = a temporary file for trying out a new feature. No other code
+  may rely on Z# files (the only link is the guarded `if (typeof buildContactLogMenu_ === "function")` in onOpen).
 - Shared code must not depend on them. Owner-only behavior (e.g. pulling from "Old Master Table" /
   "Old Phone Contacts") belongs in those files, never in the shared .gs files.
 - Shared Directory rule: draws only from Raw Data (no overrides, no discharged students).
