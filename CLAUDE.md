@@ -87,6 +87,10 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
   Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
+- Contact Log student lookup box (2 rows below END: OSIS / Student / Communications / Student Information + guardian
+  table): resetContactLog_ ends with fixContactLogLookupBox_, which deletes leftover "Parent Contact (COPY)" header rows
+  (+ the row under it when blank / #REF!) and redraws a thick black outline (left = "Communications" column, right = end
+  of the merged "Student Information" title, top = END + 2, bottom = last guardian row under "Relationship").
 - Send Out tab = a Sheets Table "Table1": A Date, B Send Out Title, C Send Out Type, D On Behalf Of, E Where Did You
   Send (dropdowns C:E), F Population, G # Reached, H Attachments (file chips); I "Behalf of List", J "Sending Location
   List" (kept). Dropdown options come from Backend BH3:BJ3 formulas (fixed options + values already typed:

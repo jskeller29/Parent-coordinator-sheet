@@ -812,6 +812,67 @@ function resetContactLog_(ss) {
       sheet.deleteRows(startDeleteRow, rowsToDelete);
     }
   }
+
+  // 6. Student lookup box under the END row: delete the leftover "Site / Phone Number /
+  //    Parent Contact (COPY)" rows (header + its #REF! row) and redraw the box's outline.
+  fixContactLogLookupBox_(sheet, endRow);
+}
+
+/**
+ * The student lookup box below the Contact Log's END row (OSIS / Student / Communications /
+ * Student Information, then the guardian table). Deletes every leftover "Parent Contact (COPY)"
+ * header row and the row under it (only when that row is blank or shows #REF!), then draws a
+ * thick black outline from 2 rows below END down to the box's last row.
+ */
+function fixContactLogLookupBox_(sheet, endRow) {
+  const below = () => {
+    const rows = sheet.getMaxRows() - endRow;
+    return rows > 0 ? sheet.getRange(endRow + 1, 1, rows, sheet.getMaxColumns()) : null;
+  };
+
+  // 1. Leftover rows, bottom up so row numbers stay right
+  let area = below();
+  if (!area) return;
+  const copyRows = area.createTextFinder("Parent Contact (COPY)").matchEntireCell(true).findAll()
+    .map(c => c.getRow()).filter((r, i, a) => a.indexOf(r) === i).sort((a, b) => b - a);
+  copyRows.forEach(r => {
+    let count = 1;
+    if (r < sheet.getMaxRows()) {
+      const next = sheet.getRange(r + 1, 1, 1, sheet.getMaxColumns()).getDisplayValues()[0];
+      if (next.every(v => v === "" || v === "#REF!")) count = 2;
+    }
+    sheet.deleteRows(r, count);
+  });
+
+  // 2. Outline: left = the "Communications" label's column, right = the end of the
+  //    "Student Information" title (merged), bottom = the last guardian row.
+  area = below();
+  if (!area) return;
+  const comm = area.createTextFinder("Communications").matchEntireCell(true).findNext();
+  const info = area.createTextFinder("Student Information").matchEntireCell(true).findNext();
+  if (!comm || !info) return;
+  const infoRange = info.isPartOfMerge() ? info.getMergedRanges()[0] : info;
+  const top = endRow + 2;
+  const left = comm.getColumn();
+  const right = infoRange.getLastColumn();
+  if (right < left || comm.getRow() < top) return;
+
+  // Scan down from the guardian table's header ("Relationship"), so a blank spacer row
+  // above it does not end the box early
+  const rel = area.createTextFinder("Relationship").matchEntireCell(true).findNext();
+  const scanFrom = rel && rel.getRow() > comm.getRow() ? rel.getRow() : comm.getRow();
+  const cols = right - left + 1;
+  const values = sheet.getRange(top, left, sheet.getMaxRows() - top + 1, cols).getDisplayValues();
+  let bottom = scanFrom;
+  for (let i = scanFrom - top + 1; i < values.length; i++) {
+    if (values[i].every(v => v === "")) break; // first empty row ends the box
+    bottom = top + i;
+  }
+
+  // Clear the old outline around the box (incl. a stray bottom line one row lower), then draw it
+  sheet.getRange(top, left, bottom - top + 2, cols).setBorder(false, false, false, false, null, null);
+  sheet.getRange(top, left, bottom - top + 1, cols)
+    .setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
 }
 
 function resetMasterTable_(ss) {
