@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include_('Styles') ?>
+  <style>
+    body { padding: 14px 16px 24px; }
+    .stack { gap: 16px; }
+    .intro { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+    .sec { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .sec > .eyebrow { margin-bottom: -2px; }
+    .f2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .f2 > div, .fld { min-width: 0; }
+    .lab { font-size: 12.5px; margin-bottom: 4px; }
+    select, input[type=number] { height: 32px; font-size: 13.5px; }
+    .picker { display: flex; gap: 6px; }
+    .picker select { flex: 1; min-width: 0; }
+    .picker .btn { width: 32px; height: 32px; padding: 0; font-size: 18px; }
+    .colorrow { display: flex; gap: 6px; align-items: center; }
+    .colorrow select { flex: 1; min-width: 0; }
+    .sw-chip { width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--line); flex: 0 0 auto; background: transparent; }
+    .sw-chip.keep { background: repeating-linear-gradient(45deg, #ffffff 0 4px, #e9edf2 4px 8px); }
+    .colorrow input[type=color] { width: 32px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: var(--radius); background: #ffffff; flex: 0 0 auto; }
+    .why { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .status { font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; align-items: flex-start; min-height: 18px; }
+    .status.warn { color: var(--warn); }
+    .status.ok { color: var(--ok); }
+    .row-btns { display: flex; gap: 8px; align-items: center; }
+    .row-btns .btn { flex: 1; }
+    textarea { font-size: 12.5px; min-height: 150px; line-height: 1.45; }
+    details { border-top: 1px solid var(--line); padding-top: 12px; }
+    details summary { cursor: pointer; font-weight: 600; font-size: 13.5px; }
+    details[open] summary { margin-bottom: 10px; }
+    .others { max-height: 150px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+    .others .cbx, .grp .cbx { font-size: 13px; }
+    .grp { display: flex; flex-direction: column; gap: 8px; }
+    .grp .help { display: block; margin-top: 1px; }
+    .sticky { position: sticky; top: 0; z-index: 5; background: #ffffff; padding-bottom: 10px; margin-bottom: -6px; border-bottom: 1px solid var(--line); }
+  </style>
+</head>
+<body>
+  <div class="stack">
+
+    <div class="sticky stack" style="gap:10px">
+      <p class="intro">Try fonts, colors and row styles on a <b>copy</b> of a tab (the "Style Preview" tab). Your real tabs don't change. When you like it, copy your picks at the bottom and send them to me.</p>
+      <div>
+        <label class="lab" for="tab">Tab to try styles on</label>
+        <select id="tab"></select>
+      </div>
+      <label class="cbx" for="auto"><input type="checkbox" id="auto" checked><span>Update the preview as I change things</span></label>
+      <div class="row-btns"><button type="button" class="btn pri" id="showBtn">Show preview</button><button type="button" class="btn sec" id="resetBtn">Start over</button></div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="sec">
+      <div class="eyebrow">Text</div>
+      <div class="fld">
+        <label class="lab" for="font">Font</label>
+        <div class="picker">
+          <button type="button" class="btn sec" id="prevFont" title="Previous font (←)" aria-label="Previous font">‹</button>
+          <select id="font"></select>
+          <button type="button" class="btn sec" id="nextFont" title="Next font (→)" aria-label="Next font">›</button>
+        </div>
+        <div class="why" id="why"></div>
+      </div>
+      <div class="f2">
+        <div><label class="lab" for="size">Size</label><select id="size"></select></div>
+        <div><label class="lab" for="valign">Line up text</label><select id="valign"></select></div>
+      </div>
+      <div class="fld"><label class="lab" for="bodyText">Text color</label><div class="colorrow" data-for="bodyText"></div></div>
+      <div class="fld"><label class="lab" for="wrap">Long text</label><select id="wrap"></select></div>
+    </div>
+
+    <div class="sec">
+      <div class="eyebrow">Header rows</div>
+      <div class="f2">
+        <div><label class="lab" for="headerRows">How many rows</label><input type="number" id="headerRows" min="0" max="8" value="1"></div>
+        <div><label class="lab" for="headerBold">Bold</label><select id="headerBold"></select></div>
+      </div>
+      <div class="fld"><label class="lab" for="headerBg">Background</label><div class="colorrow" data-for="headerBg"></div></div>
+      <div class="fld"><label class="lab" for="headerText">Text color</label><div class="colorrow" data-for="headerText"></div></div>
+      <div class="fld"><label class="lab" for="headerSize">Header text size</label><select id="headerSize"></select></div>
+    </div>
+
+    <div class="sec">
+      <div class="eyebrow">Rows</div>
+      <div class="fld"><label class="lab" for="banding">Shade every other row</label><div class="colorrow" data-for="banding"></div></div>
+      <div class="fld"><label class="lab" for="bodyBg">Existing cell colors</label><select id="bodyBg"></select><div class="why">Cells that already have a color hide the shading. "Clear" removes them on the copy.</div></div>
+      <div class="f2">
+        <div><label class="lab" for="rowHeight">Row height</label><select id="rowHeight"></select></div>
+        <div><label class="lab" for="gridlines">Gridlines</label><select id="gridlines"></select></div>
+      </div>
+      <div class="fld"><label class="lab" for="lines">Lines between rows</label><select id="lines"></select></div>
+      <div class="fld"><label class="lab" for="lineColor">Line color</label><div class="colorrow" data-for="lineColor"></div></div>
+    </div>
+
+    <div class="sec">
+      <div class="eyebrow">Your picks</div>
+      <textarea id="picksText" readonly aria-label="Your picks"></textarea>
+      <div class="row-btns"><button type="button" class="btn pri" id="copyBtn">Copy my picks</button><button type="button" class="btn sec" id="clearBtn">Forget picks</button></div>
+    </div>
+
+    <details>
+      <summary>Optional: put a font on the real tabs now</summary>
+      <div class="grp">
+        <p class="help" style="margin:0">Uses the font picked above. The whole tab changes, and builds keep the font on the built tabs and the Contact Log.</p>
+        <label class="cbx" for="applyBuilt"><input type="checkbox" id="applyBuilt" checked><span>Built tabs<span class="help" id="builtList"></span></span></label>
+        <label class="cbx" for="applyContactLog"><input type="checkbox" id="applyContactLog" checked><span>Contact Log</span></label>
+        <div class="others" id="others"></div>
+        <label class="cbx" for="applyTheme"><input type="checkbox" id="applyTheme"><span>Also the spreadsheet's default font<span class="help">For new tabs and cells nobody has set a font on.</span></span></label>
+        <button type="button" class="btn sec wide" id="applyFontBtn">Apply font to these tabs</button>
+        <div class="hint" id="nowFonts"></div>
+        <button type="button" class="link" id="resetFontsBtn" style="align-self:flex-start">Back to the original fonts</button>
+      </div>
+    </details>
+
+    <div class="sec">
+      <button type="button" class="btn sec wide" id="removeBtn">Remove the Style Preview tab</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------------- option lists (recommended first, then a line, then the rest) ----------------
+    const KEEP = ['Keep as is', 'keep'];
+    const FONTS = {
+      rec: [
+        ['Roboto', "Google's own font. Narrow, so more fits in each column; numbers are easy to read."],
+        ['Source Sans 3', 'Matches the pop-ups and sidebars. If the copy shows Arial, Sheets doesn\'t have it.'],
+        ['IBM Plex Sans', 'Very clear letters and numbers, a bit more formal.'],
+        ['Atkinson Hyperlegible', 'Made for easy reading: 1, l and I or 0 and O are hard to mix up.'],
+        ['Lato', 'Friendly and rounded, still compact.'],
+        ['Montserrat', 'What the built tabs use today. Wide, so columns need more room.']
+      ],
+      rest: ['Arial', 'Inter', 'Open Sans', 'Noto Sans', 'Nunito Sans', 'Work Sans', 'Public Sans', 'Libre Franklin',
+             'Fira Sans', 'PT Sans', 'Barlow', 'Roboto Condensed', 'Roboto Mono', 'Verdana', 'Trebuchet MS',
+             'Georgia', 'Merriweather', 'Lora', 'Source Serif 4', 'Times New Roman']
+    };
+    const LISTS = {
+      size: { rec: [['10', '10']], rest: [['9', '9'], ['11', '11'], ['12', '12'], ['14', '14']] },
+      headerSize: { rec: [['11', '11']], rest: [['10', '10'], ['12', '12'], ['14', '14']] },
+      valign: { rec: [['Middle', 'middle']], rest: [['Top', 'top'], ['Bottom', 'bottom']] },
+      wrap: { rec: [['Cut off at the edge (clip)', 'clip']], rest: [['Wrap onto more lines', 'wrap'], ['Spill into the next cell', 'overflow']] },
+      headerBold: { rec: [['Bold', 'bold']], rest: [['Normal', 'normal']] },
+      bodyBg: { rec: [['Clear them', 'clear']], rest: [] },
+      rowHeight: { rec: [['24 (roomy)', '24']], rest: [['21 (Sheets default)', '21'], ['28', '28'], ['32', '32']] },
+      gridlines: { rec: [['Hide', 'hide']], rest: [['Show', 'show']] },
+      lines: { rec: [['Light line under each row', 'rows']], rest: [['Light grid around every cell', 'grid'], ['No lines', 'none']] }
+    };
+    const COLORS = {
+      bodyText: { rec: [['Ink', '#1b2430'], ['Black', '#000000'], ['Dark grey', '#3c4043']], rest: [['Navy', '#183e69'], ['Mid grey', '#566173']] },
+      headerBg: {
+        rec: [['Navy', '#183e69'], ['Dark blue (Raw Data today)', '#073763'], ['Charcoal', '#343c44'], ['Evergreen', '#1c6450'], ['Burgundy', '#7d2235'], ['Light grey', '#eef1f5'], ['Light navy', '#e3e8ee']],
+        rest: [['Teal', '#0e6a72'], ['Slate blue', '#3b5578'], ['Brown', '#6a4a2c'], ['Plum', '#5c3b70'], ['Light green', '#e6f1ea'], ['Light yellow', '#fbf1dc'], ['White', '#ffffff']]
+      },
+      headerText: { rec: [['White', '#ffffff'], ['Ink', '#1b2430'], ['Navy', '#183e69']], rest: [['Black', '#000000'], ['Dark grey', '#3c4043']] },
+      banding: {
+        rec: [['Light grey', '#f3f5f8'], ['Light navy', '#eef2f7'], ['Light green', '#eef5f1'], ['Light yellow', '#fdf8e7']],
+        rest: [['Light blue', '#e8f0fe'], ['Light purple', '#f3eefa'], ['Light orange', '#fdf0e6'], ['Light teal', '#e6f3f4']]
+      },
+      lineColor: { rec: [['Light grey', '#e1e5ea'], ['Mid grey', '#c9d0da']], rest: [['Light navy', '#c7d2e0'], ['Dark grey', '#8a94a3']], noKeep: true }
+    };
+    const WEB_SAFE = ['Arial', 'Verdana', 'Trebuchet MS', 'Georgia', 'Times New Roman'];
+    const WHY = {}; FONTS.rec.forEach(f => WHY[f[0]] = f[1]);
+    const FONT_ORDER = FONTS.rec.map(f => f[0]).concat(FONTS.rest);
+    const FIELDS = ['font', 'size', 'valign', 'bodyText', 'wrap', 'headerRows', 'headerBold', 'headerBg', 'headerText', 'headerSize', 'banding', 'bodyBg', 'rowHeight', 'gridlines', 'lines', 'lineColor'];
+
+    const el = id => document.getElementById(id);
+    const line = () => { const o = new Option('────────────', ''); o.disabled = true; return o; };
+
+    function fillSelect(sel, list, opts) {
+      opts = opts || {};
+      if (!opts.noKeep) { sel.add(new Option(KEEP[0], KEEP[1])); sel.add(line()); }
+      list.rec.forEach(x => sel.add(new Option(x[0] + (opts.showHex ? '  ' + x[1] : ''), x[1])));
+      if (list.rest.length) { sel.add(line()); list.rest.forEach(x => sel.add(new Option(x[0] + (opts.showHex ? '  ' + x[1] : ''), x[1]))); }
+      if (opts.custom) sel.add(new Option('Pick any color…', 'custom'));
+    }
+
+    // font list
+    fillSelect(el('font'), { rec: FONTS.rec.map(f => [f[0], f[0]]), rest: FONTS.rest.map(n => [n, n]) });
+    Object.keys(LISTS).forEach(k => fillSelect(el(k), LISTS[k]));
+    // color rows: select + swatch + custom picker
+    Object.keys(COLORS).forEach(k => {
+      const row = document.querySelector('.colorrow[data-for="' + k + '"]');
+      const sel = document.createElement('select'); sel.id = k;
+      fillSelect(sel, COLORS[k], { custom: true, noKeep: COLORS[k].noKeep });
+      const chip = document.createElement('span'); chip.className = 'sw-chip'; chip.id = k + 'Chip';
+      const pick = document.createElement('input'); pick.type = 'color'; pick.id = k + 'Pick'; pick.value = '#183e69'; pick.hidden = true; pick.setAttribute('aria-label', 'Pick any color');
+      row.appendChild(sel); row.appendChild(chip); row.appendChild(pick);
+      sel.addEventListener('change', () => { syncColor(k); changed(); });
+      pick.addEventListener('input', () => { syncColor(k); changed(); });
+    });
+    function syncColor(k) {
+      const sel = el(k), pick = el(k + 'Pick'), chip = el(k + 'Chip');
+      pick.hidden = sel.value !== 'custom';
+      const v = colorValue(k);
+      chip.className = 'sw-chip' + (v === 'keep' ? ' keep' : '');
+      chip.style.background = v === 'keep' ? '' : v;
+    }
+    function colorValue(k) { const s = el(k).value; return s === 'custom' ? el(k + 'Pick').value : s; }
+    function setColor(k, v) {
+      const sel = el(k);
+      const known = Array.prototype.some.call(sel.options, o => o.value === v && v !== 'custom');
+      if (known) sel.value = v;
+      else if (v && v !== 'keep') { sel.value = 'custom'; el(k + 'Pick').value = v; }
+      else sel.value = COLORS[k].noKeep ? COLORS[k].rec[0][1] : 'keep';
+      syncColor(k);
+    }
+
+    // ---------------- reading / writing the controls ----------------
+    function readStyle() {
+      const s = {};
+      FIELDS.forEach(f => { s[f] = COLORS[f] ? colorValue(f) : el(f).value; });
+      s.headerRows = String(Math.max(0, Math.min(8, Number(el('headerRows').value) || 0)));
+      return s;
+    }
+    function writeStyle(s) {
+      FIELDS.forEach(f => {
+        if (COLORS[f]) setColor(f, s[f]);
+        else if (f === 'headerRows') el(f).value = s[f] != null ? s[f] : 1;
+        else el(f).value = s[f] != null && Array.prototype.some.call(el(f).options, o => o.value === s[f]) ? s[f] : 'keep';
+      });
+      showFontNote();
+    }
+    function blankStyle(tab) {
+      const s = { headerRows: String((STATE && STATE.headerRows[tab]) || 1) };
+      FIELDS.forEach(f => { if (f !== 'headerRows') s[f] = 'keep'; });
+      s.lineColor = COLORS.lineColor.rec[0][1];
+      return s;
+    }
+
+    // ---------------- picks text ----------------
+    function labelOf(f, v) {
+      if (v === 'keep' || v == null) return null;
+      const lists = COLORS[f] || LISTS[f];
+      if (lists) { const hit = lists.rec.concat(lists.rest).find(x => x[1] === v); return COLORS[f] ? (hit ? hit[0] + ' ' + v : 'custom ' + v) : (hit ? hit[0] : v); }
+      return v;
+    }
+    function describe(tab, s) {
+      const p = [];
+      if (s.font !== 'keep') p.push('font ' + s.font);
+      if (s.size !== 'keep') p.push('size ' + s.size);
+      if (s.bodyText !== 'keep') p.push('text ' + labelOf('bodyText', s.bodyText));
+      if (s.valign !== 'keep') p.push('line up ' + labelOf('valign', s.valign).toLowerCase());
+      if (s.wrap !== 'keep') p.push('long text: ' + labelOf('wrap', s.wrap).toLowerCase());
+      const h = [];
+      if (s.headerBg !== 'keep') h.push(labelOf('headerBg', s.headerBg));
+      if (s.headerText !== 'keep') h.push('text ' + labelOf('headerText', s.headerText));
+      if (s.headerBold !== 'keep') h.push(s.headerBold);
+      if (s.headerSize !== 'keep') h.push('size ' + s.headerSize);
+      if (h.length) p.push('header (' + s.headerRows + ' row' + (s.headerRows === '1' ? '' : 's') + '): ' + h.join(', '));
+      if (s.banding !== 'keep') p.push('shade every other row ' + labelOf('banding', s.banding));
+      if (s.bodyBg === 'clear') p.push('clear existing cell colors');
+      if (s.rowHeight !== 'keep') p.push('row height ' + s.rowHeight);
+      if (s.lines !== 'keep') p.push(labelOf('lines', s.lines).toLowerCase() + (s.lines === 'none' ? '' : ' (' + labelOf('lineColor', s.lineColor) + ')'));
+      if (s.gridlines !== 'keep') p.push((s.gridlines === 'hide' ? 'hide' : 'show') + ' gridlines');
+      return tab + ': ' + (p.length ? p.join('; ') : 'no changes');
+    }
+    function showPicks() {
+      const tabs = Object.keys(PICKS);
+      el('picksText').value = tabs.length
+        ? 'My sheet style picks:\n' + tabs.map(t => '- ' + describe(t, PICKS[t])).join('\n')
+        : 'Nothing picked yet. Change something above and it shows here.';
+    }
+
+    // ---------------- status ----------------
+    function setStatus(text, cls, busy) {
+      const s = el('status');
+      s.className = 'status' + (cls ? ' ' + cls : '');
+      s.innerHTML = '';
+      if (busy) { const sp = document.createElement('div'); sp.className = 'spinner'; s.appendChild(sp); }
+      const t = document.createElement('span'); t.textContent = text; s.appendChild(t);
+    }
+
+    // ---------------- preview (one call at a time; the latest choice wins) ----------------
+    let STATE = null, PICKS = {}, timer = null, busy = false, pending = false;
+    function changed() {
+      const tab = el('tab').value;
+      PICKS[tab] = readStyle();
+      showPicks();
+      if (el('auto').checked) { clearTimeout(timer); timer = setTimeout(runPreview, 600); }
+    }
+    function runPreview() {
+      if (busy) { pending = true; return; }
+      busy = true;
+      const tab = el('tab').value, style = readStyle();
+      PICKS[tab] = style; showPicks();
+      setStatus('Restyling the copy of "' + tab + '"…', '', true);
+      google.script.run
+        .withSuccessHandler(res => {
+          busy = false;
+          setStatus('The "Style Preview" tab shows "' + tab + '"' + (res.cut ? ' (first ' + res.rows + ' rows)' : '') + ' with your picks.', 'ok');
+          if (pending) { pending = false; runPreview(); }
+        })
+        .withFailureHandler(err => { busy = false; pending = false; setStatus('Preview failed: ' + err.message, 'warn'); })
+        .zs_preview(tab, style);
+    }
+
+    function showFontNote() {
+      const name = el('font').value;
+      if (name !== 'keep' && WEB_SAFE.indexOf(name) === -1) {
+        const l = document.createElement('link'); l.rel = 'stylesheet';
+        l.href = 'https://fonts.googleapis.com/css2?family=' + name.replace(/ /g, '+') + ':wght@400;700&display=swap';
+        document.head.appendChild(l);
+      }
+      el('why').textContent = name === 'keep' ? 'The tab keeps the fonts it has.' : (WHY[name] || 'Not on the recommended list. If the copy shows Arial, Sheets doesn\'t have this font.');
+      el('why').style.fontFamily = name === 'keep' ? '' : '"' + name + '", Arial, sans-serif';
+    }
+    function stepFont(delta) {
+      let i = FONT_ORDER.indexOf(el('font').value) + delta;
+      if (i < 0) i = FONT_ORDER.length - 1;
+      if (i >= FONT_ORDER.length) i = 0;
+      el('font').value = FONT_ORDER[i];
+      showFontNote(); changed();
+    }
+    el('prevFont').addEventListener('click', () => stepFont(-1));
+    el('nextFont').addEventListener('click', () => stepFont(1));
+    document.addEventListener('keydown', e => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].indexOf(e.target.tagName) !== -1) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); stepFont(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepFont(1); }
+    });
+    FIELDS.filter(f => !COLORS[f]).forEach(f => el(f).addEventListener('change', () => { if (f === 'font') showFontNote(); changed(); }));
+
+    el('tab').addEventListener('change', () => {
+      const tab = el('tab').value;
+      writeStyle(PICKS[tab] || blankStyle(tab));
+      runPreview();
+    });
+    el('showBtn').addEventListener('click', runPreview);
+    el('resetBtn').addEventListener('click', () => {
+      const tab = el('tab').value;
+      writeStyle(blankStyle(tab));
+      runPreview();
+    });
+
+    // ---------------- picks ----------------
+    el('copyBtn').addEventListener('click', () => {
+      const ta = el('picksText');
+      ta.focus(); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      setStatus(ok ? 'Copied. Paste it in our chat.' : 'Selected. Press Ctrl+C (or ⌘C) to copy.', 'ok');
+    });
+    el('clearBtn').addEventListener('click', () => {
+      const tab = el('tab').value;
+      google.script.run.withSuccessHandler(p => { PICKS = p || {}; writeStyle(blankStyle(tab)); showPicks(); runPreview(); }).zs_clearPicks(tab);
+    });
+
+    // ---------------- optional font apply ----------------
+    function checkedOthers() {
+      return Array.prototype.slice.call(document.querySelectorAll('#others input:checked')).map(i => i.value);
+    }
+    el('applyFontBtn').addEventListener('click', () => {
+      const font = el('font').value;
+      if (font === 'keep') { setStatus('Pick a font under Text first.', 'warn'); return; }
+      const opts = { built: el('applyBuilt').checked, contactLog: el('applyContactLog').checked, tabs: checkedOthers(), theme: el('applyTheme').checked };
+      if (!opts.built && !opts.contactLog && !opts.tabs.length && !opts.theme) { setStatus('Tick at least one tab.', 'warn'); return; }
+      if (!confirm('Change the font to ' + font + ' on the real tabs you ticked?\n\nThe whole tab changes, including headers.')) return;
+      el('applyFontBtn').disabled = true;
+      setStatus('Applying ' + font + '…', '', true);
+      google.script.run
+        .withSuccessHandler(res => {
+          el('applyFontBtn').disabled = false;
+          setStatus((res.applied.length ? font + ' is now on: ' + res.applied.join(', ') + '.' : 'No tabs changed.') + (res.themeNote ? ' ' + res.themeNote : ''), res.themeNote ? 'warn' : 'ok');
+          loadState(true);
+        })
+        .withFailureHandler(err => { el('applyFontBtn').disabled = false; setStatus('Apply failed: ' + err.message, 'warn'); })
+        .zs_applyFont(font, opts);
+    });
+    el('resetFontsBtn').addEventListener('click', () => {
+      if (!confirm('Put the built tabs back to Montserrat and the Contact Log back to Roboto?')) return;
+      setStatus('Putting the original fonts back…', '', true);
+      google.script.run
+        .withSuccessHandler(() => { setStatus('The built tabs use Montserrat and the Contact Log uses Roboto again.', 'ok'); loadState(true); })
+        .withFailureHandler(err => setStatus('Reset failed: ' + err.message, 'warn'))
+        .zs_resetFonts();
+    });
+
+    // ---------------- leaving ----------------
+    el('removeBtn').addEventListener('click', () => {
+      setStatus('Removing the Style Preview tab…', '', true);
+      google.script.run
+        .withSuccessHandler(() => {
+          // Deleting the tab you're on breaks later calls, so leave it first (separate call), then delete
+          google.script.run
+            .withSuccessHandler(done => setStatus(done ? 'The Style Preview tab is gone. Your picks are kept.' : 'There was no Style Preview tab.', 'ok'))
+            .withFailureHandler(err => setStatus('Could not remove it: ' + err.message, 'warn'))
+            .zs_deletePreview();
+        })
+        .withFailureHandler(err => setStatus('Could not leave the preview: ' + err.message, 'warn'))
+        .zs_leavePreview(el('tab').value);
+    });
+
+    // ---------------- start ----------------
+    function loadState(keepControls) {
+      google.script.run.withSuccessHandler(state => {
+        STATE = state;
+        if (!keepControls) {
+          PICKS = state.picks || {};
+          const sel = el('tab');
+          sel.innerHTML = '';
+          state.tabs.forEach(n => sel.add(new Option(n, n)));
+          const start = state.tabs.indexOf(state.active) !== -1 ? state.active : (state.built[0] || state.tabs[0]);
+          sel.value = start;
+          writeStyle(PICKS[start] || blankStyle(start));
+          showPicks();
+          setStatus('Pick a tab and change anything below. Click "Show preview" to make the copy.', '');
+        }
+        el('builtList').textContent = state.built.join(', ') || 'None found';
+        el('applyBuilt').disabled = !state.built.length;
+        el('applyContactLog').disabled = !state.hasContactLog;
+        const box = el('others'); const ticked = checkedOthers(); box.innerHTML = '';
+        state.others.forEach(n => {
+          const label = document.createElement('label'); label.className = 'cbx';
+          const input = document.createElement('input'); input.type = 'checkbox'; input.value = n; input.checked = ticked.indexOf(n) !== -1;
+          const span = document.createElement('span'); span.textContent = n;
+          label.appendChild(input); label.appendChild(span); box.appendChild(label);
+        });
+        el('nowFonts').textContent = 'Now: built tabs use ' + state.fonts.built + ', Contact Log uses ' + state.fonts.contactLog + '.';
+      }).withFailureHandler(err => setStatus('Could not load: ' + err.message, 'warn')).zs_getState();
+    }
+    Object.keys(COLORS).forEach(syncColor);
+    loadState(false);
+  </script>
+</body>
+</html>

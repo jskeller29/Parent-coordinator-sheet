@@ -241,8 +241,8 @@ function buildMenus_() {
     menu.addItem("🏗️ Build Sheets Only (No Push to Google Contacts)", "runBuildOnly"); 
     // Optional module (Z#InputDataMode.gs); a no-op without that file
     if (typeof addInputDataModeMenuItem_ === "function") addInputDataModeMenuItem_(menu);
-    // Optional module (Z#Fonts.gs); a no-op without that file
-    if (typeof addFontsMenuItem_ === "function") addFontsMenuItem_(menu);
+    // Optional module (Z#SheetStyle.gs, temporary style lab); a no-op without that file
+    if (typeof addSheetStyleMenuItem_ === "function") addSheetStyleMenuItem_(menu);
     menu.addSeparator(); 
     menu.addItem("⚙️ Settings", "openSettingsDialog"); 
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");

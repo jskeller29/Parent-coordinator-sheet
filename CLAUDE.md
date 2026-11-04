@@ -59,13 +59,17 @@ Files (shared = every school's sheet):
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
 
-- Z#Fonts.gs (+ Z#FontsSidebar.html): optional "🔤 Sheet Fonts" sidebar (🚀 App Menu full menu, one guarded
-  `addFontsMenuItem_` line in onOpen). Cycle fonts (‹ › or arrow keys; recommended first, then the rest), live preview
-  on the open tab (old fonts saved run-length encoded in the user cache ZF_SNAP_<sheetId> / ZF_SNAPS; Undo, Apply and
-  the next open put them back), Apply to whole tabs (built tabs / Contact Log / any other tab, Backend skipped) and
-  optionally the spreadsheet theme font. Apply saves doc properties SHEET_FONT_BUILT / SHEET_FONT_CONTACTLOG, read by
+- Z#SheetStyle.gs (+ Z#SheetStyleSidebar.html): TEMPORARY "🎨 Sheet Style Lab" (🚀 App Menu full menu, one guarded
+  `addSheetStyleMenuItem_` line in onOpen) to help the owner pick fonts / colors / cell styling for the tabs themselves.
+  Never restyles a real tab while experimenting: each change re-copies up to 150 rows of the chosen tab (values +
+  formats + column widths) into one "Style Preview" tab and applies the picks there (font, size, text color, vertical
+  align, wrap; header rows' background / text color / bold / size; every-other-row shading, clear body colors, row
+  height, row lines / grid, gridlines). Picks per tab in user property ZS_PICKS, shown as text to send back; the final
+  look then gets built into the code. Leaving deletes the preview tab in a second call (never delete the tab the user
+  is on). Optional font Apply on real tabs saves doc properties SHEET_FONT_BUILT / SHEET_FONT_CONTACTLOG, read by
   shared getSheetFont_ (Core.gs; defaults Montserrat / Roboto) in the build's font step (builtFontSheets_, Build.gs)
-  and the Contact Log column D repair (Edits.gs), so they keep the chosen font. Regenerate's resets still use its own fonts.
+  and the Contact Log column D repair (Edits.gs). Note: writeSheet_ only clears content, so cell colors set on the
+  built tabs survive builds; only the font is re-applied.
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
@@ -129,8 +133,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
   with them.
-- Sheet Fonts: also paste Z#Fonts (script) + Z#FontsSidebar (HTML); optional, needs Styles.html; menu item only appears
-  with them.
+- Sheet Style Lab (temporary): also paste Z#SheetStyle (script) + Z#SheetStyleSidebar (HTML); optional, needs
+  Styles.html; menu item only appears with them.
 
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
