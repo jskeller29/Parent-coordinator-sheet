@@ -4,8 +4,8 @@
 //
 //  1. LOCKED AREAS (every tab except Raw Data and Backend):
 //     - Row 1 (headers) of Contact Log, Notes and Send Out.
-//     - Contact Log: the END bar row (except its O "FILTER?" checkbox) and
-//       everything below it.
+//     - Contact Log: column A (the "Last Sunday" formula), the END bar row
+//       (except its O "FILTER?" checkbox) and everything below it.
 //     - Events: the header row (row 2) of every event table. Row 1 (event
 //       name / type / place / date / delete box) stays editable.
 //     - PCAR: everything except H2:I2 ("PUT YOUR OWN INPUT" dates).
@@ -128,6 +128,7 @@ function sheetLockRects_(sheet, name, endRow, maxR, maxC) {
   } else if (SHEET_LOCK_HEADER_TABS.indexOf(name) !== -1) {
     add(1, 1, 1, maxC, "HDR:" + name);
     if (name === "Contact Log" && endRow) {
+      add(2, 1, endRow - 1, 1, "CLWEEK"); // column A "Last Sunday" formula of every log row
       add(endRow, 1, endRow, CL_COL_FILTER_TOGGLE - 1, "CLEND");
       add(endRow, CL_COL_FILTER_TOGGLE + 1, endRow, maxC, "CLEND");
       add(endRow + 1, 1, maxR, maxC, "CLEND");
@@ -169,10 +170,13 @@ function desiredSheetLocks_(sheet, name) {
     });
   } else if (SHEET_LOCK_HEADER_TABS.indexOf(name) !== -1) {
     sheetLockRects_(sheet, name, name === "Contact Log" ? findEndRowInColumnE_(sheet) : null).forEach(r => {
+      // Column A is protected down to the bottom of the sheet (it overlaps the END bar
+      // lock), so the rows added above END land inside it and it grows with them
+      const r2 = r.zone === "CLWEEK" ? sheet.getMaxRows() : r.r2;
       out.push({
         kind: "RANGE",
-        range: sheet.getRange(r.r1, r.c1, r.r2 - r.r1 + 1, r.c2 - r.c1 + 1),
-        desc: desc + (r.zone === "CLEND" ? "Contact Log END bar and below" : "header row")
+        range: sheet.getRange(r.r1, r.c1, r2 - r.r1 + 1, r.c2 - r.c1 + 1),
+        desc: desc + (r.zone === "CLEND" ? "Contact Log END bar and below" : r.zone === "CLWEEK" ? "Contact Log column A (Last Sunday formula)" : "header row")
       });
     });
   }
@@ -436,7 +440,7 @@ function sheetLockGuard_(e, sheet, name) {
       });
       hits.forEach(h => {
         lockedCells += (h.r2 - h.r1 + 1) * (h.c2 - h.c1 + 1);
-        const kind = h.zone === "BODY" ? "built" : h.zone === "CLEND" ? "end" : h.zone === "PCAR" ? "pcar" : (SHEET_LOCK_BUILT_TABS.hasOwnProperty(name) ? "built" : "header");
+        const kind = h.zone === "BODY" ? "built" : h.zone === "CLEND" ? "end" : h.zone === "CLWEEK" ? "week" : h.zone === "PCAR" ? "pcar" : (SHEET_LOCK_BUILT_TABS.hasOwnProperty(name) ? "built" : "header");
         if (restoreLockedHit_(e, sheet, h, out.endRow)) problems.restored[kind] = true;
         else problems.failed[kind] = true;
       });
@@ -474,6 +478,13 @@ function keepContactLogEndSnapshotCurrent_(sheet, endRow) {
 
 /** Puts one locked rectangle back. Returns false when that was not possible. */
 function restoreLockedHit_(e, sheet, h, endRow) {
+  if (h.zone === "CLWEEK") {
+    // Always the same formula, so no snapshot is needed
+    const formulas = [];
+    for (let r = h.r1; r <= h.r2; r++) formulas.push([weekFormula_(r)]);
+    sheet.getRange(h.r1, 1, formulas.length, 1).setFormulas(formulas);
+    return true;
+  }
   const snap = h.zone === "BODY" ? null : loadLockSnapshot_(h.zone);
   if (snap && (h.zone !== "CLEND" || snap.endRow === endRow)) {
     restoreRectFromSnapshot_(sheet, h, snap);
@@ -513,6 +524,7 @@ function toastSheetLock_(ss, problems) {
   const what = {
     header: "The header row can't be changed",
     end: "The Contact Log END bar and the area below it can't be changed",
+    week: "Column A (Last Sunday) fills itself in from the Date and can't be changed",
     pcar: "The PCAR formulas can't be changed (only H2:I2 are yours)",
     built: "This tab is built automatically and can't be edited here"
   };
@@ -595,12 +607,16 @@ function confirmMultiRowClear_(e, sheet, name, er, endRow) {
   if (r2 - r1 + 1 < 2 || e.value !== undefined) { cache.remove(selKey); return true; }
   const c2 = er.c2; // not the sheet's last column: the clear may just have emptied the right-hand columns
 
-  // A clear leaves only blanks (and unticked checkboxes)
+  // A clear leaves only blanks (and unticked checkboxes). Contact Log column A is
+  // skipped: the sheet lock has just put its formula back.
+  const skipCol = name === "Contact Log" ? 1 : 0;
+  const isEmpty = (v, j) => v === "" || v === false || er.c1 + j === skipCol;
   const now = sheet.getRange(r1, er.c1, r2 - r1 + 1, c2 - er.c1 + 1).getValues();
   let sawBlank = false;
   for (let i = 0; i < now.length; i++) {
     for (let j = 0; j < now[i].length; j++) {
       const v = now[i][j];
+      if (er.c1 + j === skipCol) continue;
       if (v === "") sawBlank = true;
       else if (v !== false) { cache.remove(selKey); return true; }
     }
@@ -609,7 +625,7 @@ function confirmMultiRowClear_(e, sheet, name, er, endRow) {
 
   const before = selectionSnapshotFor_(cache, sheet, r1, er.c1, r2, c2);
   cache.remove(selKey);
-  if (before && before.every(row => row.every(v => v === "" || v === false))) return true; // they were empty already
+  if (before && before.every(row => row.every(isEmpty))) return true; // they were empty already
 
   const ui = SpreadsheetApp.getUi();
   const rowCount = r2 - r1 + 1;
