@@ -676,11 +676,11 @@ E Where Did You Send, F Population, G # Reached, H Attachments; I:J = the dropdo
 
 // Backend BH3:BJ3 (Send Out list): the options for the Send Out tab's dropdowns, as
 // formulas = fixed options + every value already typed in that column. Every reset
-// clears BH:BJ rows 3+ and writes these back. (BJ3 reads E2:E8, as the owner wrote it.)
+// clears BH:BJ rows 3+ and writes these back.
 var SEND_OUT_LIST_FORMULAS_ = [
   "=UNIQUE(VSTACK(\"Events\", \"Services\",UNIQUE('Send Out'!C2:C)))",
   "=UNIQUE(VSTACK(\"Parent Coordinator\",\"Principal\",\"PTA\",\"School\",UNIQUE('Send Out'!D2:D)))",
-  "=UNIQUE(VSTACK(\"Backpack\",\"DOE Messaging\",\"Parents Square\",UNIQUE('Send Out'!E2:E8)))"
+  "=UNIQUE(VSTACK(\"Backpack\",\"DOE Messaging\",\"Parents Square\",UNIQUE('Send Out'!E2:E)))"
 ];
 
 function writeSendOutListFormulas_(ss) {
