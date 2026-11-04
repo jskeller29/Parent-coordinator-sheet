@@ -36,8 +36,10 @@
     button.danger { color: #B91C1C; }
     button:disabled { opacity: 0.5; cursor: default; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 10px 14px; display: flex; gap: 8px; }
-    .footer button { flex: 1; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 10px 14px; }
+    .footer > .row button { flex: 1; }
+    #exitAsk { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; color: #7F1D1D; }
+    #exitAsk .row button { flex: 1 1 auto; font-size: 12px; padding: 6px 8px; }
     .hidden { display: none !important; }
     a { color: #1D4ED8; cursor: pointer; }
     /* 🐞 TEMPORARY DEBUG panel */
@@ -100,16 +102,6 @@
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
 
-    <div id="exitAsk" class="error hidden">
-      <b>Save your Site / Class entries first?</b>
-      <div>Exit doesn't save what you typed on the tab.</div>
-      <div class="row">
-        <button class="primary" onclick="hideExitAsk(); saveSiteClass()">💾 Save &amp; exit</button>
-        <button class="danger" onclick="hideExitAsk(); reallyExit()">Exit without saving</button>
-        <button onclick="hideExitAsk()">Cancel</button>
-      </div>
-    </div>
-
     <div id="errorBox" class="error hidden">
       <div id="errorText"></div>
       <div class="row">
@@ -144,8 +136,20 @@
   </details>
 
   <div class="footer" id="footer">
-    <button id="skipBtn" onclick="skip()">⏭️ Skip</button>
-    <button id="exitBtn" class="danger" onclick="exitMode()">🚪 Exit Input Data Mode</button>
+    <!-- Exit asks first (shows just above the buttons) -->
+    <div id="exitAsk" class="hidden">
+      <b>💾 Save your progress before exiting?</b>
+      <div class="muted" id="exitAskText"></div>
+      <div class="row">
+        <button class="primary" onclick="saveAndExit()">💾 Save &amp; exit</button>
+        <button class="danger" onclick="hideExitAsk(); reallyExit()">Exit without saving</button>
+        <button onclick="hideExitAsk()">Cancel</button>
+      </div>
+    </div>
+    <div class="row" style="margin:0">
+      <button id="skipBtn" onclick="skip()">⏭️ Skip</button>
+      <button id="exitBtn" class="danger" onclick="exitMode()">🚪 Exit Input Data Mode</button>
+    </div>
   </div>
 
 <script>
@@ -367,9 +371,13 @@
   function saveSiteClass() { working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
   function skip() { working('Skipping…'); call('idm_skip'); }
   function exitMode() {
-    if (currentManual) { show('exitAsk', true); $('exitAsk').scrollIntoView({ behavior: 'smooth' }); return; }
-    reallyExit();
+    if (busy) return;
+    $('exitAskText').textContent = currentManual
+      ? 'Save & exit saves what you typed on the Site / Class tab to Raw Data. Exit without saving loses it.'
+      : 'Everything already moved to Raw Data is saved. Save & exit also moves anything pasted on the tab that hasn\'t moved yet.';
+    show('exitAsk', true);
   }
+  function saveAndExit() { hideExitAsk(); working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function reallyExit() { working('Bringing your tabs back…'); call('idm_exit'); }
   function hideExitAsk() { show('exitAsk', false); }
   function retry() {

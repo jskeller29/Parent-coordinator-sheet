@@ -246,6 +246,37 @@ function idm_skip() {
 }
 
 /** "Exit Input Data Mode": delete the temp tab, bring hidden tabs back. */
+/**
+ * "💾 Save & exit": saves what is on the current tab first (Site / Class entries,
+ * or a paste that hasn't been moved yet), then exits. A problem (wrong export,
+ * cut-off numbers, bad class code) is shown instead and the mode stays on.
+ */
+function idm_saveAndExit() {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const step = IDM_STEPS[state.step];
+    const temp = idm_sheetById_(ss, state.tempId);
+    let result = null;
+    if (step.manual) {
+      result = idm_saveSiteClass_(ss, state);
+    } else if (temp && idm_tempHasData_(temp)) {
+      result = idm_processTemp_(ss, state, temp, false);
+    } else {
+      idm_log_("save & exit: nothing waiting on the tab");
+    }
+    if (result && result.notice && result.notice.type === 'error') return result; // stay, show the problem
+    if (result && result.finished) { result.exited = true; return result; }       // that was the last step
+    state = idm_loadState_();
+    if (!state) return { active: false, finished: true, exited: true, summary: [] };
+    const results = state.results;
+    idm_cleanup_(ss, state, idm_anyImported_(results));
+    return { active: false, finished: true, exited: true, notice: result ? result.notice : null,
+             anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
+  });
+}
+
 function idm_exit() {
   return idm_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -569,6 +600,12 @@ function idm_saveSiteClass() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    return idm_saveSiteClass_(ss, state);
+  });
+}
+
+function idm_saveSiteClass_(ss, state) {
+  {
     const step = IDM_STEPS[state.step];
     if (!step.manual) return idm_view_(ss, state);
     const temp = idm_ensureTempSheet_(ss, state);
@@ -611,7 +648,7 @@ function idm_saveSiteClass() {
     PropertiesService.getDocumentProperties().setProperty(IDM_SITECLASS_UPDATED_KEY, today);
     state.results[step.key] = { rows: out.length, saved: true };
     return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + out.length + " class(es) saved to Raw Data." });
-  });
+  }
 }
 
 // ---------------------------------------------------------------------

@@ -38,7 +38,9 @@ Files (shared = every school's sheet):
   per row: BH = site, BI = "CODE: Teacher" (what buildClassReferenceMap_ reads; ":" stripped from names, rows with
   no teacher and no site dropped, codes must be letters/digits); date in doc property
   INPUT_DATA_MODE_SITECLASS_UPDATED. Progress bar at the top (idm_goToStep) jumps to any step; the one temp tab is
-  renamed + reset for it; finishing a step goes to the next index (the last one finishes). State in doc property
+  renamed + reset for it; finishing a step goes to the next index (the last one finishes). Exit always asks: Save & exit
+  (idm_saveAndExit: saves Site / Class or moves an unmoved paste first; a problem keeps the mode on) / Exit without
+  saving / Cancel. State in doc property
   INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
