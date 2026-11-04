@@ -506,23 +506,6 @@ function noteLineHeader_(dateText, braceText) {
 }
 
 // ======================================================================
-// SHEET FONTS
-// The two fonts the code keeps re-applying: the built tabs (every build) and
-// Contact Log column D (on edits). Saved in document properties SHEET_FONT_BUILT /
-// SHEET_FONT_CONTACTLOG by the optional Sheet Style Lab (Z#SheetStyle.gs); without a
-// saved value these are the fonts the sheet always used.
-// ======================================================================
-const SHEET_FONT_DEFAULTS_ = { BUILT: "Montserrat", CONTACTLOG: "Roboto" };
-
-function getSheetFont_(group) {
-  try {
-    const saved = PropertiesService.getDocumentProperties().getProperty('SHEET_FONT_' + group);
-    if (saved) return saved;
-  } catch (e) { console.warn("Sheet font not read: " + e.message); }
-  return SHEET_FONT_DEFAULTS_[group];
-}
-
-// ======================================================================
 // DIALOG STYLES
 // Every dialog / sidebar shares one look, kept in Styles.html.
 // HTML files pull it in with a scriptlet (<?!= include_('Styles') ?>) and are
