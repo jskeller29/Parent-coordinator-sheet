@@ -499,11 +499,21 @@ function onEdit(e) {
     return; // Normal edits completely bypass the setup lock block below
   }
 
+  let undone = true;
   if (e && e.range) {
-    if (e.oldValue !== undefined) e.range.setValue(e.oldValue); 
-    else e.range.clearContent();       
+    // Put the cells back exactly (formulas too, and multi-cell Deletes) from what
+    // they held when selected (Sheet Lock.gs); otherwise the old one-cell undo
+    let restored = false;
+    try { restored = restoreEditFromSelectionCopy_(e); } catch (err) { console.warn("Setup lock restore failed: " + err.message); }
+    if (!restored) {
+      const single = e.range.getNumRows() === 1 && e.range.getNumColumns() === 1;
+      if (e.oldValue !== undefined) e.range.setValue(e.oldValue);
+      else e.range.clearContent();
+      if (!single) undone = false; // a multi-cell Delete / paste can't be put back that way
+    }
   }
-  SpreadsheetApp.getUi().alert("🔒 Action Blocked", "Initialization process needs to occur first.\n\nPlease go to '🚀 App Menu' at the top of the screen and click '🚨 Initial Setup'.", SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert("🔒 Action Blocked", "Initialization process needs to occur first.\n\nPlease go to '🚀 App Menu' at the top of the screen and click '🚨 Initial Setup'." +
+    (undone ? "" : "\n\nPress Ctrl+Z (⌘+Z on a Mac) now to undo your change."), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 // ==========================================

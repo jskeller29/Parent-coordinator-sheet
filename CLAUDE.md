@@ -172,6 +172,14 @@ SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" t
   below / PCAR from snapshots in doc properties (SHEET_LOCK_SNAP_<zone>_<n>, chunked; END bar snapshot tied to
   SHEET_LOCK_CL_END and retaken when END moves), Events headers from EVENT_TABLE_HEADERS, built tabs via oldValue
   (one cell only; otherwise a toast says Ctrl+Z / Build Sheets Only).
+- Selection copy (onSelectionChange -> document cache SHEET_LOCK_SEL_<sheetId>, readLockSnapshot_ format + .sel): taken
+  for every selection on the typed / locked tabs (Contact Log, Notes, Send Out, Events, PCAR), and on every tab but
+  Raw Data / Backend before Initial Setup. It is the FIRST source when putting locked cells back (then the build
+  snapshot), and the setup lock in onEdit (Menus.gs) uses it too (restoreEditFromSelectionCopy_), so a multi-cell
+  Delete is reversed even on a copy that never ran setup. A copy identical to the cells as they are now is not
+  trusted (trustedSelectionCopy_: a fast Delete can be read after the fact). Restores are spill-safe (formulas, flush,
+  constants only into still-empty cells, one run per row). The copy is kept after a restore so a second Delete works.
+  A missing END-bar snapshot is taken at the next Contact Log edit outside the locked area.
 - Clearing 2+ rows at once (Contact Log above END, Notes, Send Out, Events rows 3+) asks Yes/No first. No puts the rows
   back from the onSelectionChange copy (document cache SHEET_LOCK_SEL_<sheetId>), or says "press Ctrl+Z" without one.
   Pastes and checkbox-only unticks do not ask. An all-empty selection copy is ignored (onSelectionChange can read the

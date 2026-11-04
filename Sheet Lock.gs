@@ -304,7 +304,8 @@ function refreshContactLogEndSnapshot_(sheet, endRow) {
  * Reads a block into { cells: {"row,col": [kind, value]}, hasFormulas }.
  * kind: "f" formula, "v" value, "d" date (ms), "s" probably a spill output of a
  * formula to its left / above (has no formula of its own; restoring it means
- * clearing it so the formula can spill again). Blank cells are left out.
+ * clearing it so the formula can spill again; its value is kept only to tell
+ * whether it changed). Blank cells are left out.
  */
 function readLockSnapshot_(sheet, r1, c1, r2, c2) {
   const nr = r2 - r1 + 1, nc = c2 - c1 + 1;
@@ -319,7 +320,7 @@ function readLockSnapshot_(sheet, r1, c1, r2, c2) {
       if (formulas[i][j]) { cells[key] = ["f", formulas[i][j]]; hasFormulas = true; continue; }
       const v = values[i][j];
       if (v === "" || v === null) continue;
-      if (nearestFormulaSpills_(formulas, i, j)) { cells[key] = ["s"]; continue; }
+      if (nearestFormulaSpills_(formulas, i, j)) { cells[key] = ["s", v instanceof Date ? v.getTime() : v]; continue; }
       cells[key] = v instanceof Date ? ["d", v.getTime()] : ["v", v];
     }
   }
@@ -374,38 +375,56 @@ function loadLockSnapshot_(zone) {
   }
 }
 
-/** Writes one locked rectangle back from its snapshot. */
-function restoreRectFromSnapshot_(sheet, h, snap) {
+/**
+ * Writes one rectangle back from a snapshot (readLockSnapshot_ format).
+ * safe = true (always for selection copies, and whenever the snapshot has
+ * formulas): formulas first, flush, then constants only into cells that are
+ * still empty, so a value never blocks a formula that spills into that cell.
+ * Constants go back one run of cells per row, not one call per cell.
+ */
+function restoreRectFromSnapshot_(sheet, h, snap, safe) {
   const nr = h.r2 - h.r1 + 1, nc = h.c2 - h.c1 + 1;
   const range = sheet.getRange(h.r1, h.c1, nr, nc);
   const grid = [];
   const consts = [];
+  let constCount = 0;
   for (let i = 0; i < nr; i++) {
-    const row = [];
+    const row = [], crow = [];
     for (let j = 0; j < nc; j++) {
       const cell = snap.cells[(h.r1 + i) + "," + (h.c1 + j)];
+      crow.push(undefined);
       if (!cell || cell[0] === "s") { row.push(""); continue; }
       if (cell[0] === "f") { row.push(cell[1]); continue; }
       const v = cell[0] === "d" ? new Date(cell[1]) : cell[1];
-      consts.push([i, j, v]);
+      crow[j] = { v };
+      constCount++;
       row.push(v);
     }
     grid.push(row);
+    consts.push(crow);
   }
 
-  if (!snap.hasFormulas) { range.setValues(grid); return; }
+  if (!snap.hasFormulas && !safe) { range.setValues(grid); return; }
 
-  // Formula areas (PCAR, below the END bar): formulas first, flush, then only
-  // fill constants into cells that are still empty, so a value never blocks a
-  // formula that spills into that cell.
-  consts.forEach(c => { grid[c[0]][c[1]] = ""; });
+  for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) if (consts[i][j]) grid[i][j] = "";
   range.setValues(grid);
-  if (!consts.length) return;
+  if (!constCount) return;
   SpreadsheetApp.flush();
   const now = range.getValues();
-  consts.forEach(c => {
-    if (now[c[0]][c[1]] === "") sheet.getRange(h.r1 + c[0], h.c1 + c[1]).setValue(c[2]);
-  });
+  const formulaAt = (i, j) => typeof grid[i][j] === "string" && grid[i][j].charAt(0) === "=";
+  for (let i = 0; i < nr; i++) {
+    let j = 0;
+    while (j < nc) {
+      // a run = cells that are empty now and either get a constant or stay blank
+      if (now[i][j] !== "" || formulaAt(i, j) || !consts[i][j]) { j++; continue; }
+      let k = j;
+      while (k + 1 < nc && now[i][k + 1] === "" && !formulaAt(i, k + 1)) k++;
+      while (k > j && !consts[i][k]) k--; // don't end the run on blanks
+      sheet.getRange(h.r1 + i, h.c1 + j, 1, k - j + 1)
+        .setValues([consts[i].slice(j, k + 1).map(c => c ? c.v : "")]);
+      j = k + 1;
+    }
+  }
 }
 
 // ======================================================================
@@ -485,7 +504,8 @@ function contactLogEndRowForGuard_(sheet, er) {
 function keepContactLogEndSnapshotCurrent_(sheet, endRow) {
   if (!endRow) return;
   const saved = PropertiesService.getDocumentProperties().getProperty(SHEET_LOCK_CL_END_KEY);
-  if (saved && Number(saved) !== endRow) refreshContactLogEndSnapshot_(sheet, endRow);
+  // Missing (new code pasted, no build yet): take it now, while the area is untouched
+  if (!saved || Number(saved) !== endRow) refreshContactLogEndSnapshot_(sheet, endRow);
 }
 
 /** Puts one locked rectangle back. Returns false when that was not possible. */
@@ -496,6 +516,12 @@ function restoreLockedHit_(e, sheet, h, endRow) {
     for (let r = h.r1; r <= h.r2; r++) formulas.push([weekFormula_(r)]);
     sheet.getRange(h.r1, 1, formulas.length, 1).setFormulas(formulas);
     return true;
+  }
+  // Best source: what the cells held when they were selected (exact, also on copies
+  // of the sheet whose own snapshot is missing). Then the snapshot taken at the build.
+  if (h.zone !== "BODY") {
+    const copy = trustedSelectionCopy_(sheet, h);
+    if (copy) { restoreRectFromSnapshot_(sheet, h, copy, true); return true; }
   }
   const snap = h.zone === "BODY" ? null : loadLockSnapshot_(h.zone);
   if (snap && (h.zone !== "CLEND" || snap.endRow === endRow)) {
@@ -555,54 +581,103 @@ function toastSheetLock_(ss, problems) {
 // MULTI-ROW CLEAR CHECK
 // ======================================================================
 
-/** Simple trigger: remembers what was in a multi-row selection so a clear can be put back. */
+/**
+ * Simple trigger: remembers what the selected cells hold (values + formulas, the
+ * readLockSnapshot_ format plus .sel) in the document cache, so an edit or a
+ * Delete there can be put back exactly. Runs for the typed / locked tabs, and
+ * before Initial Setup for every tab (the setup lock in onEdit puts every edit back).
+ */
 function onSelectionChange(e) {
   try { rememberSelection_(e); } catch (err) { console.warn("Selection snapshot skipped: " + err.message); }
 }
 
+function selectionCopyWanted_(name) {
+  if (name === "Raw Data" || name === "RAW Data" || name === BACKEND_SHEET_NAME) return false;
+  if (isLockedTab_(name) && !SHEET_LOCK_BUILT_TABS.hasOwnProperty(name)) return true;
+  return PropertiesService.getDocumentProperties().getProperty("SETUP_COMPLETE") !== "true";
+}
+
 function rememberSelection_(e) {
   const range = e && e.range;
-  if (!range || range.getNumRows() < 2) return;
+  if (!range) return;
   const sheet = range.getSheet();
-  const firstRow = CLEAR_CHECK_FIRST_ROW[sheet.getName().trim()];
-  if (!firstRow) return;
+  if (!selectionCopyWanted_(sheet.getName().trim())) return;
 
-  const sel = { r1: range.getRow(), c1: range.getColumn(), r2: range.getLastRow(), c2: range.getLastColumn() };
-  const r1 = Math.max(sel.r1, firstRow);
-  const r2 = Math.min(sel.r2, sheet.getLastRow());
-  const c2 = Math.min(sel.c2, sheet.getLastColumn());
   const cache = CacheService.getDocumentCache();
   const key = SHEET_LOCK_SEL_KEY + sheet.getSheetId();
-  if (r2 - r1 + 1 < 2 || c2 < sel.c1 || (r2 - r1 + 1) * (c2 - sel.c1 + 1) > 20000) { cache.remove(key); return; }
-
-  const block = sheet.getRange(r1, sel.c1, r2 - r1 + 1, c2 - sel.c1 + 1);
-  const values = block.getValues();
-  const formulas = block.getFormulas();
-  const grid = values.map((row, i) => row.map((v, j) =>
-    formulas[i][j] ? formulas[i][j] : (v instanceof Date ? { d: v.getTime() } : v)));
-  const json = JSON.stringify({ sel, r1, c1: sel.c1, grid });
+  const sel = { r1: range.getRow(), c1: range.getColumn(), r2: range.getLastRow(), c2: range.getLastColumn() };
+  const r2 = Math.min(sel.r2, sheet.getLastRow());
+  const c2 = Math.min(sel.c2, sheet.getLastColumn());
+  let snap;
+  if (r2 < sel.r1 || c2 < sel.c1) {
+    snap = { r1: sel.r1, c1: sel.c1, r2: sel.r1, c2: sel.c1, hasFormulas: false, cells: {} }; // all blank
+  } else {
+    if ((r2 - sel.r1 + 1) * (c2 - sel.c1 + 1) > 20000) { cache.remove(key); return; }
+    snap = readLockSnapshot_(sheet, sel.r1, sel.c1, r2, c2);
+  }
+  snap.sel = sel;
+  const json = JSON.stringify(snap);
   if (json.length > 95000) { cache.remove(key); return; }
   cache.put(key, json, 1800);
 }
 
-/** Old contents of the rectangle from the selection snapshot, or null when there is none covering it. */
-function selectionSnapshotFor_(cache, sheet, r1, c1, r2, c2) {
-  const json = cache.get(SHEET_LOCK_SEL_KEY + sheet.getSheetId());
-  if (!json) return null;
-  const s = JSON.parse(json);
-  if (r1 < s.sel.r1 || r2 > s.sel.r2 || c1 < s.sel.c1 || c2 > s.sel.c2) return null;
-  const out = [];
-  for (let r = r1; r <= r2; r++) {
-    const row = [];
-    for (let c = c1; c <= c2; c++) {
-      const src = s.grid[r - s.r1];
-      let v = src && (c - s.c1) < src.length ? src[c - s.c1] : "";
-      if (v && typeof v === "object" && v.d !== undefined) v = new Date(v.d);
-      row.push(v === null || v === undefined ? "" : v);
+var SEL_COPY_MEMO_ = null; // { key, snap }: read the cache once per run
+
+function getSelectionCopy_(sheet) {
+  const key = SHEET_LOCK_SEL_KEY + sheet.getSheetId();
+  if (SEL_COPY_MEMO_ && SEL_COPY_MEMO_.key === key) return SEL_COPY_MEMO_.snap;
+  let snap = null;
+  try {
+    const json = CacheService.getDocumentCache().get(key);
+    snap = json ? JSON.parse(json) : null;
+  } catch (err) { snap = null; }
+  SEL_COPY_MEMO_ = { key, snap };
+  return snap;
+}
+
+function forgetSelectionCopy_(sheet) {
+  try { CacheService.getDocumentCache().remove(SHEET_LOCK_SEL_KEY + sheet.getSheetId()); } catch (err) { /* ignore */ }
+  SEL_COPY_MEMO_ = null;
+}
+
+/**
+ * The selection copy, when it covers rectangle h and differs from what is there
+ * now; otherwise null. A copy that matches the cells as they are now can't be
+ * trusted: after a fast Delete, onSelectionChange may have read the cells AFTER
+ * the edit.
+ */
+function trustedSelectionCopy_(sheet, h) {
+  const snap = getSelectionCopy_(sheet);
+  if (!snap || !snap.sel) return null;
+  if (h.r1 < snap.sel.r1 || h.r2 > snap.sel.r2 || h.c1 < snap.sel.c1 || h.c2 > snap.sel.c2) return null;
+  const range = sheet.getRange(h.r1, h.c1, h.r2 - h.r1 + 1, h.c2 - h.c1 + 1);
+  const values = range.getValues();
+  const formulas = range.getFormulas();
+  for (let i = 0; i < values.length; i++) {
+    for (let j = 0; j < values[i].length; j++) {
+      const cell = snap.cells[(h.r1 + i) + "," + (h.c1 + j)];
+      const f = formulas[i][j];
+      const v = values[i][j] instanceof Date ? values[i][j].getTime() : values[i][j];
+      if (!cell) { if (f || v !== "") return snap; continue; }
+      if (cell[0] === "f") { if (f !== cell[1]) return snap; continue; }
+      if (f || v !== cell[1]) return snap;
     }
-    out.push(row);
   }
-  return out;
+  return null;
+}
+
+/**
+ * Before Initial Setup (the "Action Blocked" lock in onEdit, Menus.gs): puts the
+ * edited cells back from the selection copy. Returns false when there is none.
+ */
+function restoreEditFromSelectionCopy_(e) {
+  const range = e.range;
+  const sheet = range.getSheet();
+  const h = { r1: range.getRow(), c1: range.getColumn(), r2: range.getLastRow(), c2: range.getLastColumn() };
+  const copy = trustedSelectionCopy_(sheet, h);
+  if (!copy) return false;
+  restoreRectFromSnapshot_(sheet, h, copy, true);
+  return true;
 }
 
 /**
@@ -610,19 +685,16 @@ function selectionSnapshotFor_(cache, sheet, r1, c1, r2, c2) {
  * (the rows were put back, or they were told to press Ctrl+Z).
  */
 function confirmMultiRowClear_(e, sheet, name, er, endRow) {
-  const cache = CacheService.getDocumentCache();
-  const selKey = SHEET_LOCK_SEL_KEY + sheet.getSheetId();
   const r1 = Math.max(er.r1, CLEAR_CHECK_FIRST_ROW[name]);
   let r2 = er.r2;
   if (name === "Contact Log") r2 = endRow ? Math.min(r2, endRow - 1) : 0;
   // Any other edit makes the remembered selection out of date
-  if (r2 - r1 + 1 < 2 || e.value !== undefined) { cache.remove(selKey); return true; }
+  if (r2 - r1 + 1 < 2 || e.value !== undefined) { forgetSelectionCopy_(sheet); return true; }
   const c2 = er.c2; // not the sheet's last column: the clear may just have emptied the right-hand columns
 
   // A clear leaves only blanks (and unticked checkboxes). Contact Log column A is
   // skipped: the sheet lock has just put its formula back.
   const skipCol = name === "Contact Log" ? 1 : 0;
-  const isEmpty = (v, j) => v === "" || v === false || er.c1 + j === skipCol;
   const now = sheet.getRange(r1, er.c1, r2 - r1 + 1, c2 - er.c1 + 1).getValues();
   let sawBlank = false;
   for (let i = 0; i < now.length; i++) {
@@ -630,17 +702,13 @@ function confirmMultiRowClear_(e, sheet, name, er, endRow) {
       const v = now[i][j];
       if (er.c1 + j === skipCol) continue;
       if (v === "") sawBlank = true;
-      else if (v !== false) { cache.remove(selKey); return true; }
+      else if (v !== false) { forgetSelectionCopy_(sheet); return true; }
     }
   }
-  if (!sawBlank) return true;
+  if (!sawBlank) { forgetSelectionCopy_(sheet); return true; }
 
-  let before = selectionSnapshotFor_(cache, sheet, r1, er.c1, r2, c2);
-  cache.remove(selKey);
-  // An all-empty copy can't be trusted: when Delete is pressed right after selecting,
-  // onSelectionChange may only read the rows AFTER they were cleared. Ask anyway
-  // (and fall back to Ctrl+Z) instead of guessing they were empty already.
-  if (before && before.every(row => row.every(isEmpty))) before = null;
+  const h = { r1, c1: er.c1, r2, c2 };
+  const before = trustedSelectionCopy_(sheet, h);
 
   const ui = SpreadsheetApp.getUi();
   const rowCount = r2 - r1 + 1;
@@ -650,10 +718,11 @@ function confirmMultiRowClear_(e, sheet, name, er, endRow) {
     "Yes = keep them cleared\nNo = " + (before ? "put them back" : "stop here (then press Ctrl+Z / ⌘+Z to bring them back)"),
     ui.ButtonSet.YES_NO
   );
-  if (resp === ui.Button.YES) return true;
+  if (resp === ui.Button.YES) { forgetSelectionCopy_(sheet); return true; }
 
   if (before) {
-    sheet.getRange(r1, er.c1, before.length, before[0].length).setValues(before);
+    // The copy still matches the rows once they are back, so a second Delete can be undone too
+    restoreRectFromSnapshot_(sheet, h, before, true);
     e.source.toast("Rows " + r1 + "–" + r2 + " were put back.", "↩️ Restored", 5);
   } else {
     ui.alert("↩️ Undo", "Press Ctrl+Z (⌘+Z on a Mac) now to bring the rows back.", ui.ButtonSet.OK);
