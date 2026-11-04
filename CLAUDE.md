@@ -88,6 +88,7 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Contact Log Follow-up (N): FOLLOWUP_OPTIONS_ (Regenerate.gs) = No Followup Needed / Followup Needed / Followup Needed -
   ASAP / Followed Up / Resolved / Skipped / Newer Interaction. Every reset runs setFollowupDropdown_, which replaces N's
   dropdown with exactly these (deleting other options) unless it already is that list (keeps hand-set chip colors;
+  skipped with a console.warn when N is a Sheets Table "Dropdown" typed column, which Apps Script may not change;
   Apps Script cannot set chip colors). Autofill default for N = "No Followup Needed" (Edits.gs). Hide rule for P
   (getContactLogHideFormula_, owner's 2026-11-04 formula): =AND($B2<>"", INT($B2)<>TODAY(), TRIM($N2)<> Followup Needed / Followup Needed - ASAP / Need to respond / Waiting For Response /
   Waiting - Check Up), always (contactLogTodayOnly no longer changes it). The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).

@@ -775,14 +775,21 @@ function setFollowupDropdown_(ss) {
   if (!endRow || endRow <= 2) return;
   const range = sheet.getRange(2, 14, endRow - 2, 1);
   const wanted = FOLLOWUP_OPTIONS_.join("\u0001");
-  const alreadyRight = range.getDataValidations().every(r => {
-    const rule = r[0];
-    return rule && rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST &&
-      rule.getCriteriaValues()[0].join("\u0001") === wanted;
-  });
-  if (alreadyRight) return;
-  range.setDataValidation(SpreadsheetApp.newDataValidation()
-    .requireValueInList(FOLLOWUP_OPTIONS_, true).build());
+  try {
+    const alreadyRight = range.getDataValidations().every(r => {
+      const rule = r[0];
+      return rule && rule.getCriteriaType() === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST &&
+        rule.getCriteriaValues()[0].join("\u0001") === wanted;
+    });
+    if (alreadyRight) return;
+    range.setDataValidation(SpreadsheetApp.newDataValidation()
+      .requireValueInList(FOLLOWUP_OPTIONS_, true).build());
+  } catch (e) {
+    // Contact Log is a Sheets Table and N is a "Dropdown" typed column: Apps Script may not
+    // change its options ("not allowed on cells in typed columns"). Its options (and chip
+    // colors) are set by hand in the Table's column menu, so skip instead of stopping the reset.
+    console.warn("Follow-up dropdown left as is (Table dropdown column): " + e.message);
+  }
 }
 
 function resetMasterTable_(ss) {
