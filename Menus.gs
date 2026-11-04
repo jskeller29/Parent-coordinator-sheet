@@ -526,9 +526,9 @@ const SETTING_KEYS = [
  * header at A5 and key/value pairs from row 6 down (cols A:B only), leaving
  * A2/A3/B3 (build date + Auto-Migrate toggle) untouched.
  */
-function saveSettingsToVersionSheet_() {
+function saveSettingsToVersionSheet_(ss) {
   const props = PropertiesService.getDocumentProperties();
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet(); // ss: another spreadsheet (owner's copy + reset tool)
   const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
 

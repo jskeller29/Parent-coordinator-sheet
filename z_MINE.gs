@@ -8,7 +8,7 @@
 //   • Phone Contacts: the "tall" layout (one row per phone number)
 //   • Quick update: also rewrites the student's Phone Contacts rows
 //   • Contacts sync: reads up to 4 phones / 3 emails per row, emails a summary
-//   • 🐞 Debug menu: Reset + Load Fake Data, Reset to Display Mode, Debug toasts
+//   • 🐞 Debug menu: Reset + Load Fake Data, Reset to Display Mode, Copy + Reset the Copy, Debug toasts
 //   • Dev tools: generateFakeLegacyData, formatting, email toggles
 //
 // HOW IT PLUGS IN: shared code calls getOwnerHooks_() (Core.gs), which returns
@@ -49,7 +49,8 @@ function ownerHooks_() {
 // ======================================================================
 // 🐞 DEBUG MENU
 // "Reset + Load Fake Data" / "Reset to Display Mode" run the Regenerate.gs
-// tools (after you type RESET, then their own "Are you sure?"). "Toggle Debug"
+// tools (after you type RESET, then their own "Are you sure?"). "Copy Sheet, Then
+// Reset the Copy" wipes only a new copy, never this sheet. "Toggle Debug"
 // turns on a toast after every edit, build, sync and sheet open saying whether
 // it worked, including errors the code normally only writes to the log.
 // ======================================================================
@@ -60,6 +61,7 @@ function ownerAddMenus_(ui) {
   ui.createMenu("🐞 Debug")
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
+    .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
     .addItem("🎨 Color Tabs", "ownerMenuColorTabs")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug")
@@ -76,6 +78,72 @@ function ownerMenuResetToDisplayMode() {
 
 function ownerMenuColorTabs() {
   runAction_("Color Tabs", () => colorTabs());
+}
+
+/**
+ * Makes a copy of this sheet (same Drive folder) and runs the Reset to Display Mode steps on the
+ * COPY only. This sheet is never changed. Same steps, in the same order, as resetToDisplayMode()
+ * in Regenerate.gs, which can't be pointed at another file (it always wipes the open sheet) and is
+ * kept as is: if its step list changes, change this list too.
+ * The copy also gets this script, z_MINE.gs included: delete z_MINE.gs from the copy's
+ * Extensions > Apps Script before handing it to another school.
+ */
+function ownerMenuCopyAndResetToDisplayMode() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resp = ui.alert(
+    "📄 Copy Sheet, Then Reset the Copy",
+    "This makes a copy of this sheet in the same Drive folder and wipes the COPY to Display Mode " +
+    "(empty Raw Data, Contact Log, Events and built tabs; Old Master Table / Old Phone Contacts deleted).\n\n" +
+    "THIS sheet is not changed. Continue?",
+    ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+
+  runAction_("Copy + Reset to Display Mode", () => {
+    ss.toast("Copying the sheet…", "📄 Copy + Reset", 30);
+    SpreadsheetApp.flush(); // the copy should include every pending write
+
+    const file = DriveApp.getFileById(ss.getId());
+    const parents = file.getParents();
+    const folder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+    const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
+    const copyFile = file.makeCopy(`${ss.getName()} - Display Mode (${stamp})`, folder);
+    const copy = SpreadsheetApp.openById(copyFile.getId());
+
+    ss.toast("Resetting the copy to Display Mode…", "📄 Copy + Reset", 60);
+    try {
+      deleteLegacySheets_(copy);
+      resetRawData_(copy);
+      writeRawDataHeaders_(copy);
+      resetDerivedSheets_(copy);
+      resetEventsSystem_(copy);
+      resizeContactLog_(copy, 3);
+      resetContactLog_(copy);
+      clearTypeDropdownColors_(copy);
+      resetMasterTable_(copy);
+      fillContactLogHstackFormulas_(copy);
+      stampVersionDate_(copy);
+      saveSettingsToVersionSheet_(copy); // this sheet's current settings, written into the copy's Backend tab
+      applyDefaultSheetVisibility_(copy);
+      SpreadsheetApp.flush();
+    } catch (e) {
+      ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but its reset stopped partway",
+        "Error: " + (e && e.message ? e.message : e) + "<br>This sheet was not changed. You can delete the copy.");
+      throw e;
+    }
+
+    ownerShowCopyLink_(copy.getUrl(), "✅ Copy reset to Display Mode",
+      "This sheet was not changed. Before sharing the copy with another school, delete z_MINE.gs from " +
+      "the copy's Extensions &gt; Apps Script.");
+  });
+}
+
+function ownerShowCopyLink_(url, title, message) {
+  const html = HtmlService.createHtmlOutput(
+    `<div style="font-family:Arial,sans-serif;font-size:14px">` +
+    `<p>${message}</p><p><a href="${url}" target="_blank">Open the copy</a></p></div>`)
+    .setWidth(420).setHeight(180);
+  SpreadsheetApp.getUi().showModalDialog(html, title);
 }
 
 function ownerMenuToggleDebug() {

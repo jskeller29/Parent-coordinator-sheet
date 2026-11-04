@@ -71,9 +71,11 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm; they also delete Old Master Table / Old Phone Contacts), "Color Tabs" (colorTabs in Regenerate.gs, colors from
-  TAB_COLORS_: yellow = paste-in data, green/orange = typed tabs, blues/teals = built, purples = reports, greys = backend/old)
-  and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS).
+  confirm; they also delete Old Master Table / Old Phone Contacts), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
+  in the same folder and runs resetToDisplayMode's steps on the copy only; keep its step list in sync with
+  resetToDisplayMode; saveSettingsToVersionSheet_ takes an optional ss for it), "Color Tabs" (colorTabs in Regenerate.gs,
+  colors from TAB_COLORS_: yellow = paste-in data, green/orange = typed tabs, blues/teals = built, purples = reports,
+  greys = backend/old) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS).
   With Debug on, runAction_ toasts ✅ / ⚠️ / ❌ after each edit, open, Build Only, Full Sync, nightly and contacts sync,
   including errors that are normally only logged (console.error / console.warn).
 
