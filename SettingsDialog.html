@@ -188,6 +188,16 @@
     </label>
   </div>
 
+  <div class="toggle-container" style="flex-direction: column; align-items: stretch; gap: 8px;">
+    <div class="toggle-label">Data Update Reminder<span class="toggle-desc">Pop-up when Student Data, Parent Square or NYCSA hasn't been updated in this long.</span></div>
+    <select id="dataReminder" class="date-input">
+      <option value="week">Remind after 1 week (default)</option>
+      <option value="2weeks">Remind after 2 weeks</option>
+      <option value="month">Remind after 1 month</option>
+      <option value="off">Remove reminders</option>
+    </select>
+  </div>
+
   <button type="button" class="btn-outline" id="purgeBtn" onclick="purgeDischarged()">Purge Discharged Students</button>
   <div style="font-size: 11px; color: #94a3b8; text-align: center; margin-top: 4px; margin-bottom: 15px;">Permanently deletes non-current students from the Master Table.</div>
 
@@ -251,6 +261,7 @@
         
         document.getElementById('disableHiddenNotes').checked = settings.disableHiddenNotes;
         document.getElementById('hideDischarged').checked = settings.hideDischarged === true;
+        document.getElementById('dataReminder').value = settings.dataReminder || 'week';
         
         // Load Custom Dates
         document.getElementById('notesStartDate').value = settings.notesStartDate || '';
@@ -286,6 +297,7 @@
       document.getElementById('contactLogTodayOnly').checked = false;
       document.getElementById('disableHiddenNotes').checked = false;
       document.getElementById('hideDischarged').checked = false;
+      document.getElementById('dataReminder').value = 'week';
       document.getElementById('notesStartDate').value = '';
       document.getElementById('notesEndDate').value = '';
 
@@ -360,6 +372,7 @@
         contactLogTodayOnly: document.getElementById('contactLogTodayOnly').checked,
         disableHiddenNotes: document.getElementById('disableHiddenNotes').checked,
         hideDischarged: document.getElementById('hideDischarged').checked,
+        dataReminder: document.getElementById('dataReminder').value,
         notesStartDate: document.getElementById('notesStartDate').value,
         notesEndDate: document.getElementById('notesEndDate').value
       };

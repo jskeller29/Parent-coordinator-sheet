@@ -433,7 +433,8 @@ function runInitialSetupWrapper() {
     autoNotes: 'true',
     disableHiddenNotes: 'false',
     ignoreHideCheckboxes: 'false',
-    emailNotifications: 'false'
+    emailNotifications: 'false',
+    dataReminder: 'week'     // data update reminder: week / 2weeks / month / off
   };
 
   const savedSettings = loadSettingsFromVersionSheet_();
@@ -514,7 +515,7 @@ const SETTING_KEYS = [
   'siteClass', 'typeCol', 'autoOverride', 'autoNotes', 'disableHiddenNotes',
   'ignoreHideCheckboxes', 'emailNotifications', 'disableRebuilds',
   'disableNightlySync', 'disableContactAutofill', 'notesStartDate',
-  'notesEndDate', 'hideDischarged', 'contactLogTodayOnly'
+  'notesEndDate', 'hideDischarged', 'contactLogTodayOnly', 'dataReminder'
 ];
 
 /**
@@ -597,7 +598,10 @@ function getSettings() {
     notesEndDate: props.getProperty('notesEndDate') || '',
 
     // --- DATA MANAGEMENT ---
-    hideDischarged: props.getProperty('hideDischarged') === 'true'
+    hideDischarged: props.getProperty('hideDischarged') === 'true',
+
+    // Data update reminder pop-up: 'week' (default), '2weeks', 'month', 'off'
+    dataReminder: getDataReminderSetting_()
   };
 }
 
@@ -780,6 +784,10 @@ function applySettings(settings) {
   props.setProperty('notesEndDate', settings.notesEndDate || '');
   props.setProperty('hideDischarged', String(settings.hideDischarged));
   props.setProperty('contactLogTodayOnly', String(newTodayOnly));
+  // Data update reminder; a new choice here also ends any "Remind After ..." wait
+  const reminder = (settings.dataReminder === 'off' || DATA_REMINDER_DAYS[settings.dataReminder]) ? settings.dataReminder : 'week';
+  if (reminder !== getDataReminderSetting_()) props.deleteProperty(DATA_REMINDER_SNOOZE_KEY);
+  props.setProperty('dataReminder', reminder);
 
   // 2b. Persist to the Version tab so a future copy inherits these settings.
   try { saveSettingsToVersionSheet_(); } catch (e) { console.error(e); }
@@ -1829,60 +1837,157 @@ function manualCheckForUpdates() {
 }
 
 // ==========================================
-// 📅 ATS DATA FRESHNESS REMINDER
-// The "Raw Data" tab stamps cell A1 with "ATS - DATE UPDATED: MM/dd/yy" every
-// time ATS data is pasted (see updateRawDataTimestamp_ in Edits.gs), so
-// that cell IS the "last updated" clock and it resets itself on every paste.
-// If that date is more than ATS_STALE_DAYS old, we remind the user on open
-// (throttled to once per day) and point them at the guide.
+// 📅 DATA UPDATE REMINDER
+// Raw Data stamps each section's date when it is pasted (updateRawDataTimestamp_,
+// Edits.gs; Input Data Mode stamps the same cells):
+//   A1  "ATS - DATE UPDATED: MM/dd/yy"            (Student Data)
+//   AG1 "Parent Square - DATE UPDATED: MM/dd/yy"
+//   AP1 "NYCSA - DATE UPDATED: MM/dd/yy"
+// If any of them (that has ever been loaded) is older than the reminder setting
+// ("dataReminder": week / 2weeks / month / off, default week), a centered pop-up
+// offers Input Data Mode. Checked on open (checkVersionOnOpen) and while the sheet
+// is open (installedOnEdit, at most once an hour). Shown at most once a day;
+// "Skip" then offers Remind After 2 Weeks / 1 Month / Remove Reminders, which
+// change the setting (also in ⚙️ Settings) and wait that long before asking again.
 // ==========================================
-const ATS_STALE_DAYS = 30;
-
 const DATA_GUIDE_URL = "https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing";
 
-function checkRawDataFreshness_() {
-  const props = PropertiesService.getDocumentProperties();
-  if (props.getProperty('SETUP_COMPLETE') !== 'true') return;
+const DATA_REMINDER_DAYS = { week: 7, '2weeks': 14, month: 30 }; // 'off' = never
+const DATA_REMINDER_SNOOZE_KEY = 'DATA_REMINDER_SNOOZE_UNTIL';     // ms; doc property only (not copied)
+const DATA_REMINDER_SECTIONS = [
+  { name: "Student Data (ATS)", cell: "A1" },
+  { name: "Parent Square", cell: "AG1" },
+  { name: "NYCSA", cell: "AP1" }
+];
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const rawSheet = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
-  if (!rawSheet) return;
-
-  // A1 looks like "ATS - DATE UPDATED: 07/23/26"; pull the date out of it.
-  const a1 = String(rawSheet.getRange("A1").getValue());
-  const match = a1.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
-  const lastMs = match ? toDateMs_(match[1]) : NaN;
-  if (isNaN(lastMs)) return; // No ATS date stamped yet — nothing to remind about.
-
-  const days = Math.floor((Date.now() - lastMs) / 86400000);
-  if (days < ATS_STALE_DAYS) return;
-
-  // Throttle to once per calendar day so we don't nag on every open.
-  const todayKey = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
-  if (props.getProperty('ATS_REMINDER_LAST_SHOWN') === todayKey) return;
-  props.setProperty('ATS_REMINDER_LAST_SHOWN', todayKey);
-
-  showAtsReminderDialog_(days);
+/** Current reminder setting: 'week' (default), '2weeks', 'month' or 'off'. */
+function getDataReminderSetting_() {
+  const v = PropertiesService.getDocumentProperties().getProperty('dataReminder');
+  return (v === 'off' || DATA_REMINDER_DAYS[v]) ? v : 'week';
 }
 
-function showAtsReminderDialog_(days) {
+/** Sections whose last update is older than the setting: [{ name, date, days }]. */
+function getStaleDataSections_(ss) {
+  const setting = getDataReminderSetting_();
+  if (setting === 'off') return [];
+  const limit = DATA_REMINDER_DAYS[setting];
+  const rawSheet = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
+  if (!rawSheet) return [];
+  const stale = [];
+  DATA_REMINDER_SECTIONS.forEach(sec => {
+    const text = String(rawSheet.getRange(sec.cell).getDisplayValue());
+    if (/00\/00\/00/.test(text)) return;                 // never loaded: nothing to remind about
+    const match = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+    const ms = match ? toDateMs_(match[1]) : NaN;
+    if (isNaN(ms)) return;
+    const days = Math.floor((Date.now() - ms) / 86400000);
+    if (days >= limit) stale.push({ name: sec.name, date: match[1], days: days });
+  });
+  return stale;
+}
+
+/**
+ * On open (and while open, see checkDataReminderWhileOpen_): shows the reminder
+ * if a section is stale, reminders are on, not snoozed, not already shown today,
+ * and Input Data Mode isn't running. Returns true if the pop-up was shown.
+ */
+function checkRawDataFreshness_() {
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty('SETUP_COMPLETE') !== 'true') return false;
+  if (getDataReminderSetting_() === 'off') return false;
+  if (props.getProperty('INPUT_DATA_MODE_STATE')) return false; // already updating data
+
+  const snooze = Number(props.getProperty(DATA_REMINDER_SNOOZE_KEY) || 0);
+  if (snooze && Date.now() < snooze) return false;
+
+  const todayKey = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  if (props.getProperty('ATS_REMINDER_LAST_SHOWN') === todayKey) return false;
+
+  const stale = getStaleDataSections_(SpreadsheetApp.getActiveSpreadsheet());
+  if (!stale.length) return false;
+
+  // Throttle to once per calendar day so we don't nag on every open.
+  props.setProperty('ATS_REMINDER_LAST_SHOWN', todayKey);
+  showDataReminderDialog_(stale);
+  return true;
+}
+
+/** Called from installedOnEdit: re-checks at most once an hour while the sheet is open. */
+function checkDataReminderWhileOpen_() {
+  const cache = CacheService.getUserCache();
+  if (cache.get('DATA_REMINDER_CHECKED')) return;
+  cache.put('DATA_REMINDER_CHECKED', '1', 3600);
+  checkRawDataFreshness_();
+}
+
+function showDataReminderDialog_(stale) {
+  const hasInputMode = typeof openInputDataMode === "function"; // optional module (Z#InputDataMode.gs)
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const limitText = { week: "a week", '2weeks': "2 weeks", month: "a month" }[getDataReminderSetting_()];
+  const rows = stale.map(s =>
+    `<tr><td>${esc(s.name)}</td><td style="text-align:right;color:#b91c1c;font-weight:600">${s.days} days ago</td></tr>`).join("");
+
   const html = `
-    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; text-align: center;">
-      <h2 style="color: #0F172A; margin-top: 0;">⏰ Time to Refresh Your Roster</h2>
-      <p style="color: #334155; font-size: 14px; line-height: 1.5; text-align: left;">
-        Your <b>ATS</b> student data hasn't been updated in <b>${days} days</b>. To keep your directory,
-        contacts, and reports accurate, paste a fresh ATS export into the <b>RAW Data</b> tab.
-      </p>
-      <a href="${DATA_GUIDE_URL}" target="_blank" rel="noopener" style="display: inline-block; padding: 12px 24px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; margin-top: 8px;">
-        📖 How to Update Your Data
-      </a>
-      <p style="margin-top: 22px; font-size: 12px; color: #94a3b8;">
-        This reminder appears once a day until your ATS data is refreshed.
-      </p>
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 6px 12px; color: #0F172A; text-align: center; }
+      h2 { margin: 4px 0 6px; font-size: 19px; }
+      p { color: #334155; font-size: 14px; line-height: 1.45; margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; margin: 10px 0 14px; font-size: 14px; text-align: left; }
+      td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+      button, .btn { display: block; width: 100%; box-sizing: border-box; padding: 11px; margin: 8px 0; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; color: #0F172A; text-decoration: none; font-family: inherit; }
+      .primary { background: #2563EB; border-color: #2563EB; color: #fff; }
+      .muted { font-size: 12px; color: #94a3b8; }
+      .hidden { display: none; }
+    </style>
+    <div id="ask">
+      <h2>⏰ Time to Update Your Data</h2>
+      <p>This data hasn't been updated in over ${limitText}:</p>
+      <table>${rows}</table>
+      ${hasInputMode
+        ? `<button class="primary" onclick="go()">📥 Go to Input Data Mode</button>`
+        : `<a class="btn primary" href="${DATA_GUIDE_URL}" target="_blank" rel="noopener">📖 How to Update Your Data</a>`}
+      <button onclick="skip()">Skip</button>
     </div>
-  `;
-  const out = HtmlService.createHtmlOutput(html).setWidth(430).setHeight(280);
-  SpreadsheetApp.getUi().showModalDialog(out, "⏰ Update Your ATS Data");
+    <div id="later" class="hidden">
+      <h2>⏭️ Skipped</h2>
+      <p>When should we remind you next?</p>
+      <button onclick="choose('2weeks')">Remind After 2 Weeks</button>
+      <button onclick="choose('month')">Remind After 1 Month</button>
+      <button onclick="choose('off')">Remove Reminders</button>
+      <button class="primary" onclick="google.script.host.close()">Just skip for today</button>
+      <p class="muted">You can change this any time in ⚙️ Settings.</p>
+    </div>
+    <div id="busy" class="hidden"><p>Working…</p></div>
+    <script>
+      function show(id) { ['ask','later','busy'].forEach(function (x) { document.getElementById(x).classList.toggle('hidden', x !== id); }); }
+      function fail(e) { alert('Something went wrong: ' + (e && e.message ? e.message : e)); google.script.host.close(); }
+      function go() { show('busy'); google.script.run.withSuccessHandler(function () { google.script.host.close(); }).withFailureHandler(fail).dataReminderOpenInputMode(); }
+      function skip() { show('later'); }
+      function choose(c) { show('busy'); google.script.run.withSuccessHandler(function () { google.script.host.close(); }).withFailureHandler(fail).dataReminderChoose(c); }
+    </script>`;
+  const height = Math.max(320, 250 + stale.length * 36); // the Skip screen needs ~320
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(420).setHeight(height), "⏰ Update Your Data");
+}
+
+/** Reminder pop-up: "📥 Go to Input Data Mode". */
+function dataReminderOpenInputMode() {
+  if (typeof openInputDataMode === "function") openInputDataMode();
+  return true;
+}
+
+/**
+ * Reminder pop-up after Skip: '2weeks' / 'month' = remind when data is that old
+ * and not before that long from now; 'off' = no reminders. Saved like any setting
+ * (document property + Backend settings block) so ⚙️ Settings shows it.
+ */
+function dataReminderChoose(choice) {
+  if (choice !== 'off' && !DATA_REMINDER_DAYS[choice]) throw new Error("Unknown reminder choice: " + choice);
+  const props = PropertiesService.getDocumentProperties();
+  props.setProperty('dataReminder', choice);
+  if (choice === 'off') props.deleteProperty(DATA_REMINDER_SNOOZE_KEY);
+  else props.setProperty(DATA_REMINDER_SNOOZE_KEY, String(Date.now() + DATA_REMINDER_DAYS[choice] * 86400000));
+  try { saveSettingsToVersionSheet_(); } catch (e) { console.error(e); }
+  return true;
 }
 
 // ==========================================

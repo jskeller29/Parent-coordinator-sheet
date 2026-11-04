@@ -11,7 +11,10 @@
 // =========================================================
 function installedOnEdit(e) {
   if (!e || !e.range) return;
-  return runAction_(() => "Edit " + e.range.getSheet().getName() + "!" + e.range.getA1Notation(), () => handleEdit_(e));
+  const result = runAction_(() => "Edit " + e.range.getSheet().getName() + "!" + e.range.getA1Notation(), () => handleEdit_(e));
+  // Data update reminder while the sheet is open (at most one check an hour; Menus.gs)
+  try { checkDataReminderWhileOpen_(); } catch (err) { console.warn("Data reminder check failed: " + err.message); }
+  return result;
 }
 
 function handleEdit_(e) {

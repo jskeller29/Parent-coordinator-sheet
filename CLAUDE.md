@@ -139,6 +139,14 @@ Owner decisions still open (current behavior kept): add shared sync safety check
 to owner sync?; owner hides Contact Log col K (11) vs shared H (8) when no site (K looks stale); Montserrat on New
 Students (owner build skips it); owner splitFullName_ changes the shared Directory name split - intended?; ghost typist
 TextFinder vs in-memory scan (differ only on stray spaces).
+Data update reminder (Menus.gs, replaced the old 30-day ATS-only reminder; same checkRawDataFreshness_ name): centered
+pop-up when Raw Data A1 / AG1 / AP1 (ATS / Parent Square / NYCSA, only sections ever loaded) is older than setting
+"dataReminder" (week default / 2weeks / month / off; in SETTING_KEYS so it is saved to the Backend settings block and
+shown in ⚙️ Settings). Checked by checkVersionOnOpen and by installedOnEdit (checkDataReminderWhileOpen_, user cache:
+once an hour); once a day (ATS_REMINDER_LAST_SHOWN); not during Input Data Mode. "Go to Input Data Mode" only if
+openInputDataMode exists (guarded), else the guide link. Skip -> Remind After 2 Weeks / 1 Month (setting + wait in doc
+property DATA_REMINDER_SNOOZE_UNTIL) / Remove Reminders / Just skip for today. Endpoints dataReminderOpenInputMode,
+dataReminderChoose. Saving a different choice in Settings clears the wait.
 Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications.
 Bugs noticed (not fixed): quick update ignores the Settings notes date range; nightly trigger 11 PM at setup
 but 2 AM after Settings save; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
