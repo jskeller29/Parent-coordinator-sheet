@@ -166,13 +166,11 @@ function buildMenus_() {
     initMenu.addItem('🚨 Initial Setup (Run Once)', 'runInitialSetupWrapper'); 
     initMenu.addToUi(); 
 
-    // Owner's sheet only: a fresh copy of it (setup not run there yet) still gets the 🐞 Debug menu,
-    // e.g. for "▶️ Load Fake Data on This Copy Now". No-op on every other sheet.
+    // Owner's sheet only: a fresh copy of it (setup not run there yet) still gets the 🐞 Debug menu.
+    // No-op on every other sheet.
     const ownerBeforeSetup = getOwnerHooks_();
     if (ownerBeforeSetup) {
       try { ownerBeforeSetup.addMenus(ui); } catch (e) { console.error(e); }
-      // The fake-data copy skips the welcome pop-up: its ▶️ item is the next step there
-      if (ownerBeforeSetup.fakeDataPending && ownerBeforeSetup.fakeDataPending()) return;
     }
     
     try {

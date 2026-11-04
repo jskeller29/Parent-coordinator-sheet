@@ -13,6 +13,16 @@ function resetToDisplayMode() {
   );
   if (resp !== ui.Button.YES) return;
 
+  resetToDisplayModeSteps_(ss);
+
+  SpreadsheetApp.getUi().alert("Display Mode Reset complete.");
+}
+
+/**
+ * The Reset to Display Mode work itself (no pop-ups). Every step takes ss, so it
+ * can also wipe a copy (owner's Debug menu: "Copy Sheet, Then Reset the Copy").
+ */
+function resetToDisplayModeSteps_(ss) {
   deleteLegacySheets_(ss); // Delete every tab not in KEEP_TABS_
 
   resetRawData_(ss);
@@ -35,12 +45,10 @@ function resetToDisplayMode() {
 
   // Snapshot the current settings into the Version tab so a fresh copy of
   // this template inherits them (see Settings Backend.gs).
-  if (typeof saveSettingsToVersionSheet_ === "function") saveSettingsToVersionSheet_();
+  if (typeof saveSettingsToVersionSheet_ === "function") saveSettingsToVersionSheet_(ss);
 
   // Reset the view to only the default-shown tabs (hide everything else).
   if (typeof applyDefaultSheetVisibility_ === "function") applyDefaultSheetVisibility_(ss);
-
-  SpreadsheetApp.getUi().alert("Display Mode Reset complete.");
 }
 
 /**
@@ -84,6 +92,22 @@ function resetAndLoadFakeData() {
     ui.ButtonSet.YES_NO
   );
   if (resp !== ui.Button.YES) return;
+
+  loadFakeDataSteps_(ss);
+
+  SpreadsheetApp.getUi().alert("Reset + Full Data Load (including Events & Parents Square) complete.");
+}
+
+/**
+ * The Reset + Load Fake Data work itself (no pop-ups). ss must be the ACTIVE
+ * spreadsheet: the Events tables, the build, the Override Report and the colors
+ * always work on the active one. (The owner's "Copy Sheet, Then Load Fake Data
+ * on the Copy" makes the copy active first; see ownerRunOnCopy_ in z_MINE.gs.)
+ */
+function loadFakeDataSteps_(ss) {
+  if (SpreadsheetApp.getActiveSpreadsheet().getId() !== ss.getId()) {
+    throw new Error("Fake data can only be loaded into the active spreadsheet.");
+  }
 
   deleteLegacySheets_(ss); // Delete every tab not in KEEP_TABS_
 
@@ -143,8 +167,6 @@ function resetAndLoadFakeData() {
   if (typeof applyTypeDropdownColors === "function") {
     applyTypeDropdownColors();
   }
-
-  SpreadsheetApp.getUi().alert("Reset + Full Data Load (including Events & Parents Square) complete.");
 }
 
 /* =========================

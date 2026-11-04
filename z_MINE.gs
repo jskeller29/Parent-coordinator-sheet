@@ -41,7 +41,6 @@ function ownerHooks_() {
 
     // --- 🐞 Debug menu + toasts (onOpen / runAction_) ---
     addMenus: ownerAddMenus_,
-    fakeDataPending: ownerFakeDataPending_,
     debugOn: ownerDebugOn_,
     debugRun: ownerDebugRun_
   };
@@ -52,7 +51,7 @@ function ownerHooks_() {
 // "Reset + Load Fake Data" / "Reset to Display Mode" run the Regenerate.gs
 // tools (after you type RESET, then their own "Are you sure?"). "Copy Sheet, Then
 // Reset the Copy" wipes only a new copy, never this sheet; "Copy Sheet, Then Load
-// Fake Data on the Copy" makes a copy you then fill with one click inside it. "Toggle Debug"
+// Fake Data on the Copy" fills only a new copy, never this sheet. "Toggle Debug"
 // turns on a toast after every edit, build, sync and sheet open saying whether
 // it worked, including errors the code normally only writes to the log.
 // ======================================================================
@@ -60,17 +59,7 @@ const OWNER_DEBUG_PROP_ = "OWNER_DEBUG_TOASTS";
 let ownerDebugDepth_ = 0; // only the outermost action reports
 
 function ownerAddMenus_(ui) {
-  const menu = ui.createMenu("🐞 Debug");
-  // A copy made by "Copy Sheet, Then Load Fake Data on the Copy" shows one extra item at the top
-  if (ownerFakeDataPending_()) {
-    menu.addItem("▶️ Load Fake Data on This Copy Now", "ownerMenuFinishFakeDataCopy").addSeparator();
-    try {
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        "This is the fake-data copy. Click 🐞 Debug → ▶️ Load Fake Data on This Copy Now " +
-        "(Google asks you to allow the script the first time).", "🧪 Fake data copy", 30);
-    } catch (e) {}
-  }
-  menu
+  ui.createMenu("🐞 Debug")
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
@@ -89,10 +78,8 @@ function ownerMenuResetToDisplayMode() {
 }
 
 /**
- * Makes a copy of this sheet (same Drive folder) and runs the Reset to Display Mode steps on the
- * COPY only. This sheet is never changed. Same steps, in the same order, as resetToDisplayMode()
- * in Regenerate.gs, which can't be pointed at another file (it always wipes the open sheet) and is
- * kept as is: if its step list changes, change this list too.
+ * Makes a copy of this sheet (same Drive folder) and runs the Reset to Display Mode steps
+ * (resetToDisplayModeSteps_, Regenerate.gs) on the COPY only. This sheet is never changed.
  * The copy also gets this script, z_MINE.gs included: delete z_MINE.gs from the copy's
  * Extensions > Apps Script before handing it to another school.
  */
@@ -113,20 +100,7 @@ function ownerMenuCopyAndResetToDisplayMode() {
 
     ss.toast("Resetting the copy to Display Mode…", "📄 Copy + Reset", 60);
     try {
-      deleteLegacySheets_(copy);
-      resetRawData_(copy);
-      writeRawDataHeaders_(copy);
-      resetDerivedSheets_(copy);
-      resetEventsSystem_(copy);
-      resizeContactLog_(copy, 3);
-      resetContactLog_(copy);
-      clearTypeDropdownColors_(copy);
-      resetMasterTable_(copy);
-      resetNotes_(copy);
-      fillContactLogHstackFormulas_(copy);
-      stampVersionDate_(copy);
-      saveSettingsToVersionSheet_(copy); // this sheet's current settings, written into the copy's Backend tab
-      applyDefaultSheetVisibility_(copy);
+      resetToDisplayModeSteps_(copy); // Regenerate.gs: same steps as Reset to Display Mode
       SpreadsheetApp.flush();
     } catch (e) {
       ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but its reset stopped partway",
@@ -153,59 +127,61 @@ function ownerCopyThisSheet_(ss, label) {
 
 // ----------------------------------------------------------------------
 // COPY SHEET, THEN LOAD FAKE DATA ON THE COPY
-// Reset + Load Fake Data can't be run on another file from here: the build, the
-// Events tables and the Override Report always work on the OPEN sheet, and the
-// build keeps its memory (new-student snapshot) in this sheet's own properties.
-// So this makes the copy and marks it (spreadsheet developer metadata). Opening
-// the copy then shows "▶️ Load Fake Data on This Copy Now" at the top of the
-// Debug menu, which runs the normal resetAndLoadFakeData there.
+// Loading fake data runs code that always works on the ACTIVE spreadsheet (the
+// Events tables, the build, the Override Report) and the build keeps its memory
+// (new-student snapshot) in this script's document properties. So ownerRunOnCopy_
+// makes the copy the active spreadsheet for the run, then switches back and puts
+// this sheet's document properties back exactly as they were.
 // ----------------------------------------------------------------------
-const OWNER_FAKE_PENDING_KEY_ = "OWNER_PENDING_FAKE_DATA";
-
 function ownerMenuCopyForFakeData() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const resp = ui.alert(
     "🧪 Copy Sheet, Then Load Fake Data on the Copy",
-    "This makes a copy of this sheet in the same Drive folder. Open the copy and click " +
-    "🐞 Debug → ▶️ Load Fake Data on This Copy Now: that wipes the COPY and loads the fake data there.\n\n" +
-    "THIS sheet is not changed. Continue?",
+    "This makes a copy of this sheet in the same Drive folder, wipes the COPY and loads the fake data " +
+    "into it (takes a minute or two).\n\nTHIS sheet is not changed. Continue?",
     ui.ButtonSet.YES_NO);
   if (resp !== ui.Button.YES) return;
 
-  runAction_("Copy for Fake Data", () => {
-    ss.toast("Copying the sheet…", "🧪 Copy for Fake Data", 30);
+  runAction_("Copy + Load Fake Data", () => {
+    ss.toast("Copying the sheet…", "🧪 Copy + Fake Data", 30);
     const copy = ownerCopyThisSheet_(ss, "Fake Data");
-    copy.addDeveloperMetadata(OWNER_FAKE_PENDING_KEY_, "true", SpreadsheetApp.DeveloperMetadataVisibility.DOCUMENT);
-    SpreadsheetApp.flush();
-    ownerShowCopyLink_(copy.getUrl(), "✅ Copy made",
-      "Open the copy, then click <b>🐞 Debug → ▶️ Load Fake Data on This Copy Now</b> (top of the menu). " +
-      "The first time, Google asks you to allow the copy's script; if nothing loads after that, click it again. " +
+
+    ss.toast("Loading fake data into the copy…", "🧪 Copy + Fake Data", 120);
+    try {
+      ownerRunOnCopy_(copy, () => loadFakeDataSteps_(copy)); // Regenerate.gs: same steps as Reset + Load Fake Data
+      SpreadsheetApp.flush();
+    } catch (e) {
+      ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but loading fake data stopped partway",
+        "Error: " + (e && e.message ? e.message : e) + "<br>This sheet was not changed. You can delete the copy.");
+      throw e;
+    }
+
+    ownerShowCopyLink_(copy.getUrl(), "✅ Copy loaded with fake data",
       "This sheet was not changed.<br><br>The copy has no automatic triggers (edits, nightly): " +
       "run 🚀 App Menu → Initial Setup there if you want to test typing in it.");
   });
 }
 
-/** True on a copy made by ownerMenuCopyForFakeData until its fake data has been loaded. */
-function ownerFakeDataPending_() {
+/**
+ * Runs fn with copy as the active spreadsheet, then makes this sheet active again and
+ * restores this script's document properties (settings, build snapshot, ...) exactly.
+ * Refuses to run fn unless the switch really happened, so this sheet is never wiped.
+ */
+function ownerRunOnCopy_(copy, fn) {
+  const original = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getDocumentProperties();
+  const savedProps = props.getProperties();
+  SpreadsheetApp.setActiveSpreadsheet(copy);
   try {
-    return SpreadsheetApp.getActiveSpreadsheet().createDeveloperMetadataFinder()
-      .withKey(OWNER_FAKE_PENDING_KEY_).find().length > 0;
-  } catch (e) { return false; }
-}
-
-/** Runs the normal Reset + Load Fake Data on this copy (its own "Are you sure?" still shows), then clears the mark. */
-function ownerMenuFinishFakeDataCopy() {
-  runAction_("Load Fake Data on This Copy", () => resetAndLoadFakeData());
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const raw = ss.getSheetByName("Raw Data");
-  // Keep the mark when "Are you sure?" was answered No (Raw Data does not start with the fake students)
-  if (!raw || String(raw.getRange("C7").getDisplayValue()).trim() !== "123456789") return;
-  try {
-    ss.createDeveloperMetadataFinder()
-      .withKey(OWNER_FAKE_PENDING_KEY_).find().forEach(md => md.remove());
-  } catch (e) { console.warn("Could not clear the fake-data mark: " + e.message); }
-  onOpen(); // refresh the menu (the ▶️ item goes away)
+    if (SpreadsheetApp.getActiveSpreadsheet().getId() !== copy.getId() || copy.getId() === original.getId()) {
+      throw new Error("Could not switch to the copy, so nothing was loaded (this sheet was not touched).");
+    }
+    return fn();
+  } finally {
+    SpreadsheetApp.setActiveSpreadsheet(original);
+    props.setProperties(savedProps, true); // true = also delete keys the run added
+  }
 }
 
 function ownerShowCopyLink_(url, title, message) {

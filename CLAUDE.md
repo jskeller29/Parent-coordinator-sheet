@@ -71,14 +71,14 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm), "Copy Sheet, Then Reset the Copy" (makes a Drive copy in the same folder and runs resetToDisplayMode's steps
-  on the copy only; keep its step list in sync with resetToDisplayMode; saveSettingsToVersionSheet_ takes an optional ss
-  for it), "Copy Sheet, Then Load Fake Data on the Copy" (makes a copy and marks it with spreadsheet developer
-  metadata OWNER_PENDING_FAKE_DATA; it cannot fill the copy itself because buildAllDerivedSheets / buildEventTable /
-  buildOverrideReport use the open sheet and the build's snapshot lives in this sheet's document properties; in the
-  copy the Debug menu then shows "▶️ Load Fake Data on This Copy Now", which runs resetAndLoadFakeData there and
-  removes the mark; buildMenus_ adds the owner menus even before Initial Setup, because a copy's setup flag
-  is not copied, and skips the welcome pop-up while the mark is there) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
+  confirm), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
+  in the same folder and runs resetToDisplayModeSteps_ on it), "Copy Sheet, Then Load Fake Data on the Copy" (runs
+  loadFakeDataSteps_ on the copy via ownerRunOnCopy_: SpreadsheetApp.setActiveSpreadsheet(copy) because the build /
+  buildEventTable / buildOverrideReport use the active spreadsheet, then switches back and restores this script's
+  document properties with setProperties(saved, true), since the build's ATS snapshot lives there; refuses to run if
+  the switch did not happen). resetToDisplayMode / resetAndLoadFakeData = confirm + these *Steps_ functions + alert;
+  loadFakeDataSteps_ throws unless ss is the active spreadsheet. buildMenus_ also adds the owner menus before
+  Initial Setup (a copy's setup flag is not copied) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
   RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
@@ -177,7 +177,7 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   owner's sheet rebuilds once per edit instead of once per OSIS; owner Phone Contacts groups guardians once; Notes /
   Events typist reads the 3 identity cells in one call; sync reads header positions once.
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
-Must keep: 15 menu handler names (+6 owner Debug items), 39 google.script.run endpoints, trigger handlers
+Must keep: 15 menu handler names (+5 owner Debug items), 39 google.script.run endpoints, trigger handlers
 (installedOnEdit, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts), all sheet names, Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
