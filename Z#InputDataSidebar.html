@@ -21,6 +21,13 @@
     .spinner { width: 14px; height: 14px; border: 2px solid #BAE6FD; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.9s linear infinite; flex: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    /* Progress bar: click a step to jump to it */
+    #progress { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 1px; margin: 12px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #E2E8F0; }
+    #progress .pstep { background: none; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 4px 2px 5px; font-size: 11px; color: #64748B; cursor: pointer; white-space: nowrap; }
+    #progress .pstep:hover:not(:disabled) { color: #1D4ED8; }
+    #progress .pstep.current { color: #1D4ED8; font-weight: 700; border-bottom-color: #1D4ED8; }
+    #progress .pstep.done { color: #166534; }
+    #progress .parrow { color: #CBD5E1; font-size: 10px; padding: 0 0 7px; }
     .done-line { font-weight: 600; margin: 2px 0; }
     .done-line.skip { color: #64748B; font-weight: 400; }
     .ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
@@ -42,6 +49,8 @@
 <body>
   <h2>📥 Welcome to Input Data Mode</h2>
   <div class="muted">Load each export one at a time. The other tabs are hidden until you finish or exit.</div>
+
+  <div id="progress" class="hidden"></div>
 
   <div id="loading" class="status"><div class="spinner"></div><div>Loading…</div></div>
 
@@ -194,6 +203,7 @@
       return;
     }
     show('stepView', true); show('doneView', false); show('footer', true);
+    renderProgress(v.progress || []);
     $('stepTitle').textContent = 'Data ' + (v.stepIndex + 1) + ' of ' + v.stepCount + ': ' + v.step.zone;
     $('stepPill').textContent = v.step.required ? 'Required' : 'Optional';
     $('stepPill').className = 'pill' + (v.step.required ? '' : ' opt');
@@ -239,8 +249,27 @@
     else schedule();
   }
 
+  function renderProgress(steps) {
+    var icons = { done: '✅ ', skipped: '⏭️ ', todo: '' };
+    $('progress').innerHTML = steps.map(function (p, i) {
+      return (i ? '<span class="parrow">→</span>' : '') +
+        '<button class="pstep' + (p.current ? ' current' : '') + (p.status === 'done' ? ' done' : '') +
+        '" onclick="goToStep(' + i + ')" title="' + (p.current ? 'You are here' : 'Go to this step') + '">' +
+        icons[p.status] + p.label + '</button>';
+    }).join('');
+    show('progress', steps.length > 0);
+  }
+
+  function goToStep(i) {
+    if (busy) return;
+    working('Switching step…');
+    hideExitAsk();
+    call('idm_goToStep', i);
+  }
+
   function renderDone(v) {
     stopPolling();
+    show('progress', false);
     show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
     $('doneTitle').textContent = v.exited ? '🚪 Input Data Mode closed' : '🎉 All done!';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = v.notice.message; show('doneNotice', true); }
@@ -268,6 +297,7 @@
 
   function setButtons(on) {
     ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn'].forEach(function (id) { $(id).disabled = !on; });
+    Array.prototype.forEach.call(document.querySelectorAll('#progress .pstep'), function (b) { b.disabled = !on; });
   }
 
   function working(text) {

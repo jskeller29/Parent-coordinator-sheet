@@ -46,7 +46,7 @@ var IDM_PENDING_DELETE_KEY = 'INPUT_DATA_MODE_DELETE_TAB';
 // updateRawDataTimestamp_ (Edits.gs). Keep them in step.
 var IDM_STEPS = [
   {
-    key: 'ats', tab: 'Student Data', zone: 'Student Data (ATS / Insight)', required: true,
+    key: 'ats', tab: 'Student Data', short: 'Student Data', zone: 'Student Data (ATS / Insight)', required: true,
     col: 1, stampCell: 'A1', stampPrefix: 'ATS - DATE UPDATED: ', minMatch: 3,
     headers: ["School Year","DBN","Student ID","Last Name","First Name","Race","Gender","Age","IEP Flag","ELL Flag","504 Flag","NYSAA Eligible","Housing Status","Temporary Housing Flag","Economic Disadvantage Flag","Cohort Year","Grade","Official Class","Home Language","Guardian Name 1","Guardian Relationship 1","Guardian Phone Number 1","Guardian Email 1","Guardian Spoken Language 1","Guardian Written Language 1","Guardian Name 2","Guardian Relationship 2","Guardian Phone Number 2","Guardian Email 2","Guardian Spoken Language 2","Guardian Written Language 2"],
     numberCols: ["Student ID","Guardian Phone Number 1","Guardian Phone Number 2"],
@@ -58,7 +58,7 @@ var IDM_STEPS = [
     ]
   },
   {
-    key: 'ps', tab: 'Parent Square Data', zone: 'Parent Square', required: false,
+    key: 'ps', tab: 'Parent Square Data', short: 'Parent Square', zone: 'Parent Square', required: false,
     col: 33, stampCell: 'AG1', stampPrefix: 'Parent Square - DATE UPDATED: ', minMatch: 2,
     headers: ["Name","Students","Email","Phone","Secondary Phone","Record Created","Registered?","SIS Synced"],
     numberCols: ["Phone","Secondary Phone"],
@@ -69,7 +69,7 @@ var IDM_STEPS = [
     ]
   },
   {
-    key: 'nycsa', tab: 'NYCSA Data', zone: 'NYCSA', required: false,
+    key: 'nycsa', tab: 'NYCSA Data', short: 'NYCSA', zone: 'NYCSA', required: false,
     col: 42, stampCell: 'AP1', stampPrefix: 'NYCSA - DATE UPDATED: ', minMatch: 3,
     headers: ["Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name","Another Custodial NYCSA Account Exist","Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"],
     numberCols: ["Student ID","Guardian Home Number","Guardian Work Number","Guardian Cell Number"],
@@ -80,7 +80,7 @@ var IDM_STEPS = [
     ]
   },
   {
-    key: 'siteclass', tab: 'Site / Class', zone: 'Site / Class', required: false, manual: true,
+    key: 'siteclass', tab: 'Site / Class', short: 'Site / Class', zone: 'Site / Class', required: false, manual: true,
     howTo: [
       "The <b>Site / Class</b> tab lists every class code from your Student Data.",
       "Type each class's <b>Teacher Name</b>.",
@@ -254,6 +254,30 @@ function idm_exit() {
     const results = state.results;
     idm_cleanup_(ss, state, false);
     return { active: false, finished: true, exited: true, anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
+  });
+}
+
+/** Progress bar click: jump to any step (back or forward). The temp tab is renamed and reset for it. */
+function idm_goToStep(index) {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    index = Number(index);
+    if (!(index >= 0 && index < IDM_STEPS.length) || index === state.step) return idm_view_(ss, state);
+    idm_log_("jump from step " + state.step + " to " + index);
+    const temp = idm_sheetById_(ss, state.tempId);
+    state.step = index;
+    if (temp) {
+      idm_renameTab_(ss, temp, IDM_STEPS[index].tab);
+      idm_prepareTab_(ss, temp, IDM_STEPS[index]);
+      temp.activate();
+    } else {
+      state.tempId = null;
+      idm_ensureTempSheet_(ss, state);
+    }
+    idm_saveState_(state);
+    return idm_view_(ss, state);
   });
 }
 
@@ -721,10 +745,15 @@ function idm_view_(ss, state, notice) {
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual },
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
-    // Earlier steps, for the "✅ "Student Data" Successful" lines under Option 1
-    done: IDM_STEPS.slice(0, state.step).map(st => {
-      const r = (state.results || {})[st.key] || {};
-      return { name: st.tab, rows: r.rows || 0, skipped: !r.rows && !r.saved };
+    // Finished / skipped steps (other than this one), for the "✅ "Student Data" Successful" lines under Option 1
+    done: IDM_STEPS.map((st, i) => ({ st: st, i: i, r: (state.results || {})[st.key] }))
+      .filter(x => x.r && x.i !== state.step)
+      .map(x => ({ name: x.st.tab, rows: x.r.rows || 0, skipped: !x.r.rows && !x.r.saved })),
+    // Progress bar at the top of the sidebar
+    progress: IDM_STEPS.map((st, i) => {
+      const r = (state.results || {})[st.key];
+      return { label: st.short, current: i === state.step,
+               status: r ? ((r.rows || r.saved) ? 'done' : 'skipped') : 'todo' };
     }),
     notice: notice || null
   };
