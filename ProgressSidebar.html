@@ -36,6 +36,17 @@
       .log-item.edited { border-left-color: #f59e0b; }
       .log-item.deleted { border-left-color: #ef4444; }
       .log-item.upgrade { border-left-color: #3b82f6; }
+
+      /* Build checklist ("Building Sheets & Directory") */
+      .build-intro { font-size: 12px; color: #555; margin: 3px 0 6px; }
+      .step-list { list-style-type: none; padding-left: 0; margin: 8px 0 0; font-size: 12px; }
+      .step-item { display: flex; gap: 6px; padding: 4px 6px; border-radius: 4px; color: #94a3b8; }
+      .step-item .step-icon { width: 16px; flex-shrink: 0; text-align: center; }
+      .step-item .step-label { font-weight: bold; }
+      .step-item .step-detail { font-size: 11px; }
+      .step-item.done { color: #334155; }
+      .step-item.current { color: #0f172a; background: #eff6ff; }
+      .step-item.failed { color: #b91c1c; background: #fef2f2; }
     </style>
   </head>
   <body>
@@ -45,8 +56,10 @@
       
       <div class="section">
         <strong>1. Building Sheets & Directory</strong>
+        <div class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and your Student Overrides.</div>
         <progress id="buildBar" value="0" max="1"></progress>
         <div id="buildStatus" class="status">Waiting to start...</div>
+        <ul id="buildSteps" class="step-list"></ul>
       </div>
 
       <div class="section" id="syncSection">
@@ -79,6 +92,9 @@
       let cachedBuildLogData = null;
       let runMode = 'FULL_SYNC';
       let buildReportShown = false; 
+      let isBuilding = false;
+      let buildStepList = [];
+      let lastBuildStep = 0;
       
       // --- ETA VARIABLES ---
       let syncStartTime = null;
@@ -95,7 +111,7 @@
             if (data && (data.newStudents.length > 0 || data.discharged.length > 0 || data.nycsaUpgrades.length > 0 || data.psUpgrades.length > 0)) {
                 cachedBuildLogData = data;
                 // Only show it if we aren't actively building a new one right now
-                if (document.getElementById('buildStatus').innerText !== 'Building sheets...') {
+                if (!isBuilding) {
                     showBuildReport();
                     buildReportShown = true;
                 }
@@ -136,9 +152,25 @@
           document.getElementById('syncBar').classList.remove('cancelled');
         }
 
+        if (state.buildSteps) buildStepList = state.buildSteps;
+        if (state.phase === 'building') isBuilding = true;
+        else if (state.phase !== 'killed') isBuilding = false;
+
         if (state.phase === 'building') {
-          document.getElementById('buildBar').removeAttribute('value');
-          document.getElementById('buildStatus').innerText = 'Building sheets...';
+          const steps = buildStepList;
+          const step = Math.min(Math.max(Number(state.buildStep) || 0, 0), Math.max(steps.length - 1, 0));
+          lastBuildStep = step;
+          const bar = document.getElementById('buildBar');
+          if (steps.length) {
+            bar.max = steps.length;
+            bar.value = step;
+            document.getElementById('buildStatus').innerText =
+              `Building sheets... Step ${step + 1} of ${steps.length}: ${steps[step].label}`;
+          } else {
+            bar.removeAttribute('value');
+            document.getElementById('buildStatus').innerText = 'Building sheets...';
+          }
+          renderBuildSteps(step, 'running');
           // Ensure old reports are wiped off the screen while a new build happens
           document.getElementById('buildReport').innerHTML = '';
           buildReportShown = false; 
@@ -149,6 +181,7 @@
           document.getElementById('buildBar').max = 1; 
           document.getElementById('buildBar').value = 1;
           document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+          renderBuildSteps(buildStepList.length, 'done');
           
           if (!buildReportShown) { showBuildReport(); buildReportShown = true; }
 
@@ -170,6 +203,7 @@
           document.getElementById('buildBar').max = 1; 
           document.getElementById('buildBar').value = 1;
           document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+          renderBuildSteps(buildStepList.length, 'done');
 
           // Instantly pop the build report onto the screen while phone sync works!
           if (!buildReportShown) { 
@@ -253,6 +287,9 @@
             cancelText = (runMode === 'BUILD_ONLY' ? '❌ Build failed: ' : '❌ Sync failed: ') + safeError;
           }
           
+          // Stopped while building: mark the step it was on
+          if (isBuilding) { renderBuildSteps(lastBuildStep, 'failed'); isBuilding = false; }
+
           if (runMode === 'BUILD_ONLY') {
              document.getElementById('buildStatus').innerHTML = `<span style="color:red; font-weight:bold;">${cancelText}</span>`;
           } else {
@@ -276,6 +313,7 @@
           document.getElementById('buildBar').max = 1; 
           document.getElementById('buildBar').value = 1;
           document.getElementById('buildStatus').innerHTML = '<span class="success">✓ Sheets Built Successfully</span>';
+          renderBuildSteps(buildStepList.length, 'done');
 
           document.getElementById('syncBar').max = state.total;
           document.getElementById('syncBar').value = state.total;
@@ -293,6 +331,21 @@
 
           google.script.run.resetSyncStatus();
         }
+      }
+
+      // The build checklist: steps before `current` are done (✅), `current` is
+      // running (⏳) or where it stopped (❌), the rest are still to come.
+      function renderBuildSteps(current, mode) {
+        const list = document.getElementById('buildSteps');
+        if (!buildStepList.length) { list.innerHTML = ''; return; }
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+        list.innerHTML = buildStepList.map((s, i) => {
+          let cls = '', icon = '○';
+          if (i < current || mode === 'done') { cls = 'done'; icon = '✅'; }
+          else if (i === current) { cls = mode === 'failed' ? 'failed' : 'current'; icon = mode === 'failed' ? '❌' : '⏳'; }
+          return `<li class="step-item ${cls}"><span class="step-icon">${icon}</span>` +
+                 `<span><span class="step-label">${esc(s.label)}</span><br><span class="step-detail">${esc(s.detail)}</span></span></li>`;
+        }).join('');
       }
 
       function showBuildReport() {
@@ -339,6 +392,7 @@
         document.getElementById('syncStatus').innerText = 'Initializing...';
         document.getElementById('summaryReport').innerHTML = ''; 
         document.getElementById('buildReport').innerHTML = ''; 
+        document.getElementById('buildSteps').innerHTML = '';
         
         document.getElementById('etaText').innerText = "";
         syncStartTime = null;

@@ -23,6 +23,7 @@ function startResilientSyncRun_() {
     }
   }
 
+  reportBuildStep_(0); // sidebar's build checklist starts at step 1
   cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building', progress: 0, total: 0 }), 21600);
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -55,7 +56,9 @@ function startResilientSyncRun_() {
 function getSyncStatus() {
   const cache = CacheService.getScriptCache();
   const stateStr = cache.get('SYNC_UI_STATE');
-  return stateStr ? JSON.parse(stateStr) : { phase: 'idle' };
+  const state = stateStr ? JSON.parse(stateStr) : { phase: 'idle' };
+  // The build's step list + current step, for the sidebar's "Building Sheets & Directory" checklist
+  return Object.assign(state, getBuildProgress_());
 }
 
 function resetSyncStatus() {

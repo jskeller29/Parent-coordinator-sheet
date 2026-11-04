@@ -3,7 +3,8 @@
 // PURPOSE: Everything that only the owner's own sheet does:
 //   • Build: history from "Old Master Table" (Master Table + Directory, which
 //     takes non-Raw-Data students only when column F Status is "MASTER") and
-//     "Old Phone Contacts" (Directory + Phone Contacts), the last-word name split
+//     "Old Phone Contacts" (Directory + Phone Contacts), the last-word name split,
+//     the "New Students" tab
 //   • Phone Contacts: the "tall" layout (one row per phone number)
 //   • Quick update: also rewrites the student's Phone Contacts rows
 //   • Contacts sync: reads up to 4 phones / 3 emails per row, emails a summary
@@ -25,6 +26,7 @@ function ownerHooks_() {
     splitFullName: ownerSplitFullName_,
     buildPhoneContactsData: ownerBuildPhoneContactsData_,
     contactLogSiteColumn: 11, // the owner's Contact Log hides/shows K (shared sheets: H)
+    logNewStudents: ownerLogNewStudents_, // the "New Students" tab
     montserratSheets: ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"],
 
     // --- Quick update (updateOsisDeltas_) ---
@@ -535,6 +537,95 @@ function buildOldPhoneMap_(oldPhoneSheet) {
     });
   }
   return oldPhoneMap;
+}
+
+// ======================================================================
+// BUILD: NEW STUDENTS TAB (was in Build.gs; owner's sheet only)
+// Keeps a running "New Students" log. Every build (including the nightly
+// sync) logs the students detectAtsChanges_ (Build.gs) found new to Raw Data
+// (ATS) or back from Discharged. Only Raw Data counts; Source is always "ATS".
+// The tab is created once and only ever added to (a row is re-dated when its
+// student re-enters). The shared build report (sidebar) still lists new
+// students on every sheet; only this tab is owner-only.
+// ======================================================================
+const OWNER_NEW_STUDENTS_SHEET_ = "New Students";
+
+/**
+ * "75M094" -> "P94M" (D75 school naming). Falls back to "" when the DBN
+ * doesn't look like a D75 code.
+ */
+function ownerSchoolShortName_(rawData) {
+  for (let i = 0; i < rawData.length; i++) {
+    const m = toText_(rawData[i][1]).toUpperCase().match(/^75([MXKQR])(\d{3})$/);
+    if (m) return `P${Number(m[2])}${m[1]}`;
+  }
+  return "";
+}
+
+/**
+ * Logs the students detectAtsChanges_ found new to Raw Data. Only Raw Data
+ * counts: New/Edit Student and other Directory sources are ignored, and Source
+ * is always "ATS".
+ *
+ * @param {Array[]} masterTable  Fresh Master Table (header row first)
+ * @param {Object}  changes      Result of detectAtsChanges_
+ * @param {Array[]} rawData      Raw Data values (A:AE)
+ * @param {Array}   guardianRows Guardian objects (for Language)
+ */
+function ownerLogNewStudents_(ss, masterTable, changes, rawData, guardianRows) {
+  let sheet = ss.getSheetByName(OWNER_NEW_STUDENTS_SHEET_);
+  if (!sheet) sheet = ss.insertSheet(OWNER_NEW_STUDENTS_SHEET_);
+  if (!toText_(sheet.getRange(1, 1).getValue())) {
+    const school = ownerSchoolShortName_(rawData);
+    const headers = [school ? `Date Entered ${school}` : "Date Entered", "Source", "OSIS", "Student", "Guardian", "Site", "Class", "Language"];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+    sheet.setFrozenRows(1);
+  }
+  if (!changes.newOsis.size) return;
+
+  const homeLanguage = new Map();
+  for (let i = 0; i < rawData.length; i++) {
+    const id = toText_(rawData[i][2]);
+    if (changes.newOsis.has(id) && !homeLanguage.has(id) && toText_(rawData[i][18])) homeLanguage.set(id, properCase_(firstWord_(rawData[i][18])));
+  }
+
+  const languagesById = new Map();
+  for (const g of guardianRows) {
+    if (!g.language) continue;
+    if (!languagesById.has(g.student_id)) languagesById.set(g.student_id, []);
+    const list = languagesById.get(g.student_id);
+    if (list.indexOf(g.language) === -1) list.push(g.language);
+  }
+
+  // Existing log rows by OSIS
+  const lastRow = sheet.getLastRow();
+  const logged = new Map();
+  if (lastRow > 1) {
+    sheet.getRange(2, 3, lastRow - 1, 1).getValues().forEach((r, i) => {
+      const osis = String(r[0]).trim();
+      if (osis) logged.set(osis, i + 2);
+    });
+  }
+
+  const today = new Date();
+  const toAppend = [];
+  for (let i = 1; i < masterTable.length; i++) {
+    const m = masterTable[i];
+    const osis = String(m[0]).trim();
+    if (!changes.newOsis.has(osis)) continue;
+
+    const language = (languagesById.get(osis) || []).join(", ") || homeLanguage.get(osis) || "";
+    const row = [today, "ATS", m[0], m[1], m[2], m[3], m[4], language];
+
+    const priorRow = logged.get(osis);
+    if (priorRow) sheet.getRange(priorRow, 1, 1, row.length).setValues([row]);
+    else toAppend.push(row);
+  }
+
+  if (toAppend.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
+  }
+  if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).setNumberFormat("M/d/yyyy");
 }
 
 // ======================================================================

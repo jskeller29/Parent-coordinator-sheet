@@ -243,7 +243,7 @@ P(p("It's organized into three kinds of sheets:"));
 P(
   bullet([t("The Engine — ", { bold: true }), t("RAW Data and the Backend tab's Type List, where you paste your system exports and customize your dropdowns.")]),
   bullet([t("The Workspaces — ", { bold: true }), t("Contact Log and Events, where you'll spend most of your day logging calls and workshops.")]),
-  bullet([t("The Output — ", { bold: true }), t("automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided, PCAR, Phone Contacts, and New Students. You never type into these — they build themselves.")]),
+  bullet([t("The Output — ", { bold: true }), t("automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided, PCAR, and Phone Contacts. You never type into these — they build themselves.")]),
 );
 P(callout("New here? Do the one-time setup in Part 1, load your data, run Build, and you're running in a few minutes.", "", BLUE, "EEF4FF"));
 
@@ -321,12 +321,12 @@ P(
   numbered([t("Copy the data and paste it into "), t("cell AP2", { bold: true }), t(".")]),
 );
 P(h3("Missing or wrong data? Use the New/Edit Student override"));
-P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, your overrides are applied to the Master Table, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist. The "), t("Directory", { bold: true }), t(" and "), t("New Students", { bold: true }), t(" tabs always show ATS (RAW Data) only. Overrides also tidy themselves up: a “New Student” override is removed once ATS has that student, an edit that ATS now matches exactly is removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)")]));
+P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, your overrides are applied to the Master Table, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist. The "), t("Directory", { bold: true }), t(" tab and the build report's new / discharged students always show ATS (RAW Data) only. Overrides also tidy themselves up: a “New Student” override is removed once ATS has that student, an edit that ATS now matches exactly is removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)")]));
 P(h3("Customizing dropdowns — the Type List"));
 P(p([t("The optional "), t("Type", { bold: true }), t(" column in the Contact Log is driven by the Type List in the hidden "), t("Backend", { bold: true }), t(" tab (column BL). Unhide Backend and edit that column to set your own conversation-topic categories (for example: Attendance, Behavior, Enrollment, IEP).")]));
 
 P(h2("Step 5 — Build the sheets"));
-P(p([t("Run "), t("🚀 App Menu → 🏗️ Build Sheets Only", { bold: true }), t(". A progress sidebar opens and generates every derived tab. When it finishes, the sidebar shows a short report — new students, discharged students, and families newly signed up for NYCSA or ParentSquare (click a count to see the names). The "), t("first", { italics: true }), t(" successful build unlocks the full menu — a toast will ask you to press "), t("F5", { bold: true }), t(" to refresh and reveal the new options.")]));
+P(p([t("Run "), t("🚀 App Menu → 🏗️ Build Sheets Only", { bold: true }), t(". A progress sidebar opens and generates every derived tab, checking off each step as it goes (reading your data, Master Table, Event Log, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, finishing up) with a line under each saying what it builds. When it finishes, the sidebar shows a short report — new students, discharged students, and families newly signed up for NYCSA or ParentSquare (click a count to see the names). The "), t("first", { italics: true }), t(" successful build unlocks the full menu — a toast will ask you to press "), t("F5", { bold: true }), t(" to refresh and reveal the new options.")]));
 P(callout("The golden rule of this sheet", "RAW Data is the only tab you paste into. Everything else is generated — so re-running Build always safely rebuilds it. Never hand-type into Master Table, Directory, or other generated tabs; your edits would be overwritten on the next build.", GREEN, "F0FDF4"));
 
 // ============================================================
@@ -378,7 +378,6 @@ P(table(
     ["Master Table", "The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.", "Hidden (generated)"],
     ["Directory", "A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.", "Yes (generated)"],
     ["Combined Contact Tracking", "One comprehensive history block per student — all contact notes and event attendances together. Great before an IEP meeting.", "Yes (generated)"],
-    ["New Students", "A running log of students who are new to ATS (or came back from Discharged): date entered, OSIS, student, guardian, site, class, and language. Each build adds to it.", "Yes (generated)"],
     ["PCAR", "Your auto-compiled PCAR reporting numbers (Phone, Walk-In, Workshops, PTCs, totals).", "Yes (generated)"],
     ["Phone Contacts", "The exact data that gets pushed to Google Contacts.", "Hidden (optional)"],
     ["Parents Divided", "One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges.", "Hidden (optional)"],

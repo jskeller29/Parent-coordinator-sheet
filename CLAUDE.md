@@ -15,7 +15,9 @@ Files (shared = every school's sheet):
 - Core.gs: Contact Log column constants, findEndRowInColumnE_, Backend tab helpers, owner hook point
   (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers.
 - Build.gs: buildAllDerivedSheets + everything it builds (Master Table, Combined Contact Tracking, Parents Divided,
-  Directory, Phone Contacts, New Students), the notes-line helpers, nightlyMasterSync, build sidebar endpoints.
+  Directory, Phone Contacts), new / discharged student detection, the notes-line helpers, nightlyMasterSync, build
+  sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
+  (cache key BUILD_STEP; getSyncStatus returns buildSteps / buildStep with the state).
 - Edits.gs: installedOnEdit, ghost typists (Contact Log / Notes / Events), Raw Data paste clean-up, quick updates
   (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables.
 - Menus.gs: onOpen menus, setup, Settings, Student Overrides + report, Rollover, Migration, Version Check, links.
@@ -58,7 +60,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Hooks: Master Table status snapshot, Old Master Table history (Master Table + Directory), Old Phone Contacts merge,
   last-word name split (splitFullName_), tall Phone Contacts layout, quick update that also rewrites Phone Contacts,
   contacts sync (4 phones / 3 emails per row, group list without pageSize, no 50% delete check, summary email),
-  Contact Log site column K (shared: H), Montserrat list without New Students, 🐞 Debug menu + toasts.
+  Contact Log site column K (shared: H), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
+  toasts.
 - Shared Directory rule: draws only from Raw Data (no overrides, no discharged students). On the owner's sheet the
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
@@ -88,12 +91,16 @@ Backend tab (see Core.gs):
   Use the backend* helpers in Core.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.
 
-New Students tab (see the NEW STUDENTS TAB section of Build.gs):
+New Students (detection: NEW / DISCHARGED STUDENTS section of Build.gs; tab: z_MINE.gs, owner's sheet only):
+- Since 2026-11-04 the "New Students" TAB is created/updated only on the owner's sheet (ownerLogNewStudents_ hook,
+  after the Directory). Shared sheets no longer create it (an old one stays but stops updating); the build report in
+  the sidebar still lists new / discharged students on every sheet.
 - Only Raw Data (ATS, A:AE) counts. Every build compares Raw Data's OSIS list with the previous build's
   (snapshot in document properties, tied to the sheet ID) and logs new / re-entered (from Discharged) students
   (Date Entered, Source = always "ATS", OSIS, Student, Guardian, Site, Class, Language).
   New/Edit Student and Old Master Table are ignored. Only appended to; a row is re-dated when the student re-enters.
-- detectAtsChanges_ is the single source for new / discharged students: the New Students tab, the build report
+- detectAtsChanges_ (shared, runs right after the Master Table) is the single source for new / discharged students:
+  the owner's New Students tab, the build report
   (sidebar) and the owner's nightly email all use it. Discharged = "Current" in the old Master Table, in Raw Data at
   the last build, and no longer in Raw Data. The snapshot is saved at the end of the build.
 

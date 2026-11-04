@@ -67,7 +67,7 @@ It's organized into three kinds of sheets:
 - **The Workspaces** — Contact Log and Events, where you'll spend most of your day
   logging calls and workshops.
 - **The Output** — automated sheets like Directory, Master Table, Combined Contact
-  Tracking, Parents Divided, PCAR, Phone Contacts, and New Students. You never type into
+  Tracking, Parents Divided, PCAR, and Phone Contacts. You never type into
   these — they build themselves.
 
 > **New here?** Do the one-time setup in Part 1, load your data, run Build, and you're
@@ -184,8 +184,8 @@ click **🏗️ Build Sheets Now**.
 ATS can lag behind real enrollment. If you need to add a student or fix contact info
 before it hits ATS, use **👤 Student Overrides → New / Edit Student**. When you build,
 your overrides are applied to the Master Table, Combined Contact Tracking, Parents
-Divided, Phone Contacts, and the Ghost Typist. The **Directory** and **New Students**
-tabs always show ATS (RAW Data) only. Overrides also tidy themselves up: a "New Student"
+Divided, Phone Contacts, and the Ghost Typist. The **Directory** tab and the build
+report's new / discharged students always show ATS (RAW Data) only. Overrides also tidy themselves up: a "New Student"
 override is removed once ATS has that student, an edit that ATS now matches exactly is
 removed too, and a student's class always follows RAW Data once they're in ATS.
 (More in Part 2.)
@@ -197,7 +197,9 @@ conversation-topic categories (for example: Attendance, Behavior, Enrollment, IE
 ### Step 5 — Build the sheets
 
 Run **🚀 App Menu → 🏗️ Build Sheets Only**. A progress sidebar generates every derived
-tab. When it finishes, the sidebar shows a short report — new students, discharged
+tab and checks off each step as it goes (reading your data, Master Table, Event Log,
+Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, finishing up),
+with a line under each saying what it builds. When it finishes, the sidebar shows a short report — new students, discharged
 students, and families newly signed up for NYCSA or ParentSquare (click a count to see
 the names). The *first* successful build unlocks the full menu — a toast asks you to
 press **F5** to refresh.
@@ -256,7 +258,6 @@ automatically in PCAR.
 | **Master Table** | The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5. | Hidden (generated) |
 | **Directory** | A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included. | Yes (generated) |
 | **Combined Contact Tracking** | One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting. | Yes (generated) |
-| **New Students** | A running log of students who are new to ATS (or came back from Discharged): date entered, OSIS, student, guardian, site, class, and language. Each build adds to it. | Yes (generated) |
 | **PCAR** | Your auto-compiled PCAR numbers (Phone, Walk-In, Workshops, PTCs, totals). | Yes (generated) |
 | **Phone Contacts** | The exact data pushed to Google Contacts. | Hidden (optional) |
 | **Parents Divided** | One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges. | Hidden (optional) |

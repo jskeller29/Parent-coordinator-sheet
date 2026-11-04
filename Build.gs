@@ -1,9 +1,37 @@
 // ======================================================================
 // FILE: Build.gs
 // PURPOSE: The full rebuild ("Build Sheets"): reads Raw Data once and writes the
-// Master Table, Combined Contact Tracking, Parents Divided, Directory, Phone
-// Contacts and New Students tabs, plus the build report for the sidebar.
+// Master Table, Combined Contact Tracking, Parents Divided, Directory and Phone
+// Contacts tabs, plus the build report for the sidebar. (The owner's sheet also
+// keeps a "New Students" tab: see ownerLogNewStudents_ in z_MINE.gs.)
 // ======================================================================
+
+/**
+ * The build's steps, shown one by one in the progress sidebar (Build Sheets
+ * Only and Full Sync). reportBuildStep_ records which one is running;
+ * getSyncStatus hands both to the sidebar.
+ */
+const BUILD_STEPS = [
+  { label: "Reading your data", detail: "Raw Data (ATS), Contact Log, Events and New/Edit Student overrides" },
+  { label: "Master Table", detail: "One row per student: guardians, siblings, site, class and status" },
+  { label: "Event Log", detail: "Splitting the Events tab into one row per student" },
+  { label: "Combined Contact Tracking", detail: "Every student's dated notes from the Contact Log and Events" },
+  { label: "Parents Divided", detail: "One row per guardian with ParentSquare and NYCSA sign-up status" },
+  { label: "Directory", detail: "The family directory, from Raw Data (ATS) only" },
+  { label: "Phone Contacts", detail: "The contact list the Google Contacts sync sends to phones" },
+  { label: "Finishing up", detail: "Showing/hiding the Site column, the new / discharged students report, fonts" }
+];
+
+function reportBuildStep_(index) {
+  try {
+    CacheService.getScriptCache().put('BUILD_STEP', String(index), 21600);
+  } catch (e) { console.warn("Build step not saved: " + e.message); }
+}
+
+function getBuildProgress_() {
+  const step = Number(CacheService.getScriptCache().get('BUILD_STEP'));
+  return { buildSteps: BUILD_STEPS, buildStep: isNaN(step) ? 0 : step };
+}
 
 /**
  * The master orchestrator function.
@@ -14,6 +42,7 @@
  * Phone Contacts layout (see ownerHooks_).
  */
 function buildAllDerivedSheets() {
+  reportBuildStep_(0); // Reading your data
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName("Raw Data");
   if (!rawSheet) throw new Error('Sheet "Raw Data" not found.');
@@ -39,7 +68,7 @@ function buildAllDerivedSheets() {
     }
   }
 
-  // OSIS -> Status from the Master Table before it is rewritten (build report + New Students log)
+  // OSIS -> Status from the Master Table before it is rewritten (build report; owner's New Students log)
   const oldMasterStatusMap = owner ? owner.readMasterStatusSnapshot(ss) : readMasterStatusSnapshot_(ss);
 
   // --- Step 0: Pre-read the Override Sheet ---
@@ -56,25 +85,19 @@ function buildAllDerivedSheets() {
   const nycsaIndex = buildNYCSAIndex_(rawData);
 
   // --- Step 2: Build and Write Output Sheets ---
+  reportBuildStep_(1); // Master Table
   let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   if (owner) masterTable = owner.adjustMasterTable(ss, masterTable); // Old Master Table history
   writeSheet_(ss, "Master Table", masterTable, 4, 1);
 
-  // Log students who just appeared in Raw Data (ATS) to the "New Students" tab.
-  // New / discharged students come from Raw Data only (same result feeds the tab and the build report)
-  const logAtsChanges = () => {
-    const changes = detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData);
-    try {
-      logNewStudents_(ss, masterTable, changes, rawData, guardianRows);
-    } catch (e) { console.warn("New Students log skipped: " + e.message); }
-    return changes;
-  };
-  // Shared sheets log right after the Master Table; the owner's sheet after the Directory (as before)
-  let atsChanges = owner ? null : logAtsChanges();
+  // New / discharged students come from Raw Data only (feeds the build report,
+  // the owner's nightly email and the owner's "New Students" tab)
+  const atsChanges = detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData);
 
   // ==========================================
   // REBUILD BACKEND EVENT LOG
   // ==========================================
+  reportBuildStep_(2); // Event Log
   {
     // 1. Call our updated helper function to scrape and split the Events sheet
     const freshEventData = buildBackendEventLogData_(ss);
@@ -90,27 +113,37 @@ function buildAllDerivedSheets() {
   }
 
   // Build Contact Tracking FIRST so we can use its dates
+  reportBuildStep_(3); // Combined Contact Tracking
   const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTable, contactLogData, eventLogData);
   writeSheet_(ss, "Combined Contact Tracking", combinedContactTracking);
 
+  reportBuildStep_(4); // Parents Divided
   const parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
   writeSheet_(ss, "Parents Divided", parentsDivided);
 
   // Directory draws only from Raw Data: no New/Edit Student overrides, no discharged students
   // (the owner's sheet then merges in Old Phone Contacts and "MASTER" Old Master Table students)
+  reportBuildStep_(5); // Directory
   let directory = buildDirectoryData_(buildStudentMap_(rawData, new Map()), buildGuardianObjects_(rawData, new Map()));
   if (owner) directory = owner.adjustDirectory(ss, directory);
   writeSheet_(ss, "Directory", directory);
 
-  if (owner) atsChanges = logAtsChanges();
+  // Owner's sheet only: log the new students to its "New Students" tab (z_MINE.gs)
+  if (owner) {
+    try {
+      owner.logNewStudents(ss, masterTable, atsChanges, rawData, guardianRows);
+    } catch (e) { console.warn("New Students log skipped: " + e.message); }
+  }
 
   formatDirectoryAuto_(ss.getSheetByName("Directory"));
 
   // UPDATED: Pass the already-built parentSquareIndex and nycsaIndex down
+  reportBuildStep_(6); // Phone Contacts
   const phoneContacts = buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, combinedContactTracking, parentSquareIndex, nycsaIndex);
   writeSheet_(ss, "Phone Contacts", phoneContacts);
 
   // --- Sync Column Visibility (Static Schema) ---
+  reportBuildStep_(7); // Finishing up
   fillContactLogHstackFormulas_(ss);
 
   const dirSheet = ss.getSheetByName("Directory");
@@ -173,7 +206,7 @@ function buildAllDerivedSheets() {
 
   // Set Montserrat font ONCE at the very end instead of inside writeSheet_
   const fontSheets = owner ? owner.montserratSheets
-    : ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"];
+    : ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
   fontSheets.forEach(name => {
     const sh = ss.getSheetByName(name);
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
@@ -230,6 +263,7 @@ function startBuildOnlyProcess() {
 
 function startBuildOnlyProcessRun_() {
   const cache = CacheService.getScriptCache();
+  reportBuildStep_(0); // sidebar's build checklist starts at step 1
   cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building' }), 21600); 
   try { 
     buildAllDerivedSheets();
@@ -1741,27 +1775,13 @@ function buildTrackingNotesMap_(ss, combinedContactTrackingArray) {
 }
 
 // ======================================================================
-// SECTION: NEW STUDENTS TAB (was NewStudents.gs)
-// Keeps a running "New Students" log. Every build (including the
-// nightly sync) compares the fresh Master Table with the one it is about to
-// replace and records students who just appeared in Raw Data (ATS) or came
-// back from Discharged. Only Raw Data counts; Source is always "ATS".
-// The tab is created once and only ever added to (a row is re-dated when its
-// student re-enters).
+// SECTION: NEW / DISCHARGED STUDENTS (ATS CHANGES)
+// Every build (including the nightly sync) compares Raw Data (ATS) with the
+// previous build's roster and finds students who just appeared in Raw Data
+// or came back from Discharged, and students who were discharged. The result
+// feeds the build report (sidebar) and, on the owner's sheet, the nightly
+// email and the "New Students" tab (ownerLogNewStudents_ in z_MINE.gs).
 // ======================================================================
-const NEW_STUDENTS_SHEET = "New Students";
-
-/**
- * "75M094" -> "P94M" (D75 school naming). Falls back to "" when the DBN
- * doesn't look like a D75 code.
- */
-function schoolShortName_(rawData) {
-  for (let i = 0; i < rawData.length; i++) {
-    const m = toText_(rawData[i][1]).toUpperCase().match(/^75([MXKQR])(\d{3})$/);
-    if (m) return `P${Number(m[2])}${m[1]}`;
-  }
-  return "";
-}
 
 /**
  * Reads the Status of every student in the current Master Table (before it is
@@ -1814,8 +1834,8 @@ function saveAtsSnapshot_(ss, osisSet) {
 }
 
 /**
- * Compares Raw Data (ATS, A:AE) with the previous build. Shared by the New
- * Students tab and the build report (sidebar / email) so they always agree.
+ * Compares Raw Data (ATS, A:AE) with the previous build. Shared by the build
+ * report (sidebar / email) and the owner's New Students tab so they always agree.
  *   newOsis:        in Raw Data now but not at the last build, or back from Discharged
  *   dischargedOsis: "Current" in the old Master Table, in Raw Data at the last
  *                   build, and no longer in Raw Data
@@ -1856,72 +1876,6 @@ function detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData) {
     }
   }
   return { atsOsis, newOsis, dischargedOsis };
-}
-
-/**
- * Logs the students detectAtsChanges_ found new to Raw Data. Only Raw Data
- * counts: New/Edit Student and other Directory sources are ignored, and Source
- * is always "ATS".
- *
- * @param {Array[]} masterTable  Fresh Master Table (header row first)
- * @param {Object}  changes      Result of detectAtsChanges_
- * @param {Array[]} rawData      Raw Data values (A:AE)
- * @param {Array}   guardianRows Guardian objects (for Language)
- */
-function logNewStudents_(ss, masterTable, changes, rawData, guardianRows) {
-  let sheet = ss.getSheetByName(NEW_STUDENTS_SHEET);
-  if (!sheet) sheet = ss.insertSheet(NEW_STUDENTS_SHEET);
-  if (!toText_(sheet.getRange(1, 1).getValue())) {
-    const school = schoolShortName_(rawData);
-    const headers = [school ? `Date Entered ${school}` : "Date Entered", "Source", "OSIS", "Student", "Guardian", "Site", "Class", "Language"];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
-    sheet.setFrozenRows(1);
-  }
-  if (!changes.newOsis.size) return;
-
-  const homeLanguage = new Map();
-  for (let i = 0; i < rawData.length; i++) {
-    const id = toText_(rawData[i][2]);
-    if (changes.newOsis.has(id) && !homeLanguage.has(id) && toText_(rawData[i][18])) homeLanguage.set(id, properCase_(firstWord_(rawData[i][18])));
-  }
-
-  const languagesById = new Map();
-  for (const g of guardianRows) {
-    if (!g.language) continue;
-    if (!languagesById.has(g.student_id)) languagesById.set(g.student_id, []);
-    const list = languagesById.get(g.student_id);
-    if (list.indexOf(g.language) === -1) list.push(g.language);
-  }
-
-  // Existing log rows by OSIS
-  const lastRow = sheet.getLastRow();
-  const logged = new Map();
-  if (lastRow > 1) {
-    sheet.getRange(2, 3, lastRow - 1, 1).getValues().forEach((r, i) => {
-      const osis = String(r[0]).trim();
-      if (osis) logged.set(osis, i + 2);
-    });
-  }
-
-  const today = new Date();
-  const toAppend = [];
-  for (let i = 1; i < masterTable.length; i++) {
-    const m = masterTable[i];
-    const osis = String(m[0]).trim();
-    if (!changes.newOsis.has(osis)) continue;
-
-    const language = (languagesById.get(osis) || []).join(", ") || homeLanguage.get(osis) || "";
-    const row = [today, "ATS", m[0], m[1], m[2], m[3], m[4], language];
-
-    const priorRow = logged.get(osis);
-    if (priorRow) sheet.getRange(priorRow, 1, 1, row.length).setValues([row]);
-    else toAppend.push(row);
-  }
-
-  if (toAppend.length) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length).setValues(toAppend);
-  }
-  if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).setNumberFormat("M/d/yyyy");
 }
 
 /** Build report lines ("Name (OSIS)") for the sidebar / email. */

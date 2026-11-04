@@ -137,7 +137,7 @@
     <li><b>The Engine</b> — RAW Data and the Backend tab's Type List, where you paste your system exports and customize your dropdowns.</li>
     <li><b>The Workspaces</b> — Contact Log and Events, where you'll spend most of your day logging calls and workshops.</li>
     <li><b>The Output</b> — automated sheets like Directory, Master Table, Combined Contact Tracking, Parents Divided,
-      PCAR, Phone Contacts, and New Students. You never type into these — they build themselves.</li>
+      PCAR, and Phone Contacts. You never type into these — they build themselves.</li>
   </ul>
   <div class="box info"><span class="t">New here?</span> Do the one-time setup in Part 1, load your data,
     run Build, and you're running in a few minutes.</div>
@@ -230,7 +230,7 @@
   <p>District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact
     info before it hits ATS, use <b>👤 Student Overrides → New / Edit Student</b>. When you build, your overrides
     are applied to the Master Table, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist.
-    The <b>Directory</b> and <b>New Students</b> tabs always show ATS (RAW Data) only. Overrides also tidy themselves
+    The <b>Directory</b> tab and the build report's new / discharged students always show ATS (RAW Data) only. Overrides also tidy themselves
     up: a "New Student" override is removed once ATS has that student, an edit that ATS now matches exactly is
     removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)</p>
 
@@ -240,7 +240,7 @@
     Attendance, Behavior, Enrollment, IEP).</p>
 
   <h2>Step 5 — Build the sheets</h2>
-  <p>Run <b>🚀 App Menu → 🏗️ Build Sheets Only</b>. A progress sidebar generates every derived tab. When it
+  <p>Run <b>🚀 App Menu → 🏗️ Build Sheets Only</b>. A progress sidebar generates every derived tab, checking off each step as it goes (reading your data, Master Table, Event Log, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, finishing up) with a line under each saying what it builds. When it
     finishes, the sidebar shows a short report — new students, discharged students, and families newly signed up
     for NYCSA or ParentSquare (click a count to see the names). The <i>first</i> successful build unlocks the full
     menu — a toast asks you to press <b>F5</b> to refresh.</p>
@@ -297,7 +297,6 @@
       <tr><td>Master Table</td><td>The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.</td><td>Hidden (generated)</td></tr>
       <tr><td>Directory</td><td>A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.</td><td>Yes (generated)</td></tr>
       <tr><td>Combined Contact Tracking</td><td>One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting.</td><td>Yes (generated)</td></tr>
-      <tr><td>New Students</td><td>A running log of students who are new to ATS (or came back from Discharged): date entered, OSIS, student, guardian, site, class, and language. Each build adds to it.</td><td>Yes (generated)</td></tr>
       <tr><td>PCAR</td><td>Your auto-compiled PCAR numbers (Phone, Walk-In, Workshops, PTCs, totals).</td><td>Yes (generated)</td></tr>
       <tr><td>Phone Contacts</td><td>The exact data pushed to Google Contacts.</td><td>Hidden (optional)</td></tr>
       <tr><td>Parents Divided</td><td>One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges.</td><td>Hidden (optional)</td></tr>
