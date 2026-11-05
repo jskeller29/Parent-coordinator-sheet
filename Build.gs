@@ -1132,6 +1132,33 @@ function eventNoteLine_(row) {
   return { dateObj: dateObj, text: line.trim() };
 }
 
+/* Divider line between notes lines in Combined Contact Tracking: as many "─" as
+   column D is wide in characters (like REPT("─", CELL("width", D1))), about 7px
+   per character; worked out once per run. */
+const NOTE_DIVIDER_CHAR_ = "─";
+let NOTE_DIVIDER_CACHE_ = null;
+
+function noteDivider_() {
+  if (NOTE_DIVIDER_CACHE_ !== null) return NOTE_DIVIDER_CACHE_;
+  let px = 100; // Google Sheets' default column width
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Combined Contact Tracking");
+    if (sheet) px = sheet.getColumnWidth(4);
+  } catch (e) {
+    console.warn("noteDivider_: could not read the column width: " + e.message);
+  }
+  NOTE_DIVIDER_CACHE_ = NOTE_DIVIDER_CHAR_.repeat(Math.max(5, Math.round(px / 7)));
+  return NOTE_DIVIDER_CACHE_;
+}
+
+/** The notes text without the divider lines (for Phone Contacts / Google Contacts). */
+function stripNoteDividers_(text) {
+  return String(text == null ? "" : text)
+    .split("\n")
+    .filter(line => !/^─+$/.test(line.trim()))
+    .join("\n");
+}
+
 /**
  * Manual notes ("𝑵𝒐𝒕𝒆𝒔: ...") first, then the dated lines NEWEST at the top,
  * oldest at the bottom (the exact reverse of oldest-first: same-day lines too,
@@ -1143,7 +1170,11 @@ function joinNoteLines_(manualNotesText, interactions) {
   let baseNotes = "";
   if (interactions.length > 0) {
     interactions.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime()).reverse();
-    baseNotes = interactions.map(interaction => interaction.text).join("\n");
+    // A ─── line above and under each interaction (one shared line between two).
+    // Only Combined Contact Tracking keeps them: buildTrackingNotesMap_ strips
+    // them again, so Phone Contacts / Google Contacts notes are unchanged.
+    const divider = noteDivider_();
+    baseNotes = divider + "\n" + interactions.map(interaction => interaction.text).join("\n" + divider + "\n") + "\n" + divider;
   }
 
   const manualNotes = manualNotesText !== "" ? `𝑵𝒐𝒕𝒆𝒔: ${manualNotesText}` : "";
@@ -1759,7 +1790,7 @@ function buildTrackingNotesMap_(ss, combinedContactTrackingArray) {
       const osis = toText_(combinedContactTrackingArray[i][0]);
       if (!isRealStudentId_(osis)) continue;
       if (!map.has(osis)) {
-        map.set(osis, toText_(combinedContactTrackingArray[i][3])); 
+        map.set(osis, toText_(stripNoteDividers_(combinedContactTrackingArray[i][3])));
       }
     }
     return map;
@@ -1773,7 +1804,7 @@ function buildTrackingNotesMap_(ss, combinedContactTrackingArray) {
     const osis = toText_(data[i][0]);
     if (!isRealStudentId_(osis)) continue;
     if (!map.has(osis)) {
-      map.set(osis, toText_(data[i][3]));
+      map.set(osis, toText_(stripNoteDividers_(data[i][3])));
     }
   }
   return map;

@@ -201,6 +201,10 @@ Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
   noteLineHeader_ (Core.gs).
 - Built in ONE place: contactLogNoteLine_ / eventNoteLine_ / joinNoteLines_ (Build.gs), used by both the full build
   (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_).
+- Divider lines (owner's trial, 2026-11-05): in Combined Contact Tracking each dated line has a "───" line above and
+  under it (one shared line between two; manual Notes block not wrapped). Length = Combined column D width / 7px
+  (noteDivider_, like REPT("─", CELL("width"))), read once per run. buildTrackingNotesMap_ strips them
+  (stripNoteDividers_), so Phone Contacts / Google Contacts notes are exactly as before.
 - Order (owner's change, 2026-11-04): manual "𝑵𝒐𝒕𝒆𝒔:" block first, then dated lines NEWEST first (joinNoteLines_ sorts
   oldest-first then reverses, so same-day ties flip too). Was oldest first.
 
