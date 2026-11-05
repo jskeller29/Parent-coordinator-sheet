@@ -219,6 +219,12 @@
     var manual = !!v.step.manual;
     currentManual = manual;
     show('uploadCard', !manual); show('pasteCard', !manual); show('siteCard', manual);
+    // The "Reading… / Moving data…" spinner and any error sit right under Option 1
+    // (Upload), so they are not pushed out of sight below the long paste steps;
+    // on the Site / Class step they sit under that card instead.
+    var anchor = manual ? $('siteCard') : $('uploadCard');
+    anchor.parentNode.insertBefore($('waiting'), anchor.nextSibling);
+    $('waiting').parentNode.insertBefore($('errorBox'), $('waiting').nextSibling);
     $('howToTitle').textContent = manual ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip (don\'t save) & finish';
