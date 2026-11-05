@@ -230,13 +230,18 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
      skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
      writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
      ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
-  3. Row clean-up (borders, checkbox, blank row, week formula, END bar; the END sweep checks the expected cell). Owner's
-     order (2026-11-05): before the notes write, so the row looks finished first (Communications ~3 s later).
+  3. Row clean-up (borders, checkbox, blank row, END bar), writes only: END's row is known (checked at the start,
+     +1 when a blank row was added), and the week formula check (patchMissingFormulasInRow_, reads) runs after the
+     notes. Owner's order (2026-11-05): clean-up before the notes write, so the row looks finished first.
   4. Quick notes write (syncNotesForRowOsis_(osis, true) -> updateCombinedNotesQuick_, returns { texts, missing }):
      Contact Log read + Event Log / Notes tab from notesSourcesData_ (doc cache NOTES_SRC_EVENTS / NOTES_SRC_NOTES,
      6 h, Notes not cached if a cell is a Date; cleared by every EVENT_LOG helper in Core.gs, any Events / Notes edit,
-     every build, the owner's resets) + Combined A:A, one cell written, then a flush (the formula follows). In a
-     try/catch: an error is logged and the normal end-of-edit sync retries.
+     every build, the owner's resets) + Combined A:A, one cell written, then a flush (the formula follows). Runs
+     under LockService.getDocumentLock (20 s tryLock; writes flushed before release) so two edits can't write older
+     notes over newer ones. In a try/catch: an error is logged and the normal end-of-edit sync retries.
+     A cleared / typed-over OSIS cell also updates the OSIS it had (e.oldValue, syncNotesForRowOsis_ extraOsis).
+     Multi-cell edits (pastes, cleared rows: the old OSIS is unknown) run resyncNotesAfterRowDelete_(ss, sheet,
+     endRow): compare every Combined student with the logs, quick-write the changed ones (> 25: full rebuild).
   5. Owner's sheet only: ownerUpdateOsisDeltas_ (PENDING_OWNER_NOTES_) with opts.combinedAlreadyWritten = true
      unless a student had no Combined row: Phone Contacts only (no in-memory Combined rebuild, buildTrackingNotesMap_
      reads the Combined tab; never rewrites Combined, which could put back older notes). The early write never falls
@@ -286,7 +291,10 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
 Row deletes (2026-11-05): installable change trigger installedOnChange (Edits.gs) -> on REMOVE_ROW with the Contact Log
 active: resyncNotesAfterRowDelete_ redraws the END bar border, recomputes every Combined student's notes from the logs
-(notesTextForOsis_, rows grouped by OSIS once, Contact Log to END + notesSourcesData_) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
+(notesTextForOsis_, rows grouped by OSIS once, Contact Log to END + notesSourcesData_), quick-writes those that differ
+(updateCombinedNotesQuick_), then on the owner's sheet the Phone-Contacts-only owner update (> 25 differ:
+updateContactAndPhoneOnly, owner-aware through buildPhoneContactsData_). Also run for Contact Log multi-cell edits
+(pastes / cleared rows). Made by
 setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureChangeTrigger_, doc property
 CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
 Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
