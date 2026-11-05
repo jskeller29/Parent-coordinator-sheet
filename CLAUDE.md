@@ -60,6 +60,54 @@ Files (shared = every school's sheet):
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
+  Step 5 "Your Lists" (step key lists, lists: true; needs Z#OwnData.gs, every od_* call guarded): no paste / upload /
+  polling / Skip; the lists card shows od_listSummaries_ (idm_view_ "lists", null = files missing -> note, Finish still
+  works) with Paste new version / Edit setup / ✏️ rename / 🗑️ delete, "➕ Add another list" (od_createList opens
+  Z#OwnDataSidebar IN PLACE of this sidebar; od_backToInputMode reopens it) and Finish (idm_finishLists:
+  results.lists = { saved, rows: ready lists, lists: true } or skipped, so the end screen offers Build). Site / Class
+  is no longer the last step: its button is "✅ Save Site / Class".
+
+- Z#OwnData.gs (+ Z#OwnDataSidebar.html): optional "Your Lists" (owner's request 2026-11-05): your own lists (bus
+  routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
+  One tab per list "📥 <name>" (rows 1-3 = OWN DATA band / status / column chips, header row 4 after a paste, data from
+  row 5, tool columns "✔ Matched" / "How" after one blank spacer column). Its setup = one row in the Backend OWN_LISTS
+  section (Tab ID, List, Setup JSON, Updated; od_loadLists_ / od_saveLists_): by (student / guardian), roles (osis,
+  student / guardian as {col} or {first, last}, phone, email, class), vars (label, show = Additional Information,
+  column = Student List / Parents Divided column, blank / notOnList = nothing | text), picks (row hash -> OSIS /
+  guardian key / "skip"), headers, title, stats.
+  - Paste: od_takePaste_ finds the header row (od_findHeaderRow_; title rows above it are remembered), moves it to
+    row 4, data as plain text. A re-paste with the same headers keeps the setup (od_rolesByHeader_) and the picks.
+  - Matching (od_matchStudentRow_ / od_matchGuardianRow_): your pick, then OSIS (normalizeOsis_), exact name token
+    set (either name order), phone / email via guardians (Raw Data incl. overrides), then best guesses (short-name
+    prefix of 3+ letters, OD_NICKNAMES_, last initial "Diana P.", a guardian's name -> their children); 2+ candidates =
+    "pick one", none = "not found". Index = Student List A5:E + Raw Data guardians (od_indexFromSheet_).
+  - Sidebar: paste view polls od_wizardCheck every 2 s; 1 Columns (dropdowns 'Column C “OSIS”', "Two columns (first +
+    last name)…", OSIS hint "5 of 6 filled cells are OSIS in your Student List"), 2 Variables (keep / name / blank /
+    not on list / where, live "How it reads" preview, privacy warning), 3 Match (od_matchPreview; "✓ Accept all N best
+    guesses" with a warning, pick / search picker / skip / undo). Save = od_saveList (writes the tool columns + stats).
+    Done view: during Input Data Mode only "← Back to Input Data Mode" (a build then would run with the tabs hidden);
+    outside it "🏗️ Build Sheets Now" (od_build).
+  - Build: buildAllDerivedSheets calls od_buildOutputs_(ss, masterTable, guardianRows) right after
+    addLastInteractionColumn_ (guarded typeof + try/catch: an error only logs "Your Lists skipped"). It re-matches every
+    ready list, rewrites the tool columns, returns studentCols (Student List columns after Last Interaction, siblings'
+    values joined " / ", addListColumns_) and guardianCols (Parents Divided, keyed OSIS|guardian name,
+    addGuardianListColumns_), and rewrites the Backend ADDL_INFO section (OSIS, Student, Guardian, Additional
+    Information; Guardian blank = the whole student). The not-on-list text goes to everyone not on the list.
+  - Phone Contacts: readAdditionalInfo_ / additionalInfoText_ (Build.gs) add "\n\nAdditional Information:\n<lines>"
+    before "Communications:" (shared) / before "Note:" and in the Old Master Table history block (owner,
+    ownerBuildPhoneContactsData_). No lists = no block = everything exactly as before (old-vs-new offline run identical
+    apart from the 2 new Backend titles on a NEW Backend tab). Combined Contact Tracking is not touched.
+    readAdditionalInfo_ keeps the rows in the doc cache (ADDL_INFO_ROWS_<spreadsheet id>, 6 h) because the owner's
+    per-edit Phone Contacts update (ownerUpdateOsisDeltas_) calls it; backendClearBlock_ / backendAppendRows_ /
+    backendBlockRange_ on ADDL_INFO clear it (a write clears first). Keyed by spreadsheet ID: the owner's "copy, then
+    load fake data on the copy" builds the copy with this script's cache. A build without Z#OwnData.gs clears ADDL_INFO
+    (no-op if never written), so removing the file also removes its lines.
+  - Resets: list tabs are deleted by deleteLegacySheets_ (not in KEEP_TABS_); resetDerivedSheets_ clears ADDL_INFO +
+    OWN_LISTS. Migration and Rollover do NOT carry lists over (not built; owner to decide).
+  - google.script.run endpoints: od_createList, od_openList, od_repasteList, od_renameList, od_deleteList, od_getWizard,
+    od_wizardCheck, od_readPaste, od_matchPreview, od_saveList, od_backToInputMode, od_build (+ idm_finishLists).
+    Tested offline (own_test: shared + owner) and by a Chromium click-through of both sidebars wired to the real
+    server code on the mock sheet (not yet tried on a real sheet).
 
 - Z#Guide.gs (+ Z#GuideSidebar.html): optional "✅ Getting Started" (bare-bones version, owner's pick 2026-11-05; a full
   tour / tab pop-ups / Start Here tab / header notes were proposed and NOT built). 3 guarded hooks in Menus.gs:
@@ -112,8 +160,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Initial Setup (a copy's setup flag is not copied) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
   RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Student List, Combined Contact Tracking, Parents Divided,
-  Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
-  Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
+  Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts, New
+  Students (owner's choice: the owner's next build re-creates it) and the 📥 Your Lists tabs (resetDerivedSheets_ also
+  clears the Backend ADDL_INFO / OWN_LISTS sections). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
 - Contact Log student lookup box (2 rows below END: OSIS / Student / Communications / Student Information + guardian
   table): resetContactLog_ ends with fixContactLogLookupBox_, which deletes leftover "Parent Contact (COPY)" header rows
@@ -155,6 +204,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
   with them.
+- Your Lists (2026-11-05): paste the new Z#OwnData (script) + Z#OwnDataSidebar (HTML) and re-paste Core, Build,
+  Regenerate, Z#InputDataMode, Z#InputDataSidebar (owner sheet: also z_MINE). Optional: without the two new files step 5
+  says they are missing and every build / phone contact is exactly as before.
 - Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
   Input Data Mode.
 
@@ -180,7 +232,10 @@ Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
   Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
-  clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List.
+  clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
+  BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs). The last two are "grow" sections: an
+  existing Backend tab gets their title the first time they are written (backendBlockReady_); before that reads return
+  nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
   Use the backend* helpers in Core.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.
@@ -337,7 +392,7 @@ property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
 to owner sync?; owner hides Contact Log col K (11) vs shared H (8) when no site (K looks stale); Montserrat on New
 Students (owner build skips it); owner splitFullName_ changes the shared Directory name split - intended?; ghost typist
-TextFinder vs in-memory scan (differ only on stray spaces).
+TextFinder vs in-memory scan (differ only on stray spaces); carry Your Lists over at Migration / Rollover (now they are not).
 Data update reminder (Menus.gs, replaced the old 30-day ATS-only reminder; same checkRawDataFreshness_ name): centered
 pop-up when Raw Data A1 / AG1 / AP1 (ATS / Parent Square / NYCSA, only sections ever loaded) is older than setting
 "dataReminder" (week default / 2weeks / month / off; in SETTING_KEYS so it is saved to the Backend settings block and

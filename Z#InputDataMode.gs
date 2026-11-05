@@ -16,6 +16,9 @@
 // as new sites are typed). Save writes Raw Data BH:BI (Class / Site) as one row
 // per site: BH = site, BI = that site's classes, one per line ("Y25: Carl" or
 // just "Y24" with no teacher); read by parseClassCell_ (Build.gs).
+// Step 5 "Your Lists" (needs Z#OwnData.gs): your own lists (bus routes, PTA ...),
+// each on its own "📥" tab, set up in the Z#OwnDataSidebar sidebar; this file
+// only shows them and calls Z#OwnData's od_* functions (guarded).
 //
 // SELF-CONTAINED ("Z#" = trying out a new feature): the only hooks into the rest
 // of the app are two guarded lines in onOpen (Menus.gs):
@@ -87,7 +90,15 @@ var IDM_STEPS = [
       "Type each class's <b>Teacher Name</b>.",
       "<b>Site</b> is optional: pick one from the dropdown or type a new one (it's added to the dropdown).",
       "Add a class that isn't listed by typing its code at the bottom of column A.",
-      "Click <b>✅ Save Site / Class &amp; finish</b> below when you're done."
+      "Click <b>✅ Save Site / Class</b> below when you're done."
+    ]
+  },
+  {
+    key: 'lists', tab: 'Your Lists', short: 'Your Lists', zone: 'Your Lists', required: false, lists: true,
+    howTo: [
+      "Any other list you get: bus routes, trip forms, after school, PTA…",
+      "Each list gets its own tab. Paste the whole sheet there; the tool works out who each row is.",
+      "What you keep shows on the phone contacts (Additional Information) and as a column in the Student List or Parents Divided after the next build."
     ]
   }
 ];
@@ -160,7 +171,7 @@ function idm_check() {
     const temp = idm_ensureTempSheet_(ss, state);
     idm_saveState_(state);
     idm_debugSheets_(ss, state, temp);
-    if (IDM_STEPS[state.step].manual) return idm_view_(ss, state);
+    if (IDM_STEPS[state.step].manual || IDM_STEPS[state.step].lists) return idm_view_(ss, state);
     const hasData = idm_tempHasData_(temp);
     idm_log_("temp tab has data: " + hasData);
     const view = idm_view_(ss, state);
@@ -260,6 +271,8 @@ function idm_saveAndExit() {
     let result = null;
     if (step.manual) {
       result = idm_saveSiteClass_(ss, state);
+    } else if (step.lists) {
+      idm_log_("save & exit: lists are saved one by one in their own sidebar");
     } else if (temp && idm_tempHasData_(temp)) {
       result = idm_processTemp_(ss, state, temp, false);
     } else {
@@ -308,6 +321,18 @@ function idm_goToStep(index) {
     }
     idm_saveState_(state);
     return idm_view_(ss, state);
+  });
+}
+
+/** Step 5 "Finish ✓": ends the mode (the lists themselves were saved one by one). */
+function idm_finishLists() {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const lists = typeof od_listSummaries_ === "function" ? od_listSummaries_(ss).filter(l => l.ready) : [];
+    state.results.lists = lists.length ? { saved: true, rows: lists.length, lists: true } : { skipped: true };
+    return idm_advance_(ss, state, null);
   });
 }
 
@@ -384,7 +409,7 @@ function idm_processTemp_(ss, state, temp, ignoreCutoff) {
  */
 function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload) {
   const step = IDM_STEPS[state.step];
-  if (step.manual) return idm_view_(ss, state, { type: 'error', code: 'manual', message: "This step is filled in on the tab — no file needed.", fromUpload: true });
+  if (step.manual || step.lists) return idm_view_(ss, state, { type: 'error', code: 'manual', message: "This step is filled in on the tab — no file needed.", fromUpload: true });
   const fail = (code, message, extra) => idm_view_(ss, state, Object.assign({ type: 'error', code: code, message: message, fromUpload: fromUpload }, extra || {}));
 
   idm_log_("step " + state.step + " (" + step.key + "), " + values.length + " rows in, fromUpload=" + fromUpload + ", ignoreCutoff=" + ignoreCutoff);
@@ -726,7 +751,24 @@ function idm_renameTab_(ss, sheet, base) {
 /** Paste tab ("PASTE HERE") or the Site / Class form. */
 function idm_prepareTab_(ss, sheet, step) {
   if (step.manual) idm_fillSiteClassTab_(ss, sheet);
+  else if (step.lists) idm_fillListsTab_(ss, sheet);
   else idm_resetTempSheet_(sheet);
+}
+
+/** Step 5's tab: just a list of your lists (they are opened from the sidebar). */
+function idm_fillListsTab_(ss, sheet) {
+  sheet.getDataRange().clearDataValidations();
+  sheet.clear();
+  const lists = typeof od_listSummaries_ === "function" ? od_listSummaries_(ss) : [];
+  const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [""],
+                ["List", "Tab", "By", "Rows", "Matched", "Need you", "Updated"]];
+  lists.forEach(l => rows.push([l.name, l.tabName, l.by === "guardian" ? "guardian" : "student",
+    l.stats ? l.stats.rows : "", l.stats ? l.stats.matched : "", l.stats ? l.stats.review : "", l.updated || ""]));
+  const width = 7;
+  sheet.getRange(1, 1, rows.length, width).setValues(rows.map(r => padRow_(r, width)));
+  sheet.getRange("A1").setFontWeight("bold").setFontSize(14);
+  sheet.getRange(4, 1, 1, width).setFontWeight("bold").setBackground("#d0e0e3");
+  sheet.setColumnWidth(1, 160);
 }
 
 function idm_resetTempSheet_(sheet) {
@@ -784,7 +826,9 @@ function idm_view_(ss, state, notice) {
     active: true,
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
-    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual },
+    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists },
+    // Step 5: your lists (null when Z#OwnData.gs isn't there)
+    lists: step.lists ? (typeof od_listSummaries_ === "function" ? od_listSummaries_(ss) : null) : undefined,
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
     // Finished / skipped steps (other than this one), for the "✅ "Student Data" Successful" lines under Option 1
@@ -803,6 +847,11 @@ function idm_view_(ss, state, notice) {
 
 /** "MM/dd/yy" from the section's DATE UPDATED stamp, plus how many days ago (null = never). */
 function idm_lastUpdated_(raw, step) {
+  if (step.lists) {
+    const dates = (typeof od_listSummaries_ === "function" ? od_listSummaries_(SpreadsheetApp.getActiveSpreadsheet()) : [])
+      .map(l => idm_dateInfo_(l.updated)).filter(Boolean).sort((a, b) => (a.days === null ? 1e9 : a.days) - (b.days === null ? 1e9 : b.days));
+    return dates[0] || null;
+  }
   if (step.manual) {
     const saved = PropertiesService.getDocumentProperties().getProperty(IDM_SITECLASS_UPDATED_KEY);
     return saved ? idm_dateInfo_(saved) : null;
@@ -827,6 +876,7 @@ function idm_dateInfo_(text) {
 function idm_summary_(results) {
   return IDM_STEPS.map(step => {
     const r = (results || {})[step.key];
+    if (r && r.lists) return "✅ " + step.zone + ": " + r.rows + " list(s) set up";
     if (r && r.saved) return "✅ " + step.zone + ": " + r.rows + " class(es) saved";
     if (r && r.rows) return "✅ " + step.zone + ": " + r.rows + " row(s) imported";
     if (r && r.skipped) return "⏭️ " + step.zone + ": skipped (old data kept)";

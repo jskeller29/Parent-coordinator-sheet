@@ -998,6 +998,9 @@ function resetDerivedSheets_(ss) {
   backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
   backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
   writeSendOutListFormulas_(ss); // put the Send Out dropdown lists (BH3:BJ3) back
+  // Your Lists (Z#OwnData.gs): the setups and their Additional Information go with the list tabs
+  backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
+  backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
 
   ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);

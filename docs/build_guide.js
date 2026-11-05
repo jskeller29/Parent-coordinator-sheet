@@ -320,6 +320,17 @@ P(
   numbered("Export the “Students with Non-NYCSA Account” report."),
   numbered([t("Copy the data and paste it into "), t("cell AP2", { bold: true }), t(".")]),
 );
+P(h3("Easier way: 📥 Input Data Mode"));
+P(p([t("Open "), t("🚀 App Menu → 📥 Input Data Mode", { bold: true }), t(" and the sheet walks you through the three exports one at a time, then two optional steps: "), t("Site / Class", { bold: true }), t(" (each class's teacher and site) and "), t("Your Lists", { bold: true }), t(" (below). Your other tabs are hidden while you work. For each export, either click "), t("📂 Upload file", { bold: true }), t(" and pick the file you downloaded, or open the file, press Ctrl+A (Mac: ⌘+A), copy (Ctrl+C / ⌘+C), and paste anywhere on the temporary tab with Ctrl+Shift+V (Mac: ⌘+Shift+V). The data moves into RAW Data by itself, and the sidebar shows when each one was last updated. It warns you, without changing RAW Data, if you pasted the wrong export or if Excel cut numbers off (like 7.19E+09). Use "), t("Skip", { bold: true }), t(" to keep the old data for an export, or "), t("Exit", { bold: true }), t(" to stop and get your tabs back. When you're done, click "), t("🏗️ Build Sheets Now", { bold: true }), t(".")]));
+P(h3("Your own lists (Input Data Mode, Your Lists step)"));
+P(p([t("Have a list that isn't an ATS export, like bus routes, after-school sign-ups, PTA members or trip forms? On the "), t("Your Lists", { bold: true }), t(" step, click "), t("➕ Add another list", { bold: true }), t(", name it, and paste the whole sheet (headers too) into the yellow box on the new "), t("📥 (name)", { bold: true }), t(" tab. The sidebar then takes you through three short steps:")]));
+P(
+  bullet([t("1. Columns. ", { bold: true }), ...[t("It finds the header row by itself (title rows above it are fine) and guesses what each column is, shown like "), t("OSIS: Column C “OSIS”", { italics: true }), t(". Fix a guess with its dropdown, and say whether each row is a "), t("student", { bold: true }), t(" or a "), t("guardian", { bold: true }), t(". A name can be one column (“LAST, FIRST” is fine) or two (first + last).")]]),
+  bullet([t("2. Variables. ", { bold: true }), ...[t("The other columns (a route, a fee, a form status). Tick "), t("keep", { bold: true }), t(", give it a name, and choose what a blank cell shows and what everyone who isn't on the list gets: nothing, or your own text (like “No bus”). Then choose where it shows: under "), t("Additional Information", { bold: true }), t(" on the phone contact (above Communications), and/or as a column in the "), t("Student List", { bold: true }), t(" (student lists) or "), t("Parents Divided", { bold: true }), t(" (guardian lists).")]]),
+  bullet([t("3. Match. ", { bold: true }), ...[t("It works out who each row is: OSIS first, then names, then phone or email, then best guesses for short names and nicknames (Sam → Samuel). Rows it isn't sure of are listed for you: confirm a best guess, pick one of several possible students, search the whole Student List, or skip the row. "), t("✓ Accept all best guesses", { bold: true }), t(" takes them all at once; check a couple first, because best guesses can be wrong.")]]),
+);
+P(p([t("Your picks are remembered: when you get a new version of the list, click "), t("Paste new version", { bold: true }), t(" and only the new rows need you. The list's tab shows who each row matched (✔ Matched / How). What you keep reaches the Student List, Parents Divided and the phone contacts at the next build; Combined Contact Tracking doesn't change. Add as many lists as you like.")]));
+P(callout("⚠️ Anything shown under Additional Information goes into your Google Contacts", "It is on the guardian's contact (and your phone) after the next sync. Keep private lists (IEP, housing, health) off, or keep them on their own tab only.", RED, "FEF2F2"));
 P(h3("Missing or wrong data? Use the New/Edit Student override"));
 P(p([t("District databases like ATS can lag behind real enrollment. If you need to add a student or fix contact info before it hits ATS, use "), t("👤 Student Overrides → New / Edit Student", { bold: true }), t(". When you build, your overrides are applied to the Student List, Combined Contact Tracking, Parents Divided, Phone Contacts, and the Ghost Typist. The "), t("Directory", { bold: true }), t(" tab and the build report's new / discharged students always show ATS (RAW Data) only. Overrides also tidy themselves up: a “New Student” override is removed once ATS has that student, an edit that ATS now matches exactly is removed too, and a student's class always follows RAW Data once they're in ATS. (More in Part 2.)")]));
 P(h3("Customizing dropdowns — the Type List"));
@@ -345,6 +356,7 @@ P(table(
     ["⚙️ Settings", "Opens the Settings dialog — show/hide tabs and columns, control live updates, filter notes, manage discharged students (full list below)."],
     ["📖 Open User Guide", "Opens this guide."],
     ["🐞 Report a Bug", "Opens a short Google Form so you can report anything broken or confusing."],
+    ["📥 Input Data Mode", "Walks you through loading each export, then Site / Class and Your Lists, one step at a time (Part 1, Step 4)."],
     ["🔔 Check for Updates", "Manually checks whether a newer template has been released, and lets you set your update preferences."],
     ["🔄 End of Year Rollover", "Archives the year to a PDF, freezes the sheet, and hands you next year's fresh template (see Part 3)."],
   ],
@@ -375,15 +387,16 @@ P(table(
   [
     ["RAW Data", "Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA).", "Hidden (show in Settings)"],
     ["Contact Log", "The heart of the tool. Log every guardian contact here (deep dive below).", "Yes"],
-    ["Student List", "The generated roster (called “Master Table” in older copies): OSIS, student, guardian, site, class, siblings, status and the date of the last interaction. Data starts on row 5.", "Hidden (generated)"],
+    ["Student List", "The generated roster (called “Master Table” in older copies): OSIS, student, guardian, site, class, siblings, status, the date of the last interaction, and a column for each student list you keep (Your Lists). Data starts on row 5.", "Hidden (generated)"],
     ["Directory", "A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.", "Yes (generated)"],
     ["Combined Contact Tracking", "One comprehensive history block per student — all contact notes and event attendances together. Great before an IEP meeting. Only students on the Student List get a block, so notes logged under a mistyped or unknown OSIS don't show here.", "Yes (generated)"],
     ["PCAR", "Your auto-compiled PCAR reporting numbers (Phone, Walk-In, Workshops, PTCs, totals).", "Yes (generated)"],
-    ["Phone Contacts", "The exact data that gets pushed to Google Contacts.", "Hidden (optional)"],
-    ["Parents Divided", "One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges.", "Hidden (optional)"],
+    ["Phone Contacts", "The exact data pushed to Google Contacts, including the Additional Information lines from Your Lists.", "Hidden (optional)"],
+    ["Parents Divided", "One row per guardian (with ParentSquare / NYCSA flags, and a column for each guardian list you keep). Handy for mail merges.", "Hidden (optional)"],
     ["Notes", "An optional manual notes tab (one row per family) with its own auto-fill and duplicate protection. Its notes show at the top of that student's Combined Contact Tracking.", "Hidden (optional)"],
     ["Send Out", "Optional tab tied to extra PCAR rows.", "Hidden (optional)"],
-    ["Backend", "Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ) and the Type List that drives the Contact Log Type dropdown (BL). Only edit the Type List.", "Hidden (system)"],
+    ["📥 Your lists", "One tab per list you add in Input Data Mode (Your Lists step): your pasted list, plus ✔ Matched / How columns showing who each row is.", "Yes (yours)"],
+    ["Backend", "Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ), the Type List that drives the Contact Log Type dropdown (BL), Additional Information (BN:BQ, rewritten by every build) and the Your Lists setups (BS:BV). Only edit the Type List.", "Hidden (system)"],
   ],
   [2280, 5080, 2000],
 ));
@@ -544,7 +557,8 @@ P(
   bullet([t("Back-dating works. ", { bold: true }), t("Type your own date, count, or follow-up status and the auto-fill leaves it alone.")]),
   bullet([t("Hide vs. Purge discharged. ", { bold: true }), t("“Hide Discharged” is a reversible view filter; “Purge Discharged Students” permanently deletes them. Use Purge only when you're sure.")]),
   bullet([t("Refresh if a menu looks stale. ", { bold: true }), t("Many actions update the menu live, but pressing F5 always reloads the latest menu.")]),
-  bullet([t("Fresh-data reminder. ", { bold: true }), t("If the ATS data in RAW Data is more than 30 days old, the sheet reminds you (once a day) when you open it to paste a fresh export.")]),
+  bullet([t("Fresh-data reminder. ", { bold: true }), t("If your ATS, ParentSquare or NYCSA data in RAW Data is older than your reminder setting (a week by default), the sheet shows a reminder once a day when you open it. Change it or turn it off in ⚙️ Settings → Student data.")]),
+  bullet([t("Lists match best with OSIS. ", { bold: true }), t("If a list you add has an OSIS column, every row with an OSIS matches exactly; names alone need more checking.")]),
 );
 
 P(h2("Troubleshooting / FAQ"));
@@ -558,6 +572,7 @@ P(table(
     ["“📡 Background Sync in Progress” warning", "A rebuild/sync is running. Wait for it to finish before entering new data, to avoid save conflicts."],
     ["Update checker says I'm up to date but there's a new version", "Use 🔔 Check for Updates (it bypasses the throttle). If it still looks wrong, report a bug."],
     ["Phone sync created duplicates / didn't finish", "Open Full Sync, use Stop then Restart. The sync mirrors the sheet and cleans up on the next full run."],
+    ["A row on my list says “not found”", "That student (or guardian) isn't on the Student List. A new student? Add them with 👤 New / Edit Student, build, then open the list again (📥 Input Data Mode → Your Lists → Edit setup). Or pick them by hand with 🔍 Pick from the Student List."],
     ["Something's broken or confusing", "Use 🚀 App Menu → 🐞 Report a Bug, or email jacob.keller@p94m.org."],
   ],
   [3560, 5800],
@@ -595,6 +610,8 @@ P(table(
     ["Stealth Mode", "An override flag that keeps a student out of the Override Report."],
     ["NYCSA / ParentSquare", "Parent account/communication systems whose exports show each family's sign-up status in Parents Divided and Phone Contacts."],
     ["Build", "Regenerating all derived tabs from your current data (🏗️ Build Sheets Only)."],
+    ["Your Lists", "Your own lists (bus routes, PTA…) added in Input Data Mode's last step. Each row is matched to a student or guardian; what you keep shows under Additional Information and as Student List / Parents Divided columns."],
+    ["Additional Information", "The lines from Your Lists on a phone contact, above Communications. Kept in the Backend tab and rewritten by every build."],
   ],
   [1900, 7460],
 ));

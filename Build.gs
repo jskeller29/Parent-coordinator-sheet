@@ -92,6 +92,17 @@ function buildAllDerivedSheets() {
   let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   if (owner) masterTable = owner.adjustMasterTable(ss, masterTable); // Old Master Table history
   masterTable = addLastInteractionColumn_(masterTable, contactLogData, freshEventData);
+  // Your Lists (optional trial file Z#OwnData.gs): matches every list tab, writes the
+  // Backend's Additional Information (read by the phone contacts) and returns the
+  // Student List / Parents Divided columns. A problem there never stops the build.
+  let listOutputs = null;
+  if (typeof od_buildOutputs_ === "function") {
+    try { listOutputs = od_buildOutputs_(ss, masterTable, guardianRows); }
+    catch (e) { console.warn("Your Lists skipped: " + e.message); }
+  } else {
+    backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW); // file removed: its old lines go too (no-op if never written)
+  }
+  if (listOutputs) masterTable = addListColumns_(masterTable, listOutputs.studentCols);
   writeSheet_(ss, STUDENT_LIST_SHEET, masterTable, 4, 1);
   styleLastInteractionHeader_(getStudentListSheet_(ss), masterTable[0]);
 
@@ -122,7 +133,8 @@ function buildAllDerivedSheets() {
   writeSheet_(ss, "Combined Contact Tracking", combinedContactTracking);
 
   reportBuildStep_(4); // Parents Divided
-  const parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
+  let parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
+  if (listOutputs) parentsDivided = addGuardianListColumns_(parentsDivided, listOutputs.guardianCols);
   writeSheet_(ss, "Parents Divided", parentsDivided);
 
   // Directory draws only from Raw Data: no New/Edit Student overrides, no discharged students
@@ -1731,6 +1743,7 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
   );
   
   const tracking = buildTrackingNotesMap_(ss, combinedContactTrackingArray); 
+  const additionalInfo = readAdditionalInfo_(ss); // Backend section filled from Your Lists
 
   const guardiansByStudentId = new Map();
   for (const g of guardianRows) {
@@ -1787,6 +1800,7 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
     const studentNotes = tracking.get(id);
     const cleanedNotes = (studentNotes && studentNotes.trim() !== "") ? studentNotes.trim() : "No Notes";
     
+    studentBlock += additionalInfoText_(additionalInfo, id, guardianName);
     studentBlock += `\n\nCommunications:\n${cleanedNotes}`;
 
     group.students.push({
@@ -1841,6 +1855,106 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
   }
   
   return out;
+}
+
+/* =========================
+   YOUR LISTS: OUTPUT COLUMNS + ADDITIONAL INFORMATION
+   Z#OwnData.gs (optional) works out the values; these only place them, so they
+   are harmless without it: no columns, an empty Backend section, no extra lines.
+========================= */
+
+/**
+ * The Backend's Additional Information section as
+ * OSIS -> { student: [lines], byGuardian: Map(lowercase guardian name -> [lines]) }.
+ * Guardian blank = a line for the student (student lists); a guardian name = a
+ * line from a guardian list, shown only on that guardian's own contact.
+ * The rows are kept in the document cache (the owner's per-edit Phone Contacts
+ * update reads them, and every sheet call costs there); any write to the
+ * section clears it (Core.gs backend helpers -> clearAdditionalInfoCache_).
+ */
+function readAdditionalInfo_(ss) {
+  let rows = null, cache = null, key = null;
+  try {
+    cache = CacheService.getDocumentCache();
+    key = additionalInfoCacheKey_(ss);
+    const hit = cache.get(key);
+    if (hit) rows = JSON.parse(hit);
+  } catch (e) { rows = null; }
+  if (!rows) {
+    rows = readBlockFromSheet_(getBackendSheet_(ss), "ADDL_INFO", false).slice(1)
+      .map(r => [toText_(r[0]), toText_(r[2]), toText_(r[3])]); // OSIS, Guardian, lines
+    try {
+      const json = JSON.stringify(rows);
+      if (cache && key && json.length < 95000) cache.put(key, json, 21600); // 6 hours; cleared on every write
+    } catch (e) { /* read again next time */ }
+  }
+  const map = new Map();
+  rows.forEach(r => {
+    const osis = r[0];
+    const lines = r[2].split("\n").map(l => l.trim()).filter(Boolean);
+    if (!osis || !lines.length) return;
+    if (!map.has(osis)) map.set(osis, { student: [], byGuardian: new Map() });
+    const entry = map.get(osis);
+    const guardian = r[1].toLowerCase();
+    if (!guardian) entry.student.push(...lines);
+    else entry.byGuardian.set(guardian, (entry.byGuardian.get(guardian) || []).concat(lines));
+  });
+  return map;
+}
+
+/** Per spreadsheet: the owner's "copy, then load fake data on the copy" builds the copy with this script's cache. */
+function additionalInfoCacheKey_(ss) {
+  return "ADDL_INFO_ROWS_" + (ss || SpreadsheetApp.getActiveSpreadsheet()).getId();
+}
+
+function clearAdditionalInfoCache_(ss) {
+  try { CacheService.getDocumentCache().remove(additionalInfoCacheKey_(ss)); }
+  catch (e) { console.warn("Additional Information cache not cleared: " + e.message); }
+}
+
+/** "\n\nAdditional Information:\n..." for one student on one guardian's contact, or "" when there is none. */
+function additionalInfoText_(info, osis, guardianName) {
+  const entry = info && info.get(toText_(osis));
+  if (!entry) return "";
+  const lines = entry.student.concat(entry.byGuardian.get(toText_(guardianName).toLowerCase()) || []);
+  return lines.length ? "\n\nAdditional Information:\n" + lines.join("\n") : "";
+}
+
+/**
+ * Student List + one column per student-list variable (header = its name).
+ * cols: [{ header, byOsis: Map(OSIS -> value) }]. A sibling row "111, 222"
+ * shows each student's value joined with " / " (like its Class).
+ */
+function addListColumns_(masterTable, cols) {
+  if (!cols || !cols.length) return masterTable;
+  const width = masterTable[0].length;
+  return masterTable.map((row, i) => {
+    const out = padRow_(row, width);
+    cols.forEach(c => {
+      if (i === 0) { out.push(c.header); return; }
+      const ids = extractOsisTokens_(row[0]);
+      const values = ids.map(o => c.byOsis.get(o) || "");
+      out.push(values.some(v => v !== "") ? values.join(" / ") : "");
+    });
+    return out;
+  });
+}
+
+/**
+ * Parents Divided + one column per guardian-list variable.
+ * cols: [{ header, byGuardian: Map("OSIS|lowercase guardian name" -> value) }].
+ */
+function addGuardianListColumns_(parentsDivided, cols) {
+  if (!cols || !cols.length) return parentsDivided;
+  const width = parentsDivided[0].length;
+  return parentsDivided.map((row, i) => {
+    const out = padRow_(row, width);
+    cols.forEach(c => {
+      if (i === 0) { out.push(c.header); return; }
+      out.push(c.byGuardian.get(toText_(row[0]) + "|" + toText_(row[1]).toLowerCase()) || "");
+    });
+    return out;
+  });
 }
 
 function buildTrackingNotesMap_(ss, combinedContactTrackingArray) { 

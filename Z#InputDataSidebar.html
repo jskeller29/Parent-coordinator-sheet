@@ -42,6 +42,22 @@
     #exitAsk .row button { flex: 1 1 auto; font-size: 12px; padding: 6px 8px; }
     .hidden { display: none !important; }
     a { color: #1D4ED8; cursor: pointer; }
+    /* Step 5: Your Lists */
+    .li { border: 1px solid #DBE2EC; border-radius: 10px; padding: 9px 11px; margin: 8px 0; background: #fff; }
+    .li .top { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13.5px; }
+    .li .top .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .li .top button { font-size: 11px; padding: 1px 5px; border-color: transparent; background: transparent; }
+    .li .top button:hover { background: #F1F5F9; border-color: #CBD5E1; }
+    .li .meta { font-size: 11.5px; color: #64748B; margin: 2px 0 0 22px; }
+    .li .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 5px 0 0 22px; }
+    .li .chip { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #E6F4EA; color: #137333; }
+    .li .chip.warn { background: #FEF3D6; color: #8A5A00; }
+    .li .chip.grey { background: #F1F5F9; color: #475569; }
+    .li .btns { display: flex; gap: 5px; flex-wrap: wrap; margin: 7px 0 0 22px; }
+    .li .btns button { font-size: 11.5px; padding: 4px 8px; }
+    .li .btns button.soft { background: #E8F0FE; color: #1D4ED8; border-color: #C6DAFC; }
+    .addlist { width: 100%; border: 1.5px dashed #94A3B8; background: #F8FAFC; color: #1D4ED8; font-weight: 700; padding: 9px; margin-top: 4px; }
+    #newListForm input { width: 100%; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px 9px; font: inherit; margin: 6px 0; }
     /* 🐞 TEMPORARY DEBUG panel */
     #debug { margin-top: 16px; border: 1px dashed #F59E0B; border-radius: 8px; padding: 8px 10px; background: #FFFBEB; font-size: 11px; }
     #debug summary { font-weight: 700; cursor: pointer; }
@@ -95,9 +111,23 @@
       <b>Fill in the <span id="siteTabName"></span> tab</b>
       <div class="muted">Your entries are only saved to Raw Data when you click Save.</div>
       <div class="row">
-        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class &amp; finish</button>
+        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class</button>
         <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
       </div>
+    </div>
+
+    <div class="card" id="listsCard">
+      <b>Your lists</b>
+      <div id="listItems"></div>
+      <div id="listsMissing" class="error hidden">Your Lists needs the <b>Z#OwnData</b> script and <b>Z#OwnDataSidebar</b> file in Extensions → Apps Script.</div>
+      <div id="newListForm" class="hidden">
+        <b>New list</b>
+        <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
+        <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; paste</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
+      </div>
+      <button class="addlist" id="addListBtn" onclick="showNewList()">➕ Add another list</button>
+      <div class="muted" style="margin-top:6px">No lists? Click Finish to skip this step.</div>
+      <div class="row"><button class="primary" id="finishListsBtn" style="flex:1" onclick="finishLists()">Finish ✓</button></div>
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
@@ -159,6 +189,7 @@
   var paused = false;        // an error is showing: wait for the user
   var pendingUpload = null;
   var currentManual = false; // on the Site / Class step (no polling)  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
+  var currentLists = false;  // on step 5, Your Lists (no polling)
 
   function $(id) { return document.getElementById(id); }
 
@@ -217,17 +248,22 @@
     $('howTo').innerHTML = v.step.howTo.map(function (h) { return '<li>' + h + '</li>'; }).join('');
     $('tabName').textContent = '"' + v.tabName + '"';
     var manual = !!v.step.manual;
+    var listsStep = !!v.step.lists;
     currentManual = manual;
-    show('uploadCard', !manual); show('pasteCard', !manual); show('siteCard', manual);
+    currentLists = listsStep;
+    show('uploadCard', !manual && !listsStep); show('pasteCard', !manual && !listsStep); show('siteCard', manual);
+    show('listsCard', listsStep);
+    if (listsStep) renderLists(v.lists);
     // The "Reading… / Moving data…" spinner and any error sit right under Option 1
     // (Upload), so they are not pushed out of sight below the long paste steps;
     // on the Site / Class step they sit under that card instead.
     var anchor = manual ? $('siteCard') : $('uploadCard');
     anchor.parentNode.insertBefore($('waiting'), anchor.nextSibling);
     $('waiting').parentNode.insertBefore($('errorBox'), $('waiting').nextSibling);
-    $('howToTitle').textContent = manual ? 'What to do' : 'Where to get it';
+    $('howToTitle').textContent = (manual || listsStep) ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip (don\'t save) & finish';
+    show('skipBtn', !listsStep); // step 5 ends with its own Finish button
     show('exitAsk', false);
 
     var n = v.notice;
@@ -252,10 +288,10 @@
       pendingUpload = null;
       show('errorBox', false);
       $('waitingText').textContent = 'Waiting for your paste or upload…';
-      show('waiting', !manual);
+      show('waiting', !manual && !listsStep);
     }
     setButtons(true);
-    if (manual) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks Save
+    if (manual || listsStep) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks a button
     else schedule();
   }
 
@@ -306,7 +342,8 @@
   function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
 
   function setButtons(on) {
-    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn'].forEach(function (id) { $(id).disabled = !on; });
+    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn', 'addListBtn', 'createListBtn', 'finishListsBtn'].forEach(function (id) { $(id).disabled = !on; });
+    Array.prototype.forEach.call(document.querySelectorAll('#listItems button'), function (b) { b.disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#progress .pstep'), function (b) { b.disabled = !on; });
   }
 
@@ -378,7 +415,9 @@
   function skip() { working('Skipping…'); call('idm_skip'); }
   function exitMode() {
     if (busy) return;
-    $('exitAskText').textContent = currentManual
+    $('exitAskText').textContent = currentLists
+      ? 'Your lists are saved one by one, so nothing is lost either way.'
+      : currentManual
       ? 'Save & exit saves what you typed on the Site / Class tab to Raw Data. Exit without saving loses it.'
       : 'Everything already moved to Raw Data is saved. Save & exit also moves anything pasted on the tab that hasn\'t moved yet.';
     show('exitAsk', true);
@@ -406,6 +445,50 @@
   function build() {
     google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
   }
+
+  // --- step 5: Your Lists (Z#OwnData.gs) ---
+  function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function renderLists(lists) {
+    show('listsMissing', lists === null);
+    show('addListBtn', lists !== null); show('newListForm', false); show('finishListsBtn', true);
+    var icons = ['🚌', '🎒', '🏫', '📋', '🗂️'];
+    $('listItems').innerHTML = (lists || []).map(function (l, i) {
+      var st = l.stats, chips = '';
+      if (!l.ready) chips = '<span class="chip warn">setup not finished</span>';
+      else if (st) chips = '<span class="chip">' + st.matched + ' matched</span>' + (st.review ? '<span class="chip warn">' + st.review + ' to review</span>' : '') + (st.skipped ? '<span class="chip grey">' + st.skipped + ' skipped</span>' : '');
+      return '<div class="li"><div class="top"><span>' + icons[i % icons.length] + '</span><span class="nm">' + esc(l.name) + '</span>' +
+        '<button title="Rename" onclick="renameList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">✏️</button>' +
+        '<button title="Delete" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">🗑️</button></div>' +
+        '<div class="meta">by ' + (l.by === 'guardian' ? 'guardian' : 'student') + (st ? ' · ' + st.rows + ' rows' : '') + (l.updated ? ' · updated ' + esc(l.updated) : '') + '</div>' +
+        (chips ? '<div class="chips">' + chips + '</div>' : '') +
+        '<div class="btns"><button class="soft" onclick="listCall(\'od_repasteList\',' + l.tabId + ')">Paste new version</button>' +
+        '<button onclick="listCall(\'od_openList\',' + l.tabId + ')">' + (l.ready ? 'Edit setup' : 'Finish setup') + '</button></div></div>';
+    }).join('');
+  }
+  function showNewList() { show('addListBtn', false); show('newListForm', true); $('newListName').value = ''; $('newListName').focus(); }
+  function listReply(r) {
+    if (r && r.error) { onFail(r.error); return; }
+    busy = false; setButtons(true);
+  }
+  function createList() {
+    var name = $('newListName').value.trim();
+    if (!name) { $('newListName').focus(); return; }
+    working('Making the "' + name + '" tab…');
+    google.script.run.withSuccessHandler(listReply).withFailureHandler(onFail).od_createList(name); // opens the list's own sidebar
+  }
+  function listCall(fn, tabId) { working('Opening the list…'); var r = google.script.run.withSuccessHandler(listReply).withFailureHandler(onFail); r[fn](tabId); }
+  function renameList(tabId, name) {
+    var n = prompt('New name for "' + name + '":', name);
+    if (!n || !n.trim()) return;
+    working('Renaming…');
+    google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); }).withFailureHandler(onFail).od_renameList(tabId, n.trim());
+  }
+  function deleteList(tabId, name) {
+    if (!confirm('Delete the list "' + name + '" and its tab? Its lines go away from the phone contacts and the Student List / Parents Divided at the next build.')) return;
+    working('Deleting…');
+    google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); }).withFailureHandler(onFail).od_deleteList(tabId);
+  }
+  function finishLists() { working('Finishing…'); call('idm_finishLists'); }
 
   // --- upload ---
   $('fileInput').addEventListener('change', function () {

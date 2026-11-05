@@ -96,6 +96,11 @@ function getStudentListSheet_(ss) {
  *   AX:BF  Backend Event Log    (was "Backend_Event_Log", 9 columns)
  *   BH:BJ  Send Out List        (feeds the "Send Out" sheet; not used by code)
  *   BL     Type List            (was "Type List")
+ *   BN:BQ  Additional Information (OSIS / Student / Guardian / lines; written by
+ *          every build from Your Lists, Z#OwnData.gs; read by the phone contacts)
+ *   BS:BV  Your Lists setup     (one row per list tab, Z#OwnData.gs)
+ * The last two are "grow" sections: an older Backend tab gets their columns the
+ * first time they are written; reading them before that returns nothing.
  *
  * Sections share rows, so NEVER delete/insert whole sheet rows, use
  * getDataRange()/getLastRow(), or clear to the right on this tab. Always go
@@ -110,7 +115,9 @@ var BACKEND_BLOCKS = {
   OVERRIDES: { col: 7,  width: 42, title: "NEW / EDIT STUDENT", legacy: "New/Edit Student" },
   EVENT_LOG: { col: 50, width: 9,  title: "BACKEND EVENT LOG",  legacy: "Backend_Event_Log" },
   SEND_OUT:  { col: 60, width: 3,  title: "SEND OUT LIST",      legacy: null },
-  TYPES:     { col: 64, width: 1,  title: "TYPE LIST",          legacy: "Type List" }
+  TYPES:     { col: 64, width: 1,  title: "TYPE LIST",          legacy: "Type List" },
+  ADDL_INFO: { col: 66, width: 4,  title: "ADDITIONAL INFORMATION", legacy: null, grow: true },
+  OWN_LISTS: { col: 71, width: 4,  title: "YOUR LISTS (SETUP)",  legacy: null, grow: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)
@@ -141,7 +148,7 @@ function getBackendSheet_(ss) {
     sheet = ss.insertSheet(BACKEND_SHEET_NAME);
     sheet.hideSheet();
   }
-  const neededCols = BACKEND_BLOCKS.TYPES.col;
+  const neededCols = Math.max.apply(null, Object.keys(BACKEND_BLOCKS).map(k => BACKEND_BLOCKS[k].col + BACKEND_BLOCKS[k].width - 1));
   if (sheet.getMaxColumns() < neededCols) {
     sheet.insertColumnsAfter(sheet.getMaxColumns(), neededCols - sheet.getMaxColumns());
   }
@@ -241,6 +248,7 @@ function backendReadBlock_(ss, key, display) {
 
 function readBlockFromSheet_(sheet, key, display) {
   const b = BACKEND_BLOCKS[key];
+  if (!backendBlockReady_(sheet, b, false)) return [];
   const lastRow = sheet.getLastRow();
   if (lastRow < BACKEND_HEADER_ROW) return [];
   const range = sheet.getRange(BACKEND_HEADER_ROW, b.col, lastRow - BACKEND_HEADER_ROW + 1, b.width);
@@ -278,6 +286,7 @@ function backendRowFor_(i) {
 /** Range inside a section: i = row index as in backendReadBlock_, c = 0-based column. */
 function backendBlockRange_(ss, key, i, c, numRows, numCols) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
+  if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too
   const sheet = getBackendSheet_(ss);
   return sheet.getRange(backendRowFor_(i), BACKEND_BLOCKS[key].col + c, numRows || 1, numCols || 1);
 }
@@ -287,6 +296,7 @@ function backendWriteBlock_(ss, key, values) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
+  backendBlockReady_(sheet, b, true);
   backendClearBlock_(ss, key, BACKEND_HEADER_ROW);
   if (!values || values.length === 0) return;
   const rows = values.map(r => padRow_(r, b.width));
@@ -297,18 +307,42 @@ function backendWriteBlock_(ss, key, values) {
 /** Clears a section's contents from fromRow down (only its own columns). */
 function backendClearBlock_(ss, key, fromRow) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
+  if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too (a write clears first, so it lands here)
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
+  if (!backendBlockReady_(sheet, b, false)) return; // a grow section that was never written: nothing to clear
   const rows = sheet.getMaxRows() - fromRow + 1;
   if (rows > 0) sheet.getRange(fromRow, b.col, rows, b.width).clearContent();
+}
+
+/**
+ * A "grow" section (Additional Information, Your Lists setup) sits right of the
+ * old ones, where an older Backend tab has no columns yet. create = true adds the
+ * columns and the section title; false just says whether they are there. Other
+ * sections answer true without any sheet call.
+ */
+function backendBlockReady_(sheet, b, create) {
+  if (!b.grow) return true;
+  const need = b.col + b.width - 1;
+  if (sheet.getMaxColumns() < need) {
+    if (!create) return false;
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), need - sheet.getMaxColumns());
+  }
+  if (create) {
+    const title = sheet.getRange(1, b.col);
+    if (String(title.getValue()).trim() === "") title.setValue(b.title).setFontWeight("bold");
+  }
+  return true;
 }
 
 /** Appends rows directly under the section's own last row. */
 function backendAppendRows_(ss, key, rows) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
+  if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too
   if (!rows || rows.length === 0) return;
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
+  backendBlockReady_(sheet, b, true);
   const current = readBlockFromSheet_(sheet, key, false);
   const startRow = BACKEND_HEADER_ROW + Math.max(current.length, 1);
   const padded = rows.map(r => padRow_(r, b.width));

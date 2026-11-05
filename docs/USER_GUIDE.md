@@ -171,14 +171,46 @@ your standard systems and paste it into the brightly-colored "PASTE" boxes on th
 4. Copy the data and paste it into **cell AP2**.
 
 **Easier way: 📥 Input Data Mode.** Open **🚀 App Menu → 📥 Input Data Mode** and the sheet
-walks you through all three exports, one at a time. Your other tabs are hidden while you
-work. For each export, either click **📂 Upload file** and pick the file you downloaded,
-or open the file, press Ctrl+A (Mac: ⌘+A), copy (Ctrl+C / ⌘+C), and paste anywhere on the
-temporary tab with Ctrl+Shift+V (Mac: ⌘+Shift+V). The data moves into RAW Data by itself,
-and the sidebar shows when each one was last updated. It warns you, without changing RAW Data,
-if you pasted the wrong export or if Excel cut numbers off (like 7.19E+09). Use **Skip** to
-keep the old data for an export, or **Exit** to stop and get your tabs back. When you're done,
-click **🏗️ Build Sheets Now**.
+walks you through the three exports one at a time, then two optional steps: **Site /
+Class** (each class's teacher and site) and **Your Lists** (below). Your other tabs are
+hidden while you work. For each export, either click **📂 Upload file** and pick the file
+you downloaded, or open the file, press Ctrl+A (Mac: ⌘+A), copy (Ctrl+C / ⌘+C), and paste
+anywhere on the temporary tab with Ctrl+Shift+V (Mac: ⌘+Shift+V). The data moves into RAW
+Data by itself, and the sidebar shows when each one was last updated. It warns you,
+without changing RAW Data, if you pasted the wrong export or if Excel cut numbers off
+(like 7.19E+09). Use **Skip** to keep the old data for an export, or **Exit** to stop and
+get your tabs back. When you're done, click **🏗️ Build Sheets Now**.
+
+**Your own lists (Input Data Mode, Your Lists step).** Have a list that isn't an ATS
+export, like bus routes, after-school sign-ups, PTA members or trip forms? On the **Your
+Lists** step, click **➕ Add another list**, name it, and paste the whole sheet (headers
+too) into the yellow box on the new **📥 (name)** tab. The sidebar then takes you through
+three short steps:
+
+1. **Columns.** It finds the header row by itself (title rows above it are fine) and
+   guesses what each column is, shown like *OSIS: Column C “OSIS”*. Fix a guess with its
+   dropdown, and say whether each row is a **student** or a **guardian**. A name can be
+   one column (“LAST, FIRST” is fine) or two (first + last).
+2. **Variables.** The other columns (a route, a fee, a form status). Tick **keep**, give
+   it a name, and choose what a blank cell shows and what everyone who isn't on the list
+   gets: nothing, or your own text (like “No bus”). Then choose where it shows: under
+   **Additional Information** on the phone contact (above Communications), and/or as a
+   column in the **Student List** (student lists) or **Parents Divided** (guardian lists).
+3. **Match.** It works out who each row is: OSIS first, then names, then phone or email,
+   then best guesses for short names and nicknames (Sam → Samuel). Rows it isn't sure of
+   are listed for you: confirm a best guess, pick one of several possible students, search
+   the whole Student List, or skip the row. **✓ Accept all best guesses** takes them all
+   at once; check a couple first, because best guesses can be wrong.
+
+Your picks are remembered: when you get a new version of the list, click **Paste new
+version** and only the new rows need you. The list's tab shows who each row matched (✔
+Matched / How). What you keep reaches the Student List, Parents Divided and the phone
+contacts at the next build; Combined Contact Tracking doesn't change. Add as many lists as
+you like.
+
+> ⚠️ **Anything shown under Additional Information goes into your Google Contacts.** It
+> is on the guardian's contact (and your phone) after the next sync. Keep private lists
+> (IEP, housing, health) off, or keep them on their own tab only.
 
 **Missing or wrong data? Use the New/Edit Student override.** District databases like
 ATS can lag behind real enrollment. If you need to add a student or fix contact info
@@ -224,6 +256,7 @@ After setup, three custom menus sit at the top of the screen, to the right of "H
 | ⚙️ **Settings** | Show/hide tabs and columns, control live updates, filter notes, manage discharged students (full list below). |
 | 📖 **Open User Guide** | Opens this guide. |
 | 🐞 **Report a Bug** | Opens a short Google Form to report anything broken or confusing. |
+| 📥 **Input Data Mode** | Walks you through loading each export, then Site / Class and Your Lists, one step at a time (Part 1, Step 4). |
 | 🔔 **Check for Updates** | Manually checks whether a newer template has been released, and lets you set update preferences. |
 | 🔄 **End of Year Rollover** | Archives the year to a PDF, freezes the sheet, and hands you next year's fresh template (Part 3). |
 
@@ -255,15 +288,16 @@ automatically in PCAR.
 |---|---|---|
 | **RAW Data** | Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA). | Hidden (show in Settings) |
 | **Contact Log** | The heart of the tool. Log every guardian contact here (deep dive below). | Yes |
-| **Student List** | The generated roster (called “Master Table” in older copies): OSIS, student, guardian, site, class, siblings, status and the date of the last interaction. Data starts on row 5. | Hidden (generated) |
+| **Student List** | The generated roster (called “Master Table” in older copies): OSIS, student, guardian, site, class, siblings, status, the date of the last interaction, and a column for each student list you keep (Your Lists). Data starts on row 5. | Hidden (generated) |
 | **Directory** | A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included. | Yes (generated) |
 | **Combined Contact Tracking** | One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting. Only students on the Student List get a block, so notes logged under a mistyped or unknown OSIS don't show here. | Yes (generated) |
 | **PCAR** | Your auto-compiled PCAR numbers (Phone, Walk-In, Workshops, PTCs, totals). | Yes (generated) |
-| **Phone Contacts** | The exact data pushed to Google Contacts. | Hidden (optional) |
-| **Parents Divided** | One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges. | Hidden (optional) |
+| **Phone Contacts** | The exact data pushed to Google Contacts, including the Additional Information lines from Your Lists. | Hidden (optional) |
+| **Parents Divided** | One row per guardian (with ParentSquare / NYCSA flags, and a column for each guardian list you keep). Handy for mail merges. | Hidden (optional) |
 | **Notes** | An optional manual notes tab (one row per family) with its own auto-fill and duplicate protection. Its notes show at the top of that student's Combined Contact Tracking. | Hidden (optional) |
 | **Send Out** | Optional tab tied to extra PCAR rows. | Hidden (optional) |
-| **Backend** | Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ) and the Type List that drives the Contact Log Type dropdown (BL). Only edit the Type List. | Hidden (system) |
+| **📥 Your lists** | One tab per list you add in Input Data Mode (Your Lists step): your pasted list, plus ✔ Matched / How columns showing who each row is. | Yes (yours) |
+| **Backend** | Behind-the-scenes sections side by side: Version & saved settings (A:E), New/Edit Student overrides (G:AV), event log (AX:BF), Send Out list (BH:BJ), the Type List that drives the Contact Log Type dropdown (BL), Additional Information (BN:BQ, rewritten by every build) and the Your Lists setups (BS:BV). Only edit the Type List. | Hidden (system) |
 
 ### The Contact Log, in depth
 
@@ -460,8 +494,11 @@ does"** in Part 1.
 - **Hide vs. Purge discharged.** "Hide Discharged" is a reversible view filter; "Purge"
   permanently deletes.
 - **Refresh if a menu looks stale.** Pressing F5 always reloads the latest menu.
-- **Fresh-data reminder.** If the ATS data in RAW Data is more than 30 days old, the
-  sheet reminds you (once a day) when you open it to paste a fresh export.
+- **Fresh-data reminder.** If your ATS, ParentSquare or NYCSA data in RAW Data is older
+  than your reminder setting (a week by default), the sheet shows a reminder once a day
+  when you open it. Change it or turn it off in ⚙️ Settings → Student data.
+- **Lists match best with OSIS.** If a list you add has an OSIS column, every row with an
+  OSIS matches exactly; names alone need more checking.
 
 ### Troubleshooting / FAQ
 
@@ -474,6 +511,7 @@ does"** in Part 1.
 | "📡 Background Sync in Progress" warning | A rebuild/sync is running. Wait for it to finish before entering new data. |
 | Update checker says I'm up to date but there's a new version | Use **🔔 Check for Updates** (it bypasses the throttle). If still wrong, report a bug. |
 | Phone sync created duplicates / didn't finish | Open Full Sync, use Stop then Restart. The sync mirrors the sheet and cleans up on the next full run. |
+| A row on my list says “not found” | That student (or guardian) isn't on the Student List. A new student? Add them with 👤 New / Edit Student, build, then open the list again (📥 Input Data Mode → Your Lists → Edit setup). Or pick them by hand with 🔍 Pick from the Student List. |
 | Something's broken or confusing | Use **🚀 App Menu → 🐞 Report a Bug**, or email jacob.keller@p94m.org. |
 
 ### Do & Don't
@@ -497,6 +535,8 @@ does"** in Part 1.
 | **Stealth Mode** | An override flag that keeps a student out of the Override Report. |
 | **NYCSA / ParentSquare** | Parent account/communication systems whose exports show each family's sign-up status in Parents Divided and Phone Contacts. |
 | **Build** | Regenerating all derived tabs from your current data (**🏗️ Build Sheets Only**). |
+| **Your Lists** | Your own lists (bus routes, PTA…) added in Input Data Mode's last step. Each row is matched to a student or guardian; what you keep shows under Additional Information and as Student List / Parents Divided columns. |
+| **Additional Information** | The lines from Your Lists on a phone contact, above Communications. Kept in the Backend tab and rewritten by every build. |
 
 ---
 

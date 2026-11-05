@@ -819,6 +819,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
 
   const masterMap = new Map(masterTable.slice(1).filter(r => isRealStudentId_(r[0])).map(r => [toText_(r[0]), r]));
   const tracking = buildTrackingNotesMap_(ss, combinedContactTrackingArray); 
+  const additionalInfo = readAdditionalInfo_(ss); // Backend section filled from Your Lists (Z#OwnData.gs)
   
   const oldContactsMap = getOldContactsMap_(ss);
 
@@ -913,6 +914,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
     if (student.site && toText_(student.site) !== "") studentBlock += `\nSite: ${toText_(student.site)}`;
     studentBlock += `\nParents Square: ${psStatus || "No"}\nNYCSA: ${nycsaStatus || "No"}`;
 
+    studentBlock += additionalInfoText_(additionalInfo, id, guardianName); // Your Lists (Backend section)
     const studentNotes = tracking.get(id);
     if (studentNotes && studentNotes.trim() !== "") studentBlock += `\n\nNote:\n${studentNotes}`;
 
@@ -1047,6 +1049,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
         if (sSite) finalNotes += `\nSite: ${sSite}`;
         finalNotes += `\nParents Square: Unknown\nNYCSA: Unknown`;
         
+        finalNotes += additionalInfoText_(additionalInfo, sOsisStr, old.firstName); // Your Lists (Backend section)
         const studentNotes = tracking.get(sOsisStr);
         if (studentNotes && studentNotes.trim() !== "") finalNotes += `\n\nNote:\n${studentNotes}`;
         

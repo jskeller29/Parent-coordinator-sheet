@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <!-- 📥 Your Lists: set up one list (Z#OwnData.gs). Opened from step 5 of Input Data Mode. -->
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 14px 14px 90px; color: #0F172A; font-size: 13px; line-height: 1.45; }
+    h2 { font-size: 17px; margin: 0 0 4px; }
+    h3 { font-size: 14px; margin: 14px 0 6px; }
+    .muted { color: #64748B; font-size: 12px; }
+    .card { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: #fff; }
+    .card.yellow { background: #FFFBEB; border-color: #FDE68A; }
+    .card.green { background: #F0FDF4; border-color: #BBF7D0; }
+    .ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
+    .warnbox { background: #FFF8E6; color: #6B4A00; border: 1px solid #F1D08A; border-radius: 8px; padding: 8px 10px; margin: 10px 0; font-size: 12px; }
+    .error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    .status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; background: #F0F9FF; color: #075985; margin: 10px 0; }
+    .spinner { width: 14px; height: 14px; border: 2px solid #BAE6FD; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.9s linear infinite; flex: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    ol { margin: 4px 0 0 18px; padding: 0; } li { margin-bottom: 3px; }
+    kbd { background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 4px; font-size: 11px; font-family: inherit; }
+    button { font-family: inherit; font-size: 13px; border-radius: 6px; padding: 7px 12px; cursor: pointer; border: 1px solid #CBD5E1; background: #fff; color: #0F172A; }
+    button.primary { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
+    button.small { font-size: 11.5px; padding: 4px 8px; }
+    button.soft { background: #E8F0FE; color: #1D4ED8; border-color: #C6DAFC; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .hidden { display: none !important; }
+    a { color: #1D4ED8; cursor: pointer; }
+    label.f { display: block; font-size: 10.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: .05em; margin: 12px 0 4px; }
+    input[type=text], select { width: 100%; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 12.5px; background: #fff; }
+    .steps { display: flex; align-items: center; gap: 4px; margin: 10px 0 6px; padding-bottom: 6px; border-bottom: 1px solid #E2E8F0; font-size: 12px; }
+    .steps span { color: #94A3B8; white-space: nowrap; }
+    .steps span.on { color: #1D4ED8; font-weight: 700; }
+    .steps span.done { color: #166534; }
+    .steps i { color: #CBD5E1; font-style: normal; }
+    .seg { display: flex; gap: 6px; }
+    .seg button { flex: 1; }
+    .seg button.on { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
+    .map { display: grid; grid-template-columns: 74px 1fr; gap: 4px 6px; align-items: center; margin-top: 6px; }
+    .map .k { font-weight: 600; font-size: 12.5px; }
+    .why { grid-column: 2; font-size: 11.5px; color: #94A3B8; margin-top: -2px; }
+    .why.ok { color: #166534; background: none; border: 0; padding: 0; margin: -2px 0 0; }
+    .two { display: flex; gap: 6px; } .two > * { flex: 1; }
+    .chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: #ECE6F7; color: #5B3FA0; margin: 2px 3px 2px 0; }
+    .chip.ok { background: #E6F4EA; color: #137333; } .chip.warn { background: #FEF3D6; color: #8A5A00; } .chip.bad { background: #FCE8E6; color: #C5221F; } .chip.grey { background: #F1F5F9; color: #475569; }
+    .vcard { border: 1px solid #E2E8F0; border-left: 4px solid #5B3FA0; border-radius: 8px; padding: 9px 10px; margin: 8px 0; background: #fff; }
+    .vcard.off { border-left-color: #CBD5E1; background: #F8FAFC; }
+    .vtop { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+    .vtop .col { color: #94A3B8; font-weight: 500; font-size: 11.5px; }
+    .vtop label { margin-left: auto; font-size: 11.5px; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .ck { display: flex; gap: 6px; align-items: flex-start; font-size: 12px; margin-top: 5px; cursor: pointer; }
+    .ck input { margin-top: 2px; }
+    .ck .sub { color: #94A3B8; font-size: 11px; display: block; }
+    .preview { border: 1px solid #E2E8F0; border-radius: 6px; background: #FBFCFE; padding: 5px 8px; margin-top: 6px; font-size: 12px; }
+    .preview .who { font-size: 10px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: .04em; }
+    .rv { border: 1px solid #E2E8F0; border-left: 4px solid #E8A33D; border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: #FFFDF7; }
+    .rv.bad { border-left-color: #D93025; background: #FFFAFA; }
+    .rv.done { border-left-color: #16A34A; background: #F6FEF8; }
+    .rv .top { display: flex; justify-content: space-between; gap: 6px; font-size: 11.5px; color: #64748B; }
+    .rv .top b { color: #0F172A; font-size: 12.5px; }
+    .rv .q { font-size: 12px; margin-top: 3px; }
+    .opt { display: flex; gap: 6px; align-items: center; font-size: 12px; margin-top: 4px; padding: 4px 6px; border: 1px solid #E2E8F0; border-radius: 6px; background: #fff; cursor: pointer; }
+    .opt.on { border-color: #1D4ED8; background: #EEF3FE; }
+    .opt .m { color: #94A3B8; }
+    .results { border: 1px solid #CBD5E1; border-radius: 6px; margin-top: 4px; max-height: 190px; overflow: auto; background: #fff; }
+    .results div { padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #F1F5F9; cursor: pointer; }
+    .results div:hover { background: #EEF3FE; }
+    .results .m { color: #94A3B8; }
+    .bulk { border: 1px solid #F1D08A; background: #FFF8E6; border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 12px; }
+    .big { font-size: 19px; font-weight: 700; } .big span { font-size: 13px; color: #94A3B8; font-weight: 500; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 10px 14px; }
+    .footer .row { margin: 0; } .footer .row button { flex: 1; }
+  </style>
+</head>
+<body>
+  <h2 id="title">📥 Your Lists</h2>
+  <div class="muted" id="subtitle">Set up one list: what each column is, what to keep, and who each row is.</div>
+
+  <div id="loading" class="status"><div class="spinner"></div><div id="loadingText">Loading…</div></div>
+  <div id="errorBox" class="error hidden"></div>
+
+  <!-- WAITING FOR THE PASTE -->
+  <div id="pasteView" class="hidden">
+    <div class="card yellow">
+      <ol>
+        <li>The tab <b id="pasteTab"></b> is ready (it's the one showing).</li>
+        <li>Open your list, press <kbd>Ctrl</kbd>+<kbd>A</kbd> (Mac: <kbd>⌘</kbd>+<kbd>A</kbd>) and copy it, headers too.</li>
+        <li>Click the <b>yellow box (A4)</b> on that tab and paste values only: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.</li>
+      </ol>
+      <div class="muted" style="margin-top:6px">Title rows above the headers are fine; the tool finds the header row itself.</div>
+    </div>
+    <div class="status"><div class="spinner"></div><div>Waiting for your paste…</div></div>
+  </div>
+
+  <!-- SETUP -->
+  <div id="setupView" class="hidden">
+    <div class="steps"><span id="st1">1 Columns</span><i>→</i><span id="st2">2 Variables</span><i>→</i><span id="st3">3 Match</span></div>
+
+    <div id="step1">
+      <div id="keptNote" class="ok hidden">Same columns as last time, so your setup was kept. Check it, then go on.</div>
+      <label class="f">List name</label>
+      <input type="text" id="listName" maxlength="60">
+      <div class="muted" id="tabHint"></div>
+      <label class="f">Header row</label>
+      <div class="card green" style="margin:0"><b>✓ Row <span id="headerRow"></span></b> — <span id="headerCells"></span>
+        <div class="muted" id="titleHint"></div></div>
+      <label class="f">Each row is a…</label>
+      <div class="seg"><button id="byStudent" onclick="setBy('student')">👦 Student</button><button id="byGuardian" onclick="setBy('guardian')">👪 Guardian</button></div>
+      <div class="muted" id="byHint" style="margin-top:4px"></div>
+      <label class="f">Who is each row?</label>
+      <div class="map" id="roleMap"></div>
+      <label class="f">Other columns</label>
+      <div id="otherCols"></div>
+      <div class="muted">Next step: choose what to keep from these.</div>
+    </div>
+
+    <div id="step2" class="hidden">
+      <label class="f" style="margin-top:4px">What do you want to keep?</label>
+      <div id="varCards"></div>
+      <div class="muted" style="margin-top:6px">Everyone on the list gets it. Lines go on the phone contact under <b>Additional Information</b>, above Communications; Combined Contact Tracking doesn't change.</div>
+      <div class="warnbox">⚠️ Anything shown goes into the guardian's Google Contact (phone). Keep private lists (IEP, housing…) off.</div>
+    </div>
+
+    <div id="step3" class="hidden">
+      <div id="matchBox"></div>
+    </div>
+  </div>
+
+  <!-- SAVED -->
+  <div id="doneView" class="hidden">
+    <div class="ok" id="doneText"></div>
+    <div class="muted" id="doneHint"></div>
+    <div class="row hidden" id="doneBackRow"><button class="primary" onclick="leave()">← Back to Input Data Mode</button></div>
+    <div class="row hidden" id="buildRow"><button class="primary" onclick="buildNow()">🏗️ Build Sheets Now</button></div>
+  </div>
+
+  <div class="footer">
+    <div class="row">
+      <button id="backBtn" onclick="back()">← Back</button>
+      <button id="nextBtn" class="primary" onclick="next()">Next →</button>
+    </div>
+    <div class="row" style="margin-top:6px" id="leaveRow"><a id="leaveLink" onclick="leave()" style="font-size:12px">← Back to Input Data Mode</a></div>
+  </div>
+
+<script>
+  var view = null;        // last setup view from the server
+  var step = 1;           // 1 Columns, 2 Variables, 3 Match
+  var setup = null;       // { by, roles, vars } being edited
+  var match = null;       // last match preview
+  var decisions = {};     // row index -> target | "skip"
+  var openPicker = {};    // row index -> true while "pick someone else" is open
+  var pollTimer = null, busy = false;
+
+  function $(id) { return document.getElementById(id); }
+  function show(id, on) { $(id).classList.toggle('hidden', !on); }
+  function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function colName(c) { var col = (view.columns || [])[c - 1]; return col ? 'Column ' + col.letter + ' “' + col.header + '”' : ''; }
+
+  function loading(text) { busy = true; $('loadingText').textContent = text; show('loading', true); show('errorBox', false); setButtons(false); }
+  function setButtons(on) { ['backBtn', 'nextBtn'].forEach(function (id) { $(id).disabled = !on; }); }
+  function fail(e) {
+    busy = false; show('loading', false); setButtons(true);
+    $('errorBox').innerHTML = '❌ ' + esc(e && e.message ? e.message : e); show('errorBox', true);
+  }
+  function run(fn, arg, ok) {
+    var r = google.script.run.withSuccessHandler(function (v) {
+      busy = false; show('loading', false); setButtons(true);
+      if (v && v.error) { $('errorBox').innerHTML = esc(v.error); show('errorBox', true); if (v.phase) ok(v); return; }
+      ok(v);
+    }).withFailureHandler(fail);
+    if (arg === undefined) r[fn](); else r[fn](arg);
+  }
+
+  // ---------- paste ----------
+  function showPaste(v) {
+    view = v;
+    $('title').textContent = '📥 ' + v.list.name;
+    $('pasteTab').textContent = '“' + v.list.tabName + '”';
+    show('pasteView', true); show('setupView', false); show('doneView', false); show('leaveRow', true);
+    show('backBtn', false); show('nextBtn', false);
+    stopPoll(); pollTimer = setTimeout(poll, 2000);
+  }
+  function stopPoll() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+  function poll() {
+    pollTimer = null;
+    google.script.run.withSuccessHandler(function (r) {
+      if (r && r.error) { fail(r.error); return; }
+      if (r && r.pasted) { loading('✅ Found your list. Reading it…'); run('od_readPaste', undefined, route); return; }
+      pollTimer = setTimeout(poll, 2000);
+    }).withFailureHandler(function () { pollTimer = setTimeout(poll, 4000); }).od_wizardCheck();
+  }
+
+  function route(v) {
+    if (!v) return;
+    if (v.phase === 'paste') return showPaste(v);
+    if (v.phase === 'setup') return showSetup(v);
+    if (v.phase === 'match') return showMatch(v);
+    if (v.phase === 'done') return showDone(v);
+  }
+
+  // ---------- step 1: columns ----------
+  function showSetup(v) {
+    stopPoll();
+    view = v;
+    setup = { by: v.by, roles: JSON.parse(JSON.stringify(v.roles || {})), vars: JSON.parse(JSON.stringify(v.vars || [])) };
+    decisions = {}; openPicker = {}; match = null;
+    $('title').textContent = '📥 ' + v.list.name;
+    $('listName').value = v.list.name;
+    $('tabHint').textContent = 'Tab: ' + v.list.tabName + ' · ' + v.rowCount + ' row(s)';
+    $('headerRow').textContent = v.headerRow;
+    $('headerCells').textContent = v.columns.map(function (c) { return c.header; }).join(' · ');
+    $('titleHint').textContent = v.list.title ? 'Title rows above it were left out: “' + v.list.title + '”' : '';
+    show('keptNote', !!v.kept);
+    show('pasteView', false); show('setupView', true); show('doneView', false); show('leaveRow', true);
+    goStep(1);
+  }
+
+  function setBy(by) { setup.by = by; renderStep1(); }
+
+  function optionList(selected, allowTwo) {
+    var html = '<option value="0">— Not in this list —</option>';
+    view.columns.forEach(function (c) { html += '<option value="' + c.col + '"' + (Number(selected) === c.col ? ' selected' : '') + '>' + esc(colName(c.col)) + '</option>'; });
+    if (allowTwo) html += '<option value="two"' + (selected === 'two' ? ' selected' : '') + '>Two columns (first + last name)…</option>';
+    return html;
+  }
+
+  function renderStep1() {
+    $('byStudent').classList.toggle('on', setup.by === 'student');
+    $('byGuardian').classList.toggle('on', setup.by === 'guardian');
+    $('byHint').innerHTML = setup.by === 'student'
+      ? 'Each row is one student. The values go on that student (and their guardians\' phone contacts) and become Student List columns.'
+      : 'Each row is one guardian. The values go on every child of that guardian (siblings too) and become Parents Divided columns.';
+    var r = setup.roles, html = '';
+    var simple = function (key, label, hint) {
+      html += '<span class="k">' + label + '</span><select onchange="setRole(\'' + key + '\', this.value)">' + optionList(r[key] || 0, false) + '</select>';
+      if (hint) html += '<div class="why ' + (hint.ok ? 'ok' : '') + '">' + hint.text + '</div>';
+    };
+    var name = function (key, label) {
+      var v = r[key];
+      var two = !!v && (v.first !== undefined || v.last !== undefined); // "Two columns" picked (parts may still be 0)
+      html += '<span class="k">' + label + '</span><select onchange="setNameRole(\'' + key + '\', this.value)">' + optionList(two ? 'two' : (v && v.col) || 0, true) + '</select>';
+      if (two) {
+        html += '<span class="k" style="font-weight:400;font-size:11.5px;color:#64748B">first / last</span><div class="two"><select onchange="setNamePart(\'' + key + '\',\'first\',this.value)">' + optionList(v.first || 0, false) + '</select>' +
+          '<select onchange="setNamePart(\'' + key + '\',\'last\',this.value)">' + optionList(v.last || 0, false) + '</select></div>';
+      } else if (v && v.col) {
+        var c = view.columns[v.col - 1];
+        if (c && c.hint.comma) html += '<div class="why ok">✓ “LAST, FIRST” is fine</div>';
+      }
+    };
+    var osisCol = r.osis ? view.columns[r.osis - 1] : null;
+    simple('osis', 'OSIS', osisCol && osisCol.hint.n ? { ok: osisCol.hint.osisKnown > 0, text: (osisCol.hint.osisKnown > 0 ? '✓ ' : '') + osisCol.hint.osisKnown + ' of ' + osisCol.hint.n + ' filled cells are OSIS in your Student List' } : null);
+    name('student', 'Student name');
+    name('guardian', 'Guardian name');
+    simple('phone', 'Phone', r.phone ? { text: 'Used to match rows that have no OSIS' } : null);
+    simple('email', 'Email', null);
+    simple('class', 'Class', null);
+    $('roleMap').innerHTML = html;
+    var used = roleCols();
+    var others = view.columns.filter(function (c) { return used.indexOf(c.col) === -1; });
+    $('otherCols').innerHTML = others.length ? others.map(function (c) { return '<span class="chip">' + esc(c.letter + ' “' + c.header + '”') + '</span>'; }).join('')
+      : '<span class="muted">None: every column is used to find who the row is.</span>';
+  }
+  function setRole(key, value) { setup.roles[key] = Number(value) || 0; syncVars(); renderStep1(); }
+  function setNameRole(key, value) {
+    if (value === 'two') setup.roles[key] = { first: 0, last: 0 };
+    else setup.roles[key] = Number(value) ? { col: Number(value) } : null;
+    syncVars(); renderStep1();
+  }
+  function setNamePart(key, part, value) { setup.roles[key][part] = Number(value) || 0; syncVars(); renderStep1(); }
+  function roleCols() {
+    var r = setup.roles, cols = [];
+    ['osis', 'phone', 'email', 'class'].forEach(function (k) { if (r[k]) cols.push(Number(r[k])); });
+    ['student', 'guardian'].forEach(function (k) { var v = r[k]; if (!v) return; ['col', 'first', 'last'].forEach(function (x) { if (v[x]) cols.push(Number(v[x])); }); });
+    return cols;
+  }
+  /** Variables = columns not used to find who the row is (their settings are kept when a role changes). */
+  function syncVars() {
+    var used = roleCols(), byCol = {};
+    setup.vars.forEach(function (v) { byCol[v.col] = v; });
+    setup.vars = view.columns.filter(function (c) { return used.indexOf(c.col) === -1; }).map(function (c) {
+      return byCol[c.col] || { col: c.col, header: c.header, label: c.header, show: false, column: false, blank: { mode: 'nothing', text: '' }, notOnList: { mode: 'nothing', text: '' } };
+    });
+  }
+
+  // ---------- step 2: variables ----------
+  function renderStep2() {
+    var colWord = setup.by === 'guardian' ? 'Parents Divided' : 'Student List';
+    $('varCards').innerHTML = setup.vars.length ? setup.vars.map(function (v, i) {
+      var c = view.columns[v.col - 1] || { samples: [] };
+      var on = v.show || v.column;
+      var preview = on ? '<div class="preview" id="pv' + i + '">' + previewHtml(v, c) + '</div>' : '';
+      return '<div class="vcard' + (on ? '' : ' off') + '"><div class="vtop">' + esc(c.header) + ' <span class="col">· Column ' + esc(c.letter) + '</span>' +
+        '<label><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleVar(' + i + ', this.checked)"> keep</label></div>' +
+        (on ? '<label class="f">Name</label><input type="text" value="' + esc(v.label) + '" oninput="setVar(' + i + ',\'label\',this.value)">' +
+          '<label class="f">If the cell is blank</label><div class="two"><select onchange="setVarMode(' + i + ',\'blank\',this.value)">' +
+            '<option value="nothing"' + (v.blank.mode !== 'text' ? ' selected' : '') + '>Show nothing</option><option value="text"' + (v.blank.mode === 'text' ? ' selected' : '') + '>Write this</option></select>' +
+            '<input type="text" placeholder="e.g. No bus" value="' + esc(v.blank.text) + '" oninput="setVarText(' + i + ',\'blank\',this.value)"' + (v.blank.mode === 'text' ? '' : ' disabled') + '></div>' +
+          '<label class="f">If ' + (setup.by === 'guardian' ? 'a guardian' : 'a student') + ' isn\'t on the list</label><div class="two"><select onchange="setVarMode(' + i + ',\'notOnList\',this.value)">' +
+            '<option value="nothing"' + (v.notOnList.mode !== 'text' ? ' selected' : '') + '>Show nothing</option><option value="text"' + (v.notOnList.mode === 'text' ? ' selected' : '') + '>Write this</option></select>' +
+            '<input type="text" placeholder="e.g. Not returned" value="' + esc(v.notOnList.text) + '" oninput="setVarText(' + i + ',\'notOnList\',this.value)"' + (v.notOnList.mode === 'text' ? '' : ' disabled') + '></div>' +
+          (v.notOnList.mode === 'text' ? '<div class="muted">That text goes on everyone who isn\'t on this list.</div>' : '') +
+          '<label class="f">Show it in</label>' +
+          '<label class="ck"><input type="checkbox" ' + (v.show ? 'checked' : '') + ' onchange="setVar(' + i + ',\'show\',this.checked)"><span>Additional Information<span class="sub">on the phone contact, above Communications (kept in the Backend tab)</span></span></label>' +
+          '<label class="ck"><input type="checkbox" ' + (v.column ? 'checked' : '') + ' onchange="setVar(' + i + ',\'column\',this.checked)"><span id="cn' + i + '">' + colText(v, c) + '</span></label>' +
+          preview : '<div class="muted">Kept on the list\'s tab only.</div>') + '</div>';
+    }).join('') : '<div class="muted">No other columns: this list only says who is on it. Pick a column on step 1 to keep, or go on to match.</div>';
+  }
+  function previewHtml(v, c) {
+    var name = esc(v.label || c.header), sample = (c.samples || [])[0] || '…';
+    var blank = v.blank.mode === 'text' && v.blank.text, off = v.notOnList.mode === 'text' && v.notOnList.text;
+    return '<div class="who">How it reads</div>' + name + ': ' + esc(sample) +
+      (blank ? '<div class="who" style="margin-top:3px">Blank cell</div>' + name + ': ' + esc(v.blank.text) : '') +
+      (off ? '<div class="who" style="margin-top:3px">Not on the list</div>' + name + ': ' + esc(v.notOnList.text) : '');
+  }
+  function colText(v, c) { return (setup.by === 'guardian' ? 'Parents Divided' : 'Student List') + ' column “' + esc(v.label || c.header) + '”'; }
+  /** Typing only updates the preview and the column name (a full re-render would take the focus away). */
+  function refreshVar(i) {
+    var v = setup.vars[i], c = view.columns[v.col - 1] || { samples: [] };
+    if ($('pv' + i)) $('pv' + i).innerHTML = previewHtml(v, c);
+    if ($('cn' + i)) $('cn' + i).innerHTML = colText(v, c);
+  }
+  function toggleVar(i, on) { var v = setup.vars[i]; v.show = on; v.column = on; renderStep2(); }
+  function setVar(i, key, value) { setup.vars[i][key] = value; if (key === 'label') refreshVar(i); else renderStep2(); }
+  function setVarMode(i, which, mode) { setup.vars[i][which].mode = mode; renderStep2(); }
+  function setVarText(i, which, text) { setup.vars[i][which].text = text; refreshVar(i); }
+
+  // ---------- step 3: match ----------
+  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, decisions: decisions }; }
+  function loadMatch() { loading('Matching every row to the Student List…'); run('od_matchPreview', payload(), function (v) { showMatch(v); }); }
+  function showMatch(v) {
+    match = v; renderMatch();
+  }
+  function decide(i, target) { decisions[i] = target; delete openPicker[i]; renderMatch(); }
+  function undecide(i) { delete decisions[i]; renderMatch(); }
+  function acceptAllGuesses() {
+    match.attention.forEach(function (a) { if (a.status === 'guess' && !decisions[a.i]) decisions[a.i] = a.target; });
+    renderMatch();
+  }
+  function pickOpen(i) { openPicker[i] = true; renderMatch(); var el = $('q' + i); if (el) el.focus(); }
+  function searchPicker(i, q) {
+    var words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    var hits = match.picker.filter(function (p) { var t = (p.text + ' ' + p.sub).toLowerCase(); return words.every(function (w) { return t.indexOf(w) !== -1; }); }).slice(0, 8);
+    $('res' + i).innerHTML = hits.length ? hits.map(function (p) {
+      return '<div onclick="decide(' + i + ',\'' + esc(p.target).replace(/'/g, '\\\'') + '\')"><b>' + esc(p.text) + '</b> <span class="m">· ' + esc(p.sub) + '</span></div>';
+    }).join('') : '<div class="m">No match for “' + esc(q) + '”</div>';
+  }
+  function textFor(target) {
+    var p = match.picker.filter(function (x) { return x.target === target; })[0];
+    return p ? p.text : target;
+  }
+  function renderMatch() {
+    var s = match.stats, decided = 0, guesses = 0;
+    match.attention.forEach(function (a) { if (decisions[a.i]) decided++; else if (a.status === 'guess') guesses++; });
+    var matched = s.matched + match.attention.filter(function (a) { return decisions[a.i] && decisions[a.i] !== 'skip'; }).length;
+    var how = Object.keys(match.how || {}).map(function (k) { return '<span class="chip ok">' + match.how[k] + ' by ' + esc(k.toLowerCase()) + '</span>'; }).join('');
+    var counts = { guess: 0, pick: 0, none: 0 };
+    match.attention.forEach(function (a) { if (!decisions[a.i]) counts[a.status] = (counts[a.status] || 0) + 1; });
+    var html = '<div class="big">' + matched + ' of ' + s.rows + ' <span>rows matched</span></div><div style="margin-top:4px">' + how +
+      (counts.guess ? '<span class="chip warn">' + counts.guess + ' best guess' + (counts.guess > 1 ? 'es' : '') + '</span>' : '') +
+      (counts.pick ? '<span class="chip warn">' + counts.pick + ' to pick</span>' : '') +
+      (counts.none ? '<span class="chip bad">' + counts.none + ' not found</span>' : '') + (s.skipped ? '<span class="chip grey">' + s.skipped + ' skipped</span>' : '') + '</div>';
+    var left = match.attention.length - decided;
+    html += '<label class="f">' + (left ? 'Needs you (' + left + ')' : 'All rows are sorted out ✓') + '</label>';
+    if (guesses) {
+      html += '<div class="bulk"><b>' + guesses + ' best guess' + (guesses > 1 ? 'es' : '') + '</b>' +
+        '<div class="row" style="margin-top:5px"><button class="primary small" onclick="acceptAllGuesses()">✓ Accept all ' + guesses + ' best guess' + (guesses > 1 ? 'es' : '') + '</button></div>' +
+        '<div style="margin-top:6px">⚠️ Best guesses can be wrong (a nickname, two children with the same last name). Check a couple first; any one can be undone. Rows with more than one possible ' + (match.by === 'guardian' ? 'guardian' : 'student') + ' still need you.</div></div>';
+    }
+    match.attention.forEach(function (a) {
+      var d = decisions[a.i];
+      var cls = d ? 'rv done' : (a.status === 'none' ? 'rv bad' : 'rv');
+      html += '<div class="' + cls + '"><div class="top"><b>Row ' + a.row + ' · “' + esc(a.label) + '”</b><span>' + esc(a.sub) + '</span></div>';
+      if (d) {
+        html += '<div class="q">' + (d === 'skip' ? '— Skipped (left out)' : '✓ ' + esc(textFor(d))) + ' <a onclick="undecide(' + a.i + ')">undo</a></div></div>';
+        return;
+      }
+      if (a.status === 'guess') {
+        html += '<div class="q">Best guess: <b>' + esc(a.targetText.text) + '</b>. ' + esc(a.reason) + '.</div>' +
+          '<div class="row" style="margin-top:5px"><button class="primary small" onclick="decide(' + a.i + ',\'' + esc(a.target) + '\')">✓ That\'s right</button>' +
+          '<button class="small" onclick="pickOpen(' + a.i + ')">Pick someone else</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
+      } else if (a.status === 'pick') {
+        html += '<div class="q">' + esc(a.reason) + '. Which one?</div>' + a.options.map(function (o) {
+          return '<div class="opt" onclick="decide(' + a.i + ',\'' + esc(o.target) + '\')">○ <b>' + esc(o.text) + '</b> <span class="m">· ' + esc(o.sub) + '</span></div>';
+        }).join('') + '<div class="row" style="margin-top:5px"><button class="small" onclick="pickOpen(' + a.i + ')">Someone else</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
+      } else {
+        html += '<div class="q">' + esc(a.reason) + '.' + (match.by === 'student' ? ' New and not in ATS yet? Add them with 👤 New / Edit Student and build, then open this list again.' : '') + '</div>' +
+          '<div class="row" style="margin-top:5px"><button class="small soft" onclick="pickOpen(' + a.i + ')">🔍 Pick from the ' + (match.by === 'guardian' ? 'guardians' : 'Student List') + '</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
+      }
+      if (openPicker[a.i]) {
+        html += '<input type="text" id="q' + a.i + '" placeholder="Search OSIS, student or guardian…" oninput="searchPicker(' + a.i + ', this.value)" style="margin-top:6px"><div class="results" id="res' + a.i + '"></div>';
+      }
+      html += '</div>';
+    });
+    html += '<div class="muted" style="margin-top:8px">Your picks are remembered for the next time you paste this list.</div>';
+    $('matchBox').innerHTML = html;
+    match.attention.forEach(function (a) { if (openPicker[a.i] && !decisions[a.i]) searchPicker(a.i, ''); });
+  }
+
+  // ---------- steps / buttons ----------
+  function goStep(n) {
+    step = n;
+    show('step1', n === 1); show('step2', n === 2); show('step3', n === 3);
+    ['st1', 'st2', 'st3'].forEach(function (id, i) { $(id).className = (i + 1 === n) ? 'on' : (i + 1 < n ? 'done' : ''); $(id).textContent = (i + 1 < n ? '✓ ' : (i + 1) + ' ') + ['Columns', 'Variables', 'Match'][i]; });
+    show('backBtn', n > 1); show('nextBtn', true);
+    $('nextBtn').textContent = n === 1 ? 'Next: Variables →' : n === 2 ? 'Next: Match →' : 'Save';
+    if (n === 1) renderStep1();
+    if (n === 2) renderStep2();
+    if (n === 3) loadMatch();
+    window.scrollTo(0, 0);
+  }
+  function next() {
+    if (busy) return;
+    if (step === 1) {
+      var r = setup.roles;
+      var any = r.osis || r.phone || r.email || (r.student && (r.student.col || r.student.first || r.student.last)) || (r.guardian && (r.guardian.col || r.guardian.first || r.guardian.last));
+      if (!any) { $('errorBox').innerHTML = 'Pick at least one column that says who the row is (OSIS, a name, phone or email).'; show('errorBox', true); return; }
+      show('errorBox', false); goStep(2); return;
+    }
+    if (step === 2) { goStep(3); return; }
+    loading('Saving…');
+    run('od_saveList', payload(), function (v) { showDone(v); });
+  }
+  function back() { if (!busy && step > 1) goStep(step - 1); }
+  function showDone(v) {
+    stopPoll();
+    show('pasteView', false); show('setupView', false); show('doneView', true);
+    show('backBtn', false); show('nextBtn', false);
+    var s = v.stats || { matched: 0, rows: 0, review: 0, skipped: 0 };
+    $('title').textContent = '📥 ' + v.list.name;
+    $('doneText').innerHTML = '✅ Saved “' + esc(v.list.name) + '”: ' + s.matched + ' of ' + s.rows + ' rows matched' +
+      (s.skipped ? ', ' + s.skipped + ' skipped' : '') + (s.review ? '. ' + s.review + ' still need you (open the list again any time).' : '.');
+    // During Input Data Mode the build comes at its end (a build now would run with the other tabs hidden)
+    $('doneHint').textContent = v.inputMode
+      ? 'The Student List / Parents Divided columns and the phone contacts get it at the next build: go back, finish Input Data Mode, then build.'
+      : 'Build the sheets so the Student List / Parents Divided columns and the phone contacts get it. Until then only the list\'s tab changed.';
+    show('doneBackRow', !!v.inputMode); show('buildRow', !v.inputMode); show('leaveRow', !v.inputMode);
+    $('leaveLink').textContent = v.inputMode ? '← Back to Input Data Mode' : 'Close';
+  }
+  function leave() {
+    stopPoll();
+    google.script.run.withSuccessHandler(function (r) { if (!r || !r.reopened) google.script.host.close(); }).withFailureHandler(fail).od_backToInputMode();
+  }
+  function buildNow() { stopPoll(); google.script.run.withFailureHandler(fail).od_build(); }
+
+  loading('Loading…');
+  run('od_getWizard', undefined, route);
+</script>
+</body>
+</html>
