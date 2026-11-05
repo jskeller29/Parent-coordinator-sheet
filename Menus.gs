@@ -12,9 +12,32 @@
 // single synchronous call. onOpen's block still fires on genuine reopens.
 var IS_RUNNING_SETUP = false;
 
+// Every tab the ⚙️ Settings "Show these tabs" list can show / hide: setting key,
+// the tab name(s), and whether it is shown by default (owner's pick 2026-11-05:
+// Contact Log, Combined Contact Tracking, PCAR and Directory). A key that was never
+// saved uses its default. The first 4 keys are the old ones (phoneContacts ...
+// sendOut); their saved values carry over. Backend is never listed (always hidden).
+var TAB_VISIBILITY = [
+  { key: 'showContactLog',     sheets: ["Contact Log"],               def: true  },
+  { key: 'showCombined',       sheets: ["Combined Contact Tracking"], def: true  },
+  { key: 'showPcar',           sheets: ["PCAR"],                      def: true  },
+  { key: 'showDirectory',      sheets: ["Directory"],                 def: true  },
+  { key: 'showRawData',        sheets: ["Raw Data", "RAW Data"],      def: false },
+  { key: 'showMasterTable',    sheets: ["Master Table"],              def: false },
+  { key: 'phoneContacts',      sheets: ["Phone Contacts"],            def: false },
+  { key: 'parentsDivided',     sheets: ["Parents Divided"],           def: false },
+  { key: 'notesTab',           sheets: ["Notes"],                     def: false },
+  { key: 'showEvents',         sheets: ["Events"],                    def: false },
+  { key: 'sendOut',            sheets: ["Send Out"],                  def: false },
+  { key: 'showOverrideReport', sheets: ["Students Override Report"],  def: false },
+  { key: 'showNewStudents',    sheets: ["New Students"],              def: false }
+];
+
 // The tabs shown by default. Everything else starts hidden; the user's saved
 // settings reveal the optional tabs later via updateVisualSettings_.
-var DEFAULT_VISIBLE_SHEETS = ["RAW Data", "Raw Data", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory", "New Students"];
+var DEFAULT_VISIBLE_SHEETS = TAB_VISIBILITY
+  .filter(function(t) { return t.def; })
+  .reduce(function(all, t) { return all.concat(t.sheets); }, []);
 
 /** Shows only the default-visible tabs and hides every other sheet. */
 function applyDefaultSheetVisibility_(ss) {
@@ -532,6 +555,8 @@ function openSettingsDialog() {
 // properties do NOT travel when a spreadsheet is copied but cell values do.
 const SETTING_KEYS = [
   'syncToPhones', 'phoneContacts', 'parentsDivided', 'notesTab', 'sendOut',
+  'showContactLog', 'showCombined', 'showPcar', 'showDirectory', 'showRawData',
+  'showMasterTable', 'showEvents', 'showOverrideReport', 'showNewStudents',
   'siteClass', 'typeCol', 'autoOverride', 'autoNotes', 'disableHiddenNotes',
   'ignoreHideCheckboxes', 'emailNotifications', 'disableRebuilds',
   'disableNightlySync', 'disableContactAutofill', 'notesStartDate',
@@ -587,14 +612,8 @@ function loadSettingsFromVersionSheet_() {
 
 function getSettings() {
   const props = PropertiesService.getDocumentProperties();
-  return {
+  const settings = {
     syncToPhones: props.getProperty('syncToPhones') === 'true',
-    
-    // --- CHANGED: Tabs now strictly default to FALSE (Hidden) ---
-    phoneContacts: props.getProperty('phoneContacts') === 'true', 
-    parentsDivided: props.getProperty('parentsDivided') === 'true', 
-    notesTab: props.getProperty('notesTab') === 'true', 
-    sendOut: props.getProperty('sendOut') === 'true', 
     
     // --- CHANGED: Columns now strictly default to FALSE (Hidden) ---
     siteClass: props.getProperty('siteClass') === 'true',
@@ -623,29 +642,38 @@ function getSettings() {
     // Data update reminder pop-up: 'week' (default), '2weeks', 'month', 'off'
     dataReminder: getDataReminderSetting_()
   };
+
+  // --- Tab visibility (TAB_VISIBILITY): saved value, else the tab's default ---
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  settings.tabsPresent = {};
+  TAB_VISIBILITY.forEach(function(t) {
+    const v = props.getProperty(t.key);
+    settings[t.key] = (v === null || v === '') ? t.def : v === 'true';
+    settings.tabsPresent[t.key] = t.sheets.some(function(name) { return !!ss.getSheetByName(name); });
+  });
+  return settings;
 }
 
 function updateVisualSettings_(settings) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // --- Tab Visibility ---
-  const tabMap = {
-    phoneContacts:  "Phone Contacts",
-    parentsDivided: "Parents Divided",
-    sendOut: "Send Out",
-    notesTab: "Notes" 
-  };
-
-  for (const [key, sheetName] of Object.entries(tabMap)) {
-    try {
-      const sheet = ss.getSheetByName(sheetName);
-      if (!sheet) continue;
-      if (settings[key]) sheet.showSheet();
-      else sheet.hideSheet();
-    } catch (e) {
-      console.warn("Could not hide/show sheet: " + sheetName);
-    }
-  }
+  // --- Tab Visibility (every tab in TAB_VISIBILITY; a key left out of the
+  // payload keeps the tab's default). Shown tabs first, so hiding never runs
+  // into "can't hide every sheet" while a tab to show is still hidden. ---
+  const wantShown = function(t) { return (settings[t.key] === undefined) ? t.def : settings[t.key] === true; };
+  const ordered = TAB_VISIBILITY.filter(wantShown).concat(TAB_VISIBILITY.filter(function(t) { return !wantShown(t); }));
+  ordered.forEach(function(t) {
+    t.sheets.forEach(function(sheetName) {
+      try {
+        const sheet = ss.getSheetByName(sheetName);
+        if (!sheet) return;
+        if (wantShown(t)) sheet.showSheet();
+        else sheet.hideSheet();
+      } catch (e) {
+        console.warn("Could not hide/show sheet: " + sheetName);
+      }
+    });
+  });
 
   // --- Contact Log Column Visibility ---
   try {
@@ -793,6 +821,9 @@ function applySettings(settings) {
   props.setProperty('parentsDivided', String(settings.parentsDivided));
   props.setProperty('notesTab', String(settings.notesTab)); 
   props.setProperty('sendOut', String(settings.sendOut));
+  TAB_VISIBILITY.forEach(function(t) {
+    if (settings[t.key] !== undefined) props.setProperty(t.key, String(settings[t.key] === true));
+  });
   props.setProperty('siteClass', String(settings.siteClass));
   props.setProperty('typeCol', String(settings.typeCol));
   props.setProperty('disableRebuilds', String(settings.disableRebuilds));

@@ -41,29 +41,29 @@ const GUIDE_LINKS = {
  * hidden in ⚙️ Settings → Tabs & columns.
  */
 const ZG_TABS = [
-  { name: "Raw Data", alt: "RAW Data", type: "data",
+  { name: "Raw Data", alt: "RAW Data", type: "data", settings: true,
     what: "Where your student data lives: ATS (columns A to AE), Parent Square (AG to AN), NYCSA (AP to BF), and your sites and classes (BH to BI). Row 1 of each part shows when it was last updated. Input Data Mode puts the data in for you." },
-  { name: "Contact Log", type: "type",
+  { name: "Contact Log", type: "type", settings: true,
     what: "Your daily log of every parent contact. Type the parent's name in column C and the student and OSIS fill in, along with the date, the # and the follow-up." },
   { name: "Notes", type: "type", settings: true,
     what: "Notes about a student that you always want to see first. They show at the top of that student's notes in Combined Contact Tracking." },
-  { name: "Events", type: "type",
+  { name: "Events", type: "type", settings: true,
     what: "Attendance for your events and workshops. Make a table with 📆 Events → 📋 New Event, then add the parents who came." },
   { name: "Send Out", type: "type", settings: true,
     what: "Messages and flyers you sent to families and how many you reached. They count toward your PCAR." },
-  { name: "PCAR", type: "report",
+  { name: "PCAR", type: "report", settings: true,
     what: "Your PCAR report, filled in for you from the other tabs. Only H2:I2 are yours to change." },
-  { name: "Master Table", type: "built",
+  { name: "Master Table", type: "built", settings: true,
     what: "One row per student with guardians, siblings, site, class and status. Rebuilt on every build, so don't type here." },
-  { name: "Combined Contact Tracking", type: "built",
+  { name: "Combined Contact Tracking", type: "built", settings: true,
     what: "Every student's notes in one place: Contact Log entries, events and Notes-tab notes, newest first." },
   { name: "Parents Divided", type: "built", settings: true,
     what: "One row per guardian, with contact details and Parents Square / NYCSA sign-up." },
-  { name: "Directory", type: "built",
+  { name: "Directory", type: "built", settings: true,
     what: "Your family directory, from ATS only: each student, OSIS, site, class and how to reach their parents." },
   { name: "Phone Contacts", type: "built", settings: true,
     what: "The contact list your phone sync sends to Google Contacts (⚙️ Settings → Contacts & sync)." },
-  { name: "Students Override Report", type: "built",
+  { name: "Students Override Report", type: "built", settings: true,
     what: "The student changes you made with 👤 Student Overrides." }
 ];
 

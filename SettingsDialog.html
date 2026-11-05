@@ -55,10 +55,19 @@
         <div>
           <div class="eyebrow" style="margin-bottom:10px">Show these tabs</div>
           <div class="grid2">
-            <label class="cbx"><input type="checkbox" id="showPhoneContacts"><span><span class="rt">Phone Contacts</span><span class="help" style="display:block">Every guardian's number</span></span></label>
-            <label class="cbx"><input type="checkbox" id="showParentsDivided"><span><span class="rt">Parents Divided</span><span class="help" style="display:block">One row per guardian</span></span></label>
-            <label class="cbx"><input type="checkbox" id="showNotes"><span><span class="rt">Notes</span><span class="help" style="display:block">Your manual notes tab</span></span></label>
-            <label class="cbx"><input type="checkbox" id="showSendOut"><span><span class="rt">Send Out</span><span class="help" style="display:block">Includes the PCAR rows</span></span></label>
+            <label class="cbx" data-tabrow="showContactLog"><input type="checkbox" data-tab="showContactLog" data-default="true"><span><span class="rt">Contact Log</span><span class="help" style="display:block">Your daily parent contacts</span></span></label>
+            <label class="cbx" data-tabrow="showCombined"><input type="checkbox" data-tab="showCombined" data-default="true"><span><span class="rt">Combined Contact Tracking</span><span class="help" style="display:block">Every student's notes in one place</span></span></label>
+            <label class="cbx" data-tabrow="showPcar"><input type="checkbox" data-tab="showPcar" data-default="true"><span><span class="rt">PCAR</span><span class="help" style="display:block">Your PCAR report</span></span></label>
+            <label class="cbx" data-tabrow="showDirectory"><input type="checkbox" data-tab="showDirectory" data-default="true"><span><span class="rt">Directory</span><span class="help" style="display:block">Your family directory</span></span></label>
+            <label class="cbx" data-tabrow="showRawData"><input type="checkbox" data-tab="showRawData" data-default="false"><span><span class="rt">Raw Data</span><span class="help" style="display:block">ATS, Parent Square, NYCSA, sites</span></span></label>
+            <label class="cbx" data-tabrow="showMasterTable"><input type="checkbox" data-tab="showMasterTable" data-default="false"><span><span class="rt">Master Table</span><span class="help" style="display:block">One row per student</span></span></label>
+            <label class="cbx" data-tabrow="phoneContacts"><input type="checkbox" data-tab="phoneContacts" data-default="false"><span><span class="rt">Phone Contacts</span><span class="help" style="display:block">Every guardian's number</span></span></label>
+            <label class="cbx" data-tabrow="parentsDivided"><input type="checkbox" data-tab="parentsDivided" data-default="false"><span><span class="rt">Parents Divided</span><span class="help" style="display:block">One row per guardian</span></span></label>
+            <label class="cbx" data-tabrow="notesTab"><input type="checkbox" data-tab="notesTab" data-default="false"><span><span class="rt">Notes</span><span class="help" style="display:block">Your manual notes tab</span></span></label>
+            <label class="cbx" data-tabrow="showEvents"><input type="checkbox" data-tab="showEvents" data-default="false"><span><span class="rt">Events</span><span class="help" style="display:block">Event attendance tables</span></span></label>
+            <label class="cbx" data-tabrow="sendOut"><input type="checkbox" data-tab="sendOut" data-default="false"><span><span class="rt">Send Out</span><span class="help" style="display:block">Includes the PCAR rows</span></span></label>
+            <label class="cbx" data-tabrow="showOverrideReport"><input type="checkbox" data-tab="showOverrideReport" data-default="false"><span><span class="rt">Students Override Report</span><span class="help" style="display:block">Your student overrides</span></span></label>
+            <label class="cbx" data-tabrow="showNewStudents"><input type="checkbox" data-tab="showNewStudents" data-default="false"><span><span class="rt">New Students</span><span class="help" style="display:block">Students new to ATS</span></span></label>
           </div>
         </div>
         <div>
@@ -241,15 +250,21 @@
       });
     });
 
+    // The "Show these tabs" checkboxes (one per TAB_VISIBILITY key in Menus.gs)
+    function tabBoxes() { return Array.prototype.slice.call(document.querySelectorAll('input[data-tab]')); }
+
     // ---------- 1. Load the current settings ----------
     if (typeof google !== 'undefined') {
       google.script.run.withSuccessHandler(function(settings) {
         document.getElementById('syncToPhones').checked = settings.syncToPhones;
 
-        document.getElementById('showPhoneContacts').checked = settings.phoneContacts;
-        document.getElementById('showParentsDivided').checked = settings.parentsDivided;
-        document.getElementById('showNotes').checked = settings.notesTab;
-        document.getElementById('showSendOut').checked = settings.sendOut;
+        tabBoxes().forEach(function(box) {
+          var key = box.getAttribute('data-tab');
+          box.checked = settings[key] === true;
+          // A tab this sheet doesn't have (e.g. New Students) is left out of the list
+          var present = !settings.tabsPresent || settings.tabsPresent[key] !== false;
+          document.querySelector('[data-tabrow="' + key + '"]').style.display = present ? '' : 'none';
+        });
 
         document.getElementById('showSiteClass').checked = settings.siteClass;
         document.getElementById('showTypeCol').checked = settings.typeCol;
@@ -288,10 +303,7 @@
         return;
       }
       document.getElementById('syncToPhones').checked = false;
-      document.getElementById('showPhoneContacts').checked = false;
-      document.getElementById('showParentsDivided').checked = false;
-      document.getElementById('showNotes').checked = false;
-      document.getElementById('showSendOut').checked = false;
+      tabBoxes().forEach(function(box) { box.checked = box.getAttribute('data-default') === 'true'; });
       document.getElementById('showSiteClass').checked = false;
       document.getElementById('showTypeCol').checked = false;
       setRebuildMode(false, false);
@@ -345,11 +357,6 @@
       const settings = {
         syncToPhones: document.getElementById('syncToPhones').checked,
 
-        phoneContacts: document.getElementById('showPhoneContacts').checked,
-        parentsDivided: document.getElementById('showParentsDivided').checked,
-        notesTab: document.getElementById('showNotes').checked,
-        sendOut: document.getElementById('showSendOut').checked,
-
         siteClass: document.getElementById('showSiteClass').checked,
         typeCol: document.getElementById('showTypeCol').checked,
 
@@ -364,6 +371,7 @@
         notesStartDate: document.getElementById('notesStartDate').value,
         notesEndDate: document.getElementById('notesEndDate').value
       };
+      tabBoxes().forEach(function(box) { settings[box.getAttribute('data-tab')] = box.checked; });
 
       // Fast-save, then close, then build
       if (typeof google !== 'undefined') {

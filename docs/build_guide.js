@@ -373,7 +373,7 @@ P(h2("The tabs — what each one is for"));
 P(table(
   ["Tab", "Purpose", "Visible by default?"],
   [
-    ["RAW Data", "Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA).", "Yes"],
+    ["RAW Data", "Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA).", "Hidden (show in Settings)"],
     ["Contact Log", "The heart of the tool. Log every guardian contact here (deep dive below).", "Yes"],
     ["Master Table", "The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5.", "Hidden (generated)"],
     ["Directory", "A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included.", "Yes (generated)"],
@@ -427,7 +427,7 @@ P(table(
   ["Setting", "What it controls"],
   [
     ["Sync Contacts to Phones (Nightly)", "Master switch for phone sync. When on, the nightly run pushes the directory into your Google Contacts (and the Full Sync menu item appears)."],
-    ["Show “Phone Contacts” / “Parents Divided” / “Notes” / “Send Out”", "Show or hide each optional tab. All start hidden."],
+    ["Show these tabs", "Show or hide any tab (every tab except Backend). Contact Log, Combined Contact Tracking, PCAR and Directory start shown; the rest start hidden."],
     ["Show Site & Class (Contact Log)", "Shows/hides the Site and Class columns in the Contact Log."],
     ["Show “Type” (Contact Log)", "Shows/hides the Type column in the Contact Log."],
     ["Rebuilds: Manual / Nightly Sync Only", "“Fast entry mode.” Skips the live rebuild after every edit; sheets refresh when you run Build or on the nightly sync. Great for bulk data entry."],

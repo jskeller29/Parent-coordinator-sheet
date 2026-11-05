@@ -166,6 +166,12 @@ New Students (detection: NEW / DISCHARGED STUDENTS section of Build.gs; tab: z_M
 UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's picks, same functions / endpoints / saved values.
 - Every dialog/sidebar uses Styles.html; Tailwind CDN removed; emoji removed inside dialogs and from dialog titles
   (menus, alert/confirm texts and menu paths like "🚀 App Menu" keep theirs). Browser confirm()/alert() kept.
+- Tab visibility (owner's request 2026-11-05): TAB_VISIBILITY (Menus.gs) lists every tab but Backend (key, tab
+  name(s), default). Shown by default: Contact Log, Combined Contact Tracking, PCAR, Directory (DEFAULT_VISIBLE_SHEETS
+  is built from it, used at setup / resets). Old keys phoneContacts / parentsDivided / notesTab / sendOut kept; new keys
+  showContactLog / showCombined / showPcar / showDirectory / showRawData / showMasterTable / showEvents /
+  showOverrideReport / showNewStudents (never saved = default; in SETTING_KEYS). Settings checkboxes use data-tab="key";
+  getSettings().tabsPresent hides rows for tabs the sheet doesn't have (New Students on shared sheets).
 - Settings: 780x580, section list on the left (Contacts & sync / Tabs & columns / Live updates / Notes / Student data).
   "Rebuild sheets" dropdown = disableRebuilds + disableNightlySync (4 combos); notes timing buttons = autoNotes;
   "Fill in Date, # and Follow-up" = !disableContactAutofill; "Contact Log shows" = contactLogTodayOnly; date-range
