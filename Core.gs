@@ -18,14 +18,14 @@ const CL_COL_STUDENT = 6;           // F — Student name
 const CL_COL_TYPE = 12;             // L — Type dropdown
 const CL_COL_DIVIDER_NOTES = 13;    // M — divider line before Notes
 const CL_COL_FILTER_TOGGLE = 15;    // O — master hide-filter checkbox on the end bar row
-const CL_COL_DIVIDER_FOLLOWUP = 15; // O — divider line before Followup Notes
+const CL_COL_DIVIDER_FOLLOWUP = 15; // O — divider line before Additional Notes
 const CL_COL_CHECKBOX = 16;         // P — row checkbox
 
 /**
  * Applies the standard Contact Log data-row formatting:
  * - no borders on the Guardian/Spoke With pair (C:D)
  * - no horizontal borders anywhere (only the dark brown end bar carries one)
- * - divider lines before Notes (M) and Followup Notes (O)
+ * - divider lines before Event Description (M) and Additional Notes (O)
  * - checkboxes planted in P
  */
 function formatContactLogRows_(sheet, startRow, numRows) {

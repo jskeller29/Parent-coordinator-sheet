@@ -443,7 +443,7 @@ function autofillContactLogDefaults_(sheet, row, col, endRow, editedValue) {
 
   // Columns that represent a real interaction being entered:
   // Guardian(3), Person Spoke With(4), OSIS(5), Student(6),
-  // Method 1(10), Method 2(11), Type(12), Notes(13), Follow-up Notes(15).
+  // Method 1(10), Method 2(11), Type(12), Event Description(13), Additional Notes(15).
   const CONTENT_COLS = [3, 4, 5, 6, 10, 11, 12, 13, 15];
   if (CONTENT_COLS.indexOf(col) === -1) return;
 

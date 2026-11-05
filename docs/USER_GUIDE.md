@@ -286,9 +286,9 @@ interaction with them — so you walk into the call with context.
 | 📱🚶 Category | Categorize for PCAR — e.g., Phone, Walk-In, Parent-Teacher. |
 | Method | The exact method — Call, Email, In School, etc. |
 | Type | (Optional) A custom topic dropdown driven by the Backend tab's Type List; can be hidden in Settings. |
-| Notes | Detailed notes about the conversation. |
+| Event Description | Detailed notes about the conversation. |
 | ⁉️ Follow-Up Needed | A visual flag: Yes · Yes – Important · No · Waiting on Someone · Completed. Auto-fills to "No" if blank. |
-| Followup Notes | Next steps or what you did after the initial contact (e.g., "Teacher will reach out"). |
+| Additional Notes | Next steps or what you did after the initial contact (e.g., "Teacher will reach out"). |
 | Hide | Check this box to keep this note out of the compiled notes (Combined Contact Tracking and Phone Contacts). The row stays in the Contact Log and still counts for PCAR. |
 
 Three things the Contact Log does for you automatically:

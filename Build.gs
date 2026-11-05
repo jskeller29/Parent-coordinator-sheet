@@ -1074,7 +1074,7 @@ function rowsByOsis_(rows, col) {
 ========================= */
 
 /**
- * A Contact Log row (B date, D person, J/K method, M notes, O follow-up, P hide)
+ * A Contact Log row (B date, D person, J/K method, M event description, O additional notes, P hide)
  * as { dateObj, text }, or null when the row is hidden (unless hidden notes are
  * included) or has neither notes nor follow-up notes.
  */
@@ -1092,8 +1092,8 @@ function contactLogNoteLine_(row, disableHiddenNotes) {
   const eVal = toText_(row[3]);  // Person Spoke With
   const mVal = toText_(row[9]);  // Method 1
   const nVal = toText_(row[10]); // Method 2
-  const pVal = toText_(row[12]); // Notes
-  const rVal = toText_(row[14]); // Followup Notes
+  const pVal = toText_(row[12]); // Event Description (was "Notes")
+  const rVal = toText_(row[14]); // Additional Notes (was "Followup Notes")
 
   if (pVal === "" && rVal === "") return null;
 
