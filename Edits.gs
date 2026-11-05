@@ -191,7 +191,7 @@ function handleEdit_(e) {
     try {
       // Watch columns: C (Guardian), E (OSIS), F (Student)
       if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
-        // Master Table A5:C + Directory C:E, from a short cache when the
+        // Student List A5:C + Directory C:E, from a short cache when the
         // previous edit already read them (ghostTypistData_)
         const tTypist = Date.now();
         const ghost = ghostTypistData_(e.source, prefetch.ghostRaw);
@@ -217,7 +217,7 @@ function handleEdit_(e) {
 
             if (correctOsis) {
               const osisSet = new Set(String(correctOsis).split(',').map(o => o.trim()).filter(String));
-              // OSIS/Site/Class (Directory C:E), already read with the Master Table
+              // OSIS/Site/Class (Directory C:E), already read with the Student List
               {
                 const dirData = ghost.dir;
                 for (let i = 0; i < dirData.length; i++) {
@@ -243,12 +243,12 @@ function handleEdit_(e) {
             else sheet.getRange(row, CL_COL_OSIS).setValue(correctOsis);                                 // E
             sheet.getRange(row, 8, 1, 2).setValues([[correctSite, correctClass]]);                       // H:I
             // (painted together with the auto-fill below: one flush for both)
-            clDbg_("⏱ ghost typist " + (Date.now() - tTypist) + " ms (Master Table / Directory data " + tLookupData +
+            clDbg_("⏱ ghost typist " + (Date.now() - tTypist) + " ms (Student List / Directory data " + tLookupData +
               " ms" + (prefetch.ghostRaw ? ", cached" : ", read from the tabs") + "): OSIS " + correctOsis + " / " + correctStudent + " / " + correctGuardian);
 
           } else {
-            clDbg_("ghost typist: '" + editedValue + "' not found in the Master Table");
-            e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
+            clDbg_("ghost typist: '" + editedValue + "' not found in the Student List");
+            e.source.toast("Could not find '" + editedValue + "' in the Student List.", "Ghost Typist Failed", 4);
           }
         }
       }
@@ -482,6 +482,7 @@ function restoreSearchBarCommunicationsFormula() {
   const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
   if (!at) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
 
+  getStudentListSheet_(ss); // an older copy's "Master Table" is renamed first (the formula reads 'Student List')
   sheet.getRange(at.row, at.col + 1).clearContent();
   sheet.getRange(at.row, at.col).setFormula(SEARCH_BAR_COMMS_FORMULA);
   ss.toast("Communications is a formula again.", "Search Bar", 5);
@@ -500,7 +501,7 @@ const SEARCH_BAR_COMMS_FORMULA = `=LET(
            oText, TO_TEXT(TRIM(osis)),
            oNum, IFERROR(VALUE(oText), oText),
            
-           name, IFNA(VLOOKUP(oNum, 'Master Table'!A:B, 2, FALSE), IFNA(VLOOKUP(oText, 'Master Table'!A:B, 2, FALSE), "Unknown")),
+           name, IFNA(VLOOKUP(oNum, 'Student List'!A:B, 2, FALSE), IFNA(VLOOKUP(oText, 'Student List'!A:B, 2, FALSE), "Unknown")),
            notes, IFNA(VLOOKUP(oNum, 'Combined Contact Tracking'!A:D, 4, FALSE), IFNA(VLOOKUP(oText, 'Combined Contact Tracking'!A:D, 4, FALSE), "")),
            
            IF(notes="", "", IF(targetF="", notes, "▶ " & name & CHAR(10) & notes))
@@ -550,7 +551,7 @@ var PENDING_OWNER_NOTES_ = null;
 
 // =========================================================
 // GHOST TYPIST DATA CACHE
-// The Contact Log ghost typist needs Master Table A5:C and Directory C:E on
+// The Contact Log ghost typist needs Student List A5:C and Directory C:E on
 // every edit. Only a build writes those tabs, so the first edit reads them and
 // keeps a copy in the document cache for 6 hours; the next edits skip both
 // reads. Every build clears it (clearGhostTypistCache_). Too big for the cache
@@ -568,7 +569,7 @@ function ghostTypistData_(ss, ghostRaw) {
     if (hit) return JSON.parse(hit);
   } catch (err) { console.warn("Ghost typist cache not read: " + err.message); }
 
-  const master = ss.getSheetByName("Master Table");
+  const master = getStudentListSheet_(ss);
   const mLast = master ? master.getLastRow() : 0;
   const dir = ss.getSheetByName("Directory");
   const dLast = dir ? dir.getLastRow() : 0;
@@ -908,12 +909,12 @@ function autofillContactLogDefaults_(sheet, row, col, endRow, editedValue, preRo
 // =========================================================
 
 /**
- * Reads Master Table A5:C ONCE and returns lookup(value, col) for pasted values,
+ * Reads Student List A5:C ONCE and returns lookup(value, col) for pasted values,
  * col 0 = OSIS, 1 = Student, 2 = Guardian. Case/spacing don't matter, and a
  * single OSIS or parent name matches a sibling group / multi-parent cell.
  */
 function buildGhostLookup_(ss) {
-  const master = ss.getSheetByName("Master Table");
+  const master = getStudentListSheet_(ss);
   const last = master ? master.getLastRow() : 0;
   const data = last >= 5 ? master.getRange(5, 1, last - 4, 3).getValues() : [];
   const key = v => String(v).trim().toLowerCase().replace(/\s+/g, " ");
@@ -961,7 +962,7 @@ function toastGhostMisses_(ss, filled, missing) {
     return;
   }
   const shown = missing.slice(0, 5).join(", ") + (missing.length > 5 ? ` (+${missing.length - 5} more)` : "");
-  ss.toast(`Filled ${filled}. Not found in the Master Table: ${shown}`, "Ghost Typist", 8);
+  ss.toast(`Filled ${filled}. Not found in the Student List: ${shown}`, "Ghost Typist", 8);
 }
 
 /** Contact Log: fills Guardian / OSIS / Student / Site / Class for every pasted row. */
@@ -1131,14 +1132,14 @@ function watchNotesSheet_(e) {
   // Assuming Columns are: A (1) = OSIS, B (2) = Guardian(s), C (3) = Student Name
   if (col === 1 || col === 2 || col === 3) {
     const tNotesTypist = Date.now();
-    const masterSheet = e.source.getSheetByName("Master Table");
+    const masterSheet = getStudentListSheet_(e.source);
     if (masterSheet) {
-      // Typed OSIS (A) -> Master Table A, Guardian (B) -> C, Student (C) -> B
+      // Typed OSIS (A) -> Student List A, Guardian (B) -> C, Student (C) -> B
       const found = findInMasterTable_(masterSheet, col === 1 ? 1 : col === 2 ? 3 : 2, editedValue);
       clDbg_("Notes typist lookup " + (Date.now() - tNotesTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
 
       if (found) {
-        // Pull exact data from Master Table
+        // Pull exact data from Student List
         const correctOsis = found.osis;
         const correctStudent = found.student;
         const correctGuardian = found.guardian;
@@ -1185,7 +1186,7 @@ function watchNotesSheet_(e) {
         clDbg_("Notes: notes sync done");
 
       } else {
-        e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
+        e.source.toast("Could not find '" + editedValue + "' in the Student List.", "Ghost Typist Failed", 4);
       }
     }
   }
@@ -1193,7 +1194,7 @@ function watchNotesSheet_(e) {
 
 /**
  * Single-cell ghost typist lookup (Notes and Events): finds a typed value in one
- * Master Table column (1 = OSIS, 2 = Student, 3 = Guardian; row 5 down, whole
+ * Student List column (1 = OSIS, 2 = Student, 3 = Guardian; row 5 down, whole
  * cell, any case) and returns that row's { osis, student, guardian }, or null.
  */
 function findInMasterTable_(masterSheet, masterCol, value) {
@@ -1473,6 +1474,12 @@ function updateCombinedNotesQuickLocked_(osisList, allowRebuild) {
   const nData = sources.nData;
 
   let combinedOsisColumn = null; // Combined Contact Tracking column A (re-read after a rebuild)
+  // Only needed for a student with no Combined row yet (read once, usually from the ghost typist cache)
+  let knownOsis = null;
+  const isKnown = osis => {
+    if (!knownOsis) knownOsis = knownStudentOsis_(ss);
+    return knownOsis.has(normalizeOsis_(osis));
+  };
 
   targets.forEach(targetOsis => {
     const finalNotesList = notesTextForOsis_(targetOsis, contactData, eventData, nData, disableHiddenNotes);
@@ -1497,6 +1504,12 @@ function updateCombinedNotesQuickLocked_(osisList, allowRebuild) {
       }
     }
 
+    // Same rule as the build: a student who isn't on the Student List gets no row (and no rebuild
+    // on every edit, which could never add it)
+    if (!foundInBackend && finalNotesList && !isKnown(targetOsis)) {
+      clDbg_("OSIS " + targetOsis + " is not on the Student List: no Combined row");
+      return;
+    }
     if (!foundInBackend && finalNotesList) missing.push(targetOsis);
     if (!foundInBackend) clDbg_("OSIS " + targetOsis + " has no Combined row" + (!finalNotesList ? " and no notes (nothing to write)" : allowRebuild ? " -> rebuilding Combined + Phone Contacts" : " (added by the owner's update at the end)"));
     if (!foundInBackend && finalNotesList && allowRebuild) {
@@ -1506,6 +1519,18 @@ function updateCombinedNotesQuickLocked_(osisList, allowRebuild) {
     }
   });
   return { texts: texts, missing: missing };
+}
+
+/**
+ * OSIS keys (normalizeOsis_) of every student who may have a Combined Contact
+ * Tracking row: the Student List (the ghost typist's cached copy, so usually no
+ * sheet read) plus, on the owner's sheet, the Old Master Table.
+ */
+function knownStudentOsis_(ss) {
+  const known = knownOsisSet_(ghostTypistData_(ss).master);
+  const owner = getOwnerHooks_();
+  if (owner) owner.oldMasterTableOsis(ss).forEach(o => known.add(o));
+  return known;
 }
 
 /**
@@ -1589,7 +1614,7 @@ function updateContactAndPhoneOnly() {
 }
 
 function getExistingMasterTable_(ss) {
-  const sheet = ss.getSheetByName("Master Table");
+  const sheet = getStudentListSheet_(ss);
   if (!sheet) return [["OSIS", "Student", "Guardian", "Class"]];
 
   const lastRow = sheet.getLastRow();
@@ -1847,7 +1872,7 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   // =======================================================
   // STRICT DROPDOWN MAPPING
   // =======================================================
-  const masterSheet = ss.getSheetByName("Master Table"); 
+  const masterSheet = getStudentListSheet_(ss); 
   if (masterSheet) {
     const osisRule = SpreadsheetApp.newDataValidation().requireValueInRange(masterSheet.getRange("A5:A"), true).build();
     sheet.getRange("A3:A").setDataValidation(osisRule);
@@ -1894,7 +1919,7 @@ function watchEventsSheet_(e) {
   // 1. GHOST TYPIST LOGIC (Runs instantly before anything else)
   const tEventsTypist = Date.now();
   if (row >= 3) {
-    const masterSheet = e.source.getSheetByName("Master Table");
+    const masterSheet = getStudentListSheet_(e.source);
     if (masterSheet) {
       
       // ⚡ CASE A: VERTICAL PASTE (Copying & Pasting a column of OSIS numbers)
@@ -1986,7 +2011,7 @@ function watchEventsSheet_(e) {
                for (let i = 0; i < osisArray.length; i++) {
                  let targetOsis = osisArray[i];
 
-                 // Fast memory sweep of the Master Table
+                 // Fast memory sweep of the Student List
                  const master = findMasterRowByOsis_(masterData, targetOsis);
                  const foundGuardian = master ? master[2] : "";
                  const foundStudent = master ? master[1] : "";
@@ -2013,7 +2038,7 @@ function watchEventsSheet_(e) {
           } 
           // ⚡ ORIGINAL LOGIC: Single typed entry
           else {
-            // Typed OSIS -> Master Table A, Guardian -> C, Student -> B
+            // Typed OSIS -> Student List A, Guardian -> C, Student -> B
             const found = findInMasterTable_(masterSheet, relativeCol === 0 ? 1 : relativeCol === 1 ? 3 : 2, editedValue);
             clDbg_("Events typist lookup " + (Date.now() - tEventsTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
             if (found) {
@@ -2205,7 +2230,7 @@ function watchEventsSheet_(e) {
   updateOsisDeltas_(Array.from(affectedOsisNumbers).filter(Boolean));
 }
 
-/** First Master Table data row (row 5 down) whose OSIS (A) is exactly `osis`, from getDataRange() values. */
+/** First Student List data row (row 5 down) whose OSIS (A) is exactly `osis`, from getDataRange() values. */
 function findMasterRowByOsis_(masterData, osis) {
   for (let r = 4; r < masterData.length; r++) {
     if (String(masterData[r][0]).trim() === osis) return masterData[r];

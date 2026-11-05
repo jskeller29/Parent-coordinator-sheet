@@ -23,7 +23,7 @@ var TAB_VISIBILITY = [
   { key: 'showPcar',           sheets: ["PCAR"],                      def: true  },
   { key: 'showDirectory',      sheets: ["Directory"],                 def: true  },
   { key: 'showRawData',        sheets: ["Raw Data", "RAW Data"],      def: false },
-  { key: 'showMasterTable',    sheets: ["Master Table"],              def: false },
+  { key: 'showMasterTable',    sheets: ["Student List", "Master Table"], def: false }, // was "Master Table" (renamed on first use)
   { key: 'phoneContacts',      sheets: ["Phone Contacts"],            def: false },
   { key: 'parentsDivided',     sheets: ["Parents Divided"],           def: false },
   { key: 'notesTab',           sheets: ["Notes"],                     def: false },
@@ -246,9 +246,9 @@ function buildMenus_() {
   // WHAT SHOWS AFTER SETUP IS COMPLETE:
   // ==============================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const masterSheet = ss.getSheetByName("Master Table");
+  const masterSheet = getStudentListSheet_(ss);
   
-  // Check if the sheets have ACTUALLY been built (Master Table data starts on Row 5)
+  // Check if the sheets have ACTUALLY been built (Student List data starts on Row 5)
   const isBuilt = masterSheet && masterSheet.getLastRow() > 4;
 
  if (!isBuilt) {
@@ -738,9 +738,9 @@ function updateVisualSettings_(settings) {
     console.warn("Could not update PCAR rows.");
   }
 
-  // --- Master Table Filter (Hide Discharged) ---
+  // --- Student List Filter (Hide Discharged) ---
   try {
-    const masterSheet = ss.getSheetByName("Master Table");
+    const masterSheet = getStudentListSheet_(ss);
     if (masterSheet) {
       const range = masterSheet.getDataRange();
       let filter = range.getFilter();
@@ -762,7 +762,7 @@ function updateVisualSettings_(settings) {
       }
     }
   } catch (e) {
-    console.warn("Could not update Master Table filter.");
+    console.warn("Could not update Student List filter.");
   }
 }
 
@@ -793,7 +793,7 @@ function manageNightlyTrigger_(disableSync) {
 // --- PERMANENT PURGE FUNCTION ---
 function purgeDischargedStudents() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const masterSheet = ss.getSheetByName("Master Table");
+  const masterSheet = getStudentListSheet_(ss);
   if (!masterSheet) return false;
   
   const data = masterSheet.getDataRange().getValues();
@@ -872,7 +872,7 @@ function applySettings(settings) {
   // 2b. Persist to the Version tab so a future copy inherits these settings.
   try { saveSettingsToVersionSheet_(); } catch (e) { console.error(e); }
 
-  // 3. Update Visuals & Master Table Filter safely
+  // 3. Update Visuals & Student List Filter safely
   updateVisualSettings_(settings);
   
   // 3b. Contact Log filter window changed: rewrite the Column P rule and refresh the filter
@@ -1034,9 +1034,9 @@ function saveStudentOverrides(payloads) {
 function getAllStudentsForEdit() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName("Raw Data");
-  const masterSheet = ss.getSheetByName("Master Table");
+  const masterSheet = getStudentListSheet_(ss);
 
-  // Dynamically map current Statuses from the Master Table
+  // Dynamically map current Statuses from the Student List
   const statusMap = new Map();
   if (masterSheet) {
     const mData = masterSheet.getDataRange().getValues();

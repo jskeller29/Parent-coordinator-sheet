@@ -1,7 +1,7 @@
 // ======================================================================
 // FILE: z_MINE.gs   (OWNER'S SHEET ONLY — never copy this into another school's sheet)
 // PURPOSE: Everything that only the owner's own sheet does:
-//   • Build: history from "Old Master Table" (Master Table + Directory, which
+//   • Build: history from "Old Master Table" (Student List + Directory, which
 //     takes non-Raw-Data students only when column F Status is "MASTER") and
 //     "Old Phone Contacts" (Directory + Phone Contacts), the last-word name split,
 //     the "New Students" tab
@@ -22,12 +22,13 @@ function ownerHooks_() {
     // --- Build (buildAllDerivedSheets) ---
     readMasterStatusSnapshot: ownerReadMasterStatusSnapshot_,
     adjustMasterTable: injectHistoricalMasterTable_,
+    oldMasterTableOsis: ownerOldMasterTableOsis_, // Combined Contact Tracking keeps these students too
     adjustDirectory: (ss, directory) => injectHistoricalDirectory_(ss, mergeOldPhoneContactsIntoDirectory_(ss, directory)),
     splitFullName: ownerSplitFullName_,
     buildPhoneContactsData: ownerBuildPhoneContactsData_,
     contactLogSiteColumn: 11, // the owner's Contact Log hides/shows K (shared sheets: H)
     logNewStudents: ownerLogNewStudents_, // the "New Students" tab
-    montserratSheets: ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"],
+    montserratSheets: [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"],
 
     // --- Quick update (updateOsisDeltas_) ---
     updateOsisDeltas: ownerUpdateOsisDeltas_,
@@ -212,7 +213,7 @@ function ownerMenuToggleDebug() {
 }
 
 /** Extra guard for the menu: these wipe the sheet, including the Old Master Table / Old Phone Contacts tabs. */
-/** A reset rewrites the Master Table / Directory / Notes without a build: drop the edit caches (Edits.gs). */
+/** A reset rewrites the Student List / Directory / Notes without a build: drop the edit caches (Edits.gs). */
 function ownerClearEditCaches_() {
   try { clearGhostTypistCache_(); clearNotesSourcesCache_(); } catch (e) { console.warn("Edit caches not cleared: " + e.message); }
 }
@@ -269,10 +270,10 @@ function ownerDebugToast_(message, title, seconds) {
 // BUILD: OLD MASTER TABLE / OLD PHONE CONTACTS HISTORY
 // ======================================================================
 
-/** OSIS -> Status from the Master Table before the build rewrites it (Status column found by header). */
+/** OSIS -> Status from the Student List before the build rewrites it (Status column found by header). */
 function ownerReadMasterStatusSnapshot_(ss) {
   const oldMasterStatusMap = new Map();
-  const oldMasterSheetForReport = ss.getSheetByName("Master Table");
+  const oldMasterSheetForReport = getStudentListSheet_(ss);
   if (oldMasterSheetForReport) {
     const oldMasterData = oldMasterSheetForReport.getDataRange().getValues();
     
@@ -302,10 +303,10 @@ function ownerSplitFullName_(fullName) {
 }
 
 /**
- * Helper 1: Injects Historical Master Table into Master Table.
- * CRITICAL FIX: Proactively scans the Master Table array. If any names are "Unknown",
+ * Helper 1: Injects the Old Master Table history into the Student List.
+ * CRITICAL FIX: Proactively scans the Student List array. If any names are "Unknown",
  * or if they are non-ATS ("Discharged"), it aggressively patches the rows with 
- * legacy data so the user never has to delete the Master Table!
+ * legacy data so the user never has to delete the Student List!
  */
 function injectHistoricalMasterTable_(ss, masterTable) {
   const oldSheet = ss.getSheetByName("Old Master Table");
@@ -336,7 +337,7 @@ function injectHistoricalMasterTable_(ss, masterTable) {
   const classCol = h("Class") !== -1 ? h("Class") : (h("Teacher") !== -1 ? h("Teacher") : 4);
   const statusCol = h("Status") !== -1 ? h("Status") : 5;
 
-  // Create a map of existing Master Table rows so we know exactly which row to overwrite
+  // Create a map of existing Student List rows so we know exactly which row to overwrite
   const existingOsisMap = new Map();
   for (let r = 1; r < masterTable.length; r++) {
      existingOsisMap.set(String(masterTable[r][0]).trim(), r);
@@ -394,7 +395,7 @@ function injectHistoricalMasterTable_(ss, masterTable) {
             }
         }
     } else {
-        // Student wasn't in the Master Table at all, append them to the bottom!
+        // Student wasn't in the Student List at all, append them to the bottom!
         masterTable.push([
           osisVal,
           studentName,
@@ -409,6 +410,41 @@ function injectHistoricalMasterTable_(ss, masterTable) {
   }
 
   return masterTable;
+}
+
+/**
+ * Every OSIS on the Old Master Table (normalizeOsis_ keys), found the same way
+ * injectHistoricalMasterTable_ finds them. Combined Contact Tracking only shows
+ * students on the Student List; on this sheet these count as well, even before
+ * the next build has copied them into the Student List.
+ */
+function ownerOldMasterTableOsis_(ss) {
+  const set = new Set();
+  const oldSheet = ss.getSheetByName("Old Master Table");
+  if (!oldSheet) return set;
+
+  const oldData = oldSheet.getDataRange().getValues();
+  let headerIdx = 0;
+  let headers = [];
+  for (let i = 0; i < Math.min(10, oldData.length); i++) {
+    if (String(oldData[i][0]).toUpperCase().includes("OSIS")) {
+      headerIdx = i;
+      headers = oldData[i];
+      break;
+    }
+  }
+  const found = headers.findIndex(col => String(col).trim().toLowerCase().includes("osis"));
+  const osisCol = found !== -1 ? found : 0;
+
+  for (let i = headerIdx + 1; i < oldData.length; i++) {
+    const osisStr = String(oldData[i][osisCol]).trim();
+    if (!osisStr || osisStr === "#N/A") continue;
+    extractOsisTokens_(osisStr).forEach(o => {
+      const key = normalizeOsis_(o);
+      if (key) set.add(key);
+    });
+  }
+  return set;
 }
 
 /**
@@ -502,7 +538,7 @@ function mergeOldPhoneContactsIntoDirectory_(ss, directory) {
 }
 
 /**
- * Helper 2: Injects Historical Master Table into Directory.
+ * Helper 2: Injects the Old Master Table history into the Directory.
  * UPGRADED: Allows all historical non-ATS students to safely port into the Directory.
  */
 function injectHistoricalDirectory_(ss, directory) {
@@ -696,7 +732,7 @@ function ownerSchoolShortName_(rawData) {
  * counts: New/Edit Student and other Directory sources are ignored, and Source
  * is always "ATS".
  *
- * @param {Array[]} masterTable  Fresh Master Table (header row first)
+ * @param {Array[]} masterTable  Fresh Student List (header row first)
  * @param {Object}  changes      Result of detectAtsChanges_
  * @param {Array[]} rawData      Raw Data values (A:AE)
  * @param {Array}   guardianRows Guardian objects (for Language)
@@ -869,7 +905,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
     const psStatus = getParentsSquareStatus_(g, parentSquareIndex);
     const nycsaStatus = getNYCSAStatus_(g, otherGuardian, nycsaIndex); 
 
-    // FALLBACK OVERRIDE: If Master Table gave us "Unknown", use the Raw ATS Data (or the rescued data!)
+    // FALLBACK OVERRIDE: If the Student List gave us "Unknown", use the Raw ATS Data (or the rescued data!)
     let pName = toText_(master[2] || guardianName);
     if (!pName || pName.toLowerCase() === "unknown" || pName === "#N/A") pName = guardianName;
 
@@ -975,7 +1011,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
         let allPhones = old.phones;
         if (allPhones.length === 0) allPhones.push({ val: "", label: "Historical" });
 
-        // Grab student data (From Active raw data or Injected Master Table)
+        // Grab student data (From Active raw data or Injected Student List)
         const sOsisStr = String(oldOsis).trim();
         const activeStudent = studentMap.get(sOsisStr);
         const isActive = !!activeStudent && !!activeStudent.student; 
@@ -1151,7 +1187,7 @@ function ownerUpdateOsisDeltas_(osisList, opts) {
     
     const masterTableData = getExistingMasterTable_(ss);
 
-    clDbg_("owner update: Raw Data / overrides / Master Table read");
+    clDbg_("owner update: Raw Data / overrides / Student List read");
 
     if (!phoneOnly) {
       // ✨ THE FIX: Fetch the Contact Log and Event Log data here so the builder doesn't crash!

@@ -53,7 +53,7 @@ const ZG_TABS = [
     what: "Messages and flyers you sent to families and how many you reached. They count toward your PCAR." },
   { name: "PCAR", type: "report", settings: true,
     what: "Your PCAR report, filled in for you from the other tabs. Only H2:I2 are yours to change." },
-  { name: "Master Table", type: "built", settings: true,
+  { name: "Student List", type: "built", settings: true,
     what: "One row per student with guardians, siblings, site, class and status. Rebuilt on every build, so don't type here." },
   { name: "Combined Contact Tracking", type: "built", settings: true,
     what: "Every student's notes in one place: Contact Log entries, events and Notes-tab notes, newest first." },
@@ -236,7 +236,7 @@ function zg_checklist_(ss) {
       links: [{ label: "Video: how to download your data", url: GUIDE_LINKS.downloadDataVideo },
               { label: "Guide: how to download your data", url: GUIDE_LINKS.downloadDataDoc }] },
     { id: "build", title: "Build your sheets", done: zg_isBuilt_(ss),
-      text: "Fills the Master Table, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
+      text: "Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
       buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
       links: [{ label: "Guide: what Build Sheets does", url: GUIDE_LINKS.buildDoc }] },
     { id: "settings", title: "Check your settings", done: props.getProperty('ZG_SETTINGS_SEEN') === 'true',
@@ -268,9 +268,9 @@ function zg_dataStatus_(ss) {
   return { ats: read("A1"), ps: read("AG1"), nycsa: read("AP1"), siteClass: siteClass };
 }
 
-/** Same test the menus use (Master Table data starts on row 5). */
+/** Same test the menus use (Student List data starts on row 5). */
 function zg_isBuilt_(ss) {
-  const m = ss.getSheetByName("Master Table");
+  const m = getStudentListSheet_(ss);
   return !!m && m.getLastRow() > 4;
 }
 

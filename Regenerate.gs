@@ -181,7 +181,7 @@ RESET & HEADER FUNCTIONS
 // New Students, *Families, Transport call, Site Info, ...). Add a name here to keep a tab.
 var KEEP_TABS_ = [
   "Raw Data", "RAW Data", "Contact Log", "Notes", "Events", "PCAR", "Send Out",
-  "Master Table", "Combined Contact Tracking", "Parents Divided", "Directory",
+  "Student List", "Combined Contact Tracking", "Parents Divided", "Directory",
   "Phone Contacts", "Students Override Report", "Backend"
 ];
 
@@ -190,6 +190,8 @@ function deleteLegacySheets_(ss) {
   // First move any old Version / New/Edit Student / Backend_Event_Log / Type List
   // tabs into the Backend tab, so their contents are kept before the old tabs go.
   getBackendSheet_(ss);
+  // An older copy's "Master Table" becomes "Student List" first, so it is kept.
+  getStudentListSheet_(ss);
 
   // Never leave the user standing on a tab that is about to be deleted.
   try {
@@ -876,7 +878,7 @@ function fixContactLogLookupBox_(sheet, endRow) {
 }
 
 function resetMasterTable_(ss) {
-  const sheet = ss.getSheetByName("Master Table");
+  const sheet = getStudentListSheet_(ss);
   if (sheet && sheet.getMaxRows() >= 5) {
     sheet.getRange(5, 1, sheet.getMaxRows() - 4, 9).clearContent();
   }

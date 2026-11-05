@@ -1,7 +1,7 @@
 // ======================================================================
 // FILE: Build.gs
 // PURPOSE: The full rebuild ("Build Sheets"): reads Raw Data once and writes the
-// Master Table, Combined Contact Tracking, Parents Divided, Directory and Phone
+// Student List, Combined Contact Tracking, Parents Divided, Directory and Phone
 // Contacts tabs, plus the build report for the sidebar. (The owner's sheet also
 // keeps a "New Students" tab: see ownerLogNewStudents_ in z_MINE.gs.)
 // ======================================================================
@@ -13,7 +13,7 @@
  */
 const BUILD_STEPS = [
   { label: "Reading your data", detail: "Raw Data (ATS), Contact Log, Events and New/Edit Student overrides" },
-  { label: "Master Table", detail: "One row per student: guardians, siblings, site, class and status" },
+  { label: "Student List", detail: "One row per student: guardians, siblings, site, class and status" },
   { label: "Event Log", detail: "Splitting the Events tab into one row per student" },
   { label: "Combined Contact Tracking", detail: "Every student's dated notes from the Contact Log and Events" },
   { label: "Parents Divided", detail: "One row per guardian with ParentSquare and NYCSA sign-up status" },
@@ -68,7 +68,7 @@ function buildAllDerivedSheets() {
     }
   }
 
-  // OSIS -> Status from the Master Table before it is rewritten (build report; owner's New Students log)
+  // OSIS -> Status from the Student List before it is rewritten (build report; owner's New Students log)
   const oldMasterStatusMap = owner ? owner.readMasterStatusSnapshot(ss) : readMasterStatusSnapshot_(ss);
 
   // --- Step 0: Pre-read the Override Sheet ---
@@ -85,10 +85,15 @@ function buildAllDerivedSheets() {
   const nycsaIndex = buildNYCSAIndex_(rawData);
 
   // --- Step 2: Build and Write Output Sheets ---
-  reportBuildStep_(1); // Master Table
+  reportBuildStep_(1); // Student List
+  // Read the Events tab now (step 2 writes these same rows to the Backend Event
+  // Log), so the Student List's Last Interaction sees today's events too
+  const freshEventData = buildBackendEventLogData_(ss);
   let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   if (owner) masterTable = owner.adjustMasterTable(ss, masterTable); // Old Master Table history
-  writeSheet_(ss, "Master Table", masterTable, 4, 1);
+  masterTable = addLastInteractionColumn_(masterTable, contactLogData, freshEventData);
+  writeSheet_(ss, STUDENT_LIST_SHEET, masterTable, 4, 1);
+  styleLastInteractionHeader_(getStudentListSheet_(ss), masterTable[0]);
 
   // New / discharged students come from Raw Data only (feeds the build report,
   // the owner's nightly email and the owner's "New Students" tab)
@@ -99,8 +104,7 @@ function buildAllDerivedSheets() {
   // ==========================================
   reportBuildStep_(2); // Event Log
   {
-    // 1. Call our updated helper function to scrape and split the Events sheet
-    const freshEventData = buildBackendEventLogData_(ss);
+    // 1. The Events sheet was scraped and split above (freshEventData, step 1)
 
     // 2+3. Replace the Backend tab's Event Log section (clears old/ghost rows;
     // only its own columns, so the other Backend sections are untouched)
@@ -206,13 +210,13 @@ function buildAllDerivedSheets() {
 
   // Set Montserrat font ONCE at the very end instead of inside writeSheet_
   const fontSheets = owner ? owner.montserratSheets
-    : ["Master Table", "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
+    : [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
   fontSheets.forEach(name => {
     const sh = ss.getSheetByName(name);
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
   });
 
-  // The ghost typist's cached Master Table / Directory copy is out of date now
+  // The ghost typist's cached Student List / Directory copy is out of date now
   clearGhostTypistCache_();
   clearNotesSourcesCache_();
 
@@ -653,9 +657,9 @@ function buildSiblingMap_(studentMap, guardianRows) {
 
 /* ========================= MASTER TABLE ========================= */
 /**
- * Compiles the Master Table.
+ * Compiles the Student List.
  * Preserves "Discharged" students by comparing 
- * current raw data with previously generated Master Table data.
+ * current raw data with previously generated Student List data.
  */
 function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
   const out = [[
@@ -675,7 +679,7 @@ function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
   }
   
   const oldMasterMap = new Map();
-  const oldMasterSheet = ss.getSheetByName("Master Table");
+  const oldMasterSheet = getStudentListSheet_(ss);
   
   if (oldMasterSheet) {
     const oldData = oldMasterSheet.getDataRange().getValues();
@@ -931,6 +935,12 @@ function buildCombinedContactTrackingData_(ss, masterTable, contactLogData, even
 
   const startIndex = (masterTable.length > 0 && String(masterTable[0][0]).toUpperCase() === "OSIS") ? 1 : 0;
 
+  // Only students on the Student List get a block; an OSIS that isn't on it (a typo, another
+  // school's student) is left out. The owner's sheet also counts the Old Master Table.
+  const knownOsis = knownOsisSet_(masterTable.slice(startIndex));
+  const owner = getOwnerHooks_();
+  if (owner) owner.oldMasterTableOsis(ss).forEach(o => knownOsis.add(o));
+
   // OSIS -> guardians/student. A sibling-group row ("111, 222" / "Ann X, Ben X") gives each
   // OSIS its own student name when the counts line up, so those rows aren't left blank.
   const masterMap = new Map();
@@ -1009,6 +1019,7 @@ function buildCombinedContactTrackingData_(ss, masterTable, contactLogData, even
   const notesRowsByOsis = rowsByOsis_(usableNotesRows, 0);
 
   for (const osis of osisSet) {
+    if (!knownOsis.has(normalizeOsis_(osis))) continue;
     const combinedInteractions = [];
 
     // --- Process Contact Log ---
@@ -1181,7 +1192,7 @@ function joinNoteLines_(manualNotesText, interactions) {
 /**
  * Sort comparator for rows with a student name in `col`: the first student's
  * last name (a sibling row "Ann X & Ben Y" uses Ann's), then the full name.
- * Used by the Master Table and Combined Contact Tracking.
+ * Used by the Student List and Combined Contact Tracking.
  */
 function byStudentLastName_(col) {
   const extractLastName = (name) => {
@@ -1406,30 +1417,13 @@ function getNYCSAStatus_(currentGuardian, otherGuardian, index) {
 }
 
 /* =========================
-   PARENTS DIVIDED
+   LAST INTERACTION
+   One place that collects the dated interactions of every OSIS: Contact Log
+   rows that aren't hidden (column P) plus Event Log rows, oldest first.
+   Parents Divided picks each guardian's newest one; the Student List picks
+   each student's newest one with anyone.
 ========================= */
-function buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData) {
-  const out = [[
-    "student_id",
-    "Guardian output",
-    "Student",
-    "Class / Site",
-    "relationship",
-    "language",
-    "email",
-    "mobile",
-    "Sibling",
-    "Parents Square",
-    "NYCSA",
-    "Last Interaction"
-  ]];
-
-  const guardiansByStudentId = new Map();
-  for (const g of guardianRows) {
-    if (!guardiansByStudentId.has(g.student_id)) guardiansByStudentId.set(g.student_id, []);
-    guardiansByStudentId.get(g.student_id).push(g);
-  }
-
+function interactionsByOsis_(contactLogData, eventLogData) {
   const allInteractions = [];
 
   for (let i = 1; i < contactLogData.length; i++) {
@@ -1476,6 +1470,79 @@ function buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareInde
       interactionsByOsis.get(osis).push(interaction);
     }
   }
+
+  return interactionsByOsis;
+}
+
+/**
+ * Adds a "Last Interaction" column after the Student List's last column: the
+ * date of the newest interaction with anyone for that student (a sibling-group
+ * row "111, 222" uses the newest of its students), or "None logged". Same date
+ * text and rules as the Parents Divided column, which is per guardian.
+ * Rows are padded to the header width first, so rows added by the owner's
+ * Old Master Table hook line up.
+ */
+function addLastInteractionColumn_(masterTable, contactLogData, eventLogData) {
+  const byOsis = interactionsByOsis_(contactLogData, eventLogData);
+  const width = masterTable[0].length;
+  return masterTable.map((row, i) => {
+    const out = padRow_(row, width);
+    if (i === 0) {
+      out.push("Last Interaction");
+      return out;
+    }
+    let latest = null;
+    new Set(extractOsisTokens_(row[0])).forEach(osis => {
+      const list = byOsis.get(osis);
+      const newest = list && list[list.length - 1];
+      if (newest && (!latest || newest.dateObj > latest.dateObj)) latest = newest;
+    });
+    out.push(latest ? formatDateFull_(latest.dateRaw) : "None logged");
+    return out;
+  });
+}
+
+/** Gives the Last Interaction header (row 4) the look of the Status header next to it. */
+function styleLastInteractionHeader_(sheet, headers) {
+  const statusCol = headers.indexOf("Status") + 1;
+  const lastCol = headers.indexOf("Last Interaction") + 1;
+  if (!sheet || statusCol < 1 || lastCol < 1) return;
+  try {
+    const src = sheet.getRange(4, statusCol);
+    sheet.getRange(4, lastCol)
+      .setBackground(src.getBackground())
+      .setFontColor(src.getFontColor())
+      .setFontWeight(src.getFontWeight())
+      .setHorizontalAlignment(src.getHorizontalAlignment());
+  } catch (e) { console.warn("Last Interaction header not styled: " + e.message); }
+}
+
+/* =========================
+   PARENTS DIVIDED
+========================= */
+function buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData) {
+  const out = [[
+    "student_id",
+    "Guardian output",
+    "Student",
+    "Class / Site",
+    "relationship",
+    "language",
+    "email",
+    "mobile",
+    "Sibling",
+    "Parents Square",
+    "NYCSA",
+    "Last Interaction"
+  ]];
+
+  const guardiansByStudentId = new Map();
+  for (const g of guardianRows) {
+    if (!guardiansByStudentId.has(g.student_id)) guardiansByStudentId.set(g.student_id, []);
+    guardiansByStudentId.get(g.student_id).push(g);
+  }
+
+  const interactionsByOsis = interactionsByOsis_(contactLogData, eventLogData);
 
   for (const g of guardianRows) {
     const student = studentMap.get(g.student_id) || { student: "", classCode: "", site: "" };
@@ -1814,12 +1881,12 @@ function buildTrackingNotesMap_(ss, combinedContactTrackingArray) {
 // ======================================================================
 
 /**
- * Reads the Status of every student in the current Master Table (before it is
+ * Reads the Status of every student in the current Student List (before it is
  * rewritten). Status is found by header, so column shifts don't break it.
  */
 function readMasterStatusSnapshot_(ss) {
   const map = new Map();
-  const sheet = ss.getSheetByName("Master Table");
+  const sheet = getStudentListSheet_(ss);
   if (!sheet) return map;
   const data = sheet.getDataRange().getValues();
   const headerIdx = data.findIndex(r => String(r[0]).trim().toUpperCase() === "OSIS");
@@ -1867,12 +1934,12 @@ function saveAtsSnapshot_(ss, osisSet) {
  * Compares Raw Data (ATS, A:AE) with the previous build. Shared by the build
  * report (sidebar / email) and the owner's New Students tab so they always agree.
  *   newOsis:        in Raw Data now but not at the last build, or back from Discharged
- *   dischargedOsis: "Current" in the old Master Table, in Raw Data at the last
+ *   dischargedOsis: "Current" in the old Student List, in Raw Data at the last
  *                   build, and no longer in Raw Data
  * Call saveAtsSnapshot_(ss, changes.atsOsis) once the build has used them.
  *
- * @param {Array[]} masterTable        Fresh Master Table (header row first)
- * @param {Map}     oldMasterStatusMap OSIS -> Status from the Master Table before this build
+ * @param {Array[]} masterTable        Fresh Student List (header row first)
+ * @param {Map}     oldMasterStatusMap OSIS -> Status from the Student List before this build
  * @param {Array[]} rawData            Raw Data values
  */
 function detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData) {
@@ -1884,7 +1951,7 @@ function detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData) {
   const newOsis = new Set();
   const dischargedOsis = new Set();
 
-  // Previous Raw Data roster. Without a snapshot, fall back to the old Master Table.
+  // Previous Raw Data roster. Without a snapshot, fall back to the old Student List.
   const prevAts = loadAtsSnapshot_(ss);
   // First build has nothing to compare against, so it would list every student
   if (!prevAts && oldMasterStatusMap.size === 0) return { atsOsis, newOsis, dischargedOsis };
@@ -1900,7 +1967,7 @@ function detectAtsChanges_(ss, masterTable, oldMasterStatusMap, rawData) {
       const hadBefore = prevAts ? prevAts.has(osis) : oldMasterStatusMap.has(osis);
       if (!hadBefore || /discharge/i.test(oldStatus)) newOsis.add(osis);
     } else if (/^current$/i.test(oldStatus)) {
-      // Without a snapshot, only count students the Master Table itself now marks Discharged
+      // Without a snapshot, only count students the Student List itself now marks Discharged
       const wasInAts = prevAts ? prevAts.has(osis) : /discharge/i.test(String(m[6]));
       if (wasInAts) dischargedOsis.add(osis);
     }

@@ -1,8 +1,8 @@
 // ======================================================================
 // FILE: Core.gs
 // PURPOSE: Shared foundation used by every other file: the Contact Log column
-// numbers, the hidden Backend tab helpers, the owner hook point, and the small
-// text / phone / OSIS / date helpers.
+// numbers, the Student List tab lookup, the hidden Backend tab helpers, the
+// owner hook point, and the small text / phone / OSIS / date helpers.
 // ======================================================================
 
 // ======================================================================
@@ -48,6 +48,40 @@ function findEndRowInColumnE_(sheet) {
     if (values[i][0].trim().toUpperCase() === "END") return i + 1;
   }
   return null;
+}
+
+// ======================================================================
+// STUDENT LIST TAB (called "Master Table" before Nov 2026)
+// The generated roster: OSIS, Student, Guardian, Site, Class, Sibling, Status,
+// Last Interaction (header on row 4, data from row 5). Every lookup goes
+// through getStudentListSheet_ so an older copy's "Master Table" tab is
+// renamed instead of a second, empty tab being made next to it.
+// The owner's "Old Master Table" is a different tab and keeps its name.
+// (Lists built when the files load - TAB_VISIBILITY, KEEP_TABS_,
+// SHEET_LOCK_BUILT_TABS - spell the name out, so file load order can't matter.)
+// ======================================================================
+var STUDENT_LIST_SHEET = "Student List";
+var LEGACY_STUDENT_LIST_SHEET = "Master Table";
+
+/**
+ * The Student List tab, or null when the sheet has neither name. An old
+ * "Master Table" tab is renamed to "Student List" the first time, so its
+ * Discharged students and statuses carry over to the next build.
+ */
+function getStudentListSheet_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(STUDENT_LIST_SHEET);
+  if (sheet) return sheet;
+
+  const legacy = ss.getSheetByName(LEGACY_STUDENT_LIST_SHEET);
+  if (!legacy) return null;
+  try {
+    legacy.setName(STUDENT_LIST_SHEET);
+  } catch (e) {
+    // e.g. a view-only user opening the sheet; the old tab still works this run
+    console.warn('Could not rename "Master Table" to "Student List": ' + e.message);
+  }
+  return legacy;
 }
 
 /**
@@ -520,6 +554,19 @@ function osisCellIncludes_(cellValue, targetOsis) {
   const target = String(targetOsis == null ? "" : targetOsis).trim();
   if (!target) return false;
   return extractOsisTokens_(cellValue).indexOf(target) !== -1;
+}
+
+/**
+ * Every OSIS in column A of the given Student List rows (a sibling row "111, 222"
+ * counts each one), as normalizeOsis_ keys, so a lost leading zero still matches.
+ */
+function knownOsisSet_(rows) {
+  const set = new Set();
+  rows.forEach(r => extractOsisTokens_(r[0]).forEach(o => {
+    const key = normalizeOsis_(o);
+    if (key) set.add(key);
+  }));
+  return set;
 }
 
 function groupGuardiansByStudent_(guardianRows) {

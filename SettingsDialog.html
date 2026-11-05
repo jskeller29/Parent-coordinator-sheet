@@ -60,7 +60,7 @@
             <label class="cbx" data-tabrow="showPcar"><input type="checkbox" data-tab="showPcar" data-default="true"><span><span class="rt">PCAR</span><span class="help" style="display:block">Your PCAR report</span></span></label>
             <label class="cbx" data-tabrow="showDirectory"><input type="checkbox" data-tab="showDirectory" data-default="true"><span><span class="rt">Directory</span><span class="help" style="display:block">Your family directory</span></span></label>
             <label class="cbx" data-tabrow="showRawData"><input type="checkbox" data-tab="showRawData" data-default="false"><span><span class="rt">Raw Data</span><span class="help" style="display:block">ATS, Parent Square, NYCSA, sites</span></span></label>
-            <label class="cbx" data-tabrow="showMasterTable"><input type="checkbox" data-tab="showMasterTable" data-default="false"><span><span class="rt">Master Table</span><span class="help" style="display:block">One row per student</span></span></label>
+            <label class="cbx" data-tabrow="showMasterTable"><input type="checkbox" data-tab="showMasterTable" data-default="false"><span><span class="rt">Student List</span><span class="help" style="display:block">One row per student</span></span></label>
             <label class="cbx" data-tabrow="phoneContacts"><input type="checkbox" data-tab="phoneContacts" data-default="false"><span><span class="rt">Phone Contacts</span><span class="help" style="display:block">Every guardian's number</span></span></label>
             <label class="cbx" data-tabrow="parentsDivided"><input type="checkbox" data-tab="parentsDivided" data-default="false"><span><span class="rt">Parents Divided</span><span class="help" style="display:block">One row per guardian</span></span></label>
             <label class="cbx" data-tabrow="notesTab"><input type="checkbox" data-tab="notesTab" data-default="false"><span><span class="rt">Notes</span><span class="help" style="display:block">Your manual notes tab</span></span></label>
@@ -80,7 +80,7 @@
       </div>
 
       <div class="set-group" data-sec="updates" hidden>
-        <div class="set-head"><h2>Live updates</h2><p class="help">When the Master Table, Directory and other tabs refresh.</p></div>
+        <div class="set-head"><h2>Live updates</h2><p class="help">When the Student List, Directory and other tabs refresh.</p></div>
         <div class="items">
           <div>
             <label class="lab" for="rebuildMode">Rebuild sheets</label>
@@ -143,7 +143,7 @@
         <div class="set-head"><h2>Student data</h2><p class="help">Reminders to update your data, and students who have left the school.</p></div>
         <div class="items">
           <div class="row">
-            <label class="t" for="hideDischarged"><div class="rt">Hide discharged students in the Master Table</div><div class="help">Only hides the rows. Turn it off to see them again.</div></label>
+            <label class="t" for="hideDischarged"><div class="rt">Hide discharged students in the Student List</div><div class="help">Only hides the rows. Turn it off to see them again.</div></label>
             <label class="sw"><input type="checkbox" id="hideDischarged"><span></span></label>
           </div>
           <div>
@@ -157,7 +157,7 @@
             <div class="help">A pop-up when Student Data, Parent Square or NYCSA hasn't been updated in this long.</div>
           </div>
           <div class="danger">
-            <div class="t"><div class="rt">Purge discharged students</div><div class="help">Permanently deletes non-current students from the Master Table. You can't undo this.</div></div>
+            <div class="t"><div class="rt">Purge discharged students</div><div class="help">Permanently deletes non-current students from the Student List. You can't undo this.</div></div>
             <button type="button" class="btn dgr" id="purgeBtn" onclick="purgeDischarged()">Purge…</button>
           </div>
         </div>
@@ -323,7 +323,7 @@
 
     // ---------- 3. Purge discharged students ----------
     function purgeDischarged() {
-      if (!confirm("⚠️ WARNING: This will permanently delete all 'Discharged' students from your Master Table memory. This action cannot be undone.\n\nAre you sure you want to proceed?")) {
+      if (!confirm("⚠️ WARNING: This will permanently delete all 'Discharged' students from your Student List. This action cannot be undone.\n\nAre you sure you want to proceed?")) {
         return;
       }
       setBusy(true);

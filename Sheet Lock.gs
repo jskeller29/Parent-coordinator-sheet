@@ -11,7 +11,7 @@
 //     everything below it.
 //   - Events: the header row (row 2) of every event table.
 //   - PCAR: everything except H2:I2 ("PUT YOUR OWN INPUT" dates).
-//   - Tabs the build writes (Master Table, Combined Contact Tracking, Parents
+//   - Tabs the build writes (Student List, Combined Contact Tracking, Parents
 //     Divided, Directory, Phone Contacts, Students Override Report, New
 //     Students): the whole tab.
 // Not warned: every place data is typed (Contact Log rows above END, incl.
@@ -31,7 +31,7 @@ var SHEET_LOCK_TAG = "🔒 Sheet Lock";
 var SHEET_LOCK_OFF_KEY = "SHEET_LOCK_OFF";
 
 // Tabs the build writes (whole tab warned)
-var SHEET_LOCK_BUILT_TABS = ["Master Table", "Combined Contact Tracking", "Parents Divided", "Directory",
+var SHEET_LOCK_BUILT_TABS = ["Student List", "Combined Contact Tracking", "Parents Divided", "Directory",
   "Phone Contacts", "Students Override Report", "New Students"];
 // Typed tabs whose row 1 is warned (Contact Log also gets its END bar)
 var SHEET_LOCK_HEADER_TABS = ["Contact Log", "Notes", "Send Out"];

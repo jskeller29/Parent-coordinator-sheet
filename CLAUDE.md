@@ -12,9 +12,9 @@ Branches:
 - Old claude/* session branches are deleted once everything in them is in main.
 
 Files (shared = every school's sheet):
-- Core.gs: Contact Log column constants, findEndRowInColumnE_, Backend tab helpers, owner hook point
-  (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers.
-- Build.gs: buildAllDerivedSheets + everything it builds (Master Table, Combined Contact Tracking, Parents Divided,
+- Core.gs: Contact Log column constants, findEndRowInColumnE_, Student List lookup (getStudentListSheet_), Backend
+  tab helpers, owner hook point (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers.
+- Build.gs: buildAllDerivedSheets + everything it builds (Student List, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts), new / discharged student detection, the notes-line helpers, nightlyMasterSync, build
   sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
   (cache key BUILD_STEP; getSyncStatus returns buildSteps / buildStep with the state).
@@ -27,6 +27,8 @@ Files (shared = every school's sheet):
   (App Menu "🔓 Unlock Sheet" / "🔒 Lock Sheet").
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
   Owner asked to keep it as is (not moved, not cleaned); change it only when the owner asks (e.g. KEEP_TABS_).
+  Student List rename (owner's request): KEEP_TABS_ says "Student List", deleteLegacySheets_ calls
+  getStudentListSheet_ first (an old "Master Table" is renamed, not deleted) and resetMasterTable_ uses it.
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -65,7 +67,7 @@ Files (shared = every school's sheet):
   new-user copies; "📖 Open User Guide" still opens showWelcomeDialog), guideOnOpen_ (checkVersionOnOpen).
   Welcome pop-up after setup: 4 steps, "Start with Input Data Mode" (only if openInputDataMode exists), video / guide
   links. Checklist sidebar: 1 load data (ticks when Raw Data A1 has a real date; also shows Parent Square AG1, NYCSA
-  AP1, Sites and classes BH7:BI7 / INPUT_DATA_MODE_SITECLASS_UPDATED), 2 build (Master Table lastRow > 4, same test as
+  AP1, Sites and classes BH7:BI7 / INPUT_DATA_MODE_SITECLASS_UPDATED), 2 build (Student List lastRow > 4, same test as
   the menus), 3 settings (doc property ZG_SETTINGS_SEEN, set when opened from the checklist), 4 first contact (any
   Contact Log C above END). Opens by itself on every open until all 4 are done, not during Input Data Mode, unless
   unticked (doc property ZG_AUTO_OPEN = "off"). "This tab" panel (zg_activeTab polled every 3 s) + "Hidden tabs" list
@@ -77,7 +79,7 @@ Files (shared = every school's sheet):
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
   Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
-  "Put formula back" (the "Use script" button went with the script-drawn box). "Anonymize" (on by default, cld_report(anon) / cldAnonymizer_): Master Table names ->
+  "Put formula back" (the "Use script" button went with the script-drawn box). "Anonymize" (on by default, cld_report(anon) / cldAnonymizer_): Student List names ->
   Student-N / Guardian-N / Name-N, OSIS -> OSIS-N, phones / emails masked, note texts -> "[N chars, K lines, #hash]"
   (cldNoteSummary_, same text = same hash), Contact Log D -> (filled)/(blank), unknown typed text -> [typed text].
   Recording = shared logger in Core.gs (clDbgStart_ / clDbg_ / clDbgEnd_ / clDbgRun_, wrapped
@@ -89,7 +91,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   which returns those hooks on the owner's sheet and null everywhere else. No shared function is redefined, so file
   load order does not matter. Shared code must work without z_MINE.gs; owner-only behavior (e.g. "Old Master Table" /
   "Old Phone Contacts") goes into a hook in z_MINE.gs, never into the shared files.
-- Hooks: Master Table status snapshot, Old Master Table history (Master Table + Directory), Old Phone Contacts merge,
+- Hooks: Student List status snapshot, Old Master Table history (Student List + Directory), Old Master Table OSIS
+  that Combined Contact Tracking also keeps (oldMasterTableOsis), Old Phone Contacts merge,
   last-word name split (splitFullName_), tall Phone Contacts layout, quick update that also rewrites Phone Contacts,
   contacts sync (4 phones / 3 emails per row, group list without pageSize, no 50% delete check, summary email),
   Contact Log site column K (shared: H), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
@@ -108,7 +111,7 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   loadFakeDataSteps_ throws unless ss is the active spreadsheet. buildMenus_ also adds the owner menus before
   Initial Setup (a copy's setup flag is not copied) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
-  RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Master Table, Combined Contact Tracking, Parents Divided,
+  RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Student List, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts and New
   Students (owner's choice: the owner's next build re-creates it). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
@@ -144,6 +147,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync, Sheet Lock (new); owner sheet also z_MINE.
+  Student List rename (2026-11-05): also Regenerate, SettingsDialog, ProgressSidebar, Z#Guide, Z#ContactLogDebug,
+  Z#InputDataSidebar (they name the tab).
   UI refresh: also add Styles.html (new) and re-paste SettingsDialog, ProgressSidebar, NewStudentDialog,
   ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (re-paste: KEEP_TABS_ tab clean-up, Color Tabs removed), the Z# files
   and the manifest are unchanged. The Contact Log tool is now named
@@ -152,6 +157,24 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   with them.
 - Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
   Input Data Mode.
+
+Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
+- Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
+  time, so its Discharged history carries over. Never getSheetByName("Master Table") directly: writeSheet_ would make
+  a second, empty tab next to it, and a reset would delete a tab missing from KEEP_TABS_. "Old Master Table" (owner
+  only) is a different tab and keeps its name. Function / variable / key names were NOT renamed (buildMasterTableData_,
+  masterTable, findInMasterTable_, Settings key showMasterTable).
+- Lists built when the files load spell the name out (file load order must not matter): TAB_VISIBILITY
+  ["Student List", "Master Table"], KEEP_TABS_, SHEET_LOCK_BUILT_TABS, Z#Guide's tab list, BUILD_STEPS. The search
+  bar formula (SEARCH_BAR_COMMS_FORMULA) reads 'Student List'!A:B; restoreSearchBarCommunicationsFormula renames an old
+  tab first. A tab renamed by hand / by setName keeps its protections, data validations and formula references.
+- Header on row 4, data from row 5: OSIS, Student, Guardian, Site, Class, Sibling, Status, Last Interaction (H).
+  Last Interaction (added 2026-11-05) = date of the newest Contact Log row (not hidden) or event for that student,
+  with anyone (sibling rows: newest of the siblings), else "None logged". interactionsByOsis_ (Build.gs) is shared
+  with Parents Divided's per-guardian Last Interaction (moved word for word). Added after the owner's Old Master Table
+  hook, so every row is padded to the same width. Only a build / nightly updates it (like Parents Divided). The build
+  reads the Events tab once at step 1 (buildBackendEventLogData_) so the column sees today's events; step 2 writes
+  those same rows to the Backend Event Log.
 
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.
@@ -170,9 +193,9 @@ New Students (detection: NEW / DISCHARGED STUDENTS section of Build.gs; tab: z_M
   (snapshot in document properties, tied to the sheet ID) and logs new / re-entered (from Discharged) students
   (Date Entered, Source = always "ATS", OSIS, Student, Guardian, Site, Class, Language).
   New/Edit Student and Old Master Table are ignored. Only appended to; a row is re-dated when the student re-enters.
-- detectAtsChanges_ (shared, runs right after the Master Table) is the single source for new / discharged students:
+- detectAtsChanges_ (shared, runs right after the Student List) is the single source for new / discharged students:
   the owner's New Students tab, the build report
-  (sidebar) and the owner's nightly email all use it. Discharged = "Current" in the old Master Table, in Raw Data at
+  (sidebar) and the owner's nightly email all use it. Discharged = "Current" in the old Student List, in Raw Data at
   the last build, and no longer in Raw Data. The snapshot is saved at the end of the build.
 
 UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's picks, same functions / endpoints / saved values.
@@ -205,7 +228,7 @@ several presses. Don't bring it back without asking.
 - Google "Heads up, are you sure?" warning-only protections (description starts "🔒 Sheet Lock"; scripts are not
   blocked) on: row 1 of Contact Log / Notes / Send Out; Contact Log END bar row (except O, the FILTER? checkbox) and
   everything below it; row 2 (headers) of every Events table (EVENT_TABLE_HEADERS); PCAR except H2:I2; the whole built
-  tabs (Master Table, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report,
+  tabs (Student List, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report,
   New Students). NOT on: Raw Data, Backend, owner-only tabs, Contact Log entry rows (incl. column A, so deleting one
   row never warns), Notes / Send Out rows 2+, Events row 1 and rows 3+.
 - applySheetLocks_ adds/refreshes them (only our tagged ones; unchanged ones kept, stale ones removed; never takes over
@@ -226,7 +249,7 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
   1. contactLogPrefetch_: ONE cache.getAll (remembered END row CL_END_ROW_<sheetId> + ghost typist data). When END is
      <= 60 rows below the edited row, ONE read (edited row .. END, B:N) checks END and gives the auto-fill its row
      values (preRowVals); else a one-cell END check (column E scanned only when END moved).
-  2. Ghost typist from the cache (Master Table A5:C + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
+  2. Ghost typist from the cache (Student List A5:C + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
      skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
      writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
      ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
@@ -264,6 +287,12 @@ Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
   changed (> 25 -> full rebuild), and the next contacts sync updates every contact's notes once.
 - Built in ONE place: contactLogNoteLine_ / eventNoteLine_ / joinNoteLines_ (Build.gs), used by both the full build
   (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_).
+- Only students on the Student List get a Combined Contact Tracking row (2026-11-05, owner's request): an OSIS from
+  the Contact Log / Events / Notes that isn't on it (typo, another school) is left out. knownOsisSet_ (Core.gs)
+  compares normalizeOsis_ keys, so a lost leading zero still matches. The owner's sheet also keeps Old Master Table
+  students (hook oldMasterTableOsis, even before a build copies them into the Student List). The quick write
+  (updateCombinedNotesQuickLocked_) checks only an OSIS that has no Combined row yet (knownStudentOsis_: the ghost
+  typist cache's Student List copy, so usually no sheet read): unknown = no row, not "missing", no rebuild loop.
 - Divider lines (owner's trial, 2026-11-05): in Combined Contact Tracking each dated line has a "───" line above and
   under it (one shared line between two; manual Notes block not wrapped). Length = fixed 36 "─" (noteDivider_,
   NOTE_DIVIDER_LENGTH_; owner's pick 2026-11-05, was column D width / 7px). buildTrackingNotesMap_ strips them
@@ -281,8 +310,8 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
      getDirectoryLabelResourceName_, getGuideLink, runInitialBulkContactSync, showSidebar), always-true typeof
      checks dropped (kept: buildContactLogMenu_ for the optional module, and inside Regenerate.gs / Z#ContactLog.gs).
   2. Done: owner hooks (above); the owner copies of buildAllDerivedSheets and syncToGoogleContacts are gone.
-  3. Done: one notes-line formatter, one last-name sort (Master Table + Combined), one Directory sort, one Contact Log
-     hide filter + week formula, safeStr_ -> toText_, one Notes/Events single-cell Master Table lookup
+  3. Done: one notes-line formatter, one last-name sort (Student List + Combined), one Directory sort, one Contact Log
+     hide filter + week formula, safeStr_ -> toText_, one Notes/Events single-cell Student List lookup
      (findInMasterTable_) and one Events OSIS lookup (findMasterRowByOsis_).
      NOT merged because the versions behave differently (merging would change results): Contact Log single-cell
      typist (in-memory, trims) vs paste lookup (buildGhostLookup_, splits groups) vs TextFinder ones; the 3 Directory
@@ -303,7 +332,7 @@ setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureCh
 CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
 Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
 handlers (installedOnEdit, installedOnChange, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts),
-all sheet names, Backend cells,
+all sheet names (except the owner's Master Table -> Student List rename), Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
 to owner sync?; owner hides Contact Log col K (11) vs shared H (8) when no site (K looks stale); Montserrat on New
@@ -320,5 +349,9 @@ dataReminderChoose. Saving a different choice in Settings clears the wait.
 Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications.
 Bugs noticed (not fixed): quick update ignores the Settings notes date range; nightly trigger 11 PM at setup
 but 2 AM after Settings save; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
-(first student loses Master Table details); EMERGENCY_STOP_SYNC leaves SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS
-needs two clicks first time; repo manifest lacks script.send_mail so the owner email may never send.
+(first student loses Student List details); EMERGENCY_STOP_SYNC leaves SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS
+needs two clicks first time; repo manifest lacks script.send_mail so the owner email may never send;
+purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header, but the Student List header is on
+row 4, so Purge finds no Status column (returned 0 in the offline run) and the filter hides nothing, unless the real
+tab has a header copy on row 1 (check on a copy); generateFakeLegacyData (owner) writes 47 columns into a new
+26-column "Old Phone Contacts" tab, so it fails right after a reset.

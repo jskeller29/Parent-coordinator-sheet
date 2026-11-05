@@ -151,7 +151,7 @@ function cldNoteSummary_(text) {
 }
 
 /**
- * Replaces every student / guardian name (Master Table B / C, whole names and
+ * Replaces every student / guardian name (Student List B / C, whole names and
  * their single words), every OSIS, phone number and email with placeholders.
  * The same name always gets the same placeholder within one report.
  */
@@ -166,7 +166,7 @@ function cldAnonymizer_(ss) {
     seen.set(name.toLowerCase(), ph);
     pairs.push([name, ph]);
   };
-  const master = ss.getSheetByName("Master Table");
+  const master = getStudentListSheet_(ss);
   const last = master ? master.getLastRow() : 0;
   const rows = last >= 5 ? master.getRange(5, 1, last - 4, 3).getDisplayValues() : [];
   const splitNames = v => String(v).split(/,|&|\band\b|\n/i).map(x => x.trim()).filter(Boolean);

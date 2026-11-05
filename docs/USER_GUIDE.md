@@ -66,7 +66,7 @@ It's organized into three kinds of sheets:
   customize your dropdowns.
 - **The Workspaces** — Contact Log and Events, where you'll spend most of your day
   logging calls and workshops.
-- **The Output** — automated sheets like Directory, Master Table, Combined Contact
+- **The Output** — automated sheets like Directory, Student List, Combined Contact
   Tracking, Parents Divided, PCAR, and Phone Contacts. You never type into
   these — they build themselves.
 
@@ -127,7 +127,7 @@ developer any access.
 
 | Permission Google shows | What it's used for | Why it's needed |
 |---|---|---|
-| See, edit, create, and delete all your Google Sheets spreadsheets | Reading your RAW Data and writing the Master Table, Directory, Contact Log, PCAR, and every other tab. | This is the whole engine — without it the tool can't build or update your sheets. |
+| See, edit, create, and delete all your Google Sheets spreadsheets | Reading your RAW Data and writing the Student List, Directory, Contact Log, PCAR, and every other tab. | This is the whole engine — without it the tool can't build or update your sheets. |
 | See, edit, download, and permanently delete your contacts | The optional "School Directory" phone sync that mirrors parent numbers into Google Contacts. | Only used if you turn on phone syncing. If you never enable it, nothing is written to your contacts. |
 | See, edit, create, and delete all of your Google Drive files | Saving the year-end PDF archive to Drive, and opening your old sheet during a migration. | Rollover creates a PDF; migration opens the old spreadsheet you point it at. |
 | Connect to an external service | A read-only check of the shared "Version Tracker" sheet so you're told when a newer template ships. | The only outside call the tool makes. It reads release dates/links — never your data. |
@@ -183,7 +183,7 @@ click **🏗️ Build Sheets Now**.
 **Missing or wrong data? Use the New/Edit Student override.** District databases like
 ATS can lag behind real enrollment. If you need to add a student or fix contact info
 before it hits ATS, use **👤 Student Overrides → New / Edit Student**. When you build,
-your overrides are applied to the Master Table, Combined Contact Tracking, Parents
+your overrides are applied to the Student List, Combined Contact Tracking, Parents
 Divided, Phone Contacts, and the Ghost Typist. The **Directory** tab and the build
 report's new / discharged students always show ATS (RAW Data) only. Overrides also tidy themselves up: a "New Student"
 override is removed once ATS has that student, an edit that ATS now matches exactly is
@@ -197,7 +197,7 @@ conversation-topic categories (for example: Attendance, Behavior, Enrollment, IE
 ### Step 5 — Build the sheets
 
 Run **🚀 App Menu → 🏗️ Build Sheets Only**. A progress sidebar generates every derived
-tab and checks off each step as it goes (reading your data, Master Table, Event Log,
+tab and checks off each step as it goes (reading your data, Student List, Event Log,
 Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, finishing up),
 with a line under each saying what it builds. When it finishes, the sidebar shows a short report — new students, discharged
 students, and families newly signed up for NYCSA or ParentSquare (click a count to see
@@ -206,7 +206,7 @@ press **F5** to refresh.
 
 > ✅ **The golden rule of this sheet:** RAW Data is the only tab you paste into.
 > Everything else is generated — so re-running Build always safely rebuilds it. Never
-> hand-type into Master Table, Directory, or other generated tabs.
+> hand-type into Student List, Directory, or other generated tabs.
 
 ---
 
@@ -255,9 +255,9 @@ automatically in PCAR.
 |---|---|---|
 | **RAW Data** | Your export paste zone — the only tab you paste raw data into (ATS / ParentSquare / NYCSA). | Hidden (show in Settings) |
 | **Contact Log** | The heart of the tool. Log every guardian contact here (deep dive below). | Yes |
-| **Master Table** | The generated master roster: OSIS, student, guardian, status, and more. Data starts on row 5. | Hidden (generated) |
+| **Student List** | The generated roster (called “Master Table” in older copies): OSIS, student, guardian, site, class, siblings, status and the date of the last interaction. Data starts on row 5. | Hidden (generated) |
 | **Directory** | A clean, printable class directory built from your RAW Data (ATS): each student's site, class/teacher, and parents' email and phone. Overrides and discharged students aren't included. | Yes (generated) |
-| **Combined Contact Tracking** | One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting. | Yes (generated) |
+| **Combined Contact Tracking** | One comprehensive history block per student — all notes and event attendances together. Great before an IEP meeting. Only students on the Student List get a block, so notes logged under a mistyped or unknown OSIS don't show here. | Yes (generated) |
 | **PCAR** | Your auto-compiled PCAR numbers (Phone, Walk-In, Workshops, PTCs, totals). | Yes (generated) |
 | **Phone Contacts** | The exact data pushed to Google Contacts. | Hidden (optional) |
 | **Parents Divided** | One row per guardian (with ParentSquare / NYCSA flags). Handy for mail merges. | Hidden (optional) |
@@ -296,7 +296,7 @@ Three things the Contact Log does for you automatically:
 - **Ghost Typist.** Type — or paste a whole column of — OSIS numbers, student names, or
   guardian names, and the other identity columns (plus Site and Class, including for
   siblings) fill in for every row. If it can't match, it warns "Could not find … in the
-  Master Table" (after a paste, it lists the ones it couldn't find).
+  Student List" (after a paste, it lists the ones it couldn't find).
 - **Smart auto-fill.** Entering real content stamps today's Date, sets # to 1, and
   Follow-up to "No" — but only where you left them blank. Anything you typed yourself is
   never overwritten.
@@ -305,7 +305,7 @@ Three things the Contact Log does for you automatically:
   this and last week's rows (or only today's — see Settings), plus anything still marked
   for follow-up.
 
-> **If the Ghost Typist says "Could not find … in the Master Table":** That family isn't
+> **If the Ghost Typist says "Could not find … in the Student List":** That family isn't
 > compiled yet. Run **🏗️ Build Sheets Only** once, then try again.
 
 ### ⚙️ Settings — every toggle explained
@@ -323,8 +323,8 @@ Three things the Contact Log does for you automatically:
 | **Contact Log: Show Today Only** | Off shows this and last week's rows in the Contact Log; on shows only today's. Important notes and open follow-ups always show. |
 | **Date Range for Compiled Notes** | Limits compiled notes to a window (Last Month / 6 Months / Year presets). Blank = all time. |
 | **Disable Hidden Notes (Show All)** | Includes notes you've hidden with the row checkbox in the compiled output. |
-| **Hide "Discharged" in Master Table** | Visual only — filters discharged students out of view. |
-| **Purge Discharged Students** | **Permanently** deletes discharged students from the Master Table. Cannot be undone. |
+| **Hide "Discharged" in Student List** | Visual only — filters discharged students out of view. |
+| **Purge Discharged Students** | **Permanently** deletes discharged students from the Student List. Cannot be undone. |
 | **Reset to Default Settings** | Returns every toggle to its default (optional tabs/columns hidden, features on). |
 
 > ✅ **Settings travel with your copy.** Your choices are saved into the hidden Backend
@@ -334,7 +334,7 @@ Three things the Contact Log does for you automatically:
 
 | Command | What it is |
 |---|---|
-| 🏗️ **Build / Rebuild Data** | An **internal** action. Takes your RAW Data and constructs all the automated sheets (Directory, Master Table, Parents Divided, Phone Contacts, PCAR). It only organizes data inside the spreadsheet. |
+| 🏗️ **Build / Rebuild Data** | An **internal** action. Takes your RAW Data and constructs all the automated sheets (Directory, Student List, Parents Divided, Phone Contacts, PCAR). It only organizes data inside the spreadsheet. |
 | 🧱 **Full Sync with Google Contacts** | An **external** action. Pushes the formatted Phone Contacts tab into your actual Google Contacts via a "School Directory" label — one number per card — so a parent's name, relationship, and student show on caller ID. |
 
 The phone sync runs in "mirror" mode — creating, editing, and removing contacts so the
@@ -470,7 +470,7 @@ does"** in Part 1.
 | The custom menus didn't appear | Wait a few seconds, then press F5. If it's a brand-new copy, run **🚨 Initial Setup** first. |
 | "🔒 Action Blocked" when I type | Setup hasn't been run yet. Click **🚀 App Menu → 🚨 Initial Setup (Run Once)**. |
 | Pasted data looks broken / directory is wrong | Re-paste using **Edit → Paste Special → Values Only**, then run **🏗️ Build Sheets Only**. |
-| Ghost Typist: "Could not find … in the Master Table" | That family isn't compiled yet. Run **🏗️ Build Sheets Only**, then try again. |
+| Ghost Typist: "Could not find … in the Student List" | That family isn't compiled yet. Run **🏗️ Build Sheets Only**, then try again. |
 | "📡 Background Sync in Progress" warning | A rebuild/sync is running. Wait for it to finish before entering new data. |
 | Update checker says I'm up to date but there's a new version | Use **🔔 Check for Updates** (it bypasses the throttle). If still wrong, report a bug. |
 | Phone sync created duplicates / didn't finish | Open Full Sync, use Stop then Restart. The sync mirrors the sheet and cleans up on the next full run. |
@@ -480,7 +480,7 @@ does"** in Part 1.
 
 | ✅ Do | 🚫 Don't |
 |---|---|
-| Paste raw data only into RAW Data — as Values Only. | Type into Master Table, Directory, or other generated tabs — they're overwritten on build. |
+| Paste raw data only into RAW Data — as Values Only. | Type into Student List, Directory, or other generated tabs — they're overwritten on build. |
 | Use Overrides to fix names, phones, or add students. | Rename or delete the generated / hidden tabs (including Backend). |
 | Run Build after big changes. | Hand-edit the hidden Backend tab's saved settings. |
 | Keep your old / retired sheet as a backup until the new one is verified. | Purge discharged students unless you're certain. |
