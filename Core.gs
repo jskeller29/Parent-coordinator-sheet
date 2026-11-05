@@ -243,12 +243,14 @@ function backendRowFor_(i) {
 
 /** Range inside a section: i = row index as in backendReadBlock_, c = 0-based column. */
 function backendBlockRange_(ss, key, i, c, numRows, numCols) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   return sheet.getRange(backendRowFor_(i), BACKEND_BLOCKS[key].col + c, numRows || 1, numCols || 1);
 }
 
 /** Replaces a whole table section (header + rows) starting at row 2. */
 function backendWriteBlock_(ss, key, values) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   backendClearBlock_(ss, key, BACKEND_HEADER_ROW);
@@ -260,6 +262,7 @@ function backendWriteBlock_(ss, key, values) {
 
 /** Clears a section's contents from fromRow down (only its own columns). */
 function backendClearBlock_(ss, key, fromRow) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   const rows = sheet.getMaxRows() - fromRow + 1;
@@ -268,6 +271,7 @@ function backendClearBlock_(ss, key, fromRow) {
 
 /** Appends rows directly under the section's own last row. */
 function backendAppendRows_(ss, key, rows) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   if (!rows || rows.length === 0) return;
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
@@ -283,6 +287,7 @@ function backendAppendRows_(ss, key, rows) {
  * the other sections are untouched. idxs are backendReadBlock_ indices (>= 1).
  */
 function backendDeleteRows_(ss, key, idxs) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   Array.from(new Set(idxs)).filter(i => i >= 1).sort((x, y) => y - x).forEach(i => {
@@ -292,6 +297,7 @@ function backendDeleteRows_(ss, key, idxs) {
 
 /** Sorts a section's data rows. specs: [{col: 0-based, ascending: bool}] */
 function backendSortBlock_(ss, key, specs) {
+  if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   const n = readBlockFromSheet_(sheet, key, false).length - 1;

@@ -55,6 +55,12 @@ function cld_fixFormula() {
   return cld_state();
 }
 
+/** Lets the script draw the box (same as running useCodeForSearchBarCommunications). */
+function cld_useScript() {
+  useCodeForSearchBarCommunications();
+  return cld_state();
+}
+
 /**
  * A snapshot of everything the search bar / notes depend on, with the time each read took.
  * anon: note texts become "[N chars, K lines, #fingerprint]" (same text = same fingerprint);
@@ -83,7 +89,7 @@ function cld_state(anon) {
   add("Update notes as I type (autoNotes)", props.getProperty("autoNotes") === "false" ? "OFF" : "on");
   add("Hidden notes included (disableHiddenNotes)", props.getProperty("disableHiddenNotes") === "true" ? "yes" : "no");
   add("Notes date range", (props.getProperty("notesStartDate") || "-") + " to " + (props.getProperty("notesEndDate") || "-"));
-  add("Communications mode (SEARCH_BAR_COMMS_MODE)", (props.getProperty(SEARCH_BAR_COMMS_PROP) === "formula" ? "formula" : "script draws it") + " (" + (props.getProperty(SEARCH_BAR_COMMS_PROP) || "not set") + ")");
+  add("Communications mode", "the cell decides: formula in the Communications cell = the formula draws it; plain text = the script draws it");
   timed("Triggers (this user)", () => ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction() + ":" + t.getEventType()).join(", ") || "none");
   add("Typist data cached", CacheService.getDocumentCache().get(GHOST_CACHE_KEY_) ? "yes" : "no");
 

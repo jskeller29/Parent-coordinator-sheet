@@ -214,6 +214,7 @@ function buildAllDerivedSheets() {
 
   // The ghost typist's cached Master Table / Directory copy is out of date now
   clearGhostTypistCache_();
+  clearNotesSourcesCache_();
 
   // Contact Log search bar's Communications box (drawn by code, Edits.gs)
   refreshSearchBarCommunications_(ss.getSheetByName("Contact Log"), null, null, true); // Combined was just rebuilt

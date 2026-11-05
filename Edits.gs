@@ -112,6 +112,7 @@ function handleEdit_(e) {
 
   // --- TRIGGER THE EVENTS GHOST TYPIST & BACKEND ---
   if (sheetName === "Events") {
+    clearNotesSourcesCache_();
     watchEventsSheet_(e);
     refreshSearchBarCommunications_(null); // an event's notes show in the search bar too
     return; 
@@ -119,6 +120,7 @@ function handleEdit_(e) {
 
   // --- NEW: TRIGGER THE NOTES GHOST TYPIST ---
   if (sheetName === "Notes") {
+    clearNotesSourcesCache_();
     watchNotesSheet_(e);
     refreshSearchBarCommunications_(null); // Notes-tab notes show in the search bar too
     return; 
@@ -176,6 +178,7 @@ function handleEdit_(e) {
   // Runs FIRST so the auto-filled values land on screen before the
   // cosmetic border/checkbox repair work below.
   // =======================================================
+  let typistOsis = null; // the OSIS the ghost typist wrote (saves re-reading the cell)
   if (range.getNumRows() === 1 && range.getNumColumns() === 1) {
     try {
       // Watch columns: C (Guardian), E (OSIS), F (Student)
@@ -196,6 +199,7 @@ function handleEdit_(e) {
 
           if (match) {
             const correctOsis = match[0];
+            typistOsis = String(correctOsis).trim();
             const correctStudent = match[1];
             const correctGuardian = match[2];
 
@@ -267,7 +271,8 @@ function handleEdit_(e) {
   // row's borders / checkbox / END bar clean-up below can wait.
   let notesDone = false;
   if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
-    const earlyOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
+    // The typist just wrote it (no read); otherwise read the row's OSIS cell
+    const earlyOsis = typistOsis !== null ? typistOsis : String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
     // Never let a notes problem stop the row clean-up below: log it, and the
     // normal sync at the end of the edit tries once more
     clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
@@ -277,22 +282,21 @@ function handleEdit_(e) {
     }
   }
 
-  // --- SEARCH BAR COMMUNICATIONS (only when drawn by code, see the section below) ---
+  // --- SEARCH BAR COMMUNICATIONS ---
   // Right after the ghost typist and the quick notes write: if the search bar
-  // shows a student on the edited row(s), redraw its notes now.
-  if (isSearchBarCodeMode_()) {
+  // shows a student on the edited row(s), redraw its notes now, with the notes
+  // the quick write just worked out (no second read). The cell decides: a
+  // Communications cell that holds the formula is left to the formula.
+  {
     const lastEdited = endRow ? Math.min(row + numRows - 1, endRow - 1) : row + numRows - 1;
     if (lastEdited >= row) {
-      const editedOsis = sheet.getRange(row, CL_COL_OSIS, lastEdited - row + 1, 1).getDisplayValues().map(r => r[0]);
+      const editedOsis = (numRows === 1 && notesDone && LAST_NOTES_TEXTS_)
+        ? Object.keys(LAST_NOTES_TEXTS_)  // already known: no read of the row
+        : sheet.getRange(row, CL_COL_OSIS, lastEdited - row + 1, 1).getDisplayValues().map(r => r[0]);
       // An OSIS typed over / cleared: the student it used to be may be the one shown
       if (col === CL_COL_OSIS && e.oldValue !== undefined) editedOsis.push(String(e.oldValue));
-      // The quick write above just put the fresh notes in Combined: read them
-      // from there (fast) instead of building them from the logs a second time
-      refreshSearchBarCommunications_(sheet, endRow, editedOsis, notesDone);
+      refreshSearchBarCommunications_(sheet, endRow, editedOsis, notesDone, notesDone ? LAST_NOTES_TEXTS_ : null);
     }
-  } else {
-    // Formula mode: if the Communications formula was lost, put it back (checked once, then remembered)
-    ensureSearchBarFormula_(sheet, endRow);
   }
 
   // --- SAFE ROW CEILING ---
@@ -402,15 +406,9 @@ function handleEdit_(e) {
 // =========================================================
 const SEARCH_BAR_COMMS_LABEL = "Communications";
 const SEARCH_BAR_SCAN_ROWS = 15;                        // rows below END searched for the label
-const SEARCH_BAR_COMMS_PROP = "SEARCH_BAR_COMMS_MODE";  // "formula" = the owner's formula; anything else = drawn by the script (default)
-
-/**
- * True when the script draws the box: the default (owner's pick 2026-11-05).
- * restoreSearchBarCommunicationsFormula switches to the formula ("formula").
- */
-function isSearchBarCodeMode_() {
-  return PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) !== "formula";
-}
+// Mode = the cell itself: the Communications cell holding the formula = the
+// formula draws it; plain text = the script draws it. (The old doc property
+// SEARCH_BAR_COMMS_MODE is no longer read.)
 const SHEETS_CELL_LIMIT = 50000;
 
 /**
@@ -443,19 +441,49 @@ function sheetsTrim_(text) {
 }
 
 /**
- * The search bar's box: { row, col, osisBox, showNames }, or null when there is
- * none. Same cells as the old formula, relative to the label: OSIS = 1 row up,
- * 1 column right; the name switch = 2 rows up, 2 columns right.
+ * The search bar's box, read in 2 calls: { row, col, osisBox, showNames,
+ * labelFormula, notesFormula, notesShown }, or null when there is none.
+ * Same cells as the old formula, relative to the label: OSIS = 1 row up,
+ * 1 column right; the name switch = 2 rows up, 2 columns right; the notes =
+ * 1 column right. The label's position (rows below END, column) is remembered
+ * in the document cache, so most edits skip the 15-row search.
  */
 function readSearchBarBox_(sheet, endRow) {
   const skip = (msg) => { clDbg_("search bar skipped: " + msg); console.warn("Search bar: " + msg); return null; };
   if (!endRow) return skip("no END row found in Contact Log column E");
-  const at = findSearchBarComms_(sheet, endRow);
-  if (!at) return skip("no \"Communications\" cell in the " + SEARCH_BAR_SCAN_ROWS + " rows below END");
-  if (at.row - 2 <= endRow) return skip("\"Communications\" is too close to END (row " + at.row + ")");
-  SpreadsheetApp.flush(); // the OSIS box is a formula: let it catch up with the edit first
-  const v = sheet.getRange(at.row - 2, at.col + 1, 2, 2).getDisplayValues();
-  return { row: at.row, col: at.col, osisBox: String(v[1][0]), showNames: String(v[0][1]) !== "" };
+  const cache = CacheService.getDocumentCache();
+  const key = "CL_COMMS_AT_" + sheet.getSheetId();
+  const isLabel = (shown, formula) => String(shown).trim() === SEARCH_BAR_COMMS_LABEL ||
+    String(formula).indexOf('"' + SEARCH_BAR_COMMS_LABEL + '"') !== -1;
+  const readBlock = (at) => {
+    const r = sheet.getRange(at.row - 2, at.col, 3, 3);
+    return { shown: r.getDisplayValues(), formulas: r.getFormulas() };
+  };
+
+  let at = null, block = null;
+  try {
+    const hit = JSON.parse(cache.get(key) || "null");
+    if (hit && hit.d > 2) {
+      const guess = { row: endRow + hit.d, col: hit.col };
+      const b = readBlock(guess);
+      if (isLabel(b.shown[2][0], b.formulas[2][0])) { at = guess; block = b; }
+    }
+  } catch (err) { at = null; }
+  if (!at) {
+    at = findSearchBarComms_(sheet, endRow);
+    if (!at) return skip("no \"Communications\" cell in the " + SEARCH_BAR_SCAN_ROWS + " rows below END");
+    if (at.row - 2 <= endRow) return skip("\"Communications\" is too close to END (row " + at.row + ")");
+    block = readBlock(at);
+    try { cache.put(key, JSON.stringify({ d: at.row - endRow, col: at.col }), 21600); } catch (err) { /* next time it searches */ }
+  }
+  return {
+    row: at.row, col: at.col,
+    osisBox: String(block.shown[1][1]),            // 1 row up, 1 column right
+    showNames: String(block.shown[0][2]) !== "",   // 2 rows up, 2 columns right
+    labelFormula: block.formulas[2][0],
+    notesFormula: block.formulas[2][1],
+    notesShown: String(block.shown[2][1])
+  };
 }
 
 /** The OSIS numbers in an OSIS box / cell ("111, 222" -> ["111", "222"]). */
@@ -486,34 +514,33 @@ function logsNotesReader_(ss, contactSheet, endRow) {
   const disableHiddenNotes = PropertiesService.getDocumentProperties().getProperty('disableHiddenNotes') === 'true';
   // Read each source once (Contact Log only down to the END bar)
   const contactData = contactSheet.getRange(1, 1, endRow, CL_WIDTH).getDisplayValues();
-  const eventData = backendReadBlock_(ss, "EVENT_LOG", true);
-  const notesSheet = ss.getSheetByName("Notes");
-  const nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
-  return osis => notesTextForOsis_(osis, contactData, eventData, nData, disableHiddenNotes);
+  const sources = notesSourcesData_(ss);
+  return osis => notesTextForOsis_(osis, contactData, sources.eventData, sources.nData, disableHiddenNotes);
 }
 
 /**
  * The Communications text for the box (same rules as the old formula).
- * fromCombined: read the notes from Combined Contact Tracking (quickest; used for
- * a search bar lookup) instead of building them from the logs (used right after
- * a Contact Log edit, before the quick update has written Combined).
+ * knownTexts: { osis: notes } already worked out by this edit (the quick notes
+ * write), used first; other students come from Combined (fromCombined) or the logs.
  */
-function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNames, fromCombined) {
+function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNames, fromCombined, knownTexts) {
   if (String(osisBox) === "") return "";
   const osisList = searchBarOsisList_(osisBox);
-  const notesFor = fromCombined ? combinedNotesReader_(ss) : logsNotesReader_(ss, contactSheet, endRow);
+  let reader = null;
+  const notesFor = osis => {
+    if (knownTexts && Object.prototype.hasOwnProperty.call(knownTexts, osis)) return knownTexts[osis];
+    if (!reader) reader = fromCombined ? combinedNotesReader_(ss) : logsNotesReader_(ss, contactSheet, endRow);
+    return reader(osis);
+  };
 
   let names = null;
   if (showNames) {
+    // Master Table OSIS -> Student, from the ghost typist's cached copy when it has one
     names = new Map();
-    const master = ss.getSheetByName("Master Table");
-    const last = master ? master.getLastRow() : 0;
-    if (last >= 5) {
-      master.getRange(5, 1, last - 4, 2).getDisplayValues().forEach(r => {
-        const k = String(r[0]).trim().toLowerCase();
-        if (k && !names.has(k)) names.set(k, r[1]);
-      });
-    }
+    ghostTypistData_(ss).master.forEach(r => {
+      const k = String(r[0]).trim().toLowerCase();
+      if (k && !names.has(k)) names.set(k, r[1]);
+    });
   }
 
   const blocks = [];
@@ -534,20 +561,24 @@ function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNa
 
 /**
  * Redraws the search bar's Communications box. Never throws (it runs inside edits).
+ * THE CELL DECIDES: when the "Communications" cell holds the formula, the
+ * formula draws the box and this does nothing; when it is plain text, this
+ * writes the notes into the cell to its right (owner's pick: no formula).
  * onlyForOsis: optional list of OSIS values; the box is only redrawn when it
  * shows one of them (a Contact Log row edit for another student skips it).
- * fromCombined: true = read the notes from Combined Contact Tracking (a lookup
- * or after a build, when Combined is current); otherwise built from the logs.
+ * fromCombined: read missing notes from Combined Contact Tracking (current
+ * after a lookup / build / the quick notes write); otherwise from the logs.
+ * knownTexts: { osis: notes } this edit already worked out (used first).
  */
-function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombined) {
+function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombined, knownTexts) {
   try {
-    if (!isSearchBarCodeMode_()) { ensureSearchBarFormula_(sheet, endRow); return; } // the formula draws it
     sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
     if (!sheet) return;
     const ss = sheet.getParent();
     endRow = endRow || findEndRowInColumnE_(sheet);
     const box = readSearchBarBox_(sheet, endRow);
     if (!box) return;
+    if (box.labelFormula) { clDbg_("search bar: the Communications cell has the formula, so the formula draws it"); return; }
 
     if (onlyForOsis) {
       const shown = new Set(searchBarOsisList_(box.osisBox));
@@ -558,17 +589,17 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
     // Combined is only current when quick updates are on (Settings "autoNotes")
     const useCombined = fromCombined === true &&
       PropertiesService.getDocumentProperties().getProperty('autoNotes') !== 'false';
-    const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames, useCombined);
-    clDbg_("search bar (code): OSIS box " + JSON.stringify(box.osisBox) + " -> " + text.length + " characters from " + (useCombined ? "Combined" : "the logs"));
+    const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames, useCombined, knownTexts);
+    clDbg_("search bar: OSIS box " + JSON.stringify(box.osisBox) + " -> " + text.length + " characters" +
+      (knownTexts ? " (from this edit's notes)" : useCombined ? " (from Combined)" : " (from the logs)"));
 
-    // Label first (this replaces the old formula, whose spill would block E), then the notes
-    const label = sheet.getRange(box.row, box.col);
-    if (label.getFormula() !== "" || label.getValue() !== SEARCH_BAR_COMMS_LABEL) label.setValue(SEARCH_BAR_COMMS_LABEL);
+    if (box.notesFormula === "" && box.notesShown === text) { clDbg_("search bar: notes already up to date"); return; }
+    // Plain text, so a note is never read as a number / date / formula
     const cell = sheet.getRange(box.row, box.col + 1);
-    if (cell.getNumberFormat() !== "@") cell.setNumberFormat("@"); // plain text: a note is never read as a number / formula
-    if (cell.getFormula() !== "" || cell.getDisplayValue() !== text) { cell.setValue(text); clDbg_("search bar: notes written to " + cell.getA1Notation()); }
-    else clDbg_("search bar: notes already up to date");
+    cell.setNumberFormat("@").setValue(text);
+    clDbg_("search bar: notes written to " + cell.getA1Notation());
   } catch (err) {
+    clDbg_("❌ search bar not updated: " + err.message);
     console.error("Search bar Communications not updated: " + err.message);
   }
 }
@@ -580,9 +611,6 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
 function checkSearchBarCommunications() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const say = (msg) => { ss.toast(msg, "Search Bar check", 15); console.log(msg); };
-  if (!isSearchBarCodeMode_()) {
-    return say("The formula draws Communications (restoreSearchBarCommunicationsFormula was run). Run useCodeForSearchBarCommunications to let the script draw it again.");
-  }
   const sheet = ss.getSheetByName("Contact Log");
   if (!sheet) return say("No Contact Log tab.");
   const endRow = findEndRowInColumnE_(sheet);
@@ -592,38 +620,11 @@ function checkSearchBarCommunications() {
   const box = readSearchBarBox_(sheet, endRow);
   if (!box) return say("\"Communications\" at row " + at.row + " is too close to END (row " + endRow + ").");
   const osisCell = sheet.getRange(box.row - 1, box.col + 1).getA1Notation();
+  if (box.labelFormula) return say("The Communications cell " + sheet.getRange(box.row, box.col).getA1Notation() + " holds the formula, so the formula draws it. Run useCodeForSearchBarCommunications to let the script draw it.");
   if (box.osisBox === "") return say("Found the box at " + sheet.getRange(box.row, box.col).getA1Notation() + ", but the OSIS cell " + osisCell + " is empty.");
   refreshSearchBarCommunications_(sheet, endRow, null, true);
   const out = sheet.getRange(box.row, box.col + 1);
   say("OSIS " + box.osisBox + " (from " + osisCell + ") -> wrote " + String(out.getDisplayValue()).length + " characters into " + out.getA1Notation() + ".");
-}
-
-/**
- * Formula mode (the default): if the Communications cell has lost its formula
- * (e.g. the script drew it as text before), put the formula back ONCE and
- * remember that (SEARCH_BAR_COMMS_MODE = "formula"), so this check never runs
- * again. Never throws.
- */
-function ensureSearchBarFormula_(sheet, endRow) {
-  try {
-    const props = PropertiesService.getDocumentProperties();
-    if (props.getProperty(SEARCH_BAR_COMMS_PROP) === "formula") { clDbg_("search bar: formula mode (the formula updates it)"); return; }
-    sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
-    if (!sheet) return;
-    endRow = endRow || findEndRowInColumnE_(sheet);
-    const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
-    if (!at) { clDbg_("search bar: no Communications cell found below END"); return; }
-    const label = sheet.getRange(at.row, at.col);
-    if (label.getFormula() === "") {
-      sheet.getRange(at.row, at.col + 1).clearContent(); // the formula spills into this cell
-      label.setFormula(SEARCH_BAR_COMMS_FORMULA);
-      clDbg_("search bar: formula was missing at " + label.getA1Notation() + " -> put back");
-    }
-    props.setProperty(SEARCH_BAR_COMMS_PROP, "formula");
-  } catch (err) {
-    clDbg_("❌ search bar formula check failed: " + err.message);
-    console.error("Search bar formula check failed: " + err.message);
-  }
 }
 
 /** Puts the original Communications formula back and stops the script from drawing it. */
@@ -634,7 +635,6 @@ function restoreSearchBarCommunicationsFormula() {
   const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
   if (!at) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
 
-  PropertiesService.getDocumentProperties().setProperty(SEARCH_BAR_COMMS_PROP, "formula");
   sheet.getRange(at.row, at.col + 1).clearContent();
   sheet.getRange(at.row, at.col).setFormula(SEARCH_BAR_COMMS_FORMULA);
   ss.toast("Communications is a formula again.", "Search Bar", 5);
@@ -642,8 +642,13 @@ function restoreSearchBarCommunicationsFormula() {
 
 /** Lets the script draw Communications again (undoes restoreSearchBarCommunicationsFormula). */
 function useCodeForSearchBarCommunications() {
-  PropertiesService.getDocumentProperties().setProperty(SEARCH_BAR_COMMS_PROP, "code");
-  refreshSearchBarCommunications_();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Contact Log");
+  const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
+  const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
+  if (!at) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
+  sheet.getRange(at.row, at.col).setValue(SEARCH_BAR_COMMS_LABEL); // the formula becomes the plain label
+  refreshSearchBarCommunications_(sheet, endRow, null, true);
   SpreadsheetApp.getActiveSpreadsheet().toast("Communications is drawn by the script.", "Search Bar", 5);
 }
 
@@ -693,10 +698,13 @@ function syncNotesForRowOsis_(targetOsis, early) {
   // so the search bar formula updates as soon as possible. On the owner's sheet
   // the heavy update (Combined + Phone Contacts) waits for the end of the edit.
   const owner = getOwnerHooks_();
-  updateCombinedNotesQuick_(osisList, !owner);
+  LAST_NOTES_TEXTS_ = updateCombinedNotesQuick_(osisList, !owner);
   PENDING_OWNER_NOTES_ = owner ? osisList : null;
   return true;
 }
+
+// { osis: notes } the early quick write of this edit worked out (the search bar reuses it)
+var LAST_NOTES_TEXTS_ = null;
 
 // OSIS list whose owner-sheet notes update (Phone Contacts) is still to run at the end of this edit
 var PENDING_OWNER_NOTES_ = null;
@@ -771,6 +779,49 @@ function contactLogPrefetch_(sheet) {
     rememberEndRow_(sheet, endRow);
   }
   return { endRow: endRow, endFromCache: endFromCache, ghostRaw: got[GHOST_CACHE_KEY_] || null };
+}
+
+// =========================================================
+// NOTES SOURCES CACHE
+// A student's notes also need the Backend Event Log and the Notes tab. A
+// Contact Log edit never changes those, but reading them cost ~1.5 s each on a
+// big sheet. So they are kept in the document cache for 10 minutes; any
+// Event Log write (the backend* helpers in Core.gs), any Events / Notes edit
+// and every build clear it. Too big (> ~95 KB) or a Notes cell holding a date:
+// read every time, as before.
+// =========================================================
+const NOTES_SRC_EVENTS_KEY_ = "NOTES_SRC_EVENTS";
+const NOTES_SRC_NOTES_KEY_ = "NOTES_SRC_NOTES";
+
+/** { eventData, nData }: Event Log (display values) and Notes tab (values), cached when possible. */
+function notesSourcesData_(ss) {
+  let cache = null, got = {};
+  try { cache = CacheService.getDocumentCache(); got = cache.getAll([NOTES_SRC_EVENTS_KEY_, NOTES_SRC_NOTES_KEY_]) || {}; } catch (err) { got = {}; }
+  const keep = (key, value) => {
+    try {
+      const json = JSON.stringify(value);
+      if (cache && json.length < 95000) cache.put(key, json, 600);
+    } catch (err) { /* read again next time */ }
+  };
+
+  let eventData;
+  if (got[NOTES_SRC_EVENTS_KEY_]) eventData = JSON.parse(got[NOTES_SRC_EVENTS_KEY_]);
+  else { eventData = backendReadBlock_(ss, "EVENT_LOG", true); keep(NOTES_SRC_EVENTS_KEY_, eventData); }
+
+  let nData;
+  if (got[NOTES_SRC_NOTES_KEY_]) nData = JSON.parse(got[NOTES_SRC_NOTES_KEY_]);
+  else {
+    const notesSheet = ss.getSheetByName("Notes");
+    nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
+    // JSON would turn a date into different text, so only plain values are cached
+    if (nData && !nData.some(r => r.some(v => v instanceof Date))) keep(NOTES_SRC_NOTES_KEY_, nData);
+  }
+  clDbg_("notes sources: Event Log " + (got[NOTES_SRC_EVENTS_KEY_] ? "cached" : "read") + ", Notes tab " + (got[NOTES_SRC_NOTES_KEY_] ? "cached" : "read"));
+  return { eventData: eventData, nData: nData };
+}
+
+function clearNotesSourcesCache_() {
+  try { CacheService.getDocumentCache().removeAll([NOTES_SRC_EVENTS_KEY_, NOTES_SRC_NOTES_KEY_]); } catch (err) { console.warn("Notes sources cache not cleared: " + err.message); }
 }
 
 function clearGhostTypistCache_() {
@@ -1535,23 +1586,27 @@ function updateOsisDeltas_(osisList) {
 function updateCombinedNotesQuick_(osisList, allowRebuild) {
   const targets = osisList.filter(o => o);
   clDbg_("notes update for " + targets.join(" | "));
-  if (!targets.length) return;
+  const texts = {};
+  if (!targets.length) return texts;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   const props = PropertiesService.getDocumentProperties();
   const disableHiddenNotes = props.getProperty('disableHiddenNotes') === 'true';
 
-  // Read each source once; none of them change while the notes are rewritten
+  // Read each source once; none of them change while the notes are rewritten.
+  // Event Log + Notes tab come from a short cache (notesSourcesData_).
   const contactSheet = ss.getSheetByName("Contact Log");
   const contactData = contactSheet ? contactSheet.getDataRange().getDisplayValues() : null;
-  const eventData = backendReadBlock_(ss, "EVENT_LOG", true);
-  const notesSheet = ss.getSheetByName("Notes");
-  const nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
+  clDbg_("notes: Contact Log read (" + (contactData ? contactData.length : 0) + " rows)");
+  const sources = notesSourcesData_(ss);
+  const eventData = sources.eventData;
+  const nData = sources.nData;
 
   let combinedOsisColumn = null; // Combined Contact Tracking column A (re-read after a rebuild)
 
   targets.forEach(targetOsis => {
     const finalNotesList = notesTextForOsis_(targetOsis, contactData, eventData, nData, disableHiddenNotes);
+    texts[targetOsis] = finalNotesList;
 
     const combinedSheet = ss.getSheetByName("Combined Contact Tracking");
     if (!combinedSheet) return;
@@ -1579,6 +1634,7 @@ function updateCombinedNotesQuick_(osisList, allowRebuild) {
       combinedOsisColumn = null; // that rebuild rewrote the tab
     }
   });
+  return texts;
 }
 
 /**
