@@ -35,8 +35,8 @@
     <button onclick="stopRec()">Stop</button>
   </div>
 
-  <div id="reportBox" class="hidden" style="display:none">
-    <div class="muted">Select all (Ctrl+A / ⌘+A in the box) and copy:</div>
+  <div id="reportBox" style="display:none">
+    <div class="muted" id="copyMsg">Building the report…</div>
     <textarea id="report" readonly></textarea>
   </div>
 
@@ -109,13 +109,26 @@
 
   function copyReport() {
     $('reportBox').style.display = 'block';
-    $('report').value = 'Building the report…';
+    $('copyMsg').textContent = 'Building the report…';
+    $('report').value = '';
     google.script.run.withSuccessHandler(function (text) {
       $('report').value = text;
       $('report').focus(); $('report').select();
-      try { document.execCommand('copy'); } catch (e) {}
+      var manual = 'Click in the box, press Ctrl+A (Mac: ⌘+A), then Ctrl+C (⌘+C) to copy.';
+      var fallback = function () {
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        $('copyMsg').textContent = ok ? '✅ Copied. Paste it in the chat.' : manual;
+      };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function () {
+            $('copyMsg').textContent = '✅ Copied. Paste it in the chat.';
+          }, fallback);
+        } else fallback();
+      } catch (e) { fallback(); }
     }).withFailureHandler(function (e) {
-      $('report').value = '❌ ' + (e && e.message ? e.message : e);
+      $('copyMsg').textContent = '❌ Could not build the report: ' + (e && e.message ? e.message : e);
     }).cld_report($('anon').checked);
   }
 
