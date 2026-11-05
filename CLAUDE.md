@@ -229,6 +229,10 @@ Contact Log search bar (rows below END; its other cells are formulas typed in th
   cache.getAll, trusts it after a one-cell "END" check (else scans column E); rememberEndRow_ after the blank-row
   insert and the END sweep. The typist writes only the cells it fills (C / E:F / H:I) without reading the row first,
   so a warm edit makes 1 sheet read before its flush.
+  Early sync = updateCombinedNotesQuick_ (one Combined cell from the logs; the shared body of updateOsisDeltas_). On
+  the owner's sheet the heavy ownerUpdateOsisDeltas_ (re-reads Raw Data, rebuilds Combined + Phone Contacts in memory)
+  runs at the END of the edit instead (PENDING_OWNER_NOTES_), and the early write never falls back to
+  updateContactAndPhoneOnly there (that writes Phone Contacts in the shared layout).
   The early notes sync is in a try/catch (an error is logged and the end-of-edit sync retries), so the row clean-up
   always runs. Notes typist: writes only the cells it fills (no row read) and flushes before the checkbox / sync.
   Events typist unchanged (already minimal for its TextFinder lookup). TextFinder lookups (Notes / Events) kept on

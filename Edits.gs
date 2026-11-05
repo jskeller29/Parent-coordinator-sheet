@@ -272,7 +272,7 @@ function handleEdit_(e) {
     // normal sync at the end of the edit tries once more
     clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
     if (isValidOsis_(earlyOsis)) {
-      try { notesDone = syncNotesForRowOsis_(earlyOsis); clDbg_(notesDone ? "notes synced (early)" : "notes NOT synced: 'update notes as I type' is off"); }
+      try { notesDone = syncNotesForRowOsis_(earlyOsis, true); clDbg_(notesDone ? "notes synced (early)" : "notes NOT synced: 'update notes as I type' is off"); }
       catch (err) { clDbg_("❌ early notes sync failed: " + err.message); console.error("Early notes sync failed (retried at the end of the edit): " + err.message); }
     }
   }
@@ -334,7 +334,17 @@ function handleEdit_(e) {
   SpreadsheetApp.flush(); 
 
   clDbg_("row clean-up + END bar done");
-  if (notesDone) return; // already synced right after the ghost typist (above)
+  if (notesDone) {
+    // Already synced right after the ghost typist (above). Owner's sheet: now the
+    // heavy update that also rewrites Phone Contacts.
+    const pending = PENDING_OWNER_NOTES_;
+    PENDING_OWNER_NOTES_ = null;
+    if (pending) {
+      try { updateOsisDeltas_(pending); }
+      catch (err) { clDbg_("❌ owner notes update failed: " + err.message); console.error("Owner notes update failed: " + err.message); }
+    }
+    return;
+  }
 
   // --- DYNAMIC DELTA SYNC TRIGGER ---
   let targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
@@ -605,6 +615,7 @@ function ensureSearchBarFormula_(sheet, endRow) {
     }
     props.setProperty(SEARCH_BAR_COMMS_PROP, "formula");
   } catch (err) {
+    clDbg_("❌ search bar formula check failed: " + err.message);
     console.error("Search bar formula check failed: " + err.message);
   }
 }
@@ -662,7 +673,7 @@ const SEARCH_BAR_COMMS_FORMULA = `=LET(
  * ran, false when "update notes as I type" is off in Settings (the caller then
  * shows the Fast Entry Mode toast at the end of the edit).
  */
-function syncNotesForRowOsis_(targetOsis) {
+function syncNotesForRowOsis_(targetOsis, early) {
   if (PropertiesService.getDocumentProperties().getProperty('autoNotes') === 'false') return false;
   const osisList = [targetOsis];
   if (targetOsis.includes(",")) {
@@ -670,9 +681,19 @@ function syncNotesForRowOsis_(targetOsis) {
       if (isValidOsis_(individualOsis)) osisList.push(individualOsis);
     });
   }
-  updateOsisDeltas_(osisList);
+  if (!early) { updateOsisDeltas_(osisList); return true; }
+
+  // Early (right after the ghost typist): only the quick one-cell Combined write,
+  // so the search bar formula updates as soon as possible. On the owner's sheet
+  // the heavy update (Combined + Phone Contacts) waits for the end of the edit.
+  const owner = getOwnerHooks_();
+  updateCombinedNotesQuick_(osisList, !owner);
+  PENDING_OWNER_NOTES_ = owner ? osisList : null;
   return true;
 }
+
+// OSIS list whose owner-sheet notes update (Phone Contacts) is still to run at the end of this edit
+var PENDING_OWNER_NOTES_ = null;
 
 // =========================================================
 // GHOST TYPIST DATA CACHE
@@ -1491,12 +1512,21 @@ function updateOsisDeltas_(osisList) {
   // The owner's sheet also rewrites that student's Phone Contacts rows
   const owner = getOwnerHooks_();
   if (owner) {
-    clDbg_("notes update (owner version, z_MINE.gs) for " + osisList.join(" | "));
+    clDbg_("notes update (owner version, z_MINE.gs: Combined + Phone Contacts) for " + osisList.join(" | "));
     const out = owner.updateOsisDeltas(osisList);
     clDbg_("notes update (owner version) finished");
     return out;
   }
+  return updateCombinedNotesQuick_(osisList, true);
+}
 
+/**
+ * The quick notes update: rewrites only each student's Combined Contact
+ * Tracking cell (D) from the logs. allowRebuild: a student with no Combined row
+ * yet rebuilds Combined + Phone Contacts (shared layout, so never on the owner's
+ * sheet: there the owner's update at the end of the edit adds the row).
+ */
+function updateCombinedNotesQuick_(osisList, allowRebuild) {
   const targets = osisList.filter(o => o);
   clDbg_("notes update for " + targets.join(" | "));
   if (!targets.length) return;
@@ -1536,8 +1566,8 @@ function updateOsisDeltas_(osisList) {
       }
     }
 
-    if (!foundInBackend) clDbg_("OSIS " + targetOsis + " has no Combined row" + (finalNotesList ? " -> rebuilding Combined + Phone Contacts" : " and no notes (nothing to write)"));
-    if (!foundInBackend && finalNotesList) {
+    if (!foundInBackend) clDbg_("OSIS " + targetOsis + " has no Combined row" + (!finalNotesList ? " and no notes (nothing to write)" : allowRebuild ? " -> rebuilding Combined + Phone Contacts" : " (added by the owner's update at the end)"));
+    if (!foundInBackend && finalNotesList && allowRebuild) {
       ss.toast("New student profile syncing to backend...", "Auto-Build", 3);
       updateContactAndPhoneOnly();
       combinedOsisColumn = null; // that rebuild rewrote the tab
