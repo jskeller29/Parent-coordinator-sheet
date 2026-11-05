@@ -230,12 +230,13 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
      skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
      writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
      ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
-  3. Quick notes write (syncNotesForRowOsis_(osis, true) -> updateCombinedNotesQuick_, returns { texts, missing }):
+  3. Row clean-up (borders, checkbox, blank row, week formula, END bar; the END sweep checks the expected cell). Owner's
+     order (2026-11-05): before the notes write, so the row looks finished first (Communications ~3 s later).
+  4. Quick notes write (syncNotesForRowOsis_(osis, true) -> updateCombinedNotesQuick_, returns { texts, missing }):
      Contact Log read + Event Log / Notes tab from notesSourcesData_ (doc cache NOTES_SRC_EVENTS / NOTES_SRC_NOTES,
      6 h, Notes not cached if a cell is a Date; cleared by every EVENT_LOG helper in Core.gs, any Events / Notes edit,
      every build, the owner's resets) + Combined A:A, one cell written, then a flush (the formula follows). In a
-     try/catch: an error is logged and the end-of-edit sync retries, so the clean-up always runs.
-  4. Row clean-up (borders, checkbox, blank row, week formula, END bar; the END sweep checks the expected cell).
+     try/catch: an error is logged and the normal end-of-edit sync retries.
   5. Owner's sheet only: ownerUpdateOsisDeltas_ (PENDING_OWNER_NOTES_) with opts.combinedAlreadyWritten = true
      unless a student had no Combined row: Phone Contacts only (no in-memory Combined rebuild, buildTrackingNotesMap_
      reads the Combined tab; never rewrites Combined, which could put back older notes). The early write never falls

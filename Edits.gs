@@ -263,28 +263,6 @@ function handleEdit_(e) {
     }
   }
 
-  // --- NOTES FIRST ---
-  // A single-cell edit whose row already has an OSIS rewrites that student's
-  // Combined Contact Tracking notes NOW, right after the ghost typist, so the
-  // search bar's Communications formula shows them as early as possible. The
-  // row's borders / checkbox / END bar clean-up below can wait.
-  let notesDone = false;
-  if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
-    // The typist just wrote it (no read); otherwise read the row's OSIS cell
-    const earlyOsis = typistOsis !== null ? typistOsis : String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
-    // Never let a notes problem stop the row clean-up below: log it, and the
-    // normal sync at the end of the edit tries once more
-    clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
-    if (isValidOsis_(earlyOsis)) {
-      try {
-        notesDone = syncNotesForRowOsis_(earlyOsis, true);
-        if (notesDone) SpreadsheetApp.flush(); // the search bar formula reads Combined: let it update now
-        clDbg_(notesDone ? "notes synced (early, pushed to the sheet)" : "notes NOT synced: 'update notes as I type' is off");
-      }
-      catch (err) { clDbg_("❌ early notes sync failed: " + err.message); console.error("Early notes sync failed (retried at the end of the edit): " + err.message); }
-    }
-  }
-
   // --- SAFE ROW CEILING ---
   let safeNumRows = numRows;
   if (endRow && (row + safeNumRows) > endRow) {
@@ -332,9 +310,30 @@ function handleEdit_(e) {
   SpreadsheetApp.flush(); 
 
   clDbg_("row clean-up + END bar done");
+
+  // --- NOTES (right after the row clean-up; owner's order 2026-11-05) ---
+  // A single-cell edit whose row already has an OSIS rewrites that student's
+  // Combined Contact Tracking notes now (the quick one-cell write), and pushes
+  // it to the sheet so the search bar's Communications formula shows them.
+  let notesDone = false;
+  if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
+    // The typist just wrote it (no read); otherwise read the row's OSIS cell
+    const earlyOsis = typistOsis !== null ? typistOsis : String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
+    // A notes problem is logged, and the normal sync below tries once more
+    clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
+    if (isValidOsis_(earlyOsis)) {
+      try {
+        notesDone = syncNotesForRowOsis_(earlyOsis, true);
+        if (notesDone) SpreadsheetApp.flush(); // the search bar formula reads Combined: let it update now
+        clDbg_(notesDone ? "notes synced (quick write, pushed to the sheet)" : "notes NOT synced: 'update notes as I type' is off");
+      }
+      catch (err) { clDbg_("❌ quick notes sync failed: " + err.message); console.error("Quick notes sync failed (retried below): " + err.message); }
+    }
+  }
+
   if (notesDone) {
-    // Already synced right after the ghost typist (above). Owner's sheet: now the
-    // heavy update that also rewrites Phone Contacts.
+    // Already synced by the quick write (above). Owner's sheet: now the update
+    // that also rewrites Phone Contacts.
     const pending = PENDING_OWNER_NOTES_;
     PENDING_OWNER_NOTES_ = null;
     if (pending) {
