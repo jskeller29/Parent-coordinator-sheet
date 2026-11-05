@@ -57,11 +57,29 @@ function resyncNotesAfterRowDelete_(ss, sheet) {
   const notesSheet = ss.getSheetByName("Notes");
   const nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
 
+  // Group each source's rows by OSIS once (same rows osisCellIncludes_ would
+  // pick, same order), so each student only looks at their own rows
+  const byOsis = (data, col, stopAtEnd) => {
+    const map = new Map();
+    if (!data) return map;
+    for (let i = 1; i < data.length; i++) {
+      if (stopAtEnd && String(data[i][col]).trim().toUpperCase() === "END") break;
+      new Set(extractOsisTokens_(data[i][col])).forEach(o => {
+        if (!map.has(o)) map.set(o, []);
+        map.get(o).push(data[i]);
+      });
+    }
+    return map;
+  };
+  const contactBy = byOsis(contactData, 4, true), eventBy = byOsis(eventData, 3, false), notesBy = byOsis(nData, 0, false);
+  const withHeader = (map, osis) => [[]].concat(map.get(osis) || []); // notesTextForOsis_ skips row 0
+
   const changed = [];
   combined.getRange(2, 1, last - 1, 4).getDisplayValues().forEach(r => {
     const osis = String(r[0]).trim();
     if (!isValidOsis_(osis)) return;
-    if (notesTextForOsis_(osis, contactData, eventData, nData, disableHiddenNotes) !== String(r[3])) changed.push(osis);
+    const text = notesTextForOsis_(osis, withHeader(contactBy, osis), withHeader(eventBy, osis), withHeader(notesBy, osis), disableHiddenNotes);
+    if (text !== String(r[3])) changed.push(osis);
   });
   if (!changed.length) return;
 
@@ -233,7 +251,12 @@ function handleEdit_(e) {
   let notesDone = false;
   if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
     const earlyOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
-    if (isValidOsis_(earlyOsis)) notesDone = syncNotesForRowOsis_(earlyOsis);
+    // Never let a notes problem stop the row clean-up below: log it, and the
+    // normal sync at the end of the edit tries once more
+    if (isValidOsis_(earlyOsis)) {
+      try { notesDone = syncNotesForRowOsis_(earlyOsis); }
+      catch (err) { console.error("Early notes sync failed (retried at the end of the edit): " + err.message); }
+    }
   }
 
   // --- SEARCH BAR COMMUNICATIONS (only when drawn by code, see the section below) ---
@@ -1164,15 +1187,12 @@ function watchNotesSheet_(e) {
           return; // Stops the script here
         }
 
-        // Batch write all 3 identity columns into the Notes sheet instantly
-        const updateRange = sheet.getRange(row, 1, 1, 3); // Columns A to C
-        const rowData = updateRange.getValues();
-
-        if (col !== 1) rowData[0][0] = correctOsis;      // Col 1 (OSIS)
-        if (col !== 2) rowData[0][1] = correctGuardian;  // Col 2 (Guardian)
-        if (col !== 3) rowData[0][2] = correctStudent;   // Col 3 (Student Name)
-
-        updateRange.setValues(rowData);
+        // Write only the 2 identity cells it fills (no read of the row first), then
+        // paint them before the checkbox and the notes sync below
+        if (col !== 1) sheet.getRange(row, 1).setValue(correctOsis);      // Col 1 (OSIS)
+        if (col !== 2) sheet.getRange(row, 2).setValue(correctGuardian);  // Col 2 (Guardian)
+        if (col !== 3) sheet.getRange(row, 3).setValue(correctStudent);   // Col 3 (Student Name)
+        SpreadsheetApp.flush();
         
         // Ensure a checkbox is securely placed in Column E if one isn't there already
         sheet.getRange(row, 5).insertCheckboxes().setFontColor("#000000");

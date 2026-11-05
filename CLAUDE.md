@@ -214,6 +214,10 @@ Contact Log search bar (rows below END; its other cells are formulas typed in th
   cache.getAll, trusts it after a one-cell "END" check (else scans column E); rememberEndRow_ after the blank-row
   insert and the END sweep. The typist writes only the cells it fills (C / E:F / H:I) without reading the row first,
   so a warm edit makes 1 sheet read before its flush.
+  The early notes sync is in a try/catch (an error is logged and the end-of-edit sync retries), so the row clean-up
+  always runs. Notes typist: writes only the cells it fills (no row read) and flushes before the checkbox / sync.
+  Events typist unchanged (already minimal for its TextFinder lookup). TextFinder lookups (Notes / Events) kept on
+  purpose: switching to the in-memory cache would change matches with stray spaces.
 - "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
   1st try, which read Combined Contact Tracking, was reverted). findSearchBarComms_ finds the label in ANY column
   within 15 rows below END (display "Communications", or a formula containing "Communications" that shows an error,
@@ -270,7 +274,7 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
 Row deletes (2026-11-05): installable change trigger installedOnChange (Edits.gs) -> on REMOVE_ROW with the Contact Log
 active: resyncNotesAfterRowDelete_ redraws the END bar border, recomputes every Combined student's notes from the logs
-(notesTextForOsis_) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
+(notesTextForOsis_, rows grouped by OSIS once) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
 setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureChangeTrigger_, doc property
 CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
 Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
