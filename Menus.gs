@@ -89,7 +89,8 @@ function setupAllInstallableTriggers() {
     triggers.forEach(t => {
       const handlerName = t.getHandlerFunction();
       // 🆕 "checkVersionOnOpen" added to the cleanup list
-      if (handlerName === "installedOnEdit" || handlerName === "nightlyMasterSync" || handlerName === "checkVersionOnOpen") {
+      if (handlerName === "installedOnEdit" || handlerName === "nightlyMasterSync" || handlerName === "checkVersionOnOpen" ||
+          handlerName === "installedOnChange") {
         ScriptApp.deleteTrigger(t);
       }
     });
@@ -132,7 +133,31 @@ function setupAllInstallableTriggers() {
     console.error("Error creating Version Check trigger: " + e.message);
   }
 
+  // 5. Change trigger: a deleted Contact Log row takes its note out of the notes (Edits.gs)
+  ensureChangeTrigger_(ss);
+
   ss.toast("Setup 100% Complete! The script is fully authorized and all automatic triggers are running.", "Success", 8);
+}
+
+/**
+ * Adds the installedOnChange trigger when it is missing. Runs at setup and on
+ * the first open after this update (checkVersionOnOpen), so sheets set up
+ * before it existed get it without running setup again.
+ * fromOpen: only once per sheet (doc property CHANGE_TRIGGER_ADDED), because
+ * triggers belong to whoever made them: a second person opening the sheet would
+ * otherwise add a second one and every delete would run twice.
+ */
+function ensureChangeTrigger_(ss, fromOpen) {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    if (fromOpen && props.getProperty('CHANGE_TRIGGER_ADDED') === 'true') return;
+    ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+    const has = ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === "installedOnChange");
+    if (!has) ScriptApp.newTrigger("installedOnChange").forSpreadsheet(ss).onChange().create();
+    props.setProperty('CHANGE_TRIGGER_ADDED', 'true');
+  } catch (e) {
+    console.error("Error creating OnChange trigger: " + e.message);
+  }
 }
 
 // ==========================================
@@ -1868,6 +1893,8 @@ const VERSION_CHECK_HOURS = 6;
  * limited-auth mode and is not allowed to open other spreadsheets.
  */
 function checkVersionOnOpen() {
+  // Sheets set up before the change trigger existed get it now (only after setup)
+  if (PropertiesService.getDocumentProperties().getProperty('SETUP_COMPLETE') === 'true') ensureChangeTrigger_(null, true);
   try {
     const shownVersionDialog = checkForUpdates_(false);
     // Only nag about stale ATS data when we didn't just open the version

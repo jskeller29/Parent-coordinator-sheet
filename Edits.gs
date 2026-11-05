@@ -17,6 +17,58 @@ function installedOnEdit(e) {
   return result;
 }
 
+/**
+ * Installable change trigger (added by ensureChangeTrigger_, Menus.gs). Row
+ * deletes do not fire onEdit, so a deleted Contact Log row's note would stay in
+ * Combined Contact Tracking (and the search bar) until the next build.
+ */
+function installedOnChange(e) {
+  if (!e || e.changeType !== "REMOVE_ROW") return;
+  return runAction_("Row deleted", () => {
+    const ss = e.source || SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getActiveSheet();
+    if (!sheet || sheet.getName().trim() !== "Contact Log") return;
+    resyncNotesAfterRowDelete_(ss, sheet);
+  });
+}
+
+/**
+ * After Contact Log rows are deleted (the change event doesn't say which):
+ * redraws the END bar's border, then works out every student's notes from the
+ * logs and updates only those whose Combined Contact Tracking text changed
+ * (normally just the deleted row's student). When many differ, Combined is
+ * rebuilt instead (updateContactAndPhoneOnly).
+ */
+function resyncNotesAfterRowDelete_(ss, sheet) {
+  // END moved up: refresh its remembered row and its top/bottom border
+  const endRow = findEndRowInColumnE_(sheet);
+  rememberEndRow_(sheet, endRow);
+  if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty('autoNotes') === 'false') return; // "update notes as I type" is off
+  const combined = ss.getSheetByName("Combined Contact Tracking");
+  const last = combined ? combined.getLastRow() : 0;
+  if (last < 2) return;
+
+  const disableHiddenNotes = props.getProperty('disableHiddenNotes') === 'true';
+  const contactData = sheet.getDataRange().getDisplayValues();
+  const eventData = backendReadBlock_(ss, "EVENT_LOG", true);
+  const notesSheet = ss.getSheetByName("Notes");
+  const nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
+
+  const changed = [];
+  combined.getRange(2, 1, last - 1, 4).getDisplayValues().forEach(r => {
+    const osis = String(r[0]).trim();
+    if (!isValidOsis_(osis)) return;
+    if (notesTextForOsis_(osis, contactData, eventData, nData, disableHiddenNotes) !== String(r[3])) changed.push(osis);
+  });
+  if (!changed.length) return;
+
+  if (changed.length > 25) updateContactAndPhoneOnly(); // e.g. a notes date range in Settings: rebuild it all
+  else updateOsisDeltas_(changed);
+}
+
 function handleEdit_(e) {
 
   const range = e.range;

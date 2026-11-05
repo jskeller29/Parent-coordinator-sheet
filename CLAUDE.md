@@ -268,8 +268,13 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   owner's sheet rebuilds once per edit instead of once per OSIS; owner Phone Contacts groups guardians once; Notes /
   Events typist reads the 3 identity cells in one call; sync reads header positions once.
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
+Row deletes (2026-11-05): installable change trigger installedOnChange (Edits.gs) -> on REMOVE_ROW with the Contact Log
+active: resyncNotesAfterRowDelete_ redraws the END bar border, recomputes every Combined student's notes from the logs
+(notesTextForOsis_) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
+setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureChangeTrigger_, doc property
+CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
 Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
-handlers (installedOnEdit, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts),
+handlers (installedOnEdit, installedOnChange, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts),
 all sheet names, Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
