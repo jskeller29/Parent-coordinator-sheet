@@ -59,6 +59,19 @@ Files (shared = every school's sheet):
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
 
+- Z#Guide.gs (+ Z#GuideSidebar.html): optional "✅ Getting Started" (bare-bones version, owner's pick 2026-11-05; a full
+  tour / tab pop-ups / Start Here tab / header notes were proposed and NOT built). 3 guarded hooks in Menus.gs:
+  addGuideMenuItems_ (both 🚀 App Menus), showGuideWelcome_ (runInitialSetupWrapper, instead of showWelcomeDialog on
+  new-user copies; "📖 Open User Guide" still opens showWelcomeDialog), guideOnOpen_ (checkVersionOnOpen).
+  Welcome pop-up after setup: 4 steps, "Start with Input Data Mode" (only if openInputDataMode exists), video / guide
+  links. Checklist sidebar: 1 load data (ticks when Raw Data A1 has a real date; also shows Parent Square AG1, NYCSA
+  AP1, Sites and classes BH7:BI7 / INPUT_DATA_MODE_SITECLASS_UPDATED), 2 build (Master Table lastRow > 4, same test as
+  the menus), 3 settings (doc property ZG_SETTINGS_SEEN, set when opened from the checklist), 4 first contact (any
+  Contact Log C above END). Opens by itself on every open until all 4 are done, not during Input Data Mode, unless
+  unticked (doc property ZG_AUTO_OPEN = "off"). "This tab" panel (zg_activeTab polled every 3 s) + "Hidden tabs" list
+  (Settings tabs: ⚙️ Settings → Tabs & columns; others: View → Hidden sheets). Link PLACEHOLDERS: GUIDE_LINKS at the
+  top of Z#Guide.gs (empty = "link coming soon").
+
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
   which returns those hooks on the owner's sheet and null everywhere else. No shared function is redefined, so file
@@ -125,6 +138,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
 - Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
   with them.
+- Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
+  Input Data Mode.
 
 Backend tab (see Core.gs):
 - One hidden "Backend" tab replaces the old Version, New/Edit Student, Backend_Event_Log and Type List tabs.

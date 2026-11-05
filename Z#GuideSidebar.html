@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include_('Styles') ?>
+  <style>
+    body { padding: 14px 16px 24px; }
+    .stack { gap: 16px; }
+    .top { display: flex; flex-direction: column; gap: 6px; }
+    .progress { display: flex; gap: 4px; margin-top: 2px; }
+    .progress i { flex: 1; height: 6px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+    .progress i.on { background: var(--accent); box-shadow: none; }
+    .count { font-size: 12.5px; color: var(--muted); }
+
+    .steps { display: flex; flex-direction: column; gap: 10px; }
+    .step { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 12px 12px 10px; display: grid; grid-template-columns: 22px 1fr; gap: 4px 10px; }
+    .step.done { background: var(--panel); }
+    .ck { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 700 11px/1 var(--font); color: #ffffff; margin-top: 1px; }
+    .step.done .ck { background: var(--accent); border-color: var(--accent); }
+    .step.next .ck { border-color: var(--accent); color: var(--accent); }
+    .step h2 { font-size: 15px; }
+    .step.done h2 { color: var(--muted); }
+    .step .body { grid-column: 2; display: flex; flex-direction: column; gap: 8px; }
+    .step.done .body { display: none; }
+    .step .doneNote { grid-column: 2; font-size: 12.5px; color: var(--ok); display: none; }
+    .step.done .doneNote { display: block; }
+    .step p { font-size: 13px; line-height: 1.45; color: var(--ink); }
+    .parts { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
+    .parts div { display: flex; justify-content: space-between; gap: 8px; }
+    .parts .no { color: var(--muted); }
+    .parts .yes { color: var(--ok); font-weight: 600; }
+    .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .btns .btn { height: 32px; font-size: 13px; padding: 0 12px; }
+    .links { display: flex; flex-direction: column; gap: 3px; }
+    .links a, .links span { font-size: 12.5px; }
+    .links span { color: var(--faint); }
+
+    .sec { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+    .tabname { font: 600 16px/1.3 var(--font-head); }
+    .tabtext { font-size: 13px; line-height: 1.45; }
+    .hidden-list { display: flex; flex-direction: column; gap: 8px; }
+    .hidden-list .h { font-size: 13px; }
+    .hidden-list .h b { display: block; }
+    .hidden-list .h span { color: var(--muted); font-size: 12.5px; }
+    .status { font-size: 12.5px; }
+    .status:empty { display: none; }
+    .status.err { color: var(--danger); }
+    .alldone { display: none; }
+  </style>
+</head>
+<body>
+  <div class="stack">
+
+    <div class="top">
+      <h1>Getting started</h1>
+      <div class="progress" id="progress"><i></i><i></i><i></i><i></i></div>
+      <div class="count" id="count">Loading…</div>
+    </div>
+
+    <div class="notice ok alldone" id="allDone">You're all set. You can open this again any time from 🚀 App Menu → ✅ Getting Started.</div>
+
+    <div class="steps" id="steps"></div>
+    <div class="status" id="status" role="status"></div>
+
+    <div class="sec">
+      <div class="eyebrow">This tab</div>
+      <div class="tabname" id="tabName">…</div>
+      <span id="tabWho" class="pill" style="align-self:flex-start;display:none"></span>
+      <p class="tabtext" id="tabText"></p>
+    </div>
+
+    <div class="sec" id="hiddenSec" style="display:none">
+      <div class="eyebrow">Hidden tabs</div>
+      <p class="help" style="margin:0">These tabs are hidden for now. Here's what they're for and where to turn them on.</p>
+      <div class="hidden-list" id="hiddenList"></div>
+    </div>
+
+    <div class="sec">
+      <div class="eyebrow">Help</div>
+      <div class="links" id="helpLinks"></div>
+      <label class="cbx" for="autoOpen" style="margin-top:6px"><input type="checkbox" id="autoOpen" checked><span>Open this by itself when the sheet opens<span class="help" style="display:block">Stops by itself once all four steps are done.</span></span></label>
+    </div>
+  </div>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const WHO = { type: 'You type here', data: 'Filled in by Input Data Mode', report: 'Filled in for you', built: 'Filled in for you' };
+    let STATE = null;
+
+    function linkEl(label, url) {
+      if (url) {
+        const a = document.createElement('a');
+        a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+        return a;
+      }
+      const s = document.createElement('span');
+      s.textContent = label + ': link coming soon';
+      return s;
+    }
+
+    function setStatus(text, err) {
+      el('status').className = 'status' + (err ? ' err' : '');
+      el('status').textContent = text || '';
+    }
+
+    function render(state) {
+      STATE = state;
+      const c = state.checklist;
+      el('count').textContent = c.allDone ? 'All 4 steps done' : c.doneCount + ' of 4 steps done';
+      Array.prototype.forEach.call(el('progress').children, (bar, i) => bar.className = c.steps[i] && c.steps[i].done ? 'on' : '');
+      el('allDone').style.display = c.allDone ? 'block' : 'none';
+
+      const box = el('steps');
+      box.innerHTML = '';
+      const nextIndex = c.steps.findIndex(s => !s.done);
+      c.steps.forEach((s, i) => {
+        const card = document.createElement('div');
+        card.className = 'step' + (s.done ? ' done' : '') + (i === nextIndex ? ' next' : '');
+        const ck = document.createElement('div'); ck.className = 'ck'; ck.textContent = s.done ? '✓' : String(i + 1);
+        const h = document.createElement('h2'); h.textContent = s.title;
+        const doneNote = document.createElement('div'); doneNote.className = 'doneNote'; doneNote.textContent = 'Done';
+        const body = document.createElement('div'); body.className = 'body';
+
+        const p = document.createElement('p'); p.textContent = s.text; body.appendChild(p);
+
+        if (s.parts) {
+          const parts = document.createElement('div'); parts.className = 'parts';
+          s.parts.forEach(pt => {
+            const row = document.createElement('div');
+            const a = document.createElement('span'); a.textContent = pt.label;
+            const b = document.createElement('span'); b.className = pt.done ? 'yes' : 'no';
+            b.textContent = pt.done ? (pt.date ? 'Updated ' + pt.date : 'Added') : 'Not yet';
+            row.appendChild(a); row.appendChild(b); parts.appendChild(row);
+          });
+          body.appendChild(parts);
+        }
+
+        const btns = document.createElement('div'); btns.className = 'btns';
+        s.buttons.forEach(bt => {
+          if (bt.needsInputMode && !state.hasInputMode) return;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'btn ' + (bt.primary && i === nextIndex ? 'pri' : 'sec');
+          b.textContent = bt.label;
+          b.addEventListener('click', () => runAction(bt.action, b));
+          btns.appendChild(b);
+        });
+        body.appendChild(btns);
+
+        if (s.links && s.links.length) {
+          const links = document.createElement('div'); links.className = 'links';
+          s.links.forEach(l => links.appendChild(linkEl(l.label, l.url)));
+          body.appendChild(links);
+        }
+
+        card.appendChild(ck); card.appendChild(h); card.appendChild(doneNote); card.appendChild(body);
+        box.appendChild(card);
+      });
+
+      showTab(state.tab);
+
+      const hl = el('hiddenList');
+      hl.innerHTML = '';
+      state.hiddenTabs.forEach(t => {
+        const d = document.createElement('div'); d.className = 'h';
+        const b = document.createElement('b'); b.textContent = t.name;
+        const w = document.createElement('span'); w.textContent = t.what + ' Turn it on: ' + t.where + '.';
+        d.appendChild(b); d.appendChild(w); hl.appendChild(d);
+      });
+      el('hiddenSec').style.display = state.hiddenTabs.length ? 'flex' : 'none';
+
+      const help = el('helpLinks');
+      help.innerHTML = '';
+      help.appendChild(linkEl('Getting started guide', state.links.guideDoc));
+      help.appendChild(linkEl('Video: how to download your data', state.links.downloadDataVideo));
+      if (state.userGuideUrl) help.appendChild(linkEl('User Guide', state.userGuideUrl));
+
+      el('autoOpen').checked = state.autoOpen;
+    }
+
+    function showTab(tab) {
+      if (!tab) return;
+      el('tabName').textContent = tab.name;
+      const who = el('tabWho');
+      if (tab.known) {
+        who.textContent = WHO[tab.type] || '';
+        who.style.display = who.textContent ? 'inline-block' : 'none';
+        el('tabText').textContent = tab.what;
+      } else {
+        who.style.display = 'none';
+        el('tabText').textContent = 'This tab isn\'t part of the guide.';
+      }
+    }
+
+    function runAction(action, btn) {
+      btn.disabled = true;
+      setStatus('Opening…');
+      google.script.run
+        .withSuccessHandler(() => { btn.disabled = false; setStatus(''); setTimeout(load, 1500); })
+        .withFailureHandler(err => { btn.disabled = false; setStatus(err.message, true); })
+        .zg_action(action);
+    }
+
+    el('autoOpen').addEventListener('change', () => {
+      google.script.run
+        .withSuccessHandler(on => setStatus(on ? 'This will open by itself until the steps are done.' : 'This won\'t open by itself. Find it in 🚀 App Menu → ✅ Getting Started.'))
+        .withFailureHandler(err => setStatus(err.message, true))
+        .zg_setAutoOpen(el('autoOpen').checked);
+    });
+
+    function load() {
+      google.script.run
+        .withSuccessHandler(render)
+        .withFailureHandler(err => setStatus('Could not load the checklist: ' + err.message, true))
+        .zg_getState();
+    }
+
+    // Keep "This tab" current (one small call every 3 s while the sidebar is visible),
+    // and refresh the checklist when you come back to it and every 30 s.
+    let lastTab = '';
+    setInterval(() => {
+      if (document.hidden) return;
+      google.script.run.withSuccessHandler(tab => {
+        if (tab.name !== lastTab) { lastTab = tab.name; showTab(tab); }
+      }).zg_activeTab();
+    }, 3000);
+    setInterval(() => { if (!document.hidden) load(); }, 30000);
+    window.addEventListener('focus', load);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+
+    load();
+  </script>
+</body>
+</html>

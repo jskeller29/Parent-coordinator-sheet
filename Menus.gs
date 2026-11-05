@@ -217,6 +217,8 @@ function buildMenus_() {
     // Optional module (Z#InputDataMode.gs); a no-op without that file
     if (typeof addInputDataModeMenuItem_ === "function") addInputDataModeMenuItem_(getStartedMenu);
     getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
+    // Optional module (Z#Guide.gs, Getting Started checklist); a no-op without that file
+    if (typeof addGuideMenuItems_ === "function") addGuideMenuItems_(getStartedMenu);
     getStartedMenu.addToUi();
 
     // =======================================================
@@ -242,6 +244,8 @@ function buildMenus_() {
     // Optional module (Z#InputDataMode.gs); a no-op without that file
     if (typeof addInputDataModeMenuItem_ === "function") addInputDataModeMenuItem_(menu);
     menu.addSeparator(); 
+    // Optional module (Z#Guide.gs, Getting Started checklist); a no-op without that file
+    if (typeof addGuideMenuItems_ === "function") addGuideMenuItems_(menu);
     menu.addItem("⚙️ Settings", "openSettingsDialog"); 
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");
     menu.addItem("🐞 Report a Bug", "reportABug");
@@ -485,7 +489,9 @@ function runInitialSetupWrapper() {
     openMigrationWizard();
   } else {
     // POP UP THE WELCOME DIALOG NOW THAT THE USER HAS CLICKED!
-    showWelcomeDialog();
+    // Optional module (Z#Guide.gs): its welcome + Getting Started checklist instead
+    if (typeof showGuideWelcome_ === "function") showGuideWelcome_();
+    else showWelcomeDialog();
   }
 }
 
@@ -1837,6 +1843,10 @@ function checkVersionOnOpen() {
     // dialog — a spreadsheet can show only one modal at a time.
     if (!shownVersionDialog) {
       checkRawDataFreshness_();
+    }
+    // Optional module (Z#Guide.gs): open the Getting Started checklist until it's done
+    if (typeof guideOnOpen_ === "function") {
+      try { guideOnOpen_(); } catch (e) { console.warn("Getting Started checklist not opened: " + e.message); }
     }
   } catch (e) {
     console.error("On-open checks failed: " + e.message);
