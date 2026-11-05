@@ -210,6 +210,10 @@ Contact Log search bar (rows below END; its other cells are formulas typed in th
   and rows whose OSIS only appears later. Ghost typist: Master Table A5:C + Directory C:E cached in the document
   cache for 10 min (ghostTypistData_, key GHOST_TYPIST_DATA, skipped if > 95 KB), cleared at the end of every build
   (clearGhostTypistCache_); Regenerate's resets don't clear it (10 min max).
+  END row: contactLogPrefetch_ gets the remembered END row (doc cache CL_END_ROW_<sheetId>) + the typist data in ONE
+  cache.getAll, trusts it after a one-cell "END" check (else scans column E); rememberEndRow_ after the blank-row
+  insert and the END sweep. The typist writes only the cells it fills (C / E:F / H:I) without reading the row first,
+  so a warm edit makes 1 sheet read before its flush.
 - "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
   1st try, which read Combined Contact Tracking, was reverted). findSearchBarComms_ finds the label in ANY column
   within 15 rows below END (display "Communications", or a formula containing "Communications" that shows an error,

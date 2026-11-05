@@ -59,8 +59,11 @@ function handleEdit_(e) {
 
   if (row < 2) return;
 
-  // 1. Shifted End Row Finder (Now Col E / 5)
-  let endRow = findEndRowInColumnE_(sheet);
+  // 1. Shifted End Row Finder (Now Col E / 5). ONE cache call brings back the
+  // END row and the ghost typist's data; the END row is then checked with a
+  // one-cell read (a full column E scan only when it moved).
+  const prefetch = contactLogPrefetch_(sheet);
+  let endRow = prefetch.endRow;
 
   // --- NEW FILTER LOGIC ---
   // The Master Toggle lives on the end bar row in Col O
@@ -101,7 +104,7 @@ function handleEdit_(e) {
       if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
         // Master Table A5:C + Directory C:E, from a short cache when the
         // previous edit already read them (ghostTypistData_)
-        const ghost = ghostTypistData_(e.source);
+        const ghost = ghostTypistData_(e.source, prefetch.ghostRaw);
         if (ghost.master.length) {
           const masterData = ghost.master;
           const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
@@ -139,16 +142,14 @@ function handleEdit_(e) {
             const correctSite = Array.from(sites).join(", ");
             const correctClass = Array.from(classes).join(", ");
 
-            const updateRange = sheet.getRange(row, 3, 1, 7);
-            const rowData = updateRange.getValues();
-
-            if (col !== CL_COL_GUARDIAN) rowData[0][0] = correctGuardian; // Col 3
-            if (col !== CL_COL_OSIS) rowData[0][2] = correctOsis;         // Col 5
-            if (col !== CL_COL_STUDENT) rowData[0][3] = correctStudent;   // Col 6
-            rowData[0][5] = correctSite;                                  // Col 8
-            rowData[0][6] = correctClass;                                 // Col 9
-
-            updateRange.setValues(rowData);
+            // Write only the cells it fills (no read of the row first: writes
+            // wait for the flush below, a read would cost a round trip).
+            // D (Person Spoke With) and G (#) are not touched.
+            if (col !== CL_COL_GUARDIAN) sheet.getRange(row, CL_COL_GUARDIAN).setValue(correctGuardian); // C
+            if (col === CL_COL_GUARDIAN) sheet.getRange(row, CL_COL_OSIS, 1, 2).setValues([[correctOsis, correctStudent]]); // E:F
+            else if (col === CL_COL_OSIS) sheet.getRange(row, CL_COL_STUDENT).setValue(correctStudent);  // F
+            else sheet.getRange(row, CL_COL_OSIS).setValue(correctOsis);                                 // E
+            sheet.getRange(row, 8, 1, 2).setValues([[correctSite, correctClass]]);                       // H:I
             SpreadsheetApp.flush(); // Paint the filled values immediately
 
           } else {
@@ -211,6 +212,7 @@ function handleEdit_(e) {
   }
 
   autoAddBlankRow_(sheet, row, endRow);
+  if (endRow && row === endRow - 1) rememberEndRow_(sheet, endRow + 1); // a row was added above END
   patchMissingFormulasInRow_(sheet, row);
 
   // --- LAG FIX: Only recalculate colors if you actually changed the Type (Col L) ---
@@ -222,6 +224,7 @@ function handleEdit_(e) {
   // --- FORCE END BAR FORMATTING & SWEEP ---
   // ==================================================
   let finalEndRow = findEndRowInColumnE_(sheet);
+  rememberEndRow_(sheet, finalEndRow);
   if (finalEndRow) {
     sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
 
@@ -556,11 +559,12 @@ function syncNotesForRowOsis_(targetOsis) {
 const GHOST_CACHE_KEY_ = "GHOST_TYPIST_DATA";
 const GHOST_CACHE_SECONDS_ = 600;
 
-function ghostTypistData_(ss) {
+/** ghostRaw: the cached JSON already fetched by contactLogPrefetch_ (skips a cache call), or undefined. */
+function ghostTypistData_(ss, ghostRaw) {
   let cache = null;
   try {
     cache = CacheService.getDocumentCache();
-    const hit = cache && cache.get(GHOST_CACHE_KEY_);
+    const hit = ghostRaw !== undefined ? ghostRaw : (cache && cache.get(GHOST_CACHE_KEY_));
     if (hit) return JSON.parse(hit);
   } catch (err) { console.warn("Ghost typist cache not read: " + err.message); }
 
@@ -577,6 +581,42 @@ function ghostTypistData_(ss) {
     if (cache && json.length < 95000) cache.put(GHOST_CACHE_KEY_, json, GHOST_CACHE_SECONDS_);
   } catch (err) { console.warn("Ghost typist cache not saved: " + err.message); }
   return data;
+}
+
+/** Cache key of the Contact Log's END row (per tab, since a copy of the tab has its own id). */
+function endRowCacheKey_(sheet) {
+  return "CL_END_ROW_" + sheet.getSheetId();
+}
+
+/** Remembers where END is for the next edit (6 hours). */
+function rememberEndRow_(sheet, endRow) {
+  if (!endRow) return;
+  try { CacheService.getDocumentCache().put(endRowCacheKey_(sheet), String(endRow), 21600); } catch (err) { /* next edit just scans */ }
+}
+
+/**
+ * Start of a Contact Log edit: { endRow, ghostRaw } with as few round trips as
+ * possible. One cache call returns the remembered END row + the ghost typist's
+ * cached data; the END row is trusted only after a one-cell check that column
+ * E still says END there, else column E is scanned (and remembered).
+ */
+function contactLogPrefetch_(sheet) {
+  const endKey = endRowCacheKey_(sheet);
+  let got = {};
+  try { got = CacheService.getDocumentCache().getAll([endKey, GHOST_CACHE_KEY_]) || {}; } catch (err) { got = {}; }
+
+  let endRow = null;
+  const remembered = parseInt(got[endKey], 10);
+  if (remembered > 1) {
+    try {
+      if (String(sheet.getRange(remembered, CL_COL_OSIS).getDisplayValue()).trim().toUpperCase() === "END") endRow = remembered;
+    } catch (err) { /* row no longer exists: scan below */ }
+  }
+  if (!endRow) {
+    endRow = findEndRowInColumnE_(sheet);
+    rememberEndRow_(sheet, endRow);
+  }
+  return { endRow: endRow, ghostRaw: got[GHOST_CACHE_KEY_] || null };
 }
 
 function clearGhostTypistCache_() {
