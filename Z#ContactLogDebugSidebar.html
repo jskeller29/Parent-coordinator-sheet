@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include_('Styles') ?>
+  <style>
+    body { padding: 10px; font-size: 13px; }
+    .bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .bar button { padding: 5px 8px; font-size: 12px; }
+    .run { border: 1px solid var(--line, #ccc); border-radius: 3px; padding: 6px 8px; margin: 6px 0; }
+    .run .head { font-weight: 600; }
+    .run .total { float: right; font-variant-numeric: tabular-nums; }
+    .step { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+    .ms { color: #666; display: inline-block; min-width: 62px; }
+    .err { color: #b00020; }
+    .slow { color: #b45309; font-weight: 600; }
+    table.state { width: 100%; border-collapse: collapse; font-size: 11px; }
+    table.state td { border-bottom: 1px solid #eee; padding: 3px 2px; vertical-align: top; word-break: break-word; }
+    table.state td:first-child { color: #444; width: 42%; }
+    textarea { width: 100%; height: 140px; font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+    .muted { color: #666; font-size: 11px; }
+    h3 { margin: 12px 0 4px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div><b>Recording</b> <span id="rec" class="muted">starting…</span></div>
+  <div class="muted">Edit the Contact Log (or delete a row). Each run shows its steps; the number is ms since the script started. Google's own delay before the script starts is not visible here.</div>
+
+  <div class="bar">
+    <button onclick="loadState()">Check search bar</button>
+    <button onclick="copyReport()">Copy report</button>
+    <button onclick="clearLog()">Clear</button>
+    <button onclick="fixFormula()">Put formula back</button>
+    <button onclick="stopRec()">Stop</button>
+  </div>
+
+  <div id="reportBox" class="hidden" style="display:none">
+    <div class="muted">Select all (Ctrl+A / ⌘+A in the box) and copy:</div>
+    <textarea id="report" readonly></textarea>
+  </div>
+
+  <h3>Search bar &amp; notes</h3>
+  <div id="state" class="muted">Click "Check search bar".</div>
+
+  <h3>Runs (newest first)</h3>
+  <div id="runs" class="muted">No runs yet.</div>
+
+<script>
+  var lastLog = [], lastState = null, stopped = false, timer = null;
+  function $(id) { return document.getElementById(id); }
+  function esc(v) { return String(v).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function renderRuns(log) {
+    lastLog = log || [];
+    if (!lastLog.length) { $('runs').innerHTML = 'No runs yet.'; return; }
+    $('runs').innerHTML = lastLog.map(function (r) {
+      var prev = 0;
+      var steps = (r.steps || []).map(function (s) {
+        var delta = s[0] - prev; prev = s[0];
+        var cls = s[1].indexOf('❌') === 0 ? 'err' : (delta >= 1000 ? 'slow' : '');
+        return '<div class="step ' + cls + '"><span class="ms">' + s[0] + ' (+' + delta + ')</span>' + esc(s[1]) + '</div>';
+      }).join('');
+      return '<div class="run"><div class="head">' + esc(r.label) + '<span class="total">' + (r.total || 0) + ' ms</span></div>' +
+        '<div class="muted">' + esc(r.at || '') + '</div>' + steps + '</div>';
+    }).join('');
+  }
+
+  function renderState(st) {
+    lastState = st;
+    $('state').innerHTML = '<table class="state">' + st.rows.map(function (r) {
+      return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td></tr>';
+    }).join('') + '</table><div class="muted">Checked in ' + st.ms + ' ms</div>';
+  }
+
+  function poll() {
+    if (stopped) return;
+    google.script.run.withSuccessHandler(function (v) {
+      $('rec').textContent = 'on (last check ' + v.now + ')';
+      renderRuns(v.log);
+      timer = setTimeout(poll, 2000);
+    }).withFailureHandler(function (e) {
+      $('rec').textContent = 'poll failed: ' + (e && e.message ? e.message : e);
+      timer = setTimeout(poll, 5000);
+    }).cld_poll();
+  }
+
+  function loadState() {
+    $('state').textContent = 'Checking…';
+    google.script.run.withSuccessHandler(renderState).withFailureHandler(function (e) {
+      $('state').textContent = '❌ ' + (e && e.message ? e.message : e);
+    }).cld_state();
+  }
+
+  function fixFormula() {
+    $('state').textContent = 'Putting the formula back…';
+    google.script.run.withSuccessHandler(renderState).withFailureHandler(function (e) {
+      $('state').textContent = '❌ ' + (e && e.message ? e.message : e);
+    }).cld_fixFormula();
+  }
+
+  function clearLog() { google.script.run.withSuccessHandler(function (v) { renderRuns(v.log); }).cld_clear(); }
+
+  function stopRec() {
+    stopped = true; if (timer) clearTimeout(timer);
+    google.script.run.cld_stop();
+    $('rec').textContent = 'stopped (close and reopen the sidebar to record again)';
+  }
+
+  function copyReport() {
+    var lines = ['CONTACT LOG DEBUG REPORT ' + new Date().toLocaleString(), ''];
+    if (lastState) {
+      lines.push('SEARCH BAR & NOTES (checked in ' + lastState.ms + ' ms)');
+      lastState.rows.forEach(function (r) { lines.push('  ' + r[0] + ': ' + r[1]); });
+      lines.push('');
+    } else {
+      lines.push('(search bar not checked: click "Check search bar" first)', '');
+    }
+    lines.push('RUNS (newest first)');
+    lastLog.forEach(function (r) {
+      lines.push('- ' + r.label + '  [' + (r.at || '') + ', total ' + (r.total || 0) + ' ms]');
+      var prev = 0;
+      (r.steps || []).forEach(function (s) { lines.push('    ' + s[0] + ' ms (+' + (s[0] - prev) + '): ' + s[1]); prev = s[0]; });
+    });
+    $('report').value = lines.join('\n');
+    $('reportBox').style.display = 'block';
+    $('report').focus(); $('report').select();
+    try { document.execCommand('copy'); } catch (e) {}
+  }
+
+  poll();
+  loadState();
+</script>
+</body>
+</html>

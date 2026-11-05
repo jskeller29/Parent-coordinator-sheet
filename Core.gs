@@ -337,6 +337,65 @@ function runAction_(label, fn) {
 }
 
 // ======================================================================
+// EDIT DEBUG LOG (read by the optional 🐞 Contact Log Debug sidebar,
+// Z#ContactLogDebug.gs). Off unless that sidebar is open: it keeps the
+// document cache key CL_DEBUG_ON alive while it polls, so recording stops by
+// itself a few minutes after the sidebar is closed. When off, each edit costs
+// one cache read. Each run's steps (ms since the script started) go to the
+// document cache key CL_DEBUG_LOG (newest 25 runs).
+// ======================================================================
+var CL_DEBUG_RUN_ = null;
+var CL_DEBUG_LOG_KEY = "CL_DEBUG_LOG";
+var CL_DEBUG_ON_KEY = "CL_DEBUG_ON";
+
+function clDbgStart_(label) {
+  CL_DEBUG_RUN_ = null;
+  try {
+    if (CacheService.getDocumentCache().get(CL_DEBUG_ON_KEY) !== "1") return;
+    if (typeof label === "function") label = label(); // only worked out when recording
+    CL_DEBUG_RUN_ = { label: String(label), at: new Date().toLocaleTimeString(), t0: Date.now(), steps: [] };
+  } catch (e) { CL_DEBUG_RUN_ = null; }
+}
+
+/** One step of the current run (no-op when recording is off). */
+function clDbg_(msg) {
+  if (!CL_DEBUG_RUN_) return;
+  CL_DEBUG_RUN_.steps.push([Date.now() - CL_DEBUG_RUN_.t0, String(msg).slice(0, 400)]);
+}
+
+function clDbgEnd_(error) {
+  const run = CL_DEBUG_RUN_;
+  CL_DEBUG_RUN_ = null;
+  if (!run) return;
+  try {
+    if (error) run.steps.push([Date.now() - run.t0, "❌ ERROR: " + (error && error.message ? error.message : error)]);
+    run.total = Date.now() - run.t0;
+    delete run.t0;
+    const cache = CacheService.getDocumentCache();
+    let log = [];
+    try { log = JSON.parse(cache.get(CL_DEBUG_LOG_KEY) || "[]"); } catch (e) { log = []; }
+    log.unshift(run);
+    log = log.slice(0, 25);
+    let json = JSON.stringify(log);
+    while (json.length > 90000 && log.length > 1) { log.pop(); json = JSON.stringify(log); }
+    cache.put(CL_DEBUG_LOG_KEY, json, 21600);
+  } catch (e) { /* debug only */ }
+}
+
+/** Runs fn as one recorded run (errors are recorded, then thrown as before). */
+function clDbgRun_(label, fn) {
+  clDbgStart_(label);
+  try {
+    const out = fn();
+    clDbgEnd_();
+    return out;
+  } catch (err) {
+    clDbgEnd_(err);
+    throw err;
+  }
+}
+
+// ======================================================================
 // SMALL HELPERS (text, names, phones, OSIS, dates)
 // ======================================================================
 function writeSheet_(ss, name, values, startRow = 1, startCol = 1) {

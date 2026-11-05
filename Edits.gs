@@ -11,7 +11,9 @@
 // =========================================================
 function installedOnEdit(e) {
   if (!e || !e.range) return;
-  const result = runAction_(() => "Edit " + e.range.getSheet().getName() + "!" + e.range.getA1Notation(), () => handleEdit_(e));
+  const result = runAction_(() => "Edit " + e.range.getSheet().getName() + "!" + e.range.getA1Notation(),
+    () => clDbgRun_(() => "Edit " + e.range.getSheet().getName() + "!" + e.range.getA1Notation() +
+      " = " + JSON.stringify(String(e.value === undefined ? "(paste / multi-cell or cleared)" : e.value).slice(0, 60)), () => handleEdit_(e)));
   // Data update reminder while the sheet is open (at most one check an hour; Menus.gs)
   try { checkDataReminderWhileOpen_(); } catch (err) { console.warn("Data reminder check failed: " + err.message); }
   return result;
@@ -24,12 +26,13 @@ function installedOnEdit(e) {
  */
 function installedOnChange(e) {
   if (!e || e.changeType !== "REMOVE_ROW") return;
-  return runAction_("Row deleted", () => {
+  return runAction_("Row deleted", () => clDbgRun_("Row(s) deleted", () => {
     const ss = e.source || SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getActiveSheet();
+    clDbg_("active tab: " + (sheet ? sheet.getName() : "?"));
     if (!sheet || sheet.getName().trim() !== "Contact Log") return;
     resyncNotesAfterRowDelete_(ss, sheet);
-  });
+  }));
 }
 
 /**
@@ -44,9 +47,10 @@ function resyncNotesAfterRowDelete_(ss, sheet) {
   const endRow = findEndRowInColumnE_(sheet);
   rememberEndRow_(sheet, endRow);
   if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+  clDbg_("END is now row " + endRow + " (border redrawn)");
 
   const props = PropertiesService.getDocumentProperties();
-  if (props.getProperty('autoNotes') === 'false') return; // "update notes as I type" is off
+  if (props.getProperty('autoNotes') === 'false') { clDbg_("skipped: 'update notes as I type' is off in Settings"); return; }
   const combined = ss.getSheetByName("Combined Contact Tracking");
   const last = combined ? combined.getLastRow() : 0;
   if (last < 2) return;
@@ -81,10 +85,12 @@ function resyncNotesAfterRowDelete_(ss, sheet) {
     const text = notesTextForOsis_(osis, withHeader(contactBy, osis), withHeader(eventBy, osis), withHeader(notesBy, osis), disableHiddenNotes);
     if (text !== String(r[3])) changed.push(osis);
   });
+  clDbg_("notes compared for " + (last - 1) + " Combined rows; different: " + (changed.length ? changed.slice(0, 10).join(", ") + (changed.length > 10 ? " …" : "") : "none"));
   if (!changed.length) return;
 
-  if (changed.length > 25) updateContactAndPhoneOnly(); // e.g. a notes date range in Settings: rebuild it all
+  if (changed.length > 25) { clDbg_("more than 25 differ -> full rebuild of Combined"); updateContactAndPhoneOnly(); }
   else updateOsisDeltas_(changed);
+  clDbg_("notes updated");
 }
 
 function handleEdit_(e) {
@@ -134,6 +140,7 @@ function handleEdit_(e) {
   // one-cell read (a full column E scan only when it moved).
   const prefetch = contactLogPrefetch_(sheet);
   let endRow = prefetch.endRow;
+  clDbg_("END row " + endRow + (prefetch.endFromCache ? " (remembered)" : " (scanned column E)") + "; typist data " + (prefetch.ghostRaw ? "cached" : "not cached"));
 
   // --- NEW FILTER LOGIC ---
   // The Master Toggle lives on the end bar row in Col O
@@ -146,6 +153,7 @@ function handleEdit_(e) {
   if (endRow && row >= endRow) {
     // An edit in the search bar below the END bar (e.g. looking up a student):
     // draw its Communications box right away
+    clDbg_("edit is in the search bar area (below END)");
     if (row > endRow) refreshSearchBarCommunications_(sheet, endRow, null, true);
     return;
   }
@@ -174,7 +182,9 @@ function handleEdit_(e) {
       if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
         // Master Table A5:C + Directory C:E, from a short cache when the
         // previous edit already read them (ghostTypistData_)
+        const tTypist = Date.now();
         const ghost = ghostTypistData_(e.source, prefetch.ghostRaw);
+        const tLookupData = Date.now() - tTypist;
         if (ghost.master.length) {
           const masterData = ghost.master;
           const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
@@ -219,10 +229,15 @@ function handleEdit_(e) {
             if (col === CL_COL_GUARDIAN) sheet.getRange(row, CL_COL_OSIS, 1, 2).setValues([[correctOsis, correctStudent]]); // E:F
             else if (col === CL_COL_OSIS) sheet.getRange(row, CL_COL_STUDENT).setValue(correctStudent);  // F
             else sheet.getRange(row, CL_COL_OSIS).setValue(correctOsis);                                 // E
+            const tWrite = Date.now();
             sheet.getRange(row, 8, 1, 2).setValues([[correctSite, correctClass]]);                       // H:I
             SpreadsheetApp.flush(); // Paint the filled values immediately
+            clDbg_("⏱ ghost typist " + (Date.now() - tTypist) + " ms (Master Table / Directory data " + tLookupData +
+              " ms" + (prefetch.ghostRaw ? ", cached" : ", read from the tabs") + "; write + paint " + (Date.now() - tWrite) +
+              " ms): OSIS " + correctOsis + " / " + correctStudent + " / " + correctGuardian);
 
           } else {
+            clDbg_("ghost typist: '" + editedValue + "' not found in the Master Table");
             e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
           }
         }
@@ -234,7 +249,9 @@ function handleEdit_(e) {
       // entirely when "Disable Contact Log Auto-Fill" is on in Settings. The
       // identity lookup above always runs regardless of that setting.
       // =======================================================
+      const tAuto = Date.now();
       autofillContactLogDefaults_(sheet, row, col, endRow, editedValue);
+      clDbg_("⏱ auto-fill (Date / # / Follow-up) " + (Date.now() - tAuto) + " ms");
     } catch (err) {
       // Surface ghost-typist/auto-fill failures instead of dying silently
       // mid-edit; the repair and delta sync below still get a chance to run.
@@ -253,9 +270,10 @@ function handleEdit_(e) {
     const earlyOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
     // Never let a notes problem stop the row clean-up below: log it, and the
     // normal sync at the end of the edit tries once more
+    clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
     if (isValidOsis_(earlyOsis)) {
-      try { notesDone = syncNotesForRowOsis_(earlyOsis); }
-      catch (err) { console.error("Early notes sync failed (retried at the end of the edit): " + err.message); }
+      try { notesDone = syncNotesForRowOsis_(earlyOsis); clDbg_(notesDone ? "notes synced (early)" : "notes NOT synced: 'update notes as I type' is off"); }
+      catch (err) { clDbg_("❌ early notes sync failed: " + err.message); console.error("Early notes sync failed (retried at the end of the edit): " + err.message); }
     }
   }
 
@@ -312,6 +330,7 @@ function handleEdit_(e) {
 
   SpreadsheetApp.flush(); 
 
+  clDbg_("row clean-up + END bar done");
   if (notesDone) return; // already synced right after the ghost typist (above)
 
   // --- DYNAMIC DELTA SYNC TRIGGER ---
@@ -323,6 +342,7 @@ function handleEdit_(e) {
     targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
   }
 
+  clDbg_("row OSIS at the end of the edit: " + JSON.stringify(targetOsis));
   if (isValidOsis_(targetOsis)) {
     const props = PropertiesService.getDocumentProperties();
     const autoNotes = props.getProperty('autoNotes') !== 'false'; 
@@ -503,7 +523,7 @@ function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNa
  */
 function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombined) {
   try {
-    if (!isSearchBarCodeMode_()) return; // the formula draws it
+    if (!isSearchBarCodeMode_()) { ensureSearchBarFormula_(sheet, endRow); return; } // the formula draws it
     sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
     if (!sheet) return;
     const ss = sheet.getParent();
@@ -521,6 +541,7 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
     const useCombined = fromCombined === true &&
       PropertiesService.getDocumentProperties().getProperty('autoNotes') !== 'false';
     const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames, useCombined);
+    clDbg_("search bar (code): OSIS box " + JSON.stringify(box.osisBox) + " -> " + text.length + " characters from " + (useCombined ? "Combined" : "the logs"));
 
     // Label first (this replaces the old formula, whose spill would block E), then the notes
     const label = sheet.getRange(box.row, box.col);
@@ -556,6 +577,33 @@ function checkSearchBarCommunications() {
   refreshSearchBarCommunications_(sheet, endRow, null, true);
   const out = sheet.getRange(box.row, box.col + 1);
   say("OSIS " + box.osisBox + " (from " + osisCell + ") -> wrote " + String(out.getDisplayValue()).length + " characters into " + out.getA1Notation() + ".");
+}
+
+/**
+ * Formula mode (the default): if the Communications cell has lost its formula
+ * (e.g. the script drew it as text before), put the formula back ONCE and
+ * remember that (SEARCH_BAR_COMMS_MODE = "formula"), so this check never runs
+ * again. Never throws.
+ */
+function ensureSearchBarFormula_(sheet, endRow) {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    if (props.getProperty(SEARCH_BAR_COMMS_PROP) === "formula") { clDbg_("search bar: formula mode (the formula updates it)"); return; }
+    sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
+    if (!sheet) return;
+    endRow = endRow || findEndRowInColumnE_(sheet);
+    const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
+    if (!at) { clDbg_("search bar: no Communications cell found below END"); return; }
+    const label = sheet.getRange(at.row, at.col);
+    if (label.getFormula() === "") {
+      sheet.getRange(at.row, at.col + 1).clearContent(); // the formula spills into this cell
+      label.setFormula(SEARCH_BAR_COMMS_FORMULA);
+      clDbg_("search bar: formula was missing at " + label.getA1Notation() + " -> put back");
+    }
+    props.setProperty(SEARCH_BAR_COMMS_PROP, "formula");
+  } catch (err) {
+    console.error("Search bar formula check failed: " + err.message);
+  }
 }
 
 /** Puts the original Communications formula back and stops the script from drawing it. */
@@ -682,16 +730,17 @@ function contactLogPrefetch_(sheet) {
 
   let endRow = null;
   const remembered = parseInt(got[endKey], 10);
+  let endFromCache = false;
   if (remembered > 1) {
     try {
-      if (String(sheet.getRange(remembered, CL_COL_OSIS).getDisplayValue()).trim().toUpperCase() === "END") endRow = remembered;
+      if (String(sheet.getRange(remembered, CL_COL_OSIS).getDisplayValue()).trim().toUpperCase() === "END") { endRow = remembered; endFromCache = true; }
     } catch (err) { /* row no longer exists: scan below */ }
   }
   if (!endRow) {
     endRow = findEndRowInColumnE_(sheet);
     rememberEndRow_(sheet, endRow);
   }
-  return { endRow: endRow, ghostRaw: got[GHOST_CACHE_KEY_] || null };
+  return { endRow: endRow, endFromCache: endFromCache, ghostRaw: got[GHOST_CACHE_KEY_] || null };
 }
 
 function clearGhostTypistCache_() {
@@ -1150,10 +1199,12 @@ function watchNotesSheet_(e) {
 
   // Assuming Columns are: A (1) = OSIS, B (2) = Guardian(s), C (3) = Student Name
   if (col === 1 || col === 2 || col === 3) {
+    const tNotesTypist = Date.now();
     const masterSheet = e.source.getSheetByName("Master Table");
     if (masterSheet) {
       // Typed OSIS (A) -> Master Table A, Guardian (B) -> C, Student (C) -> B
       const found = findInMasterTable_(masterSheet, col === 1 ? 1 : col === 2 ? 3 : 2, editedValue);
+      clDbg_("Notes typist lookup " + (Date.now() - tNotesTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
 
       if (found) {
         // Pull exact data from Master Table
@@ -1193,12 +1244,14 @@ function watchNotesSheet_(e) {
         if (col !== 2) sheet.getRange(row, 2).setValue(correctGuardian);  // Col 2 (Guardian)
         if (col !== 3) sheet.getRange(row, 3).setValue(correctStudent);   // Col 3 (Student Name)
         SpreadsheetApp.flush();
+        clDbg_("⏱ Notes typist " + (Date.now() - tNotesTypist) + " ms (painted)");
         
         // Ensure a checkbox is securely placed in Column E if one isn't there already
         sheet.getRange(row, 5).insertCheckboxes().setFontColor("#000000");
 
         // A note typed before the student was filled in syncs now that the row has an OSIS
         syncNotesRows_(sheet, row, 1, true);
+        clDbg_("Notes: notes sync done");
 
       } else {
         e.source.toast("Could not find '" + editedValue + "' in the Master Table.", "Ghost Typist Failed", 4);
@@ -1434,9 +1487,15 @@ function updateSingleOsisDelta_(targetOsis) {
 function updateOsisDeltas_(osisList) {
   // The owner's sheet also rewrites that student's Phone Contacts rows
   const owner = getOwnerHooks_();
-  if (owner) return owner.updateOsisDeltas(osisList);
+  if (owner) {
+    clDbg_("notes update (owner version, z_MINE.gs) for " + osisList.join(" | "));
+    const out = owner.updateOsisDeltas(osisList);
+    clDbg_("notes update (owner version) finished");
+    return out;
+  }
 
   const targets = osisList.filter(o => o);
+  clDbg_("notes update for " + targets.join(" | "));
   if (!targets.length) return;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -1468,11 +1527,13 @@ function updateOsisDeltas_(osisList) {
 
       if (sheetOsis === cleanTarget && cleanTarget !== "") {
         combinedSheet.getRange(i + 1, 4).setValue(finalNotesList); // Column D
+        clDbg_("Combined row " + (i + 1) + " (OSIS " + targetOsis + ") rewritten: " + finalNotesList.length + " characters");
         foundInBackend = true;
         break;
       }
     }
 
+    if (!foundInBackend) clDbg_("OSIS " + targetOsis + " has no Combined row" + (finalNotesList ? " -> rebuilding Combined + Phone Contacts" : " and no notes (nothing to write)"));
     if (!foundInBackend && finalNotesList) {
       ss.toast("New student profile syncing to backend...", "Auto-Build", 3);
       updateContactAndPhoneOnly();
@@ -1865,6 +1926,7 @@ function watchEventsSheet_(e) {
   const relativeCol = col - tableStartCol; // 0=OSIS, 1=Guardian, 2=Attendee, 3=Student, 4=#Indv, 5=Notes/Box
   
   // 1. GHOST TYPIST LOGIC (Runs instantly before anything else)
+  const tEventsTypist = Date.now();
   if (row >= 3) {
     const masterSheet = e.source.getSheetByName("Master Table");
     if (masterSheet) {
@@ -1987,6 +2049,7 @@ function watchEventsSheet_(e) {
           else {
             // Typed OSIS -> Master Table A, Guardian -> C, Student -> B
             const found = findInMasterTable_(masterSheet, relativeCol === 0 ? 1 : relativeCol === 1 ? 3 : 2, editedValue);
+            clDbg_("Events typist lookup " + (Date.now() - tEventsTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
             if (found) {
               const correctOsis = found.osis;
               const correctStudent = found.student;
@@ -2008,6 +2071,7 @@ function watchEventsSheet_(e) {
   }
 
   SpreadsheetApp.flush(); 
+  clDbg_("⏱ Events typist " + (Date.now() - tEventsTypist) + " ms (painted)");
 
   const eventName = String(sheet.getRange(1, tableStartCol).getValue()).trim();
   if (!eventName) return; 

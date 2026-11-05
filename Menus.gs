@@ -267,6 +267,8 @@ function buildMenus_() {
     getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
     // Optional module (Z#Guide.gs, Getting Started checklist); a no-op without that file
     if (typeof addGuideMenuItems_ === "function") addGuideMenuItems_(getStartedMenu);
+    // Optional trial (Z#ContactLogDebug.gs); a no-op without that file
+    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(getStartedMenu);
     getStartedMenu.addToUi();
 
     // =======================================================
@@ -298,6 +300,8 @@ function buildMenus_() {
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");
     menu.addItem("🐞 Report a Bug", "reportABug");
     menu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
+    // Optional trial (Z#ContactLogDebug.gs); a no-op without that file
+    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(menu);
     // Sheet Lock.gs: turn the baby-proofing off for layout changes, then back on
     menu.addItem(isSheetLockOn_() ? "🔓 Unlock Sheet (change headers / layout)" : "🔒 Lock Sheet", "toggleSheetLock");
     

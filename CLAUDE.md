@@ -72,6 +72,18 @@ Files (shared = every school's sheet):
   (Settings tabs: ⚙️ Settings → Tabs & columns; others: View → Hidden sheets). Link PLACEHOLDERS: GUIDE_LINKS at the
   top of Z#Guide.gs (empty = "link coming soon").
 
+- Z#ContactLogDebug.gs (+ Z#ContactLogDebugSidebar.html): TEMPORARY "🐞 Contact Log Debug" sidebar (🚀 App Menu, both
+  menus, guarded addContactLogDebugMenuItem_ lines in buildMenus_). Live list of runs (Contact Log / Notes / Events
+  edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
+  auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
+  Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
+  "Put formula back". Recording = shared logger in Core.gs (clDbgStart_ / clDbg_ / clDbgEnd_ / clDbgRun_, wrapped
+  around installedOnEdit / installedOnChange): on only while doc cache key CL_DEBUG_ON exists (the sidebar re-puts it
+  every 2 s poll, 5-min TTL); runs in CL_DEBUG_LOG (newest 25). Off = one cache read per edit.
+- Search bar formula self-repair: in formula mode refreshSearchBarCommunications_ calls ensureSearchBarFormula_, which
+  puts SEARCH_BAR_COMMS_FORMULA back ONCE if the Communications cell has no formula (e.g. left as text by the code
+  mode), then sets SEARCH_BAR_COMMS_MODE = "formula" so it never checks again. Runs on a search bar edit / build.
+
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
   which returns those hooks on the owner's sheet and null everywhere else. No shared function is redefined, so file
