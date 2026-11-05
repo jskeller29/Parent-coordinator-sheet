@@ -1100,10 +1100,11 @@ function contactLogNoteLine_(row, disableHiddenNotes) {
   const methodLabel = nVal !== "" ? nVal : mVal;
   const dateText = formatDateFull_(dateVal);
 
-  // Only append the "- Person Spoke With" when Col D was actually filled;
-  // a blank D should read "{Method}", not "{Method - }".
-  const spokeWith = String(eVal).trim() ? ` - ${eVal}` : "";
-  let line = `${noteLineHeader_(dateText, methodLabel + spokeWith)} ${pVal}`;
+  // "{Method - Person}" with only the parts that are filled in: a blank D
+  // (Person Spoke With) reads "{Method}", never "{Method - }" (and a blank
+  // method reads "{Person}", never "{ - Person}").
+  const braceText = [methodLabel, eVal].map(v => String(v).trim()).filter(v => v !== "").join(" - ");
+  let line = `${noteLineHeader_(dateText, braceText)} ${pVal}`;
   if (rVal !== "") line += ` [${rVal}]`;
 
   return { dateObj: dateObj, text: line.trim() };
