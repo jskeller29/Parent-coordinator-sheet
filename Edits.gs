@@ -291,14 +291,26 @@ const SEARCH_BAR_SCAN_ROWS = 15;                        // rows below END search
 const SEARCH_BAR_COMMS_PROP = "SEARCH_BAR_COMMS_MODE";  // "formula" = left to the old formula
 const SHEETS_CELL_LIMIT = 50000;
 
-/** Row of the "Communications" label (column D) below the END bar, or null. */
-function findSearchBarCommsRow_(sheet, endRow) {
+/**
+ * The "Communications" label cell below the END bar as { row, col }, or null.
+ * Any column (the box's position comes from the sheet, not the code). Also
+ * matches the old HSTACK formula when it shows an error instead of the label
+ * (e.g. #REF! because text left in the cell beside it blocks its spill).
+ */
+function findSearchBarComms_(sheet, endRow) {
   const first = endRow + 1;
   const count = Math.min(SEARCH_BAR_SCAN_ROWS, sheet.getMaxRows() - endRow);
   if (count < 1) return null;
-  const labels = sheet.getRange(first, 4, count, 1).getDisplayValues();
-  for (let i = 0; i < labels.length; i++) {
-    if (String(labels[i][0]).trim() === SEARCH_BAR_COMMS_LABEL) return first + i;
+  const area = sheet.getRange(first, 1, count, sheet.getMaxColumns());
+  const shown = area.getDisplayValues();
+  const formulas = area.getFormulas();
+  for (let i = 0; i < shown.length; i++) {
+    for (let j = 0; j < shown[i].length; j++) {
+      if (String(shown[i][j]).trim() === SEARCH_BAR_COMMS_LABEL ||
+          formulas[i][j].indexOf('"' + SEARCH_BAR_COMMS_LABEL + '"') !== -1) {
+        return { row: first + i, col: j + 1 };
+      }
+    }
   }
   return null;
 }
@@ -308,13 +320,19 @@ function sheetsTrim_(text) {
   return String(text).replace(/ {2,}/g, " ").replace(/^ +| +$/g, "");
 }
 
-/** The search bar's box: { row, osisBox, showNames }, or null when there is none. */
+/**
+ * The search bar's box: { row, col, osisBox, showNames }, or null when there is
+ * none. Same cells as the old formula, relative to the label: OSIS = 1 row up,
+ * 1 column right; the name switch = 2 rows up, 2 columns right.
+ */
 function readSearchBarBox_(sheet, endRow) {
-  if (!endRow) return null;
-  const row = findSearchBarCommsRow_(sheet, endRow);
-  if (!row || row - 2 <= endRow) return null;
-  const v = sheet.getRange(row - 2, 5, 2, 2).getDisplayValues(); // E:F, 2 rows above + 1 row above
-  return { row: row, osisBox: String(v[1][0]), showNames: String(v[0][1]) !== "" };
+  if (!endRow) { console.warn("Search bar: no END row found in Contact Log column E."); return null; }
+  const at = findSearchBarComms_(sheet, endRow);
+  if (!at) { console.warn("Search bar: no \"Communications\" cell in the " + SEARCH_BAR_SCAN_ROWS + " rows below END."); return null; }
+  if (at.row - 2 <= endRow) { console.warn("Search bar: \"Communications\" is too close to END (row " + at.row + ")."); return null; }
+  SpreadsheetApp.flush(); // the OSIS box is a formula: let it catch up with the edit first
+  const v = sheet.getRange(at.row - 2, at.col + 1, 2, 2).getDisplayValues();
+  return { row: at.row, col: at.col, osisBox: String(v[1][0]), showNames: String(v[0][1]) !== "" };
 }
 
 /** The OSIS numbers in an OSIS box / cell ("111, 222" -> ["111", "222"]). */
@@ -420,9 +438,9 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
     const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames, useCombined);
 
     // Label first (this replaces the old formula, whose spill would block E), then the notes
-    const label = sheet.getRange(box.row, 4);
+    const label = sheet.getRange(box.row, box.col);
     if (label.getFormula() !== "" || label.getValue() !== SEARCH_BAR_COMMS_LABEL) label.setValue(SEARCH_BAR_COMMS_LABEL);
-    const cell = sheet.getRange(box.row, 5);
+    const cell = sheet.getRange(box.row, box.col + 1);
     if (cell.getNumberFormat() !== "@") cell.setNumberFormat("@"); // plain text: a note is never read as a number / formula
     if (cell.getFormula() !== "" || cell.getDisplayValue() !== text) cell.setValue(text);
   } catch (err) {
@@ -430,17 +448,42 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
   }
 }
 
+/**
+ * Run from the Apps Script editor to see why the box is (not) filled: redraws it
+ * and toasts what it found, or what stopped it.
+ */
+function checkSearchBarCommunications() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const say = (msg) => { ss.toast(msg, "Search Bar check", 15); console.log(msg); };
+  if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") {
+    return say("Turned off (formula mode). Run useCodeForSearchBarCommunications to turn it on.");
+  }
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) return say("No Contact Log tab.");
+  const endRow = findEndRowInColumnE_(sheet);
+  if (!endRow) return say("No END row found in Contact Log column E.");
+  const at = findSearchBarComms_(sheet, endRow);
+  if (!at) return say("END is row " + endRow + ", but no \"Communications\" cell in the " + SEARCH_BAR_SCAN_ROWS + " rows below it.");
+  const box = readSearchBarBox_(sheet, endRow);
+  if (!box) return say("\"Communications\" at row " + at.row + " is too close to END (row " + endRow + ").");
+  const osisCell = sheet.getRange(box.row - 1, box.col + 1).getA1Notation();
+  if (box.osisBox === "") return say("Found the box at " + sheet.getRange(box.row, box.col).getA1Notation() + ", but the OSIS cell " + osisCell + " is empty.");
+  refreshSearchBarCommunications_(sheet, endRow, null, true);
+  const out = sheet.getRange(box.row, box.col + 1);
+  say("OSIS " + box.osisBox + " (from " + osisCell + ") -> wrote " + String(out.getDisplayValue()).length + " characters into " + out.getA1Notation() + ".");
+}
+
 /** Puts the original Communications formula back and stops the script from drawing it. */
 function restoreSearchBarCommunicationsFormula() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("Contact Log");
   const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
-  const row = endRow ? findSearchBarCommsRow_(sheet, endRow) : null;
-  if (!row) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
+  const at = endRow ? findSearchBarComms_(sheet, endRow) : null;
+  if (!at) { ss.toast("Could not find the Communications box below END.", "Search Bar", 5); return; }
 
   PropertiesService.getDocumentProperties().setProperty(SEARCH_BAR_COMMS_PROP, "formula");
-  sheet.getRange(row, 5).clearContent();
-  sheet.getRange(row, 4).setFormula(SEARCH_BAR_COMMS_FORMULA);
+  sheet.getRange(at.row, at.col + 1).clearContent();
+  sheet.getRange(at.row, at.col).setFormula(SEARCH_BAR_COMMS_FORMULA);
   ss.toast("Communications is a formula again.", "Search Bar", 5);
 }
 

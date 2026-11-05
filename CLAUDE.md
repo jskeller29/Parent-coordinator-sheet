@@ -202,9 +202,11 @@ several presses. Don't bring it back without asking.
 
 Contact Log search bar (rows below END; its other cells are formulas typed in the sheet, not in the repo):
 - "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
-  1st try, which read Combined Contact Tracking, was reverted). refreshSearchBarCommunications_ finds the label in
-  column D within 15 rows below END, writes the label as text in D (replacing the HSTACK formula) and the notes in E
-  (plain text). OSIS = E of the row above, "▶ Name" (Master Table B) when F two rows above is not blank, "No Notes",
+  1st try, which read Combined Contact Tracking, was reverted). findSearchBarComms_ finds the label in ANY column
+  within 15 rows below END (display "Communications", or a formula containing "Communications" that shows an error,
+  e.g. #REF! from a blocked spill); refreshSearchBarCommunications_ writes the label as text there (replacing the
+  HSTACK formula) and the notes one column right (plain text); OSIS / name switch are read relative to the label
+  after a flush. checkSearchBarCommunications (run from the editor) toasts what it found or why it skipped. OSIS = E of the row above, "▶ Name" (Master Table B) when F two rows above is not blank, "No Notes",
   leading "Notes:" stripped (old formula's rules). Notes are built straight from Contact Log (to END) / Backend Event
   Log / Notes with notesTextForOsis_ (also used by updateOsisDeltas_), so it never waits for Combined — EXCEPT a
   search bar lookup (edit below END) and the end of a build read Combined D instead (quickest; Combined is current
