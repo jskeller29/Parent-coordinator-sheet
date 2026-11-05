@@ -347,8 +347,10 @@ openInputDataMode exists (guarded), else the guide link. Skip -> Remind After 2 
 property DATA_REMINDER_SNOOZE_UNTIL) / Remove Reminders / Just skip for today. Endpoints dataReminderOpenInputMode,
 dataReminderChoose. Saving a different choice in Settings clears the wait.
 Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications.
-Bugs noticed (not fixed): quick update ignores the Settings notes date range; nightly trigger 11 PM at setup
-but 2 AM after Settings save; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
+Nightly trigger (nightlyMasterSync): 10 PM, NIGHTLY_SYNC_HOUR (Menus.gs), both at Initial Setup and when a Settings
+save re-makes it (owner's pick 2026-11-05; was 11 PM at setup but 2 AM after a Settings save). Existing triggers keep
+their old hour until Settings is saved once or Initial Setup is run again.
+Bugs noticed (not fixed): quick update ignores the Settings notes date range; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
 (first student loses Student List details); EMERGENCY_STOP_SYNC leaves SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS
 needs two clicks first time; repo manifest lacks script.send_mail so the owner email may never send;
 purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header, but the Student List header is on

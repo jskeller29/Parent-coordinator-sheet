@@ -269,7 +269,7 @@ P(h2("Step 2 — Run Initial Setup (once)"));
 P(p([t("Wait for the spreadsheet to finish loading until the "), t("🚀 App Menu", { bold: true }), t(" appears in the top toolbar — don't click anything else until it shows. Then click "), t("🚀 App Menu → 🚨 Initial Setup (Run Once)", { bold: true }), t(". This does the behind-the-scenes wiring:")]));
 P(
   bullet("Authorizes the script to run as you."),
-  bullet("Installs the automatic triggers — instant updates when you edit the Contact Log, a nightly refresh/sync (overnight), and a periodic “check for updates.”"),
+  bullet("Installs the automatic triggers — instant updates when you edit the Contact Log, a nightly refresh/sync (around 10 PM), and a periodic “check for updates.”"),
   bullet("Records this copy as your original (a clone-detector so a later copy starts clean)."),
   bullet("Applies the default tab layout and opens this User Guide."),
 );
@@ -288,7 +288,7 @@ P(table(
     ["See, edit, download, and permanently delete your contacts", "The optional “School Directory” phone sync that mirrors parent numbers into your Google Contacts.", "Only used if you turn on phone syncing in Settings. If you never enable it, nothing is written to your contacts."],
     ["See, edit, create, and delete all of your Google Drive files", "Saving the year-end PDF archive to your Drive, and opening your old sheet during a migration.", "Rollover creates a PDF file; migration opens the old spreadsheet you point it at."],
     ["Connect to an external service", "A read-only check of the shared “Version Tracker” sheet so you're told when a newer template ships.", "The only outside call the tool makes. It reads release dates/links — never your data."],
-    ["Run when you're not present / manage its own triggers", "The automatic triggers: instant Contact Log updates, the nightly rebuild/sync (overnight), and the update check on open.", "Lets the sheet keep itself current without you clicking Build every time."],
+    ["Run when you're not present / manage its own triggers", "The automatic triggers: instant Contact Log updates, the nightly rebuild/sync (around 10 PM), and the update check on open.", "Lets the sheet keep itself current without you clicking Build every time."],
     ["Display and run third-party web content in dialogs and sidebars", "The menus, wizards, and sidebars — Settings, Migration, Rollover, and the progress bars.", "These custom screens are how you drive the tool."],
   ],
   [3000, 3400, 2960],

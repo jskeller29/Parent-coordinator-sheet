@@ -33,6 +33,11 @@ var TAB_VISIBILITY = [
   { key: 'showNewStudents',    sheets: ["New Students"],              def: false }
 ];
 
+// Hour of the nightly rebuild / phone sync trigger (22 = 10 PM in the script's time
+// zone; Apps Script runs it some time in that hour). Initial Setup and every
+// Settings save make the trigger with this hour (owner's pick 2026-11-05).
+var NIGHTLY_SYNC_HOUR = 22;
+
 // The tabs shown by default. Everything else starts hidden; the user's saved
 // settings reveal the optional tabs later via updateVisualSettings_.
 var DEFAULT_VISIBLE_SHEETS = TAB_VISIBILITY
@@ -108,11 +113,11 @@ function setupAllInstallableTriggers() {
     console.error("Error creating OnEdit trigger: " + e.message);
   }
 
-  // 3. Create the Nightly Sync Trigger unconditionally (Runs at 11 PM every day)
+  // 3. Create the Nightly Sync Trigger unconditionally (10 PM every day, NIGHTLY_SYNC_HOUR)
   try {
     ScriptApp.newTrigger("nightlyMasterSync")
       .timeBased()
-      .atHour(23)
+      .atHour(NIGHTLY_SYNC_HOUR)
       .everyDays(1)
       .create();
   } catch (e) {
@@ -781,7 +786,7 @@ function manageNightlyTrigger_(disableSync) {
     if (!disableSync) {
       ScriptApp.newTrigger(syncFunctionName)
         .timeBased()
-        .atHour(2) 
+        .atHour(NIGHTLY_SYNC_HOUR)
         .everyDays(1)
         .create();
     }
