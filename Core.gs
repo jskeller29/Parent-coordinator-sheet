@@ -548,24 +548,28 @@ function formatDateFull_(value) {
 }
 
 /**
- * Bold Unicode text (same characters as lingojam.com/BoldTextGenerator):
- * A-Z, a-z and 0-9 become Mathematical Bold letters/digits; everything else
- * (spaces, punctuation, accented letters) is left as is.
- * italic = true uses Bold Italic (serif) letters; Unicode has no italic digits,
- * so digits stay bold.
+ * Bold Unicode text: A-Z, a-z and 0-9 become Mathematical Sans-Serif Bold
+ * letters/digits (𝗕𝗼𝗹𝗱 𝟭𝟮𝟯, the "Bold Sans" sets on yaytext / lingojam);
+ * everything else (spaces, punctuation, accented letters) is left as is.
+ * italic = true uses Sans-Serif Bold Italic letters (𝘽𝙤𝙡𝙙); Unicode has no
+ * italic digits, so digits stay bold.
+ * Sans-serif (owner's pick 2026-11-05) to match the sheet's Montserrat text;
+ * it was the serif Mathematical Bold / Bold Italic set before.
+ * Used for the notes-line headers: a formula (the search bar's Communications
+ * box) can't show real bold for part of a cell, but these letters stay bold.
  */
 function boldText_(text, italic) {
-  const upper = italic ? 0x1D468 : 0x1D400;
-  const lower = italic ? 0x1D482 : 0x1D41A;
+  const upper = italic ? 0x1D63C : 0x1D5D4;
+  const lower = italic ? 0x1D656 : 0x1D5EE;
   return String(text == null ? "" : text).replace(/[A-Za-z0-9]/g, ch => {
     const c = ch.charCodeAt(0);
     if (c >= 65 && c <= 90) return String.fromCodePoint(upper + c - 65);   // A-Z
     if (c >= 97 && c <= 122) return String.fromCodePoint(lower + c - 97);  // a-z
-    return String.fromCodePoint(0x1D7CE + c - 48);                         // 0-9
+    return String.fromCodePoint(0x1D7EC + c - 48);                         // 0-9 (sans-serif bold)
   });
 }
 
-/** Header of one notes line: "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧}" (date bold italic, braces bold). */
+/** Header of one notes line: "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻}" (date bold italic sans, braces bold sans). */
 function noteLineHeader_(dateText, braceText) {
   return `${boldText_(dateText, true)} - {${boldText_(braceText)}}`;
 }

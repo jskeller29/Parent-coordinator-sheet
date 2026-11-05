@@ -255,16 +255,20 @@ Workflow:
   changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
 
 Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
-- Each line is "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧} note [follow-up]" (event: "... - {𝐄𝐯𝐞𝐧𝐭 - [𝐏𝐞𝐫𝐬𝐨𝐧]} |Event|"), no bullet.
-  Date = Bold Italic serif (digits stay bold), braces = Mathematical Bold (lingojam BoldTextGenerator) via boldText_ /
-  noteLineHeader_ (Core.gs).
+- Each line is "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻} note [follow-up]" (event: "... - {𝗘𝘃𝗲𝗻𝘁 - [𝗣𝗲𝗿𝘀𝗼𝗻]} |Event|"), no bullet.
+  Date = Sans-Serif Bold Italic (digits = sans bold), braces = Sans-Serif Bold, manual block label "𝙉𝙤𝙩𝙚𝙨:" (bold
+  italic sans), all via boldText_ / noteLineHeader_ (Core.gs). Owner's pick 2026-11-05 (was the serif Mathematical
+  Bold / Bold Italic set): sans-serif matches the sheet's Montserrat. Unicode bold is used because the search bar's
+  Communications formula can't show real (rich-text) bold for part of a cell. Accented letters stay plain. Changing
+  the style changes every notes text: run a build once after, or the delete / clear check sees all students as
+  changed (> 25 -> full rebuild), and the next contacts sync updates every contact's notes once.
 - Built in ONE place: contactLogNoteLine_ / eventNoteLine_ / joinNoteLines_ (Build.gs), used by both the full build
   (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_).
 - Divider lines (owner's trial, 2026-11-05): in Combined Contact Tracking each dated line has a "───" line above and
   under it (one shared line between two; manual Notes block not wrapped). Length = fixed 36 "─" (noteDivider_,
   NOTE_DIVIDER_LENGTH_; owner's pick 2026-11-05, was column D width / 7px). buildTrackingNotesMap_ strips them
   (stripNoteDividers_), so Phone Contacts / Google Contacts notes are exactly as before.
-- Order (owner's change, 2026-11-04): manual "𝑵𝒐𝒕𝒆𝒔:" block first, then dated lines NEWEST first (joinNoteLines_ sorts
+- Order (owner's change, 2026-11-04): manual "𝙉𝙤𝙩𝙚𝙨:" block first, then dated lines NEWEST first (joinNoteLines_ sorts
   oldest-first then reverses, so same-day ties flip too). Was oldest first.
 
 CODE CLEANUP (the old "POSSIBLE FUTURE PLAN"): stages 1-3 done on Test-Version (2026-11-04), stage 4 not started.

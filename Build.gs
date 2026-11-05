@@ -1072,7 +1072,7 @@ function rowsByOsis_(rows, col) {
 /* =========================
    NOTES LINES
    One place that turns Contact Log / Event Log rows into the notes lines
-   "𝑫𝒂𝒕𝒆 - {𝐌𝐞𝐭𝐡𝐨𝐝 - 𝐏𝐞𝐫𝐬𝐨𝐧} note [follow-up]", used by both the full build
+   "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻} note [follow-up]", used by both the full build
    (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_),
    so the two always write the same text.
 ========================= */
@@ -1154,7 +1154,7 @@ function stripNoteDividers_(text) {
 }
 
 /**
- * Manual notes ("𝑵𝒐𝒕𝒆𝒔: ...") first, then the dated lines NEWEST at the top,
+ * Manual notes ("𝙉𝙤𝙩𝙚𝙨: ...") first, then the dated lines NEWEST at the top,
  * oldest at the bottom (the exact reverse of oldest-first: same-day lines too,
  * the one logged last comes first). Used by the full build and the quick
  * update, so Combined Contact Tracking, Phone Contacts and Google Contacts
@@ -1171,7 +1171,7 @@ function joinNoteLines_(manualNotesText, interactions) {
     baseNotes = divider + "\n" + interactions.map(interaction => interaction.text).join("\n" + divider + "\n") + "\n" + divider;
   }
 
-  const manualNotes = manualNotesText !== "" ? `𝑵𝒐𝒕𝒆𝒔: ${manualNotesText}` : "";
+  const manualNotes = manualNotesText !== "" ? `${boldText_("Notes", true)}: ${manualNotesText}` : ""; // 𝙉𝙤𝙩𝙚𝙨:
 
   if (manualNotes !== "" && baseNotes !== "") return manualNotes + "\n\n" + baseNotes;
   if (manualNotes !== "") return manualNotes;
