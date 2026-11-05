@@ -289,6 +289,9 @@ function handleEdit_(e) {
       if (col === CL_COL_OSIS && e.oldValue !== undefined) editedOsis.push(String(e.oldValue));
       refreshSearchBarCommunications_(sheet, endRow, editedOsis);
     }
+  } else {
+    // Formula mode: if the Communications formula was lost, put it back (checked once, then remembered)
+    ensureSearchBarFormula_(sheet, endRow);
   }
 
   // --- SAFE ROW CEILING ---
