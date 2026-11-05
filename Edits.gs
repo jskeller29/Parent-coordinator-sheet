@@ -42,18 +42,22 @@ function installedOnChange(e) {
  * (normally just the deleted row's student). When many differ, Combined is
  * rebuilt instead (updateContactAndPhoneOnly).
  */
-function resyncNotesAfterRowDelete_(ss, sheet) {
-  // END moved up: refresh its remembered row and its top/bottom border
-  const endRow = findEndRowInColumnE_(sheet);
-  rememberEndRow_(sheet, endRow);
-  if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
-  clDbg_("END is now row " + endRow + " (border redrawn)");
+function resyncNotesAfterRowDelete_(ss, sheet, knownEndRow) {
+  // knownEndRow: the edit handler already knows END (it just redrew its border)
+  let endRow = knownEndRow;
+  if (!endRow) {
+    // A row delete: END moved up; refresh its remembered row and its top/bottom border
+    endRow = findEndRowInColumnE_(sheet);
+    rememberEndRow_(sheet, endRow);
+    if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+    clDbg_("END is now row " + endRow + " (border redrawn)");
+  }
 
   const props = PropertiesService.getDocumentProperties();
-  if (props.getProperty('autoNotes') === 'false') { clDbg_("skipped: 'update notes as I type' is off in Settings"); return; }
+  if (props.getProperty('autoNotes') === 'false') { clDbg_("skipped: 'update notes as I type' is off in Settings"); return false; }
   const combined = ss.getSheetByName("Combined Contact Tracking");
   const last = combined ? combined.getLastRow() : 0;
-  if (last < 2) return;
+  if (last < 2) return false;
 
   const disableHiddenNotes = props.getProperty('disableHiddenNotes') === 'true';
   const contactData = endRow ? sheet.getRange(1, 1, endRow, CL_WIDTH).getDisplayValues() : sheet.getDataRange().getDisplayValues();
@@ -86,11 +90,18 @@ function resyncNotesAfterRowDelete_(ss, sheet) {
     if (text !== String(r[3])) changed.push(osis);
   });
   clDbg_("notes compared for " + (last - 1) + " Combined rows; different: " + (changed.length ? changed.slice(0, 10).join(", ") + (changed.length > 10 ? " …" : "") : "none"));
-  if (!changed.length) return;
+  if (!changed.length) return true;
 
   if (changed.length > 25) { clDbg_("more than 25 differ -> full rebuild of Combined"); updateContactAndPhoneOnly(); }
-  else updateOsisDeltas_(changed);
+  else {
+    // The quick one-cell writes first (the search bar formula follows), then on
+    // the owner's sheet the update that also rewrites Phone Contacts
+    const owner = getOwnerHooks_();
+    const quick = updateCombinedNotesQuick_(changed, !owner);
+    if (owner) updateOsisDeltas_(changed, { combinedAlreadyWritten: quick.missing.length === 0 });
+  }
   clDbg_("notes updated");
+  return true;
 }
 
 function handleEdit_(e) {
@@ -277,8 +288,9 @@ function handleEdit_(e) {
   }
 
   autoAddBlankRow_(sheet, row, endRow);
-  if (endRow && row === endRow - 1) rememberEndRow_(sheet, endRow + 1); // a row was added above END
-  patchMissingFormulasInRow_(sheet, row);
+  const addedBlankRow = !!(endRow && row === endRow - 1); // autoAddBlankRow_ added a row above END
+  // (the week formula check, patchMissingFormulasInRow_, runs at the end of the
+  // edit: its reads would hold up the clean-up and the notes)
 
   // --- LAG FIX: Only recalculate colors if you actually changed the Type (Col L) ---
   if (col === CL_COL_TYPE) {
@@ -288,14 +300,10 @@ function handleEdit_(e) {
   // ==================================================
   // --- FORCE END BAR FORMATTING & SWEEP ---
   // ==================================================
-  // Where END should be now (one row lower when a blank row was added above it);
-  // checked with one cell, column E is only scanned when it is not there
-  let finalEndRow = null;
-  if (endRow) {
-    const expected = (row === endRow - 1) ? endRow + 1 : endRow;
-    try { if (String(sheet.getRange(expected, CL_COL_OSIS).getDisplayValue()).trim().toUpperCase() === "END") finalEndRow = expected; } catch (err) { finalEndRow = null; }
-  }
-  if (!finalEndRow) finalEndRow = findEndRowInColumnE_(sheet);
+  // Where END is now: it was checked at the start of this edit, and moves down
+  // exactly one row when a blank row was added above it (no read needed);
+  // column E is only scanned when END was not known
+  const finalEndRow = endRow ? (addedBlankRow ? endRow + 1 : endRow) : findEndRowInColumnE_(sheet);
   rememberEndRow_(sheet, finalEndRow);
   if (finalEndRow) {
     sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
@@ -316,20 +324,35 @@ function handleEdit_(e) {
   // Combined Contact Tracking notes now (the quick one-cell write), and pushes
   // it to the sheet so the search bar's Communications formula shows them.
   let notesDone = false;
-  if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
+  const multiCell = numRows > 1 || range.getNumColumns() > 1;
+  if (!multiCell && (!endRow || row < endRow)) {
     // The typist just wrote it (no read); otherwise read the row's OSIS cell
     const earlyOsis = typistOsis !== null ? typistOsis : String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
+    // OSIS cleared or typed over: the student it USED to be loses this row's note
+    const oldOsis = (col === CL_COL_OSIS && e.oldValue !== undefined) ? String(e.oldValue).trim() : "";
+    const extra = (isValidOsis_(oldOsis) && oldOsis !== earlyOsis) ? [oldOsis] : [];
+    const mainOsis = isValidOsis_(earlyOsis) ? earlyOsis : (extra.length ? extra.shift() : "");
     // A notes problem is logged, and the normal sync below tries once more
-    clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis));
-    if (isValidOsis_(earlyOsis)) {
+    clDbg_("row OSIS for the notes: " + JSON.stringify(earlyOsis) + (oldOsis ? " (was " + JSON.stringify(oldOsis) + ")" : ""));
+    if (mainOsis) {
       try {
-        notesDone = syncNotesForRowOsis_(earlyOsis, true);
-        if (notesDone) SpreadsheetApp.flush(); // the search bar formula reads Combined: let it update now
+        notesDone = syncNotesForRowOsis_(mainOsis, true, extra);
         clDbg_(notesDone ? "notes synced (quick write, pushed to the sheet)" : "notes NOT synced: 'update notes as I type' is off");
       }
       catch (err) { clDbg_("❌ quick notes sync failed: " + err.message); console.error("Quick notes sync failed (retried below): " + err.message); }
     }
+  } else if (multiCell && (!endRow || row < endRow)) {
+    // A paste or cleared row(s): which students changed is not known (a cleared
+    // row's old OSIS is gone), so compare every student's notes with the logs
+    // and update the ones that changed (same check as a deleted row)
+    try {
+      clDbg_("multi-cell edit (paste / cleared rows): checking which students' notes changed");
+      notesDone = resyncNotesAfterRowDelete_(e.source, sheet, finalEndRow);
+    } catch (err) { clDbg_("❌ notes check after the paste / clear failed: " + err.message); console.error("Notes check after a paste / clear failed: " + err.message); }
   }
+
+  // Week formula in column A (reads, so after the notes)
+  try { patchMissingFormulasInRow_(sheet, row); } catch (err) { console.warn("Week formula not checked: " + err.message); }
 
   if (notesDone) {
     // Already synced by the quick write (above). Owner's sheet: now the update
@@ -369,7 +392,8 @@ function handleEdit_(e) {
     }
 
   } else {
-    if (col === CL_COL_OSIS && !editedValue) {
+    // OSIS cleared and its old value unknown: rebuild Combined + Phone Contacts
+    if (col === CL_COL_OSIS && !editedValue && !multiCell) {
       updateContactAndPhoneOnly();
     }
   }
@@ -495,14 +519,20 @@ const SEARCH_BAR_COMMS_FORMULA = `=LET(
  * ran, false when "update notes as I type" is off in Settings (the caller then
  * shows the Fast Entry Mode toast at the end of the edit).
  */
-function syncNotesForRowOsis_(targetOsis, early) {
+function syncNotesForRowOsis_(targetOsis, early, extraOsis) {
   if (PropertiesService.getDocumentProperties().getProperty('autoNotes') === 'false') return false;
-  const osisList = [targetOsis];
-  if (targetOsis.includes(",")) {
-    targetOsis.split(",").map(o => o.trim()).forEach(individualOsis => {
-      if (isValidOsis_(individualOsis)) osisList.push(individualOsis);
-    });
-  }
+  const osisList = [];
+  const add = (o) => {
+    if (!o || osisList.indexOf(o) !== -1) return;
+    osisList.push(o);
+    if (o.includes(",")) {
+      o.split(",").map(x => x.trim()).forEach(individualOsis => {
+        if (isValidOsis_(individualOsis) && osisList.indexOf(individualOsis) === -1) osisList.push(individualOsis);
+      });
+    }
+  };
+  add(targetOsis);
+  (extraOsis || []).forEach(add); // e.g. the OSIS this row had before it was cleared / typed over
   if (!early) { updateOsisDeltas_(osisList); return true; }
 
   // Early (right after the ghost typist): only the quick one-cell Combined write,
@@ -1408,6 +1438,22 @@ function updateOsisDeltas_(osisList, opts) {
  * sheet: there the owner's update at the end of the edit adds the row).
  */
 function updateCombinedNotesQuick_(osisList, allowRebuild) {
+  // One edit at a time: two quick edits running side by side could otherwise
+  // write older notes over newer ones. The writes are pushed to the sheet before
+  // the lock is let go, so the next edit reads them.
+  let lock = null, locked = false;
+  try { lock = LockService.getDocumentLock(); locked = lock.tryLock(20000); } catch (err) { locked = false; }
+  if (!locked) clDbg_("notes: another edit held the lock for 20 s, writing anyway");
+  try {
+    const out = updateCombinedNotesQuickLocked_(osisList, allowRebuild);
+    SpreadsheetApp.flush();
+    return out;
+  } finally {
+    if (locked) { try { lock.releaseLock(); } catch (err) { /* released when the run ends */ } }
+  }
+}
+
+function updateCombinedNotesQuickLocked_(osisList, allowRebuild) {
   const targets = osisList.filter(o => o);
   clDbg_("notes update for " + targets.join(" | "));
   const texts = {}, missing = [];
