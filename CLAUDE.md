@@ -77,15 +77,12 @@ Files (shared = every school's sheet):
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
   Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
-  "Put formula back". "Anonymize" (on by default, cld_report(anon) / cldAnonymizer_): Master Table names ->
+  "Put formula back" (the "Use script" button went with the script-drawn box). "Anonymize" (on by default, cld_report(anon) / cldAnonymizer_): Master Table names ->
   Student-N / Guardian-N / Name-N, OSIS -> OSIS-N, phones / emails masked, note texts -> "[N chars, K lines, #hash]"
   (cldNoteSummary_, same text = same hash), Contact Log D -> (filled)/(blank), unknown typed text -> [typed text].
   Recording = shared logger in Core.gs (clDbgStart_ / clDbg_ / clDbgEnd_ / clDbgRun_, wrapped
   around installedOnEdit / installedOnChange): on only while doc cache key CL_DEBUG_ON exists (the sidebar re-puts it
   every 2 s poll, 5-min TTL); runs in CL_DEBUG_LOG (newest 25). Off = one cache read per edit.
-- Search bar formula self-repair: in formula mode refreshSearchBarCommunications_ calls ensureSearchBarFormula_, which
-  puts SEARCH_BAR_COMMS_FORMULA back ONCE if the Communications cell has no formula (e.g. left as text by the code
-  mode), then sets SEARCH_BAR_COMMS_MODE = "formula" so it never checks again. Runs on a search bar edit / build.
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
@@ -215,52 +212,37 @@ several presses. Don't bring it back without asking.
   someone else's sheet protection) at the end of every build, at Initial Setup, after buildEventTable / an event delete
   (Events only) and buildOverrideReport. It also deletes the old version's doc properties (SHEET_LOCK_SNAP_*, SHEET_LOCK_CL_END).
 
-Contact Log search bar (rows below END; its other cells are formulas typed in the sheet, not in the repo):
-- THE CELL DECIDES (2026-11-05; owner wants "no formula"): if the Communications cell holds a formula, the formula
-  draws the box and the script does nothing; if it is plain text, the script writes the notes one column right. Doc
-  property SEARCH_BAR_COMMS_MODE is no longer read (it was set to "formula" while the cell had no formula, leaving the
-  box blank). restoreSearchBarCommunicationsFormula puts the formula in; useCodeForSearchBarCommunications turns it
-  back into the plain label and draws. ensureSearchBarFormula_ / isSearchBarCodeMode_ were removed.
-  readSearchBarBox_ = 2 calls (3x3 block display + formulas around the label); the label's place (rows below END,
-  column) is cached in doc cache CL_COMMS_AT_<sheetId> and checked against the block. A row edit redraws the box
-  right after the quick notes write with that write's own texts (LAST_NOTES_TEXTS_), no second read; "▶ Name" uses
-  the ghost typist's cached Master Table. The typist's OSIS is reused (typistOsis) instead of re-reading E.
-- Notes sources cache (notesSourcesData_): Backend Event Log (display) + Notes tab (values, not cached if a cell is a
-  Date) in doc cache NOTES_SRC_EVENTS / NOTES_SRC_NOTES for 10 min (skipped > 95 KB). Cleared by every EVENT_LOG
-  write/clear/append/delete/sort/range helper in Core.gs, any Events / Notes edit (handleEdit_) and every build. On
-  the owner's sheet each sheet call cost 0.4-1.5 s (1,243-row Contact Log), so fewer calls is the main speed lever.
-- Speed (2026-11-05): a single-cell Contact Log edit whose row has an OSIS runs the quick notes update
-  (syncNotesForRowOsis_ -> updateOsisDeltas_) RIGHT AFTER the ghost typist / autofill, before the row repair /
-  blank row / END sweep, so Combined (and the formula) update sooner; the old end-of-edit sync still covers pastes
-  and rows whose OSIS only appears later. Ghost typist: Master Table A5:C + Directory C:E cached in the document
-  cache for 10 min (ghostTypistData_, key GHOST_TYPIST_DATA, skipped if > 95 KB), cleared at the end of every build
-  (clearGhostTypistCache_); Regenerate's resets don't clear it (10 min max).
-  END row: contactLogPrefetch_ gets the remembered END row (doc cache CL_END_ROW_<sheetId>) + the typist data in ONE
-  cache.getAll, trusts it after a one-cell "END" check (else scans column E); rememberEndRow_ after the blank-row
-  insert and the END sweep. The typist writes only the cells it fills (C / E:F / H:I) without reading the row first,
-  so a warm edit makes 1 sheet read before its flush.
-  Early sync = updateCombinedNotesQuick_ (one Combined cell from the logs; the shared body of updateOsisDeltas_). On
-  the owner's sheet the heavy ownerUpdateOsisDeltas_ (re-reads Raw Data, rebuilds Combined + Phone Contacts in memory)
-  runs at the END of the edit instead (PENDING_OWNER_NOTES_), and the early write never falls back to
-  updateContactAndPhoneOnly there (that writes Phone Contacts in the shared layout).
-  The early notes sync is in a try/catch (an error is logged and the end-of-edit sync retries), so the row clean-up
-  always runs. Notes typist: writes only the cells it fills (no row read) and flushes before the checkbox / sync.
-  Events typist unchanged (already minimal for its TextFinder lookup). TextFinder lookups (Notes / Events) kept on
-  purpose: switching to the in-memory cache would change matches with stray spaces.
-- "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
-  1st try, which read Combined Contact Tracking, was reverted). findSearchBarComms_ finds the label in ANY column
-  within 15 rows below END (display "Communications", or a formula containing "Communications" that shows an error,
-  e.g. #REF! from a blocked spill); refreshSearchBarCommunications_ writes the label as text there (replacing the
-  HSTACK formula) and the notes one column right (plain text); OSIS / name switch are read relative to the label
-  after a flush. checkSearchBarCommunications (run from the editor) toasts what it found or why it skipped. OSIS = E of the row above, "▶ Name" (Master Table B) when F two rows above is not blank, "No Notes",
-  leading "Notes:" stripped (old formula's rules). Notes are built straight from Contact Log (to END) / Backend Event
-  Log / Notes with notesTextForOsis_ (also used by updateOsisDeltas_), so it never waits for Combined — EXCEPT a
-  search bar lookup (edit below END) and the end of a build read Combined D instead (quickest; Combined is current
-  then), unless Settings autoNotes is off (Combined may be stale).
-  Runs: edit below END; a Contact Log row edit whose OSIS (or old OSIS) is in the box, right after the ghost typist
-  and before the quick update; after Notes / Events edits; end of buildAllDerivedSheets. Writes only when changed.
-  restoreSearchBarCommunicationsFormula puts the formula back (doc property SEARCH_BAR_COMMS_MODE = "formula");
-  useCodeForSearchBarCommunications switches back.
+Contact Log search bar (rows below END; its cells are formulas typed in the sheet, not in the repo):
+- The "Communications" box is the owner's FORMULA (SEARCH_BAR_COMMS_FORMULA in Edits.gs, HSTACK in the label cell,
+  reads Combined Contact Tracking D). Owner's decision 2026-11-05 after trying a script-drawn box the same day: a
+  script can never be instant on a lookup and it did not follow row deletes. All script-drawn code (refresh / read
+  box / "cell decides" / mode property SEARCH_BAR_COMMS_MODE / useCode... / checkSearchBarCommunications) was removed.
+  Kept: findSearchBarComms_ (label in any column within 15 rows below END, also an erroring HSTACK formula),
+  combinedNotesReader_ / logsNotesReader_ (debug sidebar), restoreSearchBarCommunicationsFormula (puts the formula in
+  the label cell and clears the cell right of it, where it spills; also the debug sidebar's "Put formula back").
+  Everything below is about getting Combined written sooner, which the formula then shows.
+- Speed (2026-11-05; on the owner's sheet each sheet call cost 0.4-1.5 s with a 1,243-row Contact Log, so fewer
+  calls is the main lever). Single-cell Contact Log edit, in order:
+  1. contactLogPrefetch_: ONE cache.getAll (remembered END row CL_END_ROW_<sheetId> + ghost typist data). When END is
+     <= 60 rows below the edited row, ONE read (edited row .. END, B:N) checks END and gives the auto-fill its row
+     values (preRowVals); else a one-cell END check (column E scanned only when END moved).
+  2. Ghost typist from the cache (Master Table A5:C + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
+     skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
+     writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
+     ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
+  3. Quick notes write (syncNotesForRowOsis_(osis, true) -> updateCombinedNotesQuick_, returns { texts, missing }):
+     Contact Log read + Event Log / Notes tab from notesSourcesData_ (doc cache NOTES_SRC_EVENTS / NOTES_SRC_NOTES,
+     6 h, Notes not cached if a cell is a Date; cleared by every EVENT_LOG helper in Core.gs, any Events / Notes edit,
+     every build, the owner's resets) + Combined A:A, one cell written, then a flush (the formula follows). In a
+     try/catch: an error is logged and the end-of-edit sync retries, so the clean-up always runs.
+  4. Row clean-up (borders, checkbox, blank row, week formula, END bar; the END sweep checks the expected cell).
+  5. Owner's sheet only: ownerUpdateOsisDeltas_ (PENDING_OWNER_NOTES_) with opts.combinedAlreadyWritten = true
+     unless a student had no Combined row: Phone Contacts only (no in-memory Combined rebuild, buildTrackingNotesMap_
+     reads the Combined tab; never rewrites Combined, which could put back older notes). The early write never falls
+     back to updateContactAndPhoneOnly on the owner's sheet.
+  Pastes / rows whose OSIS appears later use the old end-of-edit sync. Notes typist: writes only the cells it fills
+  and flushes before the checkbox / sync. Events typist unchanged. TextFinder lookups (Notes / Events) kept on
+  purpose: the in-memory cache would change matches with stray spaces.
 
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
@@ -303,7 +285,7 @@ triggers, contacts, toasts and alerts; the only additions are the owner's Debug 
   4. Not started — optional behavior fixes, one at a time, only with the owner's go-ahead.
 Row deletes (2026-11-05): installable change trigger installedOnChange (Edits.gs) -> on REMOVE_ROW with the Contact Log
 active: resyncNotesAfterRowDelete_ redraws the END bar border, recomputes every Combined student's notes from the logs
-(notesTextForOsis_, rows grouped by OSIS once) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
+(notesTextForOsis_, rows grouped by OSIS once, Contact Log to END + notesSourcesData_) and runs updateOsisDeltas_ for those that differ (> 25 differ: updateContactAndPhoneOnly). Made by
 setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureChangeTrigger_, doc property
 CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
 Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger

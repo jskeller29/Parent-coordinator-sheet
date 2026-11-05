@@ -71,10 +71,12 @@ function ownerAddMenus_(ui) {
 
 function ownerMenuResetAndLoadFakeData() {
   if (ownerConfirmWipe_("Reset + Load Fake Data")) runAction_("Reset + Load Fake Data", () => resetAndLoadFakeData());
+  ownerClearEditCaches_();
 }
 
 function ownerMenuResetToDisplayMode() {
   if (ownerConfirmWipe_("Reset to Display Mode")) runAction_("Reset to Display Mode", () => resetToDisplayMode());
+  ownerClearEditCaches_();
 }
 
 /**
@@ -210,6 +212,11 @@ function ownerMenuToggleDebug() {
 }
 
 /** Extra guard for the menu: these wipe the sheet, including the Old Master Table / Old Phone Contacts tabs. */
+/** A reset rewrites the Master Table / Directory / Notes without a build: drop the edit caches (Edits.gs). */
+function ownerClearEditCaches_() {
+  try { clearGhostTypistCache_(); clearNotesSourcesCache_(); } catch (e) { console.warn("Edit caches not cleared: " + e.message); }
+}
+
 function ownerConfirmWipe_(what) {
   const ui = SpreadsheetApp.getUi();
   const res = ui.prompt(
@@ -1120,9 +1127,14 @@ function normalizePhoneForMerge_(value) {
 // Rebuilds Combined Contact Tracking + Phone Contacts in memory ONCE, then
 // rewrites only the rows of each OSIS in the list.
 // ======================================================================
-function ownerUpdateOsisDeltas_(osisList) {
+function ownerUpdateOsisDeltas_(osisList, opts) {
+  // combinedAlreadyWritten: a Contact Log edit's quick write (Edits.gs) already
+  // rewrote these students' Combined rows, so only Phone Contacts is done here:
+  // Combined is not rebuilt in memory (its notes are read from the sheet) and
+  // not rewritten (that could put back older notes than the quick write's).
+  const phoneOnly = !!(opts && opts.combinedAlreadyWritten);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let combinedContactTracking, phoneContacts, osisIndex;
+  let combinedContactTracking = null, phoneContacts, osisIndex;
   try {
     const rawSheet = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
     if (!rawSheet) return;
@@ -1139,15 +1151,22 @@ function ownerUpdateOsisDeltas_(osisList) {
     
     const masterTableData = getExistingMasterTable_(ss);
 
-    // ✨ THE FIX: Fetch the Contact Log and Event Log data here so the builder doesn't crash!
-    const contactLogSheet = ss.getSheetByName("Contact Log");
-    const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getValues() : [];
-    
-    const eventLogData = backendReadBlock_(ss, "EVENT_LOG");
+    clDbg_("owner update: Raw Data / overrides / Master Table read");
 
-    // Pass ALL 4 arguments into the builder
-    combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTableData, contactLogData, eventLogData);
+    if (!phoneOnly) {
+      // ✨ THE FIX: Fetch the Contact Log and Event Log data here so the builder doesn't crash!
+      const contactLogSheet = ss.getSheetByName("Contact Log");
+      const contactLogData = contactLogSheet ? contactLogSheet.getDataRange().getValues() : [];
+      
+      const eventLogData = backendReadBlock_(ss, "EVENT_LOG");
+
+      // Pass ALL 4 arguments into the builder
+      combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTableData, contactLogData, eventLogData);
+      clDbg_("owner update: Combined rebuilt in memory");
+    }
+    // phoneOnly: null makes buildTrackingNotesMap_ read the notes from the Combined tab
     phoneContacts = ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTableData, combinedContactTracking, parentSquareIndex, nycsaIndex);
+    clDbg_("owner update: Phone Contacts built in memory");
 
     const phoneHeaders = phoneContacts[0];
     osisIndex = phoneHeaders.indexOf("OSIS") !== -1 ? phoneHeaders.indexOf("OSIS") : 5;
@@ -1159,7 +1178,7 @@ function ownerUpdateOsisDeltas_(osisList) {
 
   osisList.forEach(targetOsis => {
     try {
-      writeSingleRowDelta_(ss, "Combined Contact Tracking", combinedContactTracking, targetOsis, 0);
+      if (!phoneOnly) writeSingleRowDelta_(ss, "Combined Contact Tracking", combinedContactTracking, targetOsis, 0);
       writeMultipleRowDeltas_(ss, "Phone Contacts", phoneContacts, targetOsis, osisIndex);
     } catch (err) {
       console.error("Delta update failed: " + err.message);

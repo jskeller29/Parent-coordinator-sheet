@@ -31,7 +31,6 @@
     <button onclick="copyReport()">Copy report</button>
     <label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="anon" checked> Anonymize</label>
     <button onclick="clearLog()">Clear</button>
-    <button onclick="useScript()">Use script (no formula)</button>
     <button onclick="fixFormula()">Put formula back</button>
     <button onclick="stopRec()">Stop</button>
   </div>
@@ -98,13 +97,6 @@
     google.script.run.withSuccessHandler(renderState).withFailureHandler(function (e) {
       $('state').textContent = '❌ ' + (e && e.message ? e.message : e);
     }).cld_fixFormula();
-  }
-
-  function useScript() {
-    $('state').textContent = 'Switching to the script…';
-    google.script.run.withSuccessHandler(renderState).withFailureHandler(function (e) {
-      $('state').textContent = '❌ ' + (e && e.message ? e.message : e);
-    }).cld_useScript();
   }
 
   function clearLog() { google.script.run.withSuccessHandler(function (v) { renderRuns(v.log); }).cld_clear(); }
