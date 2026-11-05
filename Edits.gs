@@ -924,9 +924,9 @@ function cleanRawDataPasteZone_(sheet, range) {
   sheet.getRange("AP2").setValue("PASTE").setHorizontalAlignment("center");
   
   try {
-    sheet.getRange("BH3:BI3").merge().setValue("MAKE OWN DATA").setHorizontalAlignment("center");
+    sheet.getRange("BH3:BI3").merge().setValue("Class / Site").setHorizontalAlignment("center");
   } catch(e) {
-    sheet.getRange("BH3").setValue("MAKE OWN DATA").setHorizontalAlignment("center");
+    sheet.getRange("BH3").setValue("Class / Site").setHorizontalAlignment("center");
   }
   
   sheet.getRange("AF:AF").clearContent().setBackground("#FFFFFF");

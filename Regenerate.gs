@@ -272,7 +272,7 @@ function writeRawDataHeaders_(ss) {
   sheet.getRange("A1").setValue("ATS - DATE UPDATED: 00/00/00");
   sheet.getRange("AG1").setValue("Parent Square - DATE UPDATED: 00/00/00");
   sheet.getRange("AP1").setValue("NYCSA - DATE UPDATED: 00/00/00");
-  sheet.getRange("BH3").setValue("MAKE OWN DATA");
+  sheet.getRange("BH3").setValue("Class / Site");
 
   // Lock in the vibrant paint job and ENFORCE CLIPPING!
   forceVibrantColors_(sheet);

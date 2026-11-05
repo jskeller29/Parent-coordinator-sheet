@@ -13,7 +13,7 @@
 //   5. At the end (or on Exit) temp tabs are deleted and the hidden tabs come back.
 // Step 4 "Site / Class" is filled in by hand instead: one row per class code
 // (from the ATS data), with Teacher Name and Site (optional, dropdown that grows
-// as new sites are typed). Save writes Raw Data BH:BI (MAKE OWN DATA) as one row
+// as new sites are typed). Save writes Raw Data BH:BI (Class / Site) as one row
 // per site: BH = site, BI = that site's classes, one per line ("Y25: Carl" or
 // just "Y24" with no teacher); read by parseClassCell_ (Build.gs).
 //
