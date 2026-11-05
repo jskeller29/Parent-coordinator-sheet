@@ -77,7 +77,10 @@ Files (shared = every school's sheet):
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
   Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
-  "Put formula back". Recording = shared logger in Core.gs (clDbgStart_ / clDbg_ / clDbgEnd_ / clDbgRun_, wrapped
+  "Put formula back". "Anonymize" (on by default, cld_report(anon) / cldAnonymizer_): Master Table names ->
+  Student-N / Guardian-N / Name-N, OSIS -> OSIS-N, phones / emails masked, note texts -> "[N chars, K lines, #hash]"
+  (cldNoteSummary_, same text = same hash), Contact Log D -> (filled)/(blank), unknown typed text -> [typed text].
+  Recording = shared logger in Core.gs (clDbgStart_ / clDbg_ / clDbgEnd_ / clDbgRun_, wrapped
   around installedOnEdit / installedOnChange): on only while doc cache key CL_DEBUG_ON exists (the sidebar re-puts it
   every 2 s poll, 5-min TTL); runs in CL_DEBUG_LOG (newest 25). Off = one cache read per edit.
 - Search bar formula self-repair: in formula mode refreshSearchBarCommunications_ calls ensureSearchBarFormula_, which

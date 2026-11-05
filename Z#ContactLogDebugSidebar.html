@@ -29,6 +29,7 @@
   <div class="bar">
     <button onclick="loadState()">Check search bar</button>
     <button onclick="copyReport()">Copy report</button>
+    <label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="anon" checked> Anonymize</label>
     <button onclick="clearLog()">Clear</button>
     <button onclick="fixFormula()">Put formula back</button>
     <button onclick="stopRec()">Stop</button>
@@ -107,24 +108,15 @@
   }
 
   function copyReport() {
-    var lines = ['CONTACT LOG DEBUG REPORT ' + new Date().toLocaleString(), ''];
-    if (lastState) {
-      lines.push('SEARCH BAR & NOTES (checked in ' + lastState.ms + ' ms)');
-      lastState.rows.forEach(function (r) { lines.push('  ' + r[0] + ': ' + r[1]); });
-      lines.push('');
-    } else {
-      lines.push('(search bar not checked: click "Check search bar" first)', '');
-    }
-    lines.push('RUNS (newest first)');
-    lastLog.forEach(function (r) {
-      lines.push('- ' + r.label + '  [' + (r.at || '') + ', total ' + (r.total || 0) + ' ms]');
-      var prev = 0;
-      (r.steps || []).forEach(function (s) { lines.push('    ' + s[0] + ' ms (+' + (s[0] - prev) + '): ' + s[1]); prev = s[0]; });
-    });
-    $('report').value = lines.join('\n');
     $('reportBox').style.display = 'block';
-    $('report').focus(); $('report').select();
-    try { document.execCommand('copy'); } catch (e) {}
+    $('report').value = 'Building the report…';
+    google.script.run.withSuccessHandler(function (text) {
+      $('report').value = text;
+      $('report').focus(); $('report').select();
+      try { document.execCommand('copy'); } catch (e) {}
+    }).withFailureHandler(function (e) {
+      $('report').value = '❌ ' + (e && e.message ? e.message : e);
+    }).cld_report($('anon').checked);
   }
 
   poll();
