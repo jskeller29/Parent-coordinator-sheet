@@ -187,6 +187,9 @@ SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" t
 choice 2026-11-05): the code never puts cells back after an edit; the earlier undo layer (snapshots, onSelectionChange
 copies, "clear 2+ rows?" popup, column A auto-restore) was removed because its extra script writes made Ctrl+Z need
 several presses. Don't bring it back without asking.
+- All are RANGE protections (owner's pick 2026-11-05: a whole-tab SHEET protection puts a 🔒 icon on the tab). Built
+  tabs = one range over the whole grid; PCAR = 4 ranges around H2:I2. A range covers the grid as it was when locked;
+  rows a build adds are covered when applySheetLocks_ runs at the end of the build. Old SHEET ones are removed as stale.
 - Google "Heads up, are you sure?" warning-only protections (description starts "🔒 Sheet Lock"; scripts are not
   blocked) on: row 1 of Contact Log / Notes / Send Out; Contact Log END bar row (except O, the FILTER? checkbox) and
   everything below it; row 2 (headers) of every Events table (EVENT_TABLE_HEADERS); PCAR except H2:I2; the whole built
@@ -196,6 +199,18 @@ several presses. Don't bring it back without asking.
 - applySheetLocks_ adds/refreshes them (only our tagged ones; unchanged ones kept, stale ones removed; never takes over
   someone else's sheet protection) at the end of every build, at Initial Setup, after buildEventTable / an event delete
   (Events only) and buildOverrideReport. It also deletes the old version's doc properties (SHEET_LOCK_SNAP_*, SHEET_LOCK_CL_END).
+
+Contact Log search bar (rows below END; its other cells are formulas typed in the sheet, not in the repo):
+- "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
+  1st try, which read Combined Contact Tracking, was reverted). refreshSearchBarCommunications_ finds the label in
+  column D within 15 rows below END, writes the label as text in D (replacing the HSTACK formula) and the notes in E
+  (plain text). OSIS = E of the row above, "▶ Name" (Master Table B) when F two rows above is not blank, "No Notes",
+  leading "Notes:" stripped (old formula's rules). Notes are built straight from Contact Log (to END) / Backend Event
+  Log / Notes with notesTextForOsis_ (also used by updateOsisDeltas_), so it never waits for Combined.
+  Runs: edit below END; a Contact Log row edit whose OSIS (or old OSIS) is in the box, right after the ghost typist
+  and before the quick update; after Notes / Events edits; end of buildAllDerivedSheets. Writes only when changed.
+  restoreSearchBarCommunicationsFormula puts the formula back (doc property SEARCH_BAR_COMMS_MODE = "formula");
+  useCodeForSearchBarCommunications switches back. Divider lines use Combined's column D width.
 
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets

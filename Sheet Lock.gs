@@ -17,6 +17,8 @@
 // Not warned: every place data is typed (Contact Log rows above END, incl.
 // column A; Notes / Send Out rows 2+; Events row 1 and rows 3+).
 //
+// All are RANGE protections (a whole-tab SHEET protection puts a 🔒 on the tab);
+// SHEET ones from the older version are removed as stale by applySheetLocks_.
 // Warning-only protections never block scripts. Ours carry a description
 // starting with SHEET_LOCK_TAG, so applySheetLocks_ can find and redo them
 // (end of every build, Initial Setup, new / deleted event, Override Report).
@@ -101,11 +103,20 @@ function desiredSheetLocks_(sheet, name) {
     if (r2 >= r1 && c2 >= c1) out.push({ kind: "RANGE", range: sheet.getRange(r1, c1, r2 - r1 + 1, c2 - c1 + 1), desc: desc + what });
   };
 
+  // Whole tabs are warned with RANGE protections over every cell, not a sheet
+  // protection: same warning, but Google shows no 🔒 on the tab (owner's pick
+  // 2026-11-05). A range covers the grid as it is now; the build re-runs this,
+  // so rows a build adds are covered again right after.
   if (SHEET_LOCK_BUILT_TABS.indexOf(name) !== -1) {
-    out.push({ kind: "SHEET", unprotected: [], desc: desc + "built automatically (🏗️ Build Sheets Only rewrites it)" });
+    range(1, 1, maxR, maxC, "built automatically (🏗️ Build Sheets Only rewrites it)");
   } else if (name === SHEET_LOCK_PCAR) {
-    const inp = SHEET_LOCK_PCAR_INPUT;
-    out.push({ kind: "SHEET", unprotected: [sheet.getRange(inp.row, inp.col, 1, inp.numCols)], desc: desc + "PCAR formulas (only H2:I2 are yours to change)" });
+    // Everything except H2:I2, as 4 blocks around it
+    const inp = SHEET_LOCK_PCAR_INPUT, what = "PCAR formulas (only H2:I2 are yours to change)";
+    const lastInpCol = inp.col + inp.numCols - 1;
+    range(1, 1, inp.row - 1, maxC, what);                            // rows above
+    range(inp.row, 1, inp.row, inp.col - 1, what);                   // left of H2
+    range(inp.row, lastInpCol + 1, inp.row, maxC, what);             // right of I2
+    range(inp.row + 1, 1, maxR, maxC, what);                         // rows below
   } else if (name === "Events") {
     eventTableStarts_(sheet).forEach(c => range(2, c, 2, c + EVENT_TABLE_HEADERS.length - 1, "event table headers"));
   } else if (SHEET_LOCK_HEADER_TABS.indexOf(name) !== -1) {
