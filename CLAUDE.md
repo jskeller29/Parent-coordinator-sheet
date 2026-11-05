@@ -206,7 +206,9 @@ Contact Log search bar (rows below END; its other cells are formulas typed in th
   column D within 15 rows below END, writes the label as text in D (replacing the HSTACK formula) and the notes in E
   (plain text). OSIS = E of the row above, "▶ Name" (Master Table B) when F two rows above is not blank, "No Notes",
   leading "Notes:" stripped (old formula's rules). Notes are built straight from Contact Log (to END) / Backend Event
-  Log / Notes with notesTextForOsis_ (also used by updateOsisDeltas_), so it never waits for Combined.
+  Log / Notes with notesTextForOsis_ (also used by updateOsisDeltas_), so it never waits for Combined — EXCEPT a
+  search bar lookup (edit below END) and the end of a build read Combined D instead (quickest; Combined is current
+  then), unless Settings autoNotes is off (Combined may be stale).
   Runs: edit below END; a Contact Log row edit whose OSIS (or old OSIS) is in the box, right after the ghost typist
   and before the quick update; after Notes / Events edits; end of buildAllDerivedSheets. Writes only when changed.
   restoreSearchBarCommunicationsFormula puts the formula back (doc property SEARCH_BAR_COMMS_MODE = "formula");

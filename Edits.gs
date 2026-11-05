@@ -73,7 +73,7 @@ function handleEdit_(e) {
   if (endRow && row >= endRow) {
     // An edit in the search bar below the END bar (e.g. looking up a student):
     // draw its Communications box right away
-    if (row > endRow) refreshSearchBarCommunications_(sheet, endRow);
+    if (row > endRow) refreshSearchBarCommunications_(sheet, endRow, null, true);
     return;
   }
 
@@ -322,17 +322,45 @@ function searchBarOsisList_(text) {
   return String(text).split(",").map(o => sheetsTrim_(o)).filter(o => o !== "");
 }
 
-/** The Communications text for the box (same rules as the old formula). */
-function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNames) {
-  if (String(osisBox) === "") return "";
-  const osisList = searchBarOsisList_(osisBox);
+/**
+ * One student's notes, read from Combined Contact Tracking (A = OSIS, D = notes):
+ * the fast path for a search bar lookup, when Combined is already up to date.
+ * Returns a function osis -> notes ("" when the student has no row).
+ */
+function combinedNotesReader_(ss) {
+  const sh = ss.getSheetByName("Combined Contact Tracking");
+  const last = sh ? sh.getLastRow() : 0;
+  const ids = last >= 2 ? sh.getRange(2, 1, last - 1, 1).getDisplayValues() : [];
+  return osis => {
+    const key = String(osis).trim().toLowerCase();
+    for (let i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]).trim().toLowerCase() === key) return String(sh.getRange(i + 2, 4).getDisplayValue());
+    }
+    return "";
+  };
+}
 
+/** One student's notes built from the Contact Log / Event Log / Notes data (never stale). */
+function logsNotesReader_(ss, contactSheet, endRow) {
   const disableHiddenNotes = PropertiesService.getDocumentProperties().getProperty('disableHiddenNotes') === 'true';
   // Read each source once (Contact Log only down to the END bar)
   const contactData = contactSheet.getRange(1, 1, endRow, CL_WIDTH).getDisplayValues();
   const eventData = backendReadBlock_(ss, "EVENT_LOG", true);
   const notesSheet = ss.getSheetByName("Notes");
   const nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
+  return osis => notesTextForOsis_(osis, contactData, eventData, nData, disableHiddenNotes);
+}
+
+/**
+ * The Communications text for the box (same rules as the old formula).
+ * fromCombined: read the notes from Combined Contact Tracking (quickest; used for
+ * a search bar lookup) instead of building them from the logs (used right after
+ * a Contact Log edit, before the quick update has written Combined).
+ */
+function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNames, fromCombined) {
+  if (String(osisBox) === "") return "";
+  const osisList = searchBarOsisList_(osisBox);
+  const notesFor = fromCombined ? combinedNotesReader_(ss) : logsNotesReader_(ss, contactSheet, endRow);
 
   let names = null;
   if (showNames) {
@@ -349,7 +377,7 @@ function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNa
 
   const blocks = [];
   osisList.forEach(osis => {
-    const notes = notesTextForOsis_(osis, contactData, eventData, nData, disableHiddenNotes);
+    const notes = notesFor(osis);
     if (notes === "") return;
     if (!names) { blocks.push(notes); return; }
     const name = names.get(osis.toLowerCase());
@@ -367,8 +395,10 @@ function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNa
  * Redraws the search bar's Communications box. Never throws (it runs inside edits).
  * onlyForOsis: optional list of OSIS values; the box is only redrawn when it
  * shows one of them (a Contact Log row edit for another student skips it).
+ * fromCombined: true = read the notes from Combined Contact Tracking (a lookup
+ * or after a build, when Combined is current); otherwise built from the logs.
  */
-function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis) {
+function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombined) {
   try {
     if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") return;
     sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
@@ -384,7 +414,10 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis) {
       if (!wanted.some(o => shown.has(o))) return;
     }
 
-    const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames);
+    // Combined is only current when quick updates are on (Settings "autoNotes")
+    const useCombined = fromCombined === true &&
+      PropertiesService.getDocumentProperties().getProperty('autoNotes') !== 'false';
+    const text = buildSearchBarCommunications_(ss, sheet, endRow, box.osisBox, box.showNames, useCombined);
 
     // Label first (this replaces the old formula, whose spill would block E), then the notes
     const label = sheet.getRange(box.row, 4);
