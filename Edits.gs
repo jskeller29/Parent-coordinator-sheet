@@ -99,12 +99,11 @@ function handleEdit_(e) {
     try {
       // Watch columns: C (Guardian), E (OSIS), F (Student)
       if ((col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT) && editedValue && editedValue.toUpperCase() !== "FALSE" && editedValue.toUpperCase() !== "TRUE") {
-        const masterSheet = e.source.getSheetByName("Master Table");
-        const masterLastRow = masterSheet ? masterSheet.getLastRow() : 0;
-        if (masterSheet && masterLastRow >= 5) {
-          // ONE read of OSIS/Student/Guardian (A5:C) with an in-memory scan,
-          // instead of a TextFinder plus three single-cell reads.
-          const masterData = masterSheet.getRange(5, 1, masterLastRow - 4, 3).getValues();
+        // Master Table A5:C + Directory C:E, from a short cache when the
+        // previous edit already read them (ghostTypistData_)
+        const ghost = ghostTypistData_(e.source);
+        if (ghost.master.length) {
+          const masterData = ghost.master;
           const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
           const needle = editedValue.toLowerCase();
           let match = null;
@@ -121,14 +120,11 @@ function handleEdit_(e) {
             const sites = new Set();
             const classes = new Set();
 
-            const dirSheet = e.source.getSheetByName("Directory");
-            if (dirSheet && correctOsis) {
+            if (correctOsis) {
               const osisSet = new Set(String(correctOsis).split(',').map(o => o.trim()).filter(String));
-              // ONE read of OSIS/Site/Class (C:E) instead of a TextFinder
-              // round trip per sibling.
-              const dirLastRow = dirSheet.getLastRow();
-              if (dirLastRow > 0) {
-                const dirData = dirSheet.getRange(1, 3, dirLastRow, 3).getValues();
+              // OSIS/Site/Class (Directory C:E), already read with the Master Table
+              {
+                const dirData = ghost.dir;
                 for (let i = 0; i < dirData.length; i++) {
                   if (osisSet.has(String(dirData[i][0]).trim())) {
                     const siteVal = String(dirData[i][1]).trim();
@@ -176,11 +172,22 @@ function handleEdit_(e) {
     }
   }
 
-  // --- SEARCH BAR COMMUNICATIONS ---
+  // --- NOTES FIRST ---
+  // A single-cell edit whose row already has an OSIS rewrites that student's
+  // Combined Contact Tracking notes NOW, right after the ghost typist, so the
+  // search bar's Communications formula shows them as early as possible. The
+  // row's borders / checkbox / END bar clean-up below can wait.
+  let notesDone = false;
+  if (numRows === 1 && range.getNumColumns() === 1 && (!endRow || row < endRow)) {
+    const earlyOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
+    if (isValidOsis_(earlyOsis)) notesDone = syncNotesForRowOsis_(earlyOsis);
+  }
+
+  // --- SEARCH BAR COMMUNICATIONS (only when drawn by code, see the section below) ---
   // Right after the ghost typist: if the search bar shows a student on the
   // edited row(s), redraw its notes now (built from the Contact Log itself, so
   // it does not wait for the Combined Contact Tracking update further down).
-  {
+  if (isSearchBarCodeMode_()) {
     const lastEdited = endRow ? Math.min(row + numRows - 1, endRow - 1) : row + numRows - 1;
     if (lastEdited >= row) {
       const editedOsis = sheet.getRange(row, CL_COL_OSIS, lastEdited - row + 1, 1).getDisplayValues().map(r => r[0]);
@@ -227,6 +234,8 @@ function handleEdit_(e) {
 
   SpreadsheetApp.flush(); 
 
+  if (notesDone) return; // already synced right after the ghost typist (above)
+
   // --- DYNAMIC DELTA SYNC TRIGGER ---
   let targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
 
@@ -241,14 +250,7 @@ function handleEdit_(e) {
     const autoNotes = props.getProperty('autoNotes') !== 'false'; 
     
     if (autoNotes) {
-      // A sibling group ("111, 222") updates the group row and then each sibling
-      const osisList = [targetOsis];
-      if (targetOsis.includes(",")) {
-        targetOsis.split(",").map(o => o.trim()).forEach(individualOsis => {
-          if (isValidOsis_(individualOsis)) osisList.push(individualOsis);
-        });
-      }
-      updateOsisDeltas_(osisList);
+      syncNotesForRowOsis_(targetOsis);
     } else {
       SpreadsheetApp.getActiveSpreadsheet().toast(
         "Note saved locally. Background sync is paused via Settings.", 
@@ -288,7 +290,12 @@ function handleEdit_(e) {
 // =========================================================
 const SEARCH_BAR_COMMS_LABEL = "Communications";
 const SEARCH_BAR_SCAN_ROWS = 15;                        // rows below END searched for the label
-const SEARCH_BAR_COMMS_PROP = "SEARCH_BAR_COMMS_MODE";  // "formula" = left to the old formula
+const SEARCH_BAR_COMMS_PROP = "SEARCH_BAR_COMMS_MODE";  // "code" = drawn by the script; anything else = the formula (default)
+
+/** True when the script draws the box (useCodeForSearchBarCommunications); default is the formula. */
+function isSearchBarCodeMode_() {
+  return PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "code";
+}
 const SHEETS_CELL_LIMIT = 50000;
 
 /**
@@ -418,7 +425,7 @@ function buildSearchBarCommunications_(ss, contactSheet, endRow, osisBox, showNa
  */
 function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombined) {
   try {
-    if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") return;
+    if (!isSearchBarCodeMode_()) return; // the formula draws it
     sheet = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
     if (!sheet) return;
     const ss = sheet.getParent();
@@ -455,8 +462,8 @@ function refreshSearchBarCommunications_(sheet, endRow, onlyForOsis, fromCombine
 function checkSearchBarCommunications() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const say = (msg) => { ss.toast(msg, "Search Bar check", 15); console.log(msg); };
-  if (PropertiesService.getDocumentProperties().getProperty(SEARCH_BAR_COMMS_PROP) === "formula") {
-    return say("Turned off (formula mode). Run useCodeForSearchBarCommunications to turn it on.");
+  if (!isSearchBarCodeMode_()) {
+    return say("The formula draws Communications (the default). Run useCodeForSearchBarCommunications to let the script draw it.");
   }
   const sheet = ss.getSheetByName("Contact Log");
   if (!sheet) return say("No Contact Log tab.");
@@ -489,7 +496,7 @@ function restoreSearchBarCommunicationsFormula() {
 
 /** Lets the script draw Communications again (undoes restoreSearchBarCommunicationsFormula). */
 function useCodeForSearchBarCommunications() {
-  PropertiesService.getDocumentProperties().deleteProperty(SEARCH_BAR_COMMS_PROP);
+  PropertiesService.getDocumentProperties().setProperty(SEARCH_BAR_COMMS_PROP, "code");
   refreshSearchBarCommunications_();
   SpreadsheetApp.getActiveSpreadsheet().toast("Communications is drawn by the script.", "Search Bar", 5);
 }
@@ -519,6 +526,62 @@ const SEARCH_BAR_COMMS_FORMULA = `=LET(
     ))
   )
 )`;
+
+/**
+ * The quick notes update for one Contact Log row's OSIS (a sibling group
+ * "111, 222" updates the group row and then each sibling). Returns true when it
+ * ran, false when "update notes as I type" is off in Settings (the caller then
+ * shows the Fast Entry Mode toast at the end of the edit).
+ */
+function syncNotesForRowOsis_(targetOsis) {
+  if (PropertiesService.getDocumentProperties().getProperty('autoNotes') === 'false') return false;
+  const osisList = [targetOsis];
+  if (targetOsis.includes(",")) {
+    targetOsis.split(",").map(o => o.trim()).forEach(individualOsis => {
+      if (isValidOsis_(individualOsis)) osisList.push(individualOsis);
+    });
+  }
+  updateOsisDeltas_(osisList);
+  return true;
+}
+
+// =========================================================
+// GHOST TYPIST DATA CACHE
+// The Contact Log ghost typist needs Master Table A5:C and Directory C:E on
+// every edit. Only a build writes those tabs, so the first edit reads them and
+// keeps a copy in the document cache for 10 minutes; the next edits skip both
+// reads. Every build clears it (clearGhostTypistCache_). Too big for the cache
+// (> ~95 KB): read every time, as before.
+// =========================================================
+const GHOST_CACHE_KEY_ = "GHOST_TYPIST_DATA";
+const GHOST_CACHE_SECONDS_ = 600;
+
+function ghostTypistData_(ss) {
+  let cache = null;
+  try {
+    cache = CacheService.getDocumentCache();
+    const hit = cache && cache.get(GHOST_CACHE_KEY_);
+    if (hit) return JSON.parse(hit);
+  } catch (err) { console.warn("Ghost typist cache not read: " + err.message); }
+
+  const master = ss.getSheetByName("Master Table");
+  const mLast = master ? master.getLastRow() : 0;
+  const dir = ss.getSheetByName("Directory");
+  const dLast = dir ? dir.getLastRow() : 0;
+  const data = {
+    master: mLast >= 5 ? master.getRange(5, 1, mLast - 4, 3).getValues() : [],
+    dir: dLast > 0 ? dir.getRange(1, 3, dLast, 3).getValues() : []
+  };
+  try {
+    const json = JSON.stringify(data);
+    if (cache && json.length < 95000) cache.put(GHOST_CACHE_KEY_, json, GHOST_CACHE_SECONDS_);
+  } catch (err) { console.warn("Ghost typist cache not saved: " + err.message); }
+  return data;
+}
+
+function clearGhostTypistCache_() {
+  try { CacheService.getDocumentCache().remove(GHOST_CACHE_KEY_); } catch (err) { console.warn("Ghost typist cache not cleared: " + err.message); }
+}
 
 // =========================================================
 // HELPER FUNCTIONS FOR TRIGGERS

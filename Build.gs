@@ -212,6 +212,9 @@ function buildAllDerivedSheets() {
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
   });
 
+  // The ghost typist's cached Master Table / Directory copy is out of date now
+  clearGhostTypistCache_();
+
   // Contact Log search bar's Communications box (drawn by code, Edits.gs)
   refreshSearchBarCommunications_(ss.getSheetByName("Contact Log"), null, null, true); // Combined was just rebuilt
 
@@ -1135,23 +1138,13 @@ function eventNoteLine_(row) {
   return { dateObj: dateObj, text: line.trim() };
 }
 
-/* Divider line between notes lines in Combined Contact Tracking: as many "─" as
-   column D is wide in characters (like REPT("─", CELL("width", D1))), about 7px
-   per character; worked out once per run. */
+/* Divider line between notes lines in Combined Contact Tracking: a fixed 36
+   "─" (owner's pick 2026-11-05; was the column width). */
 const NOTE_DIVIDER_CHAR_ = "─";
-let NOTE_DIVIDER_CACHE_ = null;
+const NOTE_DIVIDER_LENGTH_ = 36;
 
 function noteDivider_() {
-  if (NOTE_DIVIDER_CACHE_ !== null) return NOTE_DIVIDER_CACHE_;
-  let px = 100; // Google Sheets' default column width
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Combined Contact Tracking");
-    if (sheet) px = sheet.getColumnWidth(4);
-  } catch (e) {
-    console.warn("noteDivider_: could not read the column width: " + e.message);
-  }
-  NOTE_DIVIDER_CACHE_ = NOTE_DIVIDER_CHAR_.repeat(Math.max(5, Math.round(px / 7)));
-  return NOTE_DIVIDER_CACHE_;
+  return NOTE_DIVIDER_CHAR_.repeat(NOTE_DIVIDER_LENGTH_);
 }
 
 /** The notes text without the divider lines (for Phone Contacts / Google Contacts). */

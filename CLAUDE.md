@@ -201,6 +201,15 @@ several presses. Don't bring it back without asking.
   (Events only) and buildOverrideReport. It also deletes the old version's doc properties (SHEET_LOCK_SNAP_*, SHEET_LOCK_CL_END).
 
 Contact Log search bar (rows below END; its other cells are formulas typed in the sheet, not in the repo):
+- DEFAULT = the owner's HSTACK formula (instant on a lookup, like the OSIS / Student formulas; a script can't be,
+  the edit trigger starts ~1-2 s late). The code drawing below is opt-in: doc property SEARCH_BAR_COMMS_MODE = "code"
+  (useCodeForSearchBarCommunications); restoreSearchBarCommunicationsFormula puts the formula back (+ clears E).
+- Speed (2026-11-05): a single-cell Contact Log edit whose row has an OSIS runs the quick notes update
+  (syncNotesForRowOsis_ -> updateOsisDeltas_) RIGHT AFTER the ghost typist / autofill, before the row repair /
+  blank row / END sweep, so Combined (and the formula) update sooner; the old end-of-edit sync still covers pastes
+  and rows whose OSIS only appears later. Ghost typist: Master Table A5:C + Directory C:E cached in the document
+  cache for 10 min (ghostTypistData_, key GHOST_TYPIST_DATA, skipped if > 95 KB), cleared at the end of every build
+  (clearGhostTypistCache_); Regenerate's resets don't clear it (10 min max).
 - "Communications" box drawn by code (CONTACT LOG SEARCH BAR section of Edits.gs; owner's 2nd try, 2026-11-05; the
   1st try, which read Combined Contact Tracking, was reverted). findSearchBarComms_ finds the label in ANY column
   within 15 rows below END (display "Communications", or a formula containing "Communications" that shows an error,
@@ -214,7 +223,7 @@ Contact Log search bar (rows below END; its other cells are formulas typed in th
   Runs: edit below END; a Contact Log row edit whose OSIS (or old OSIS) is in the box, right after the ghost typist
   and before the quick update; after Notes / Events edits; end of buildAllDerivedSheets. Writes only when changed.
   restoreSearchBarCommunicationsFormula puts the formula back (doc property SEARCH_BAR_COMMS_MODE = "formula");
-  useCodeForSearchBarCommunications switches back. Divider lines use Combined's column D width.
+  useCodeForSearchBarCommunications switches back.
 
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
@@ -227,8 +236,8 @@ Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
 - Built in ONE place: contactLogNoteLine_ / eventNoteLine_ / joinNoteLines_ (Build.gs), used by both the full build
   (buildCombinedContactTrackingData_) and the quick update (updateOsisDeltas_).
 - Divider lines (owner's trial, 2026-11-05): in Combined Contact Tracking each dated line has a "───" line above and
-  under it (one shared line between two; manual Notes block not wrapped). Length = Combined column D width / 7px
-  (noteDivider_, like REPT("─", CELL("width"))), read once per run. buildTrackingNotesMap_ strips them
+  under it (one shared line between two; manual Notes block not wrapped). Length = fixed 36 "─" (noteDivider_,
+  NOTE_DIVIDER_LENGTH_; owner's pick 2026-11-05, was column D width / 7px). buildTrackingNotesMap_ strips them
   (stripNoteDividers_), so Phone Contacts / Google Contacts notes are exactly as before.
 - Order (owner's change, 2026-11-04): manual "𝑵𝒐𝒕𝒆𝒔:" block first, then dated lines NEWEST first (joinNoteLines_ sorts
   oldest-first then reverses, so same-day ties flip too). Was oldest first.
