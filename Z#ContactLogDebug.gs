@@ -83,7 +83,7 @@ function cld_state(anon) {
   add("Update notes as I type (autoNotes)", props.getProperty("autoNotes") === "false" ? "OFF" : "on");
   add("Hidden notes included (disableHiddenNotes)", props.getProperty("disableHiddenNotes") === "true" ? "yes" : "no");
   add("Notes date range", (props.getProperty("notesStartDate") || "-") + " to " + (props.getProperty("notesEndDate") || "-"));
-  add("Communications mode (SEARCH_BAR_COMMS_MODE)", props.getProperty(SEARCH_BAR_COMMS_PROP) || "(not set = formula, checked once)");
+  add("Communications mode (SEARCH_BAR_COMMS_MODE)", (props.getProperty(SEARCH_BAR_COMMS_PROP) === "formula" ? "formula" : "script draws it") + " (" + (props.getProperty(SEARCH_BAR_COMMS_PROP) || "not set") + ")");
   timed("Triggers (this user)", () => ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction() + ":" + t.getEventType()).join(", ") || "none");
   add("Typist data cached", CacheService.getDocumentCache().get(GHOST_CACHE_KEY_) ? "yes" : "no");
 
@@ -115,6 +115,11 @@ function cld_state(anon) {
         const v = combinedNotesReader_(ss)(first);
         return v === "" ? "(no row / empty)" : short(v, 300);
       });
+      // What each source of the notes costs to read
+      timed("  read Contact Log to END", () => sheet.getRange(1, 1, endRow, CL_WIDTH).getDisplayValues().length + " rows");
+      timed("  read Backend Event Log", () => backendReadBlock_(ss, "EVENT_LOG", true).length + " rows");
+      timed("  read Notes tab", () => { const n = ss.getSheetByName("Notes"); return n ? n.getDataRange().getValues().length + " rows x " + n.getLastColumn() + " cols" : "no tab"; });
+      timed("  Backend tab size", () => { const b = ss.getSheetByName(BACKEND_SHEET_NAME); return b ? b.getLastRow() + " rows x " + b.getLastColumn() + " cols" : "no tab"; });
       const fromLogs = timed("Notes built from the logs for " + first, () => {
         const v = logsNotesReader_(ss, sheet, endRow)(first);
         return v === "" ? "(none)" : short(v, 300);

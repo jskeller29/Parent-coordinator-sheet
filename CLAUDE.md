@@ -216,9 +216,10 @@ several presses. Don't bring it back without asking.
   (Events only) and buildOverrideReport. It also deletes the old version's doc properties (SHEET_LOCK_SNAP_*, SHEET_LOCK_CL_END).
 
 Contact Log search bar (rows below END; its other cells are formulas typed in the sheet, not in the repo):
-- DEFAULT = the owner's HSTACK formula (instant on a lookup, like the OSIS / Student formulas; a script can't be,
-  the edit trigger starts ~1-2 s late). The code drawing below is opt-in: doc property SEARCH_BAR_COMMS_MODE = "code"
-  (useCodeForSearchBarCommunications); restoreSearchBarCommunicationsFormula puts the formula back (+ clears E).
+- DEFAULT = drawn by the SCRIPT (owner's pick 2026-11-05, "no formula"): isSearchBarCodeMode_ is true unless doc
+  property SEARCH_BAR_COMMS_MODE = "formula" (set by restoreSearchBarCommunicationsFormula, which puts the HSTACK
+  formula back; useCodeForSearchBarCommunications switches back). ensureSearchBarFormula_ only acts in formula mode.
+  A row edit redraws the box AFTER the quick notes write, reading Combined (fast) when that write ran.
 - Speed (2026-11-05): a single-cell Contact Log edit whose row has an OSIS runs the quick notes update
   (syncNotesForRowOsis_ -> updateOsisDeltas_) RIGHT AFTER the ghost typist / autofill, before the row repair /
   blank row / END sweep, so Combined (and the formula) update sooner; the old end-of-edit sync still covers pastes
