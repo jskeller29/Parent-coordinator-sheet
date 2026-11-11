@@ -202,7 +202,12 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Script may not change its options ("not allowed on cells in typed columns"), so code never touches N's dropdown
   (set by hand in the Table; owner removed the reset step that tried). Autofill default for N = "No Followup Needed" (Edits.gs). Hide rule for P
   (getContactLogHideFormula_, owner's 2026-11-04 formula): =AND($B2<>"", INT($B2)<>TODAY(), TRIM($N2)<> Followup Needed / Followup Needed - ASAP / Need to respond / Waiting For Response /
-  Waiting - Check Up), always (contactLogTodayOnly no longer changes it). The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).
+  Waiting - Check Up). The date part follows Settings → Notes → "Contact Log shows" (contactLogTodayOnly, 2026-11-11 fix:
+  it had stopped changing the rule): "Today only" = INT($B2)<>TODAY() (the owner's formula exactly); "This week and last
+  week" (default, never saved) = B outside last week's Sunday .. this week's Saturday (same weeks as the A:B color bands).
+  Used by every reset, the nightly run (resetContactLogFormatting) and every Settings save: refreshContactLogFilter_
+  (Menus.gs) swaps ONLY the P custom-formula rule (rule.copy(), Type colors and other rules kept; added back if missing),
+  writes nothing when it already matches, then re-sets the P filter. The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).
 - Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
   Belcher Louise/Gene + override-only Tina, Addams Wednesday/Pugsley), Parent Square, NYCSA, Site/Class in the new
   BH:BI format (one row per site, classes one per line; 5 of 6 sites have 2-3 classes; "Y12"/"Y50" have no teacher),

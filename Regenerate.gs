@@ -999,15 +999,18 @@ function resetDerivedSheets_(ss) {
 
 /**
  * Formula that greys out (and so filters away) Contact Log rows via Column P.
- * Rows stay visible when they fall in the chosen date window (Settings: "Show Today Only"
- * = today's notes, otherwise this/last week's), or when Follow-up (N) marks them
- * Important or still needing action, regardless of date.
+ * Rows stay visible when they fall in the chosen date window (Settings → Notes →
+ * "Contact Log shows": "Today only" = today's rows, otherwise this week's and last
+ * week's, Sunday to Saturday), or when Follow-up (N) still needs action, regardless of date.
  */
 function getContactLogHideFormula_() {
-  // Owner's rule (2026-11-04), used as is by every reset, the nightly run and Settings save:
-  // a dated row greys out (and the filter hides it) once it is not today's, unless
-  // Follow-up still needs action. (The "Contact Log shows" setting no longer changes it.)
-  return '=AND($B2<>"", INT($B2)<>TODAY(), ' +
+  // Owner's rule (2026-11-04) with the date window from the setting; used by every
+  // reset, the nightly run and Settings save. "Today only" = the owner's formula as is.
+  const todayOnly = PropertiesService.getDocumentProperties().getProperty('contactLogTodayOnly') === 'true';
+  const outsideWindow = todayOnly
+    ? 'INT($B2)<>TODAY()'
+    : 'OR(INT($B2)<TODAY()-WEEKDAY(TODAY(),1)-6, INT($B2)>TODAY()-WEEKDAY(TODAY(),1)+7)';
+  return '=AND($B2<>"", ' + outsideWindow + ', ' +
     'TRIM($N2)<>"Followup Needed", TRIM($N2)<>"Followup Needed - ASAP", TRIM($N2)<>"Need to respond", ' +
     'TRIM($N2)<>"Waiting For Response", TRIM($N2)<>"Waiting - Check Up")';
 }

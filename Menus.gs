@@ -846,7 +846,6 @@ function applySettings(settings) {
   const oldEndDate = props.getProperty('notesEndDate') || '';
 
   const newDisableHidden = settings.disableHiddenNotes === true;
-  const oldTodayOnly = props.getProperty('contactLogTodayOnly') === 'true';
   const newTodayOnly = settings.contactLogTodayOnly === true;
 
   // 2. Save settings - Using String() safely handles undefined payload data instead of crashing!
@@ -880,10 +879,9 @@ function applySettings(settings) {
   // 3. Update Visuals & Student List Filter safely
   updateVisualSettings_(settings);
   
-  // 3b. Contact Log filter window changed: rewrite the Column P rule and refresh the filter
-  if (oldTodayOnly !== newTodayOnly) {
-    try { refreshContactLogFilter_(); } catch (e) { console.warn("Could not refresh Contact Log filter: " + e.message); }
-  }
+  // 3b. Contact Log filter window: make the Column P rule match the setting (no writes
+  // when it already does) and refresh the filter
+  try { refreshContactLogFilter_(); } catch (e) { console.warn("Could not refresh Contact Log filter: " + e.message); }
 
   // 4. Update Triggers Programmatically safely
   manageNightlyTrigger_(settings.disableNightlySync);
@@ -922,13 +920,39 @@ function applySettings(settings) {
 }
 
 /**
- * Re-applies the Contact Log conditional formatting (which reads the filter-window
- * setting) and re-sets the Column P filter so rows re-hide/re-show right away.
+ * Settings save: puts the "Contact Log shows" window into the Contact Log's Column P
+ * grey-out rule (getContactLogHideFormula_) and re-sets the Column P filter so rows
+ * re-hide/re-show right away. Only the P rule changes (Type colors and any other rule
+ * stay); nothing is written when the rule already matches the setting.
  */
 function refreshContactLogFilter_() {
-  resetContactLogFormatting();
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Contact Log");
-  const filter = sheet ? sheet.getFilter() : null;
+  if (!sheet) return;
+  const wanted = getContactLogHideFormula_();
+  const rules = sheet.getConditionalFormatRules();
+  let found = false, changed = false;
+  const newRules = rules.map(function(rule) {
+    const ranges = rule.getRanges();
+    const onlyP = ranges.length > 0 && ranges.every(r => r.getColumn() === 16 && r.getLastColumn() === 16);
+    const cond = onlyP ? rule.getBooleanCondition() : null;
+    if (!cond || cond.getCriteriaType() !== SpreadsheetApp.BooleanCriteria.CUSTOM_FORMULA) return rule;
+    found = true;
+    if (String(cond.getCriteriaValues()[0]) === wanted) return rule;
+    changed = true;
+    return rule.copy().whenFormulaSatisfied(wanted).build(); // same range and grey font
+  });
+  if (!found) {
+    // No P rule (removed by hand): add it back as resetContactLogFormatting draws it
+    newRules.push(SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(wanted)
+      .setFontColor("#999999")
+      .setRanges([sheet.getRange("P2:P" + sheet.getMaxRows())]).build());
+    changed = true;
+  }
+  if (!changed) return;
+  sheet.setConditionalFormatRules(newRules);
+
+  const filter = sheet.getFilter();
   if (!filter) return;
   const criteria = filter.getColumnFilterCriteria(16);
   if (criteria) filter.setColumnFilterCriteria(16, criteria);
