@@ -806,26 +806,29 @@ function resetContactLog_(ss) {
 
   // 5 + 6. Student lookup box under the END row: delete the old UI rows under it and the
   //    leftover "Site / Phone Number / Parent Contact (COPY)" rows (header + its #REF! row),
-  //    put it in the new layout (guardian table on top) and redraw the box's outline.
+  //    then redraw the box's outline.
   fixContactLogLookupBox_(sheet, endRow);
 }
 
 /**
- * The student lookup box below the Contact Log's END row (OSIS / Student, the guardian table,
- * Communications / Student Information). Run by every reset:
- * 1. deletes up to 11 rows right under the box (old UI elements; was rows END+9..END+19, which
- *    were right under the box in the old layout),
+ * The student lookup box below the Contact Log's END row. Owner's layout (2026-11-11, made
+ * by hand in the sheet; small rows = 10 px):
+ *   [small row] [OSIS | Student | Class] [small row] [guardian header] [guardian rows]
+ *   [small row] [Communications | Student Info]
+ * Old layout: [top row] [OSIS | Student | "Student Information" title] [Communications + the
+ * Student Information text] [spacer] [guardian table], ending at END + 8.
+ * Run by every reset:
+ * 1. deletes up to 11 rows right under the box (old UI elements; was always rows END+9..END+19,
+ *    which in the new layout would have deleted the Communications row),
  * 2. deletes every leftover "Parent Contact (COPY)" header row and the row under it (only when
  *    that row is blank or shows #REF!),
- * 3. old layout -> new layout and the thick black outline (updateContactLogLookupBox_).
+ * 3. redraws the box's thick black outline (drawContactLogLookupBoxOutline_).
+ * Nothing else in the box (rows, heights, inner lines, formulas) is changed.
  */
 function fixContactLogLookupBox_(sheet, endRow) {
-  // 1. Old UI rows under the box. Old layout (or no box found): rows END+9..END+19 as before.
-  //    New layout: the 11 rows right under Communications. Never a row the box uses.
+  // 1. Old UI rows under the box (never a row the box uses; no box found: END+9..END+19 as before)
   const box = findContactLogLookupBox_(sheet, endRow);
-  let from = endRow + 9;
-  if (box && lookupBoxIsNewLayout_(box)) from = box.commEnd + 1;
-  if (box) from = Math.max(from, box.lowest + 1);
+  const from = box ? Math.max(box.bottom + 1, box.lowest + 1) : endRow + 9;
   const maxRows = sheet.getMaxRows();
   if (maxRows >= from) sheet.deleteRows(from, Math.min(11, maxRows - from + 1));
 
@@ -845,178 +848,74 @@ function fixContactLogLookupBox_(sheet, endRow) {
     });
   }
 
-  // 3. Layout + outline
-  updateContactLogLookupBox_(sheet, endRow);
+  // 3. Outline
+  drawContactLogLookupBoxOutline_(sheet, endRow);
 }
 
 /**
- * Apps Script editor: puts this sheet's Contact Log lookup box in the new layout and redraws its
- * outline (what a reset does, without deleting any rows), e.g. on a sheet that is never reset.
+ * Thick black outline around the lookup box: top = the row above OSIS, left = the
+ * "Communications" label's column, right = the box's last column, bottom = its last row
+ * (new layout: the bottom of the Communications rows). None of these depend on the student
+ * shown (the old outline looked for the first empty guardian row, which a reset has just
+ * emptied, so it stopped at the guardian header). Returns false when the box is not found.
  */
-function rearrangeContactLogLookupBox() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Contact Log");
-  const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
-  if (!endRow) { ss.toast("Could not find the Contact Log's END row.", "Lookup box", 5); return; }
-  const result = updateContactLogLookupBox_(sheet, endRow);
-  const text = {
-    moved: "Guardian table moved up, Communications moved to the bottom, outline redrawn.",
-    already: "Already in the new layout; outline redrawn.",
-    outline: "Rows not moved (layout not recognized, or the move failed: see the execution log); outline redrawn.",
-    missing: "Could not find the lookup box (Communications / Student Information) below END."
-  };
-  ss.toast(text[result] || result, "Lookup box", 8);
-}
-
-/**
- * Old layout -> new layout (owner's request 2026-11-11), then the thick black outline.
- *   Old: [top row] [OSIS / Student] [Communications] [spacer] [guardian header] [guardians]
- *   New: [top row] [OSIS / Student] [spacer] [guardian header] [guardians] [spacer copy] [Communications]
- * The outline goes from END + 2 to the box's last row: in the new layout the bottom of the
- * Communications rows, which does not depend on the student shown (the old outline was measured
- * from the guardian rows, which a reset has just emptied, so it stopped at the guardian header).
- * Returns "moved", "already", "outline" (not moved: layout not recognized or the move failed) or "missing".
- */
-function updateContactLogLookupBox_(sheet, endRow) {
-  let box = findContactLogLookupBox_(sheet, endRow);
-  if (!box) return "missing";
-  let result = lookupBoxIsNewLayout_(box) ? "already" : "outline";
-  if (lookupBoxIsOldLayout_(box)) {
-    try {
-      moveLookupBoxCommunicationsDown_(sheet, endRow, box);
-      result = "moved";
-    } catch (err) {
-      console.warn("Lookup box: rows not moved (" + err.message + ")");
-    }
-    box = findContactLogLookupBox_(sheet, endRow);
-    if (!box) return "missing";
-  }
-
-  const bottom = lookupBoxBottom_(sheet, endRow, box);
-  const black = "#000000", thick = SpreadsheetApp.BorderStyle.SOLID_THICK;
+function drawContactLogLookupBoxOutline_(sheet, endRow) {
+  const box = findContactLogLookupBox_(sheet, endRow);
+  if (!box) return false;
+  const cols = box.right - box.left + 1;
   // Clear the old outline around the box (incl. a stray bottom line one row lower), then draw it
-  const clearRows = Math.min(bottom - box.top + 2, sheet.getMaxRows() - box.top + 1);
-  sheet.getRange(box.top, box.left, clearRows, box.cols).setBorder(false, false, false, false, null, null);
-  sheet.getRange(box.top, box.left, bottom - box.top + 1, box.cols).setBorder(true, true, true, true, null, null, black, thick);
-  return result;
+  const clearRows = Math.min(box.bottom - box.top + 2, sheet.getMaxRows() - box.top + 1);
+  sheet.getRange(box.top, box.left, clearRows, cols).setBorder(false, false, false, false, null, null);
+  sheet.getRange(box.top, box.left, box.bottom - box.top + 1, cols)
+    .setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
+  return true;
 }
 
 /**
- * Where the lookup box's parts are, or null when its "Communications" label or "Student
- * Information" title is not found below END:
- * { top, left, right, cols, infoRow, commRow, commEnd, headerRow (0 = no "Relationship" header), lowest }
- * commEnd = last row of the Communications rows (a merge that starts there, e.g. the Student
- * Information text, can make them taller); lowest = the lowest of those rows.
+ * Where the lookup box is, or null when its "Communications" label is not found below END:
+ * { top, left, right, bottom, lowest, old }.
+ * - top: the row above the "OSIS" label (the Communications formula's name switch); END + 2 without it
+ * - right: the furthest of the "Student Information" / "Student Info" cell's merge, the merges in
+ *   the Communications row and the guardian header's last filled cell
+ * - bottom: new layout = last Communications row (a merge there can make them taller);
+ *   old layout (guardian table under Communications) = END + 8, the last row every reset kept
+ * - lowest: the lowest row any part of the box was found on
  */
 function findContactLogLookupBox_(sheet, endRow) {
-  const rows = sheet.getMaxRows() - endRow;
+  const maxRows = sheet.getMaxRows();
+  const rows = maxRows - endRow;
   if (rows < 1) return null;
-  const area = sheet.getRange(endRow + 1, 1, rows, sheet.getMaxColumns());
+  const maxCols = sheet.getMaxColumns();
+  const area = sheet.getRange(endRow + 1, 1, rows, maxCols);
   const found = text => area.createTextFinder(text).matchEntireCell(true).findNext();
 
   const commCell = found("Communications");
   // An erroring Communications formula shows no label: findSearchBarComms_ also matches its text
   const comm = commCell ? { row: commCell.getRow(), col: commCell.getColumn() } : findSearchBarComms_(sheet, endRow);
-  const info = found("Student Information");
-  if (!comm || !info) return null;
-  const infoRange = info.isPartOfMerge() ? info.getMergedRanges()[0] : info;
-  const top = endRow + 2;
-  const left = comm.col;
-  const right = infoRange.getLastColumn();
-  if (right < left || comm.row < top || info.getRow() < top) return null;
-  const cols = right - left + 1;
-
-  let commEnd = comm.row;
-  sheet.getRange(comm.row, left, 1, cols).getMergedRanges().forEach(m => { commEnd = Math.max(commEnd, m.getLastRow()); });
+  if (!comm) return null;
+  const osis = found("OSIS");
+  const info = found("Student Information") || found("Student Info");
   const rel = found("Relationship");
-  const headerRow = rel && rel.getRow() > info.getRow() ? rel.getRow() : 0;
-  return { top: top, left: left, right: right, cols: cols, infoRow: info.getRow(), commRow: comm.row,
-    commEnd: commEnd, headerRow: headerRow, lowest: Math.max(commEnd, headerRow, info.getRow()) };
-}
+  const header = rel ? rel.getRow() : 0;
 
-/** New layout: the guardian table is above Communications. */
-function lookupBoxIsNewLayout_(box) {
-  return box.headerRow > 0 && box.headerRow < box.commRow;
-}
-
-/** Old layout: OSIS / Student, then Communications, then the guardian table. */
-function lookupBoxIsOldLayout_(box) {
-  return box.headerRow > box.commEnd && box.infoRow < box.commRow;
-}
-
-/**
- * The box's last row. New layout (or no guardian table): the last Communications row.
- * Old layout: the last guardian row (lookupBoxGuardianEnd_).
- */
-function lookupBoxBottom_(sheet, endRow, box) {
-  if (!lookupBoxIsOldLayout_(box)) return box.commEnd;
-  return Math.max(box.commEnd, lookupBoxGuardianEnd_(sheet, endRow, box));
-}
-
-/**
- * Old layout: the last guardian row = END + 8 (or the header row, if lower). Every reset kept
- * rows END+1..END+8 and deleted the ones under them, so those rows are the box, even right after
- * a reset has emptied the guardian rows (the old outline looked for the first empty row there,
- * so it stopped at the guardian header).
- */
-function lookupBoxGuardianEnd_(sheet, endRow, box) {
-  return Math.max(box.headerRow, Math.min(endRow + 8, sheet.getMaxRows()));
-}
-
-/**
- * Old layout -> new layout. Moves the spacer + guardian header + guardian rows up as whole rows
- * (moveRows: contents, formats, merges, heights go with them; formulas pointing at moved cells
- * follow), so Communications ends up under the guardian table, then puts a copy of the spacer
- * row(s) between them. Formulas that find a cell by counting rows (ADDRESS(ROW()-1, ...), as the
- * Communications formula does) are re-counted so they still point at the same cell.
- * Lines: none inside the guardian rows (a stray one under the header came from the old outline),
- * a thick one under the last guardian row, none under the spacer copy.
- */
-function moveLookupBoxCommunicationsDown_(sheet, endRow, box) {
-  const c1 = box.commRow, c2 = box.commEnd;
-  const k = c2 - c1 + 1;                                  // Communications rows
-  const gEnd = lookupBoxGuardianEnd_(sheet, endRow, box); // last guardian row
-  const b = gEnd - c2;                                    // spacer + header + guardian rows
-  const s = box.headerRow - c2 - 1;                       // spacer rows above the header
-  if (b < 1 || s < 0) throw new Error("unexpected rows (Communications " + c1 + "-" + c2 + ", header " + box.headerRow + ")");
-  const maxCols = sheet.getMaxColumns();
-
-  // Where each old row ends up, and the other way round (null = a spacer copy)
-  const newRow = r => r < c1 ? r : r <= c2 ? r + b + s : r <= gEnd ? r - k : r + s;
-  const oldRow = R => R < c1 ? R : R < c1 + b ? R + k : R < c1 + b + s ? null : R <= gEnd + s ? R - b - s : R - s;
-
-  sheet.moveRows(sheet.getRange(c2 + 1, 1, b, 1), c1);
-  if (s > 0) sheet.insertRowsBefore(c1 + b, s);
-
-  // Re-count ROW()-n / ROW()+n (the row moves above changed what n rows up / down is)
-  const first = endRow + 1, last = gEnd + s;
-  const formulas = sheet.getRange(first, 1, last - first + 1, maxCols).getFormulas();
-  formulas.forEach((rowFormulas, i) => {
-    const R = first + i, r = oldRow(R);
-    if (r === null) return;
-    rowFormulas.forEach((f, j) => {
-      if (!f) return;
-      const fixed = f.replace(/(^|[^A-Za-z0-9_.])ROW\(\s*\)\s*([+-])\s*(\d+)/gi, (m, pre, sign, n) => {
-        const target = sign === "-" ? r - Number(n) : r + Number(n);
-        const d = R - newRow(target);
-        return pre + "ROW()" + (d > 0 ? "-" + d : d < 0 ? "+" + (-d) : "");
-      });
-      if (fixed !== f) sheet.getRange(R, j + 1).setFormula(fixed);
-    });
+  let right = comm.col;
+  if (info) right = Math.max(right, (info.isPartOfMerge() ? info.getMergedRanges()[0] : info).getLastColumn());
+  let commEnd = comm.row;
+  sheet.getRange(comm.row, comm.col, 1, maxCols - comm.col + 1).getMergedRanges().forEach(m => {
+    commEnd = Math.max(commEnd, m.getLastRow());
+    right = Math.max(right, m.getLastColumn());
   });
-
-  // Spacer copy between the guardian rows and Communications (the spacer is now at c1)
-  if (s > 0) {
-    sheet.getRange(c1, 1, s, maxCols).copyTo(sheet.getRange(c1 + b, 1, s, maxCols));
-    for (let i = 0; i < s; i++) sheet.setRowHeight(c1 + b + i, sheet.getRowHeight(c1 + i));
-    sheet.getRange(c1 + b + s - 1, box.left, 1, box.cols).setBorder(null, null, false, null, null, null);
+  if (header) {
+    const shown = sheet.getRange(header, 1, 1, maxCols).getDisplayValues()[0];
+    for (let c = shown.length; c > comm.col; c--) if (shown[c - 1] !== "") { right = Math.max(right, c); break; }
   }
 
-  // Lines around the guardian rows (header now at c1 + s, last guardian row at c1 + b - 1)
-  const g1 = c1 + s + 1, gLast = c1 + b - 1;
-  const black = "#000000", thick = SpreadsheetApp.BorderStyle.SOLID_THICK;
-  if (gLast >= g1) sheet.getRange(g1, box.left, gLast - g1 + 1, box.cols).setBorder(false, null, null, null, null, false);
-  sheet.getRange(gLast, box.left, 1, box.cols).setBorder(null, null, true, null, null, null, black, thick);
+  const top = osis && osis.getRow() > endRow + 1 && osis.getRow() < comm.row ? osis.getRow() - 1 : endRow + 2;
+  const old = header > commEnd && !!info && info.getRow() < comm.row;
+  const bottom = old ? Math.max(header, Math.min(endRow + 8, maxRows)) : commEnd;
+  const lowest = Math.max(commEnd, header, info ? info.getRow() : 0, osis ? osis.getRow() : 0);
+  if (top > comm.row) return null;
+  return { top: top, left: comm.col, right: right, bottom: bottom, lowest: lowest, old: old };
 }
 
 function resetMasterTable_(ss) {

@@ -439,9 +439,9 @@ function findSearchBarComms_(sheet, endRow) {
 
 /**
  * How many rows above the Communications label the OSIS box is: 1 in the old lookup box
- * layout (OSIS row right above Communications), more since the guardian table sits between
- * them (Regenerate.gs, updateContactLogLookupBox_). Found from the "OSIS" label (the box is the
- * cell right of it); 1 when there is no such label above Communications.
+ * layout (OSIS row right above Communications), 6 in the owner's 2026-11-11 layout (the
+ * guardian table sits between them). Found from the "OSIS" label (the box is the cell right
+ * of it); 1 when there is no such label above Communications.
  */
 function searchBarOsisRowsAbove_(sheet, endRow, at) {
   const rows = at.row - endRow - 1;

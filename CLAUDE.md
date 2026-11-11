@@ -164,20 +164,21 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Students (owner's choice: the owner's next build re-creates it) and the 📥 Your Lists tabs (resetDerivedSheets_ also
   clears the Backend ADDL_INFO / OWN_LISTS sections). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
 - All three resets also clear the Notes tab (resetNotes_, A:D rows 2+).
-- Contact Log student lookup box (from END + 2). NEW layout (owner's request 2026-11-11): top row, OSIS / Student
-  (+ "Student Information" title), spacer, guardian table ("Relationship" header + guardian rows), spacer copy,
-  Communications + the Student Information text at the bottom. OLD layout: OSIS / Student, Communications, spacer,
-  guardian table (box ended at END + 8). resetContactLog_ ends with fixContactLogLookupBox_ (Regenerate.gs): deletes up
-  to 11 rows right under the box (old layout / no box: END+9..END+19 as before; new layout: under Communications; never a
-  row the box uses), leftover "Parent Contact (COPY)" header rows (+ the row under it when blank / #REF!), then
-  updateContactLogLookupBox_: an old layout is converted once (moveLookupBoxCommunicationsDown_: moveRows of spacer +
-  header + guardian rows up, a copy of the spacer row(s) above Communications, every ROW()-n / ROW()+n in the box's
-  formulas re-counted so ADDRESS(ROW()-1, ...) still points at the OSIS box, no lines inside the guardian rows, thick line
-  under the last one), then the thick black outline (left = "Communications" column, right = end of the merged
-  "Student Information" title, top = END + 2, bottom = last Communications row; old layout: END + 8). The bottom no longer
-  depends on the student shown: the old outline looked for the first empty guardian row right after the reset had
-  emptied them, so it stopped at the guardian header. rearrangeContactLogLookupBox() (Apps Script editor) does the
-  conversion + outline on a sheet without a reset (no rows deleted). Tested only on a mock sheet so far.
+- Contact Log student lookup box. Owner's layout (made by hand 2026-11-11; small rows = 10 px): small row (Communications
+  formula's name switch), OSIS | Student | Class, small row, guardian table ("Relationship" header + guardian rows),
+  small row, Communications | Student Info (labels are HSTACK formulas; Communications reads the OSIS box with
+  ADDRESS(ROW()-6, ...), Student Info with ADDRESS(ROW()-6, COLUMN()-6), Class reads the last Contact Log OSIS itself).
+  Old layout: top row, OSIS | Student | "Student Information" title, Communications + Student Information text, spacer,
+  guardian table, ending at END + 8. resetContactLog_ ends with fixContactLogLookupBox_ (Regenerate.gs): deletes up to
+  11 rows right under the box (findContactLogLookupBox_: new layout = under the last Communications row; old layout /
+  no box found: END+9..END+19 as before, which in the new layout would delete Communications; never a row the box
+  uses), leftover "Parent Contact (COPY)" header rows (+ the row under it when blank / #REF!), then
+  drawContactLogLookupBoxOutline_: thick black outline, top = row above "OSIS", left = "Communications" column, right =
+  furthest of the Student Information / Student Info merge, the Communications-row merges and the guardian header's
+  last filled cell, bottom = last Communications row (old layout: END + 8). It does not depend on the student shown
+  (the old outline looked for the first empty guardian row right after the reset had emptied them, so it stopped at the
+  guardian header). Rows, heights, inner lines and formulas are never changed (an automatic old -> new conversion was
+  tried the same day and removed: the owner built the layout by hand). Tested only on a mock sheet so far.
 - Send Out tab = a Sheets Table "Table1": A Date, B Send Out Title, C Send Out Type, D On Behalf Of, E Where Did You
   Send (dropdowns C:E), F Population, G # Reached, H Attachments (file chips); I "Behalf of List", J "Sending Location
   List" (kept). Dropdown options come from Backend BH3:BJ3 formulas (fixed options + values already typed:
@@ -219,8 +220,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   says they are missing and every build / phone contact is exactly as before.
 - Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
   Input Data Mode.
-- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug. The next reset converts the box; on a
-  sheet that is not reset, run rearrangeContactLogLookupBox from the Apps Script editor.
+- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug (the box itself is set up by hand in
+  the sheet; the code only finds it, cleans under it and outlines it).
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
