@@ -300,7 +300,10 @@ Backend tab (see Core.gs):
   row 2; the Contact Log's dropdowns read =Table[OSIS] etc.), so the block has keepHeader: backendWriteBlock_ writes its
   header row only when it differs and rewrites rows 3+; resetDerivedSheets_ clears rows 3+ only. Apps Script cannot
   resize a Table (no Sheets advanced service): the Table must reach below the last student (rows past it are written
-  but not in =Table[...]); keep its column types none / Text (OSIS holds "111, 222"). The last three are "grow"
+  but not in =Table[...]); keep its column types none / Text (OSIS holds "111, 222"). The Table's HEADER must be row 2:
+  the owner's first try had it on row 3 (it took the first student, "249004359 | Alexa Abbey ... | Column 6 | Column 7",
+  as its column names, with the real headers plain text on row 2), so every build wrote students into the Table header.
+  The build wraps this write in try/catch (console.warn + toast) so a Backend problem never stops the rest of the build. The last three are "grow"
   sections: an existing Backend tab gets their title the first time they are written (backendBlockReady_); before that
   reads return nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.

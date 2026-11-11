@@ -106,7 +106,17 @@ function buildAllDerivedSheets() {
   // The full table (OSIS..Status, sibling-group rows included) goes to the Backend
   // (BX:CD) for the autofill; the Student List tab gets one row per student. The
   // build itself keeps using the full masterTable (Combined, Phone Contacts, ...).
-  backendWriteBlock_(ss, "STUDENT_LIST", masterTable.map(r => r.slice(0, BACKEND_BLOCKS.STUDENT_LIST.width)));
+  // A problem there (e.g. the Sheets Table on BX:CD has its header on row 3, so row 3 can't take a
+  // student) never stops the build: the autofill keeps the list it had, and the toast says why.
+  try {
+    backendWriteBlock_(ss, "STUDENT_LIST", masterTable.map(r => r.slice(0, BACKEND_BLOCKS.STUDENT_LIST.width)));
+  } catch (e) {
+    console.warn("Backend Student List (BX:CD) not written: " + e.message);
+    try {
+      ss.toast("The Backend Student List (BX:CD) could not be updated: " + e.message +
+        " Its Table header must be on row 2 (OSIS, Student, ...), students from row 3.", "⚠️ Build", 20);
+    } catch (t) { /* no UI (nightly run) */ }
+  }
   try { pointEventDropdownsAtBackend_(ss); } catch (e) { console.warn("Events dropdowns not updated: " + e.message); }
   writeSheet_(ss, STUDENT_LIST_SHEET, masterTable.filter((r, i) => i === 0 || !isSiblingGroupRow_(r)), STUDENT_LIST_HEADER_ROW, 1);
   styleLastInteractionHeader_(getStudentListSheet_(ss), masterTable[0]);
