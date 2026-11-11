@@ -201,8 +201,9 @@ var BACKEND_BLOCKS = {
   TYPES:     { col: 64, width: 1,  title: "TYPE LIST",          legacy: "Type List" },
   ADDL_INFO: { col: 66, width: 4,  title: "ADDITIONAL INFORMATION", legacy: null, grow: true },
   OWN_LISTS: { col: 71, width: 4,  title: "YOUR LISTS (SETUP)",  legacy: null, grow: true },
-  // keepHeader: the owner made BX:CD a Sheets Table ("Table", read by =Table[OSIS] dropdowns), so its
-  // header row is only written when it differs and never cleared (backendWriteBlock_ / the resets)
+  // keepHeader: the header row is only written when it differs and never cleared (backendWriteBlock_ /
+  // the resets). Added while BX:CD was a Sheets Table (dropped 2026-11-11: plain range, dropdowns read
+  // Backend!$BX$3:$BX etc.); kept because it is harmless and saves a write per build.
   STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true, keepHeader: true }
 };
 

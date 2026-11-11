@@ -296,15 +296,13 @@ Backend tab (see Core.gs):
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
   BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs), BX:CD Student List (OSIS..Status incl.
-  the sibling-group rows; every build; read by the autofill). The owner made BX:CD a Sheets Table named "Table" (header
-  row 2; the Contact Log's dropdowns read =Table[OSIS] etc.), so the block has keepHeader: backendWriteBlock_ writes its
-  header row only when it differs and rewrites rows 3+; resetDerivedSheets_ clears rows 3+ only. Apps Script cannot
-  resize a Table (no Sheets advanced service): the Table must reach below the last student (rows past it are written
-  but not in =Table[...]); keep its column types none / Text (OSIS holds "111, 222"). The Table's HEADER must be row 2:
-  the owner's first try had it on row 3 (it took the first student, "249004359 | Alexa Abbey ... | Column 6 | Column 7",
-  as its column names, with the real headers plain text on row 2), so every build wrote students into the Table header.
-  The build wraps this write in try/catch (console.warn + toast) so a Backend problem never stops the rest of the build.
-  Owner's choice 2026-11-11: KEEP the Table (re-made over BX2:CD2000, header row 2), not a plain range. The last three are "grow"
+  the sibling-group rows; every build; read by the autofill). PLAIN RANGE, no Sheets Table (owner's choice 2026-11-11):
+  the Contact Log's dropdowns read Backend!$BX$3:$BX (OSIS) / $BY$3:$BY (Student) / $BZ$3:$BZ (Guardian), open-ended, so
+  every student is included. A Table was tried first and dropped: it had its header on row 3 (it took the first student
+  "249004359 | Alexa Abbey ... | Column 6 | Column 7" as its column names), so every build wrote students into the Table
+  header; Apps Script also cannot resize a Table (no Sheets advanced service). Left from then (harmless): keepHeader
+  (backendWriteBlock_ writes the header row only when it differs, rewrites rows 3+; resetDerivedSheets_ clears rows 3+)
+  and the build's try/catch around this write (console.warn + toast), so a Backend problem never stops the build. The last three are "grow"
   sections: an existing Backend tab gets their title the first time they are written (backendBlockReady_); before that
   reads return nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
