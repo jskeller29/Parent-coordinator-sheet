@@ -167,7 +167,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Contact Log student lookup box. Owner's layout (made by hand 2026-11-11; small rows = 10 px): small row (Communications
   formula's name switch), OSIS | Student | Class, small row, guardian table ("Relationship" header + guardian rows),
   small row, Communications | Student Info (labels are HSTACK formulas; Communications reads the OSIS box with
-  ADDRESS(ROW()-6, ...), Student Info with ADDRESS(ROW()-6, COLUMN()-6), Class reads the last Contact Log OSIS itself).
+  ADDRESS(ROW()-6, COLUMN()+1) from D = the OSIS box in column E, Student Info (column L, moved from K) with
+  ADDRESS(ROW()-6, 5) = column E, Class reads the last Contact Log OSIS itself).
   Old layout: top row, OSIS | Student | "Student Information" title, Communications + Student Information text, spacer,
   guardian table, ending at END + 8. resetContactLog_ ends with fixContactLogLookupBox_ (Regenerate.gs): deletes up to
   11 rows right under the box (findContactLogLookupBox_: new layout = under the last Communications row; old layout /
