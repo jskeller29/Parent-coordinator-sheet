@@ -98,8 +98,9 @@ function cld_state(anon) {
     const label = sheet.getRange(found.row, found.col);
     const formula = label.getFormula();
     add("Communications cell has the formula", formula ? "yes" : "NO (plain text)");
-    const osisCell = sheet.getRange(found.row - 1, found.col + 1);
-    const nameCell = sheet.getRange(found.row - 2, found.col + 2);
+    const up = searchBarOsisRowsAbove_(sheet, endRow, found); // 1 in the old layout
+    const osisCell = sheet.getRange(found.row - up, found.col + 1);
+    const nameCell = sheet.getRange(found.row - up - 1, found.col + 2);
     const osisBox = osisCell.getDisplayValue();
     const osisFormula = osisCell.getFormula();
     add("OSIS box " + osisCell.getA1Notation(), JSON.stringify(osisBox) + (osisFormula ? "  formula: " + (osisFormula.length > 300 ? osisFormula.slice(0, 300) + "…" : osisFormula) : "  (typed, no formula)"));

@@ -437,6 +437,30 @@ function findSearchBarComms_(sheet, endRow) {
   return null;
 }
 
+/**
+ * How many rows above the Communications label the OSIS box is: 1 in the old lookup box
+ * layout (OSIS row right above Communications), more since the guardian table sits between
+ * them (Regenerate.gs, updateContactLogLookupBox_). Found from the "OSIS" label (the box is the
+ * cell right of it); 1 when there is no such label above Communications.
+ */
+function searchBarOsisRowsAbove_(sheet, endRow, at) {
+  const rows = at.row - endRow - 1;
+  if (rows < 1) return 1;
+  const label = sheet.getRange(endRow + 1, 1, rows, sheet.getMaxColumns())
+    .createTextFinder("OSIS").matchEntireCell(true).findNext();
+  return label ? at.row - label.getRow() : 1;
+}
+
+/**
+ * The Communications formula for a label cell whose OSIS box is rowsAbove rows up (and the
+ * name switch one row above that): SEARCH_BAR_COMMS_FORMULA with its row counts changed.
+ */
+function searchBarCommsFormula_(rowsAbove) {
+  return SEARCH_BAR_COMMS_FORMULA
+    .replace("ADDRESS(ROW()-1, COLUMN()+1)", "ADDRESS(ROW()-" + rowsAbove + ", COLUMN()+1)")
+    .replace("ADDRESS(ROW()-2, COLUMN()+2)", "ADDRESS(ROW()-" + (rowsAbove + 1) + ", COLUMN()+2)");
+}
+
 /** Same as Sheets' TRIM: drops leading/trailing spaces and collapses repeated spaces. */
 function sheetsTrim_(text) {
   return String(text).replace(/ {2,}/g, " ").replace(/^ +| +$/g, "");
@@ -484,11 +508,11 @@ function restoreSearchBarCommunicationsFormula() {
 
   getStudentListSheet_(ss); // an older copy's "Master Table" is renamed first (the formula reads 'Student List')
   sheet.getRange(at.row, at.col + 1).clearContent();
-  sheet.getRange(at.row, at.col).setFormula(SEARCH_BAR_COMMS_FORMULA);
+  sheet.getRange(at.row, at.col).setFormula(searchBarCommsFormula_(searchBarOsisRowsAbove_(sheet, endRow, at)));
   ss.toast("Communications is a formula again.", "Search Bar", 5);
 }
 
-/** The original formula (only used to put it back). */
+/** The original formula (only used to put it back; searchBarCommsFormula_ sets its row counts). */
 const SEARCH_BAR_COMMS_FORMULA = `=LET(
   targetE, INDIRECT(ADDRESS(ROW()-1, COLUMN()+1)),
   targetF, INDIRECT(ADDRESS(ROW()-2, COLUMN()+2)),
