@@ -103,7 +103,12 @@ function buildAllDerivedSheets() {
     backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW); // file removed: its old lines go too (no-op if never written)
   }
   if (listOutputs) masterTable = addListColumns_(masterTable, listOutputs.studentCols);
-  writeSheet_(ss, STUDENT_LIST_SHEET, masterTable, 4, 1);
+  // The full table (OSIS..Status, sibling-group rows included) goes to the Backend
+  // (BX:CD) for the autofill; the Student List tab gets one row per student. The
+  // build itself keeps using the full masterTable (Combined, Phone Contacts, ...).
+  backendWriteBlock_(ss, "STUDENT_LIST", masterTable.map(r => r.slice(0, BACKEND_BLOCKS.STUDENT_LIST.width)));
+  try { pointEventDropdownsAtBackend_(ss); } catch (e) { console.warn("Events dropdowns not updated: " + e.message); }
+  writeSheet_(ss, STUDENT_LIST_SHEET, masterTable.filter((r, i) => i === 0 || !isSiblingGroupRow_(r)), 4, 1);
   styleLastInteractionHeader_(getStudentListSheet_(ss), masterTable[0]);
 
   // New / discharged students come from Raw Data only (feeds the build report,

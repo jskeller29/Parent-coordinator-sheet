@@ -8,7 +8,8 @@
 //   • Phone Contacts: the "tall" layout (one row per phone number)
 //   • Quick update: also rewrites the student's Phone Contacts rows
 //   • Contacts sync: reads up to 4 phones / 3 emails per row, emails a summary
-//   • 🐞 Debug menu: Reset + Load Fake Data, Reset to Display Mode, Copy + Reset the Copy, Copy + Fake Data, Debug toasts
+//   • 🐞 Debug menu: Reset + Load Fake Data, Reset to Display Mode, Copy + Reset the Copy, Copy + Fake Data,
+//     Fix Dropdown Criteria (one time: Student List dropdowns -> Backend copy), Debug toasts
 //   • Dev tools: generateFakeLegacyData, formatting, email toggles
 //
 // HOW IT PLUGS IN: shared code calls getOwnerHooks_() (Core.gs), which returns
@@ -65,6 +66,8 @@ function ownerAddMenus_(ui) {
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
     .addItem("🧪 Copy Sheet, Then Load Fake Data on the Copy", "ownerMenuCopyForFakeData")
+    .addSeparator()
+    .addItem("🔧 Fix Dropdown Criteria (Student List → Backend)", "ownerMenuFixDropdownCriteria")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug")
     .addToUi();
@@ -210,6 +213,124 @@ function ownerMenuToggleDebug() {
     on ? "Debug toasts are ON: every edit, build, sync and open now reports ✅ / ⚠️ / ❌." : "Debug toasts are OFF.",
     "🐞 Debug", 8);
   onOpen(); // refresh the menu label
+}
+
+// ======================================================================
+// 🔧 FIX DROPDOWN CRITERIA (one time, 2026-11-11)
+// The Student List tab now has one row per student; the full list WITH the
+// sibling-group rows is the Backend copy (BX:CD, written by every build).
+// Every dropdown on any tab that lists Student List columns A:G (OSIS, Student,
+// Guardian, Site, Class, Sibling, Status) is pointed at the same column of the
+// Backend copy (e.g. 'Student List'!B5:B -> Backend!BY3:BY), keeping its other
+// settings. Sheets Table "Dropdown" columns can't be changed by a script: those
+// are listed in the report to change by hand. Dropdowns with a custom formula
+// that mentions the Student List are listed too (not changed).
+// ======================================================================
+function ownerMenuFixDropdownCriteria() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const title = "🔧 Fix Dropdown Criteria";
+  const src = studentLookupSource_(ss);
+  if (!src || src.sheet.getName() !== BACKEND_SHEET_NAME) {
+    ui.alert(title, "The Backend copy of the Student List (Backend BX:CD) is still empty. " +
+      "Build the sheets once, then run this again.", ui.ButtonSet.OK);
+    return;
+  }
+  const resp = ui.alert(title,
+    "Every dropdown that lists the Student List tab (OSIS, Student, Guardian, ...) will list the same column " +
+    "of the Backend copy instead (Backend BX:CD, which keeps the sibling groups). Continue?",
+    ui.ButtonSet.OK_CANCEL);
+  if (resp !== ui.Button.OK) return;
+
+  const report = runAction_("Fix Dropdown Criteria", () => {
+    ss.toast("Checking every tab's dropdowns…", title, 30);
+    return ownerFixDropdownCriteria_(ss, src);
+  });
+  const lines = [];
+  lines.push(report.fixed.length ? "Changed to the Backend list:\n" + report.fixed.join("\n")
+    : "No script-changeable dropdown listed the Student List.");
+  if (report.byHand.length) {
+    lines.push("Could NOT be changed by the script (Table dropdown columns): change these by hand " +
+      "(column menu → Edit column type / Data validation → range):\n" + report.byHand.join("\n"));
+  }
+  if (report.formulas.length) {
+    lines.push("Custom-formula rules that mention the Student List (left as is, check by hand):\n" + report.formulas.join("\n"));
+  }
+  ui.alert(title, lines.join("\n\n"), ui.ButtonSet.OK);
+}
+
+/** Does the work for ownerMenuFixDropdownCriteria; returns { fixed, byHand, formulas } (text lines). */
+function ownerFixDropdownCriteria_(ss, src) {
+  const list = getStudentListSheet_(ss);
+  const report = { fixed: [], byHand: [], formulas: [] };
+  if (!list) return report;
+  const listId = list.getSheetId();
+  const width = BACKEND_BLOCKS.STUDENT_LIST.width;
+  const IN_RANGE = SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE;
+  const FORMULA = SpreadsheetApp.DataValidationCriteria.CUSTOM_FORMULA;
+
+  // What a rule lists: { key, first, count, show } when it is Student List columns A:G, else null
+  const target = rule => {
+    if (rule.getCriteriaType() !== IN_RANGE) return null;
+    const args = rule.getCriteriaValues();
+    const listed = args[0];
+    if (!listed || listed.getSheet().getSheetId() !== listId) return null;
+    const first = listed.getColumn(), count = listed.getNumColumns();
+    if (first + count - 1 > width) return null; // e.g. Last Interaction: not in the Backend copy
+    const show = args[1] !== false;
+    return { key: first + "|" + count + "|" + show, first: first, count: count, show: show };
+  };
+  const backendA1 = t => {
+    const a = columnLetter_(src.col + t.first - 1), b = columnLetter_(src.col + t.first + t.count - 2);
+    return a + src.firstRow + ":" + b;
+  };
+
+  ss.getSheets().forEach(sheet => {
+    const name = sheet.getName();
+    if (sheet.getSheetId() === listId || name === BACKEND_SHEET_NAME) return;
+    const rows = sheet.getMaxRows(), cols = sheet.getMaxColumns();
+    if (rows < 1 || cols < 1) return;
+    const rules = sheet.getRange(1, 1, rows, cols).getDataValidations();
+
+    for (let c = 0; c < cols; c++) {
+      let run = null;       // consecutive cells in this column listing the same Student List range
+      let formulaRun = null;
+      const apply = () => {
+        if (!run) return;
+        const cells = sheet.getRange(run.start + 1, c + 1, run.end - run.start + 1, 1);
+        const a1 = backendA1(run.t);
+        const label = `${name}!${cells.getA1Notation()} → Backend!${a1}`;
+        try {
+          const rule = run.rule.copy().requireValueInRange(src.sheet.getRange(a1), run.t.show).build();
+          cells.setDataValidation(rule);
+          report.fixed.push(label);
+        } catch (e) {
+          report.byHand.push(label);
+          console.warn(`Fix Dropdown Criteria: ${label} not changed: ${e.message}`);
+        }
+        run = null;
+      };
+      const noteFormula = () => {
+        if (formulaRun) report.formulas.push(`${name}!${sheet.getRange(formulaRun.start + 1, c + 1, formulaRun.end - formulaRun.start + 1, 1).getA1Notation()}`);
+        formulaRun = null;
+      };
+
+      for (let r = 0; r < rows; r++) {
+        const rule = rules[r][c];
+        const t = rule ? target(rule) : null;
+        if (t && run && run.t.key === t.key && run.end === r - 1) { run.end = r; }
+        else { apply(); if (t) run = { start: r, end: r, t: t, rule: rule }; }
+
+        const f = rule && !t && rule.getCriteriaType() === FORMULA &&
+          /student list|master table/i.test(String(rule.getCriteriaValues()[0]));
+        if (f && formulaRun && formulaRun.end === r - 1) formulaRun.end = r;
+        else { noteFormula(); if (f) formulaRun = { start: r, end: r }; }
+      }
+      apply();
+      noteFormula();
+    }
+  });
+  return report;
 }
 
 /** Extra guard for the menu: these wipe the sheet, including the Old Master Table / Old Phone Contacts tabs. */

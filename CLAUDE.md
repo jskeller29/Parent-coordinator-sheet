@@ -145,6 +145,11 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   contacts sync (4 phones / 3 emails per row, group list without pageSize, no 50% delete check, summary email),
   Contact Log site column K (shared: H), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
   toasts.
+- 🐞 Debug → "🔧 Fix Dropdown Criteria (Student List → Backend)" (ownerMenuFixDropdownCriteria, one-time tool,
+  2026-11-11): every tab's data validations (one getDataValidations per tab) listing Student List columns A:G are
+  repointed to the same Backend column from row 3 (rule.copy(), other settings kept), per run of cells in a column.
+  Needs a build first (refuses while BX is empty). Sheets Table "Dropdown" columns throw -> listed "change by hand";
+  custom-formula rules mentioning the Student List are listed, not changed. Running it again changes nothing.
 - Shared Directory rule: draws only from Raw Data (no overrides, no discharged students). On the owner's sheet the
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
@@ -239,6 +244,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Input Data Mode.
 - Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug, Build (the box itself is set up by
   hand in the sheet; the code finds it, cleans under it, outlines it and adds / removes guardian rows).
+- Student List without sibling rows (2026-11-11): re-paste Core, Build, Edits, Regenerate (owner sheet: also z_MINE),
+  then Build Sheets once (fills Backend BX:CD and repoints the Events dropdowns); owner sheet: then 🐞 Debug → Fix
+  Dropdown Criteria for dropdowns made by hand.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
@@ -250,6 +258,20 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   ["Student List", "Master Table"], KEEP_TABS_, SHEET_LOCK_BUILT_TABS, Z#Guide's tab list, BUILD_STEPS. The search
   bar formula (SEARCH_BAR_COMMS_FORMULA) reads 'Student List'!A:B; restoreSearchBarCommunicationsFormula renames an old
   tab first. A tab renamed by hand / by setName keeps its protections, data validations and formula references.
+- ONE ROW PER STUDENT (owner's request 2026-11-11): the tab has no sibling-group rows ("111, 222" / "Ann X & Ben X");
+  the Sibling column stays. The build keeps the full table in memory (Combined Contact Tracking, Phone Contacts,
+  New Students, build report unchanged), writes it OSIS..Status WITH the group rows to the Backend STUDENT_LIST
+  section (BX:CD), then writes the tab filtered by isSiblingGroupRow_ (OSIS cell has a comma).
+- The autofill reads the Backend copy (so a sibling group can still be typed / picked): studentLookupSource_ /
+  studentLookupRows_ / studentLookupColumn_ (Core.gs) feed the Contact Log ghost typist (ghostTypistData_, also
+  knownStudentOsis_), the paste lookup (buildGhostLookup_), the Notes / Events typists (findInMasterTable_(src, ...),
+  findMasterRowByOsis_ on data rows), getExistingMasterTable_ (quick updates) and the Events dropdowns
+  (eventDropdownRules_: Backend!BX3:BX / BY3:BY / BZ3:BZ). Until a build has written BX (header "OSIS" in BX2) they
+  fall back to the Student List tab (row 5+), whose old build still has the group rows. Every build also runs
+  pointEventDropdownsAtBackend_ (Edits.gs): Events columns whose row-3 rule still lists the Student List tab are
+  repointed (one row read after the first time). Readers that skip comma rows anyway read the tab: Discharged
+  history, status snapshots, Your Lists index, Hide Discharged / Purge, isBuilt checks, Contact Log Debug anonymizer.
+  The search bar's Communications formula SPLITs the OSIS, so 'Student List'!A:B still works.
 - Header on row 4, data from row 5: OSIS, Student, Guardian, Site, Class, Sibling, Status, Last Interaction (H).
   Last Interaction (added 2026-11-05) = date of the newest Contact Log row (not hidden) or event for that student,
   with anyone (sibling rows: newest of the siblings), else "None logged". interactionsByOsis_ (Build.gs) is shared
@@ -263,9 +285,10 @@ Backend tab (see Core.gs):
   Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
-  BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs). The last two are "grow" sections: an
-  existing Backend tab gets their title the first time they are written (backendBlockReady_); before that reads return
-  nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
+  BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs), BX:CD Student List (OSIS..Status incl.
+  the sibling-group rows; every build; read by the autofill; resetDerivedSheets_ clears it). The last three are "grow"
+  sections: an existing Backend tab gets their title the first time they are written (backendBlockReady_); before that
+  reads return nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
   Use the backend* helpers in Core.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.
@@ -417,7 +440,7 @@ updateContactAndPhoneOnly, owner-aware through buildPhoneContactsData_). Also ru
 (pastes / cleared rows). Made by
 setupAllInstallableTriggers and, once per sheet, by checkVersionOnOpen (ensureChangeTrigger_, doc property
 CHANGE_TRIGGER_ADDED, so a 2nd user's open doesn't add a 2nd copy).
-Must keep: 15 menu handler names (+5 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
+Must keep: 15 menu handler names (+6 owner Debug items, + toggleSheetLock), 39 google.script.run endpoints, trigger
 handlers (installedOnEdit, installedOnChange, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts),
 all sheet names (except the owner's Master Table -> Student List rename), Backend cells,
 property/cache keys.

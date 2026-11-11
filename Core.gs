@@ -53,9 +53,13 @@ function findEndRowInColumnE_(sheet) {
 // ======================================================================
 // STUDENT LIST TAB (called "Master Table" before Nov 2026)
 // The generated roster: OSIS, Student, Guardian, Site, Class, Sibling, Status,
-// Last Interaction (header on row 4, data from row 5). Every lookup goes
-// through getStudentListSheet_ so an older copy's "Master Table" tab is
-// renamed instead of a second, empty tab being made next to it.
+// Last Interaction (header on row 4, data from row 5), ONE ROW PER STUDENT:
+// no sibling-group rows. Every lookup goes through getStudentListSheet_ so an
+// older copy's "Master Table" tab is renamed instead of a second, empty tab
+// being made next to it.
+// The autofill (ghost typists, Events dropdowns, quick updates) also needs the
+// sibling-group rows ("111, 222" / "Ann X & Ben X"); it reads the full table
+// from the Backend STUDENT_LIST section instead (studentLookupSource_ below).
 // The owner's "Old Master Table" is a different tab and keeps its name.
 // (Lists built when the files load - TAB_VISIBILITY, KEEP_TABS_,
 // SHEET_LOCK_BUILT_TABS - spell the name out, so file load order can't matter.)
@@ -85,6 +89,62 @@ function getStudentListSheet_(ss) {
 }
 
 /**
+ * Where the autofill looks students up: the Backend STUDENT_LIST section (BX:CD,
+ * the full Student List WITH the sibling-group rows, written by every build).
+ * Until a build has written it (a sheet updated to this version but not built
+ * since), the Student List tab instead, whose last build still has those rows.
+ * Returns { sheet, firstRow, col } (first data row; sheet column of OSIS, then
+ * Student, Guardian, Site, Class, Sibling, Status) or null when neither exists.
+ */
+function studentLookupSource_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const b = BACKEND_BLOCKS.STUDENT_LIST;
+  const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
+  if (backend && backend.getMaxColumns() >= b.col + b.width - 1 &&
+      String(backend.getRange(BACKEND_HEADER_ROW, b.col).getValue()).trim().toUpperCase() === "OSIS") {
+    return { sheet: backend, firstRow: BACKEND_HEADER_ROW + 1, col: b.col };
+  }
+  const list = getStudentListSheet_(ss);
+  return list ? { sheet: list, firstRow: 5, col: 1 } : null;
+}
+
+/**
+ * The lookup source's data rows (no header), `width` columns from OSIS; trailing
+ * blank rows dropped. src: an already-found studentLookupSource_ (optional).
+ */
+function studentLookupRows_(ss, width, src) {
+  src = src || studentLookupSource_(ss);
+  if (!src) return [];
+  const last = src.sheet.getLastRow();
+  if (last < src.firstRow) return [];
+  const vals = src.sheet.getRange(src.firstRow, src.col, last - src.firstRow + 1, width).getValues();
+  let end = vals.length;
+  while (end > 0 && !vals[end - 1].some(v => String(v).trim() !== "")) end--;
+  return vals.slice(0, end);
+}
+
+/**
+ * Open-ended range of one lookup column from the first data row down
+ * (offset 0 = OSIS, 1 = Student, 2 = Guardian), e.g. Backend!BX3:BX.
+ */
+function studentLookupColumn_(src, offset) {
+  const letter = columnLetter_(src.col + offset);
+  return src.sheet.getRange(letter + src.firstRow + ":" + letter);
+}
+
+/** Sibling-group row of the full Student List (its OSIS cell lists several: "111, 222"). */
+function isSiblingGroupRow_(row) {
+  return String(row[0]).includes(",");
+}
+
+/** 1 -> "A", 76 -> "BX". */
+function columnLetter_(col) {
+  let s = "";
+  for (let n = col; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s;
+  return s;
+}
+
+/**
  * ==============================================================================
  * BACKEND SHEET
  * One hidden "Backend" tab holds several side-by-side sections that used to be
@@ -99,7 +159,9 @@ function getStudentListSheet_(ss) {
  *   BN:BQ  Additional Information (OSIS / Student / Guardian / lines; written by
  *          every build from Your Lists, Z#OwnData.gs; read by the phone contacts)
  *   BS:BV  Your Lists setup     (one row per list tab, Z#OwnData.gs)
- * The last two are "grow" sections: an older Backend tab gets their columns the
+ *   BX:CD  Student List         (OSIS..Status WITH the sibling-group rows;
+ *          written by every build, read by the autofill, studentLookupSource_)
+ * The last three are "grow" sections: an older Backend tab gets their columns the
  * first time they are written; reading them before that returns nothing.
  *
  * Sections share rows, so NEVER delete/insert whole sheet rows, use
@@ -117,7 +179,8 @@ var BACKEND_BLOCKS = {
   SEND_OUT:  { col: 60, width: 3,  title: "SEND OUT LIST",      legacy: null },
   TYPES:     { col: 64, width: 1,  title: "TYPE LIST",          legacy: "Type List" },
   ADDL_INFO: { col: 66, width: 4,  title: "ADDITIONAL INFORMATION", legacy: null, grow: true },
-  OWN_LISTS: { col: 71, width: 4,  title: "YOUR LISTS (SETUP)",  legacy: null, grow: true }
+  OWN_LISTS: { col: 71, width: 4,  title: "YOUR LISTS (SETUP)",  legacy: null, grow: true },
+  STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)
@@ -316,7 +379,7 @@ function backendClearBlock_(ss, key, fromRow) {
 }
 
 /**
- * A "grow" section (Additional Information, Your Lists setup) sits right of the
+ * A "grow" section (Additional Information, Your Lists setup, Student List) sits right of the
  * old ones, where an older Backend tab has no columns yet. create = true adds the
  * columns and the section title; false just says whether they are there. Other
  * sections answer true without any sheet call.

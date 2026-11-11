@@ -793,12 +793,10 @@ function ghostTypistData_(ss, ghostRaw) {
     if (hit) return JSON.parse(hit);
   } catch (err) { console.warn("Ghost typist cache not read: " + err.message); }
 
-  const master = getStudentListSheet_(ss);
-  const mLast = master ? master.getLastRow() : 0;
   const dir = ss.getSheetByName("Directory");
   const dLast = dir ? dir.getLastRow() : 0;
   const data = {
-    master: mLast >= 5 ? master.getRange(5, 1, mLast - 4, 3).getValues() : [],
+    master: studentLookupRows_(ss, 3), // OSIS / Student / Guardian incl. sibling groups (Backend copy)
     dir: dLast > 0 ? dir.getRange(1, 3, dLast, 3).getValues() : []
   };
   try {
@@ -1133,14 +1131,13 @@ function autofillContactLogDefaults_(sheet, row, col, endRow, editedValue, preRo
 // =========================================================
 
 /**
- * Reads Student List A5:C ONCE and returns lookup(value, col) for pasted values,
+ * Reads the Student List's OSIS / Student / Guardian ONCE (the Backend copy, with
+ * the sibling-group rows) and returns lookup(value, col) for pasted values,
  * col 0 = OSIS, 1 = Student, 2 = Guardian. Case/spacing don't matter, and a
  * single OSIS or parent name matches a sibling group / multi-parent cell.
  */
 function buildGhostLookup_(ss) {
-  const master = getStudentListSheet_(ss);
-  const last = master ? master.getLastRow() : 0;
-  const data = last >= 5 ? master.getRange(5, 1, last - 4, 3).getValues() : [];
+  const data = studentLookupRows_(ss, 3);
   const key = v => String(v).trim().toLowerCase().replace(/\s+/g, " ");
   const byCol = [new Map(), new Map(), new Map()];
   const add = (c, k, rec) => { if (k && !byCol[c].has(k)) byCol[c].set(k, rec); };
@@ -1356,10 +1353,10 @@ function watchNotesSheet_(e) {
   // Assuming Columns are: A (1) = OSIS, B (2) = Guardian(s), C (3) = Student Name
   if (col === 1 || col === 2 || col === 3) {
     const tNotesTypist = Date.now();
-    const masterSheet = getStudentListSheet_(e.source);
-    if (masterSheet) {
+    const lookupSrc = studentLookupSource_(e.source); // Student List incl. sibling groups (Backend copy)
+    if (lookupSrc) {
       // Typed OSIS (A) -> Student List A, Guardian (B) -> C, Student (C) -> B
-      const found = findInMasterTable_(masterSheet, col === 1 ? 1 : col === 2 ? 3 : 2, editedValue);
+      const found = findInMasterTable_(lookupSrc, col === 1 ? 1 : col === 2 ? 3 : 2, editedValue);
       clDbg_("Notes typist lookup " + (Date.now() - tNotesTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
 
       if (found) {
@@ -1418,14 +1415,14 @@ function watchNotesSheet_(e) {
 
 /**
  * Single-cell ghost typist lookup (Notes and Events): finds a typed value in one
- * Student List column (1 = OSIS, 2 = Student, 3 = Guardian; row 5 down, whole
- * cell, any case) and returns that row's { osis, student, guardian }, or null.
+ * Student List column (1 = OSIS, 2 = Student, 3 = Guardian; whole cell, any case)
+ * of src (studentLookupSource_: the Backend copy, sibling groups included) and
+ * returns that row's { osis, student, guardian }, or null.
  */
-function findInMasterTable_(masterSheet, masterCol, value) {
-  const letter = ["A", "B", "C"][masterCol - 1];
-  const found = masterSheet.getRange(`${letter}5:${letter}`).createTextFinder(value).matchEntireCell(true).matchCase(false).findNext();
+function findInMasterTable_(src, masterCol, value) {
+  const found = studentLookupColumn_(src, masterCol - 1).createTextFinder(value).matchEntireCell(true).matchCase(false).findNext();
   if (!found) return null;
-  const vals = masterSheet.getRange(found.getRow(), 1, 1, 3).getValues()[0];
+  const vals = src.sheet.getRange(found.getRow(), src.col, 1, 3).getValues()[0];
   return { osis: vals[0], student: vals[1], guardian: vals[2] };
 }
 
@@ -1837,14 +1834,10 @@ function updateContactAndPhoneOnly() {
   writeSheet_(ss, "Phone Contacts", phoneContacts);
 }
 
+/** Student List rows (OSIS, Student, Guardian, Site) incl. sibling groups, from the Backend copy. */
 function getExistingMasterTable_(ss) {
-  const sheet = getStudentListSheet_(ss);
-  if (!sheet) return [["OSIS", "Student", "Guardian", "Class"]];
-
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 5) return [["OSIS", "Student", "Guardian", "Class"]];
-
-  const data = sheet.getRange(5, 1, lastRow - 4, 4).getValues(); 
+  const data = studentLookupRows_(ss, 4);
+  if (data.length === 0) return [["OSIS", "Student", "Guardian", "Class"]];
   return data.filter(row => row[0] && !String(row[0]).includes("#"));
 }
 
@@ -2096,19 +2089,12 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   // =======================================================
   // STRICT DROPDOWN MAPPING
   // =======================================================
-  const masterSheet = getStudentListSheet_(ss); 
-  if (masterSheet) {
-    const osisRule = SpreadsheetApp.newDataValidation().requireValueInRange(masterSheet.getRange("A5:A"), true).build();
-    sheet.getRange("A3:A").setDataValidation(osisRule);
-
-    const guardianRule = SpreadsheetApp.newDataValidation().requireValueInRange(masterSheet.getRange("C5:C"), true).build();
-    sheet.getRange("B3:B").setDataValidation(guardianRule);
-    
-    // Parent Attendee is manual entry, no strict validation needed.
-
-    const studentRule = SpreadsheetApp.newDataValidation().requireValueInRange(masterSheet.getRange("B5:B"), true).build();
-    sheet.getRange("D3:D").setDataValidation(studentRule);
-  }
+  // Lists come from the Backend copy of the Student List, so sibling groups can be picked
+  const rules = eventDropdownRules_(ss);
+  sheet.getRange("A3:A").setDataValidation(rules.osis);
+  sheet.getRange("B3:B").setDataValidation(rules.guardian);
+  // Parent Attendee is manual entry, no strict validation needed.
+  sheet.getRange("D3:D").setDataValidation(rules.student);
 
   // Ensure the Backend tab's Event Log section has its header row
   if (backendReadBlock_(ss, "EVENT_LOG").length === 0) {
@@ -2117,6 +2103,44 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
 
   // The tables moved right: re-lock every table's header row (Sheet Lock.gs)
   try { applySheetLocks_(ss, ["Events"]); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
+}
+
+/**
+ * The Events tables' OSIS / Guardian / Student dropdown rules: they list the
+ * Backend copy of the Student List (Backend!BX3:BX, BY3:BY, BZ3:BZ), sibling
+ * groups included. Before the first build with this version the list is empty.
+ */
+function eventDropdownRules_(ss) {
+  const sheet = getBackendSheet_(ss);
+  const b = BACKEND_BLOCKS.STUDENT_LIST;
+  backendBlockReady_(sheet, b, true); // an older Backend tab gets the section's columns first
+  const src = { sheet: sheet, firstRow: BACKEND_HEADER_ROW + 1, col: b.col };
+  const rule = offset => SpreadsheetApp.newDataValidation().requireValueInRange(studentLookupColumn_(src, offset), true).build();
+  return { osis: rule(0), student: rule(1), guardian: rule(2) };
+}
+
+/**
+ * Event tables made before the sibling-group rows moved to the Backend list the
+ * Student List tab (now one row per student). Points those columns at the Backend
+ * copy. Reads row 3 only (buildEventTable gives each column one rule from row 3
+ * down) and rewrites a column only while its rule still lists the Student List
+ * tab, so after the first time this is one read. Run by every build.
+ */
+function pointEventDropdownsAtBackend_(ss) {
+  const events = ss.getSheetByName("Events");
+  const list = getStudentListSheet_(ss);
+  if (!events || !list || events.getMaxRows() < 3) return;
+  const listId = list.getSheetId();
+  const keyFor = { 1: "osis", 2: "student", 3: "guardian" }; // Student List column -> rule
+  let rules = null;
+  events.getRange(3, 1, 1, events.getMaxColumns()).getDataValidations()[0].forEach((rule, i) => {
+    if (!rule || rule.getCriteriaType() !== SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) return;
+    const listed = rule.getCriteriaValues()[0];
+    if (!listed || listed.getSheet().getSheetId() !== listId || !keyFor[listed.getColumn()]) return;
+    rules = rules || eventDropdownRules_(ss);
+    const letter = columnLetter_(i + 1);
+    events.getRange(letter + "3:" + letter).setDataValidation(rules[keyFor[listed.getColumn()]]);
+  });
 }
 
 // ==============================================================
@@ -2143,13 +2167,13 @@ function watchEventsSheet_(e) {
   // 1. GHOST TYPIST LOGIC (Runs instantly before anything else)
   const tEventsTypist = Date.now();
   if (row >= 3) {
-    const masterSheet = getStudentListSheet_(e.source);
-    if (masterSheet) {
+    const lookupSrc = studentLookupSource_(e.source); // Student List incl. sibling groups (Backend copy)
+    if (lookupSrc) {
       
       // ⚡ CASE A: VERTICAL PASTE (Copying & Pasting a column of OSIS numbers)
       if (range.getNumRows() > 1 && range.getNumColumns() === 1 && relativeCol === 0) {
         const pastedValues = range.getDisplayValues();
-        const masterData = masterSheet.getDataRange().getValues();
+        const masterData = studentLookupRows_(e.source, 3, lookupSrc);
         const updateData = [];
         let hasUpdates = false;
 
@@ -2218,7 +2242,7 @@ function watchEventsSheet_(e) {
              const osisArray = editedValue.split(/[,\n]+/).map(o => o.trim()).filter(Boolean);
              
              if (osisArray.length > 0) {
-               const masterData = masterSheet.getDataRange().getValues();
+               const masterData = studentLookupRows_(e.source, 3, lookupSrc);
                const numNewRows = osisArray.length - 1;
                
                if (numNewRows > 0) {
@@ -2263,7 +2287,7 @@ function watchEventsSheet_(e) {
           // ⚡ ORIGINAL LOGIC: Single typed entry
           else {
             // Typed OSIS -> Student List A, Guardian -> C, Student -> B
-            const found = findInMasterTable_(masterSheet, relativeCol === 0 ? 1 : relativeCol === 1 ? 3 : 2, editedValue);
+            const found = findInMasterTable_(lookupSrc, relativeCol === 0 ? 1 : relativeCol === 1 ? 3 : 2, editedValue);
             clDbg_("Events typist lookup " + (Date.now() - tEventsTypist) + " ms: " + (found ? "found OSIS " + found.osis : "'" + editedValue + "' not found"));
             if (found) {
               const correctOsis = found.osis;
@@ -2454,9 +2478,9 @@ function watchEventsSheet_(e) {
   updateOsisDeltas_(Array.from(affectedOsisNumbers).filter(Boolean));
 }
 
-/** First Student List data row (row 5 down) whose OSIS (A) is exactly `osis`, from getDataRange() values. */
+/** First Student List row whose OSIS is exactly `osis`, from studentLookupRows_ (data rows only). */
 function findMasterRowByOsis_(masterData, osis) {
-  for (let r = 4; r < masterData.length; r++) {
+  for (let r = 0; r < masterData.length; r++) {
     if (String(masterData[r][0]).trim() === osis) return masterData[r];
   }
   return null;

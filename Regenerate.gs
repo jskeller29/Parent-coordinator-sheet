@@ -983,6 +983,8 @@ function resetDerivedSheets_(ss) {
   // Your Lists (Z#OwnData.gs): the setups and their Additional Information go with the list tabs
   backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
+  // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
+  backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW);
 
   ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);
