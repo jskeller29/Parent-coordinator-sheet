@@ -400,13 +400,15 @@ function ownerReadMasterStatusSnapshot_(ss) {
     
     // Dynamically find the Status column to prevent breaking when transitioning to the new 7-column format!
     let statusIndex = 5; 
-    const headerRow = oldMasterData.find(r => String(r[0]).trim().toUpperCase() === "OSIS") || oldMasterData[3];
+    const headerIdx = oldMasterData.findIndex(r => String(r[0]).trim().toUpperCase() === "OSIS");
+    const headerRow = headerIdx !== -1 ? oldMasterData[headerIdx] : oldMasterData[3];
     if (headerRow) {
       const foundIdx = headerRow.indexOf("Status");
       if (foundIdx !== -1) statusIndex = foundIdx;
     }
     
-    for (let i = 4; i < oldMasterData.length; i++) {
+    // Students start under the header (row 2 now; row 5 on a tab not rebuilt since 2026-11-11)
+    for (let i = headerIdx !== -1 ? headerIdx + 1 : 4; i < oldMasterData.length; i++) {
       const osis = String(oldMasterData[i][0]).trim();
       if (osis && !osis.includes(",")) oldMasterStatusMap.set(osis, oldMasterData[i][statusIndex]);
     }

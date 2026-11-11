@@ -364,11 +364,9 @@ function od_index_(studentRows, guardianRows) {
   return idx;
 }
 
-/** Student List rows (row 5 down) + Raw Data guardians, for the sidebar (outside a build). */
+/** Student List rows (OSIS..Class, the Backend copy; od_index_ skips its sibling-group rows) + Raw Data guardians, for the sidebar (outside a build). */
 function od_indexFromSheet_(ss) {
-  const sl = getStudentListSheet_(ss);
-  const last = sl ? sl.getLastRow() : 0;
-  const studentRows = last >= 5 ? sl.getRange(5, 1, last - 4, 5).getValues() : [];
+  const studentRows = studentLookupRows_(ss, 5);
   const raw = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
   let guardianRows = [];
   if (raw && raw.getLastRow() > 1) {

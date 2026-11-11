@@ -108,7 +108,7 @@ function buildAllDerivedSheets() {
   // build itself keeps using the full masterTable (Combined, Phone Contacts, ...).
   backendWriteBlock_(ss, "STUDENT_LIST", masterTable.map(r => r.slice(0, BACKEND_BLOCKS.STUDENT_LIST.width)));
   try { pointEventDropdownsAtBackend_(ss); } catch (e) { console.warn("Events dropdowns not updated: " + e.message); }
-  writeSheet_(ss, STUDENT_LIST_SHEET, masterTable.filter((r, i) => i === 0 || !isSiblingGroupRow_(r)), 4, 1);
+  writeSheet_(ss, STUDENT_LIST_SHEET, masterTable.filter((r, i) => i === 0 || !isSiblingGroupRow_(r)), STUDENT_LIST_HEADER_ROW, 1);
   styleLastInteractionHeader_(getStudentListSheet_(ss), masterTable[0]);
 
   // New / discharged students come from Raw Data only (feeds the build report,
@@ -717,7 +717,7 @@ function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
        }
     }
     
-    const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 4;
+    const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : STUDENT_LIST_HEADER_ROW;
     const hStudent = oldHeaderMap["Student"] !== undefined ? oldHeaderMap["Student"] : 1;
     const hGuardian = oldHeaderMap["Guardian"] !== undefined ? oldHeaderMap["Guardian"] : 2;
     const hSite = oldHeaderMap["Site"] !== undefined ? oldHeaderMap["Site"] : -1;
@@ -1523,14 +1523,14 @@ function addLastInteractionColumn_(masterTable, contactLogData, eventLogData) {
   });
 }
 
-/** Gives the Last Interaction header (row 4) the look of the Status header next to it. */
+/** Gives the Last Interaction header (header row) the look of the Status header next to it. */
 function styleLastInteractionHeader_(sheet, headers) {
   const statusCol = headers.indexOf("Status") + 1;
   const lastCol = headers.indexOf("Last Interaction") + 1;
   if (!sheet || statusCol < 1 || lastCol < 1) return;
   try {
-    const src = sheet.getRange(4, statusCol);
-    sheet.getRange(4, lastCol)
+    const src = sheet.getRange(STUDENT_LIST_HEADER_ROW, statusCol);
+    sheet.getRange(STUDENT_LIST_HEADER_ROW, lastCol)
       .setBackground(src.getBackground())
       .setFontColor(src.getFontColor())
       .setFontWeight(src.getFontWeight())

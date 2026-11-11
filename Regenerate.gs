@@ -861,8 +861,10 @@ function fixContactLogLookupBox_(sheet, endRow, ss) {
 
 function resetMasterTable_(ss) {
   const sheet = getStudentListSheet_(ss);
-  if (sheet && sheet.getMaxRows() >= 5) {
-    sheet.getRange(5, 1, sheet.getMaxRows() - 4, 9).clearContent();
+  if (!sheet) return;
+  const firstRow = studentListHeaderRow_(sheet) + 1; // row 2 (row 5 on a tab not rebuilt since 2026-11-11)
+  if (sheet.getMaxRows() >= firstRow) {
+    sheet.getRange(firstRow, 1, sheet.getMaxRows() - firstRow + 1, 9).clearContent();
   }
 }
 
@@ -984,7 +986,7 @@ function resetDerivedSheets_(ss) {
   backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
   // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
-  backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW);
+  backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW + 1); // header kept: BX:CD is the owner's Sheets Table
 
   ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);

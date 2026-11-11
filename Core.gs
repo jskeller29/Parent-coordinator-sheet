@@ -53,7 +53,8 @@ function findEndRowInColumnE_(sheet) {
 // ======================================================================
 // STUDENT LIST TAB (called "Master Table" before Nov 2026)
 // The generated roster: OSIS, Student, Guardian, Site, Class, Sibling, Status,
-// Last Interaction (header on row 4, data from row 5), ONE ROW PER STUDENT:
+// Last Interaction (header on row 1, data from row 2 since 2026-11-11; was row
+// 4 / row 5), ONE ROW PER STUDENT:
 // no sibling-group rows. Every lookup goes through getStudentListSheet_ so an
 // older copy's "Master Table" tab is renamed instead of a second, empty tab
 // being made next to it.
@@ -66,6 +67,7 @@ function findEndRowInColumnE_(sheet) {
 // ======================================================================
 var STUDENT_LIST_SHEET = "Student List";
 var LEGACY_STUDENT_LIST_SHEET = "Master Table";
+var STUDENT_LIST_HEADER_ROW = 1; // the build writes the header here, students from the next row
 
 /**
  * The Student List tab, or null when the sheet has neither name. An old
@@ -89,6 +91,25 @@ function getStudentListSheet_(ss) {
 }
 
 /**
+ * Row of the Student List tab's header ("OSIS" in column A, rows 1-10): 1, or 4
+ * on a tab whose last build was before the header moved up (2026-11-11).
+ */
+function studentListHeaderRow_(sheet) {
+  const n = Math.min(10, sheet.getMaxRows());
+  const vals = sheet.getRange(1, 1, n, 1).getValues();
+  for (let i = 0; i < n; i++) {
+    if (String(vals[i][0]).trim().toUpperCase() === "OSIS") return i + 1;
+  }
+  return STUDENT_LIST_HEADER_ROW;
+}
+
+/** Has a build filled the Student List (a row under its header)? Used by the menus and Getting Started. */
+function studentListIsBuilt_(ss) {
+  const sheet = getStudentListSheet_(ss);
+  return !!sheet && sheet.getLastRow() > studentListHeaderRow_(sheet);
+}
+
+/**
  * Where the autofill looks students up: the Backend STUDENT_LIST section (BX:CD,
  * the full Student List WITH the sibling-group rows, written by every build).
  * Until a build has written it (a sheet updated to this version but not built
@@ -105,7 +126,7 @@ function studentLookupSource_(ss) {
     return { sheet: backend, firstRow: BACKEND_HEADER_ROW + 1, col: b.col };
   }
   const list = getStudentListSheet_(ss);
-  return list ? { sheet: list, firstRow: 5, col: 1 } : null;
+  return list ? { sheet: list, firstRow: studentListHeaderRow_(list) + 1, col: 1 } : null;
 }
 
 /**
@@ -180,7 +201,9 @@ var BACKEND_BLOCKS = {
   TYPES:     { col: 64, width: 1,  title: "TYPE LIST",          legacy: "Type List" },
   ADDL_INFO: { col: 66, width: 4,  title: "ADDITIONAL INFORMATION", legacy: null, grow: true },
   OWN_LISTS: { col: 71, width: 4,  title: "YOUR LISTS (SETUP)",  legacy: null, grow: true },
-  STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true }
+  // keepHeader: the owner made BX:CD a Sheets Table ("Table", read by =Table[OSIS] dropdowns), so its
+  // header row is only written when it differs and never cleared (backendWriteBlock_ / the resets)
+  STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true, keepHeader: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)
@@ -360,6 +383,17 @@ function backendWriteBlock_(ss, key, values) {
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   backendBlockReady_(sheet, b, true);
+  if (b.keepHeader && values && values.length > 0) {
+    const header = padRow_(values[0], b.width);
+    const headerRange = sheet.getRange(BACKEND_HEADER_ROW, b.col, 1, b.width);
+    if (headerRange.getValues()[0].map(String).join("\u0001") !== header.map(String).join("\u0001")) headerRange.setValues([header]);
+    backendClearBlock_(ss, key, BACKEND_HEADER_ROW + 1);
+    const data = values.slice(1).map(r => padRow_(r, b.width));
+    if (data.length === 0) return;
+    ensureBackendRows_(sheet, BACKEND_HEADER_ROW + data.length);
+    sheet.getRange(BACKEND_HEADER_ROW + 1, b.col, data.length, b.width).setValues(data);
+    return;
+  }
   backendClearBlock_(ss, key, BACKEND_HEADER_ROW);
   if (!values || values.length === 0) return;
   const rows = values.map(r => padRow_(r, b.width));

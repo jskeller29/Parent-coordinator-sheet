@@ -167,9 +167,7 @@ function cldAnonymizer_(ss) {
     seen.set(name.toLowerCase(), ph);
     pairs.push([name, ph]);
   };
-  const master = getStudentListSheet_(ss);
-  const last = master ? master.getLastRow() : 0;
-  const rows = last >= 5 ? master.getRange(5, 1, last - 4, 3).getDisplayValues() : [];
+  const rows = studentLookupRows_(ss, 3).map(r => r.map(String)); // Student List names (Backend copy)
   const splitNames = v => String(v).split(/,|&|\band\b|\n/i).map(x => x.trim()).filter(Boolean);
   rows.forEach(r => {
     String(r[0]).split(/[^0-9]+/).filter(x => x.length >= 6).forEach(o => {

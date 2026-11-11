@@ -251,10 +251,8 @@ function buildMenus_() {
   // WHAT SHOWS AFTER SETUP IS COMPLETE:
   // ==============================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const masterSheet = getStudentListSheet_(ss);
-  
-  // Check if the sheets have ACTUALLY been built (Student List data starts on Row 5)
-  const isBuilt = masterSheet && masterSheet.getLastRow() > 4;
+  // Check if the sheets have ACTUALLY been built (a student under the Student List header)
+  const isBuilt = studentListIsBuilt_(ss);
 
  if (!isBuilt) {
     // 🛑 INTERMEDIATE STATE: Setup done, but sheets haven't been built yet
@@ -1069,14 +1067,15 @@ function getAllStudentsForEdit() {
   const statusMap = new Map();
   if (masterSheet) {
     const mData = masterSheet.getDataRange().getValues();
-    let osisIdx = 0, statIdx = 6; 
+    let osisIdx = 0, statIdx = 6, headerIdx = -1;
     for(let i=0; i < Math.min(10, mData.length); i++) {
         for(let c=0; c<mData[i].length; c++) {
-            if(String(mData[i][c]).toUpperCase() === "OSIS") osisIdx = c;
+            if(String(mData[i][c]).toUpperCase() === "OSIS") { osisIdx = c; if (headerIdx === -1) headerIdx = i; }
             if(String(mData[i][c]).toUpperCase() === "STATUS") statIdx = c;
         }
     }
-    for(let i = 4; i < mData.length; i++) {
+    // Students start under the header (row 2 now; row 5 on a tab not rebuilt since 2026-11-11)
+    for(let i = headerIdx !== -1 ? headerIdx + 1 : 4; i < mData.length; i++) {
         statusMap.set(toText_(mData[i][osisIdx]), toText_(mData[i][statIdx]));
     }
   }

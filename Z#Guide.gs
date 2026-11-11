@@ -268,10 +268,9 @@ function zg_dataStatus_(ss) {
   return { ats: read("A1"), ps: read("AG1"), nycsa: read("AP1"), siteClass: siteClass };
 }
 
-/** Same test the menus use (Student List data starts on row 5). */
+/** Same test the menus use (a student under the Student List header). */
 function zg_isBuilt_(ss) {
-  const m = getStudentListSheet_(ss);
-  return !!m && m.getLastRow() > 4;
+  return studentListIsBuilt_(ss);
 }
 
 /** Any parent name in Contact Log column C above the END bar. */

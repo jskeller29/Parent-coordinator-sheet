@@ -80,7 +80,8 @@ Files (shared = every school's sheet):
   - Matching (od_matchStudentRow_ / od_matchGuardianRow_): your pick, then OSIS (normalizeOsis_), exact name token
     set (either name order), phone / email via guardians (Raw Data incl. overrides), then best guesses (short-name
     prefix of 3+ letters, OD_NICKNAMES_, last initial "Diana P.", a guardian's name -> their children); 2+ candidates =
-    "pick one", none = "not found". Index = Student List A5:E + Raw Data guardians (od_indexFromSheet_).
+    "pick one", none = "not found". Index = Student List OSIS..Class (sidebar: the Backend copy, sibling-group rows
+    skipped) + Raw Data guardians (od_indexFromSheet_).
   - Sidebar: paste view polls od_wizardCheck every 2 s; 1 Columns (dropdowns 'Column C “OSIS”', "Two columns (first +
     last name)…", OSIS hint "5 of 6 filled cells are OSIS in your Student List"), 2 Variables (keep / name / blank /
     not on list / where, live "How it reads" preview, privacy warning), 3 Match (od_matchPreview; "✓ Accept all N best
@@ -117,7 +118,7 @@ Files (shared = every school's sheet):
   links. Checklist sidebar: 1 load data (ticks when Raw Data A1 has a real date; also shows Parent Square AG1, NYCSA
   AP1, Sites and classes BH7:BI7 / INPUT_DATA_MODE_SITECLASS_UPDATED), 2 build (Student List lastRow > 4, same test as
   the menus), 3 settings (doc property ZG_SETTINGS_SEEN, set when opened from the checklist), 4 first contact (any
-  Contact Log C above END). Opens by itself on every open until all 4 are done, not during Input Data Mode, unless
+  Contact Log C above END). (Step 2 = studentListIsBuilt_, Core.gs, since 2026-11-11.) Opens by itself on every open until all 4 are done, not during Input Data Mode, unless
   unticked (doc property ZG_AUTO_OPEN = "off"). "This tab" panel (zg_activeTab polled every 3 s) + "Hidden tabs" list
   (Settings tabs: ⚙️ Settings → Tabs & columns; others: View → Hidden sheets). Link PLACEHOLDERS: GUIDE_LINKS at the
   top of Z#Guide.gs (empty = "link coming soon").
@@ -244,9 +245,11 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Input Data Mode.
 - Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug, Build (the box itself is set up by
   hand in the sheet; the code finds it, cleans under it, outlines it and adds / removes guardian rows).
-- Student List without sibling rows (2026-11-11): re-paste Core, Build, Edits, Regenerate (owner sheet: also z_MINE),
-  then Build Sheets once (fills Backend BX:CD and repoints the Events dropdowns); owner sheet: then 🐞 Debug → Fix
-  Dropdown Criteria for dropdowns made by hand.
+- Student List without sibling rows + header on row 1 (2026-11-11): re-paste Core, Build, Edits, Menus, Regenerate,
+  Z#OwnData, Z#Guide, Z#ContactLogDebug (owner sheet: also z_MINE), then Build Sheets once (fills Backend BX:CD,
+  writes the Student List from row 1, repoints the Events dropdowns); owner sheet: then 🐞 Debug → Fix Dropdown
+  Criteria for dropdowns made by hand. The master template's Student List tab needs the same row-1 layout (the build
+  writes from row 1 anyway, but frozen rows / header look are set by hand).
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
@@ -272,7 +275,14 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   repointed (one row read after the first time). Readers that skip comma rows anyway read the tab: Discharged
   history, status snapshots, Your Lists index, Hide Discharged / Purge, isBuilt checks, Contact Log Debug anonymizer.
   The search bar's Communications formula SPLITs the OSIS, so 'Student List'!A:B still works.
-- Header on row 4, data from row 5: OSIS, Student, Guardian, Site, Class, Sibling, Status, Last Interaction (H).
+- Header on ROW 1, data from row 2 (owner moved it 2026-11-11; was row 4 / row 5): OSIS, Student, Guardian, Site, Class,
+  Sibling, Status, Last Interaction (H). STUDENT_LIST_HEADER_ROW (Core.gs) = where the build writes it. Readers find the
+  header themselves (studentListHeaderRow_: "OSIS" in A1:A10, else row 1), so a tab not rebuilt since still works:
+  studentListIsBuilt_ (menus + Z#Guide), the lookup fallback, resetMasterTable_ (clears under the header),
+  getAllStudentsForEdit and ownerReadMasterStatusSnapshot_ (start under the header), buildMasterTableData_ /
+  readMasterStatusSnapshot_ (already scanned for "OSIS"). Your Lists' sidebar index (od_indexFromSheet_) and the Contact
+  Log Debug anonymizer read the Backend copy (studentLookupRows_). Hide Discharged / Purge take row 1 as the header,
+  which is now right.
   Last Interaction (added 2026-11-05) = date of the newest Contact Log row (not hidden) or event for that student,
   with anyone (sibling rows: newest of the siblings), else "None logged". interactionsByOsis_ (Build.gs) is shared
   with Parents Divided's per-guardian Last Interaction (moved word for word). Added after the owner's Old Master Table
@@ -286,7 +296,11 @@ Backend tab (see Core.gs):
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
   BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs), BX:CD Student List (OSIS..Status incl.
-  the sibling-group rows; every build; read by the autofill; resetDerivedSheets_ clears it). The last three are "grow"
+  the sibling-group rows; every build; read by the autofill). The owner made BX:CD a Sheets Table named "Table" (header
+  row 2; the Contact Log's dropdowns read =Table[OSIS] etc.), so the block has keepHeader: backendWriteBlock_ writes its
+  header row only when it differs and rewrites rows 3+; resetDerivedSheets_ clears rows 3+ only. Apps Script cannot
+  resize a Table (no Sheets advanced service): the Table must reach below the last student (rows past it are written
+  but not in =Table[...]); keep its column types none / Text (OSIS holds "111, 222"). The last three are "grow"
   sections: an existing Backend tab gets their title the first time they are written (backendBlockReady_); before that
   reads return nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
@@ -359,7 +373,7 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
   1. contactLogPrefetch_: ONE cache.getAll (remembered END row CL_END_ROW_<sheetId> + ghost typist data). When END is
      <= 60 rows below the edited row, ONE read (edited row .. END, B:N) checks END and gives the auto-fill its row
      values (preRowVals); else a one-cell END check (column E scanned only when END moved).
-  2. Ghost typist from the cache (Student List A5:C + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
+  2. Ghost typist from the cache (Student List OSIS / Student / Guardian from the Backend copy BX:BZ + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
      skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
      writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
      ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
@@ -463,7 +477,6 @@ their old hour until Settings is saved once or Initial Setup is run again.
 Bugs noticed (not fixed): quick update ignores the Settings notes date range; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
 (first student loses Student List details); EMERGENCY_STOP_SYNC leaves SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS
 needs two clicks first time; repo manifest lacks script.send_mail so the owner email may never send;
-purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header, but the Student List header is on
-row 4, so Purge finds no Status column (returned 0 in the offline run) and the filter hides nothing, unless the real
-tab has a header copy on row 1 (check on a copy); generateFakeLegacyData (owner) writes 47 columns into a new
+purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header (they found no Status column while
+the header was on row 4; since 2026-11-11 it is on row 1, so they should work now: untested); generateFakeLegacyData (owner) writes 47 columns into a new
 26-column "Old Phone Contacts" tab, so it fails right after a reset.
