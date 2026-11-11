@@ -177,8 +177,19 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   furthest of the Student Information / Student Info merge, the Communications-row merges and the guardian header's
   last filled cell, bottom = last Communications row (old layout: END + 8). It does not depend on the student shown
   (the old outline looked for the first empty guardian row right after the reset had emptied them, so it stopped at the
-  guardian header). Rows, heights, inner lines and formulas are never changed (an automatic old -> new conversion was
-  tried the same day and removed: the owner built the layout by hand). Tested only on a mock sheet so far.
+  guardian header). The reset does not move rows or change heights / inner lines (an automatic old -> new conversion
+  was tried the same day and removed: the owner built the layout by hand). The box helpers (findContactLogLookupBox_,
+  drawContactLogLookupBoxOutline_) are in Edits.gs (search bar section), since the build uses them too.
+  Guardian rows (owner's request 2026-11-11): syncLookupBoxGuardianRows_ (Edits.gs) makes the guardian table as tall
+  as the student with the most guardians in Parents Divided needs (A = OSIS, B not blank, as the table's FILTER; at
+  least 2, at most 10), so a 3rd-5th guardian from New/Edit Student does not spill into the small row (#REF!). Run at
+  the end of every build (saving / deleting an override runs one; syncLookupBoxGuardianRowsForBuild_) and by every
+  reset (Parents Divided just emptied, so extra rows go). Guardian rows = header + 1 down to the small row(s) (<= 15 px)
+  right above Communications (none found = not touched). Added rows go under the last guardian row: its height, no
+  line between guardian rows, guardian 3 / 5 white, 4 cream #fff8ee (LOOKUP_BOX_ROW_COLORS_), the box's thick sides +
+  thick line under the new last row. Extra rows are deleted when no student needs them (not if one holds a formula),
+  thick line under the new last row. Each time, recountLookupBoxRowOffsets_ re-counts every ROW()-n / ROW()+n in the
+  box (Communications 6 -> 7 for 3 guardians, Student Info the same). Tested only on a mock sheet so far.
 - Send Out tab = a Sheets Table "Table1": A Date, B Send Out Title, C Send Out Type, D On Behalf Of, E Where Did You
   Send (dropdowns C:E), F Population, G # Reached, H Attachments (file chips); I "Behalf of List", J "Sending Location
   List" (kept). Dropdown options come from Backend BH3:BJ3 formulas (fixed options + values already typed:
@@ -220,8 +231,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   says they are missing and every build / phone contact is exactly as before.
 - Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
   Input Data Mode.
-- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug (the box itself is set up by hand in
-  the sheet; the code only finds it, cleans under it and outlines it).
+- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug, Build (the box itself is set up by
+  hand in the sheet; the code finds it, cleans under it, outlines it and adds / removes guardian rows).
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first

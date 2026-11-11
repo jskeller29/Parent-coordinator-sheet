@@ -232,6 +232,10 @@ function buildAllDerivedSheets() {
   clearGhostTypistCache_();
   clearNotesSourcesCache_();
 
+  // Contact Log lookup box: as many guardian rows as the student with the most guardians
+  // needs (a 3rd+ guardian from New/Edit Student; Edits.gs). Never stops a build.
+  try { syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided); } catch (e) { console.warn("Lookup box guardian rows skipped: " + e.message); }
+
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }

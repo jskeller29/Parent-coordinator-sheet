@@ -538,6 +538,206 @@ const SEARCH_BAR_COMMS_FORMULA = `=LET(
   )
 )`;
 
+// =========================================================
+// CONTACT LOG LOOKUP BOX (the search bar's whole box below END)
+// Owner's layout (2026-11-11, made by hand; small rows = 10 px): small row,
+// OSIS | Student | Class, small row, guardian table, small row,
+// Communications | Student Info. The code finds it, outlines it (reset) and
+// keeps the guardian table as tall as the student with the most guardians
+// needs (every build and reset). Its formulas are typed in the sheet.
+// =========================================================
+const LOOKUP_BOX_GUARDIAN_ROWS_ = 2;      // guardian rows the box is built with (never fewer)
+const LOOKUP_BOX_MAX_GUARDIAN_ROWS_ = 10; // never more
+const LOOKUP_BOX_SPACER_MAX_PX_ = 15;     // the small rows (10 px) between the parts
+const LOOKUP_BOX_ROW_COLORS_ = ["#ffffff", "#fff8ee"]; // guardian 1, 3, 5... white; 2, 4... cream
+
+/**
+ * Thick black outline around the lookup box: top = the row above OSIS, left = the
+ * "Communications" label's column, right = the box's last column, bottom = its last row
+ * (new layout: the bottom of the Communications rows). None of these depend on the student
+ * shown (the old outline looked for the first empty guardian row, which a reset has just
+ * emptied, so it stopped at the guardian header). Returns false when the box is not found.
+ */
+function drawContactLogLookupBoxOutline_(sheet, endRow) {
+  const box = findContactLogLookupBox_(sheet, endRow);
+  if (!box) return false;
+  const cols = box.right - box.left + 1;
+  // Clear the old outline around the box (incl. a stray bottom line one row lower), then draw it
+  const clearRows = Math.min(box.bottom - box.top + 2, sheet.getMaxRows() - box.top + 1);
+  sheet.getRange(box.top, box.left, clearRows, cols).setBorder(false, false, false, false, null, null);
+  sheet.getRange(box.top, box.left, box.bottom - box.top + 1, cols)
+    .setBorder(true, true, true, true, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
+  return true;
+}
+
+/**
+ * Where the lookup box is, or null when its "Communications" label is not found below END:
+ * { top, left, right, bottom, lowest, old, header (0 = no "Relationship" header), commRow }.
+ * - top: the row above the "OSIS" label (the Communications formula's name switch); END + 2 without it
+ * - right: the furthest of the "Student Information" / "Student Info" cell's merge, the merges in
+ *   the Communications row and the guardian header's last filled cell
+ * - bottom: new layout = last Communications row (a merge there can make them taller);
+ *   old layout (guardian table under Communications) = END + 8, the last row every reset kept
+ * - lowest: the lowest row any part of the box was found on
+ */
+function findContactLogLookupBox_(sheet, endRow) {
+  const maxRows = sheet.getMaxRows();
+  const rows = maxRows - endRow;
+  if (rows < 1) return null;
+  const maxCols = sheet.getMaxColumns();
+  const area = sheet.getRange(endRow + 1, 1, rows, maxCols);
+  const found = text => area.createTextFinder(text).matchEntireCell(true).findNext();
+
+  const commCell = found("Communications");
+  // An erroring Communications formula shows no label: findSearchBarComms_ also matches its text
+  const comm = commCell ? { row: commCell.getRow(), col: commCell.getColumn() } : findSearchBarComms_(sheet, endRow);
+  if (!comm) return null;
+  const osis = found("OSIS");
+  const info = found("Student Information") || found("Student Info");
+  const rel = found("Relationship");
+  const header = rel ? rel.getRow() : 0;
+
+  let right = comm.col;
+  if (info) right = Math.max(right, (info.isPartOfMerge() ? info.getMergedRanges()[0] : info).getLastColumn());
+  let commEnd = comm.row;
+  sheet.getRange(comm.row, comm.col, 1, maxCols - comm.col + 1).getMergedRanges().forEach(m => {
+    commEnd = Math.max(commEnd, m.getLastRow());
+    right = Math.max(right, m.getLastColumn());
+  });
+  if (header) {
+    const shown = sheet.getRange(header, 1, 1, maxCols).getDisplayValues()[0];
+    for (let c = shown.length; c > comm.col; c--) if (shown[c - 1] !== "") { right = Math.max(right, c); break; }
+  }
+
+  const top = osis && osis.getRow() > endRow + 1 && osis.getRow() < comm.row ? osis.getRow() - 1 : endRow + 2;
+  const old = header > commEnd && !!info && info.getRow() < comm.row;
+  const bottom = old ? Math.max(header, Math.min(endRow + 8, maxRows)) : commEnd;
+  const lowest = Math.max(commEnd, header, info ? info.getRow() : 0, osis ? osis.getRow() : 0);
+  if (top > comm.row) return null;
+  return { top: top, left: comm.col, right: right, bottom: bottom, lowest: lowest, old: old, header: header, commRow: comm.row };
+}
+
+/**
+ * The most guardians any one student has in Parents Divided data (header row first; A = OSIS,
+ * B = guardian name), counted the way the guardian table's FILTER picks them (B not blank).
+ */
+function lookupBoxGuardianCount_(parentsDivided) {
+  const counts = new Map();
+  let max = 0;
+  for (let i = 1; i < (parentsDivided || []).length; i++) {
+    const osis = String(parentsDivided[i][0]).trim(), name = String(parentsDivided[i][1]).trim();
+    if (!osis || !name) continue;
+    const n = (counts.get(osis) || 0) + 1;
+    counts.set(osis, n);
+    if (n > max) max = n;
+  }
+  return max;
+}
+
+/** Same, read from the Parents Divided tab (0 when it is missing or empty). */
+function lookupBoxGuardianCountFromSheet_(ss) {
+  const sh = ss ? ss.getSheetByName("Parents Divided") : null;
+  const last = sh ? sh.getLastRow() : 0;
+  return last >= 2 ? lookupBoxGuardianCount_(sh.getRange(1, 1, last, 2).getDisplayValues()) : 0;
+}
+
+/** End of a build: guardian rows for the Parents Divided rows just built. */
+function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
+  const sheet = ss.getSheetByName("Contact Log");
+  const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
+  return endRow ? syncLookupBoxGuardianRows_(sheet, endRow, lookupBoxGuardianCount_(parentsDivided)) : 0;
+}
+
+/**
+ * Makes the lookup box's guardian table exactly as tall as maxGuardians needs (at least
+ * LOOKUP_BOX_GUARDIAN_ROWS_), so a student with a 3rd / 4th / 5th guardian (New/Edit Student)
+ * does not spill into the small row above Communications (#REF!), and the extra rows go again
+ * when no student needs them. Rows are added / deleted under the last guardian row:
+ * - added rows: same height as that row, no line between guardian rows, white / #fff8ee
+ *   taking turns (guardian 3 white, 4 cream, 5 white ...), the box's thick sides, and the thick
+ *   line under the new last row;
+ * - a row is only deleted when it holds no formula; the thick line goes under the new last row;
+ * - every ROW()-n / ROW()+n in the box's formulas (Communications, Student Info: they count rows
+ *   up to the OSIS box) is re-counted so it still points at the same cell.
+ * Only in the owner's layout (guardian table above Communications, a small row between them).
+ * Returns the number of rows added (negative = deleted), 0 when nothing changed.
+ */
+function syncLookupBoxGuardianRows_(sheet, endRow, maxGuardians) {
+  const box = findContactLogLookupBox_(sheet, endRow);
+  if (!box || box.old || !box.header || box.header >= box.commRow) return 0;
+
+  // Guardian rows: under the header down to the small row(s) right above Communications
+  let last = box.commRow - 1;
+  while (last > box.header && sheet.getRowHeight(last) <= LOOKUP_BOX_SPACER_MAX_PX_) last--;
+  if (last === box.commRow - 1) return 0; // no small row above Communications: not the layout we know
+  const have = last - box.header;
+  if (have < 1) return 0;
+  const want = Math.min(LOOKUP_BOX_MAX_GUARDIAN_ROWS_, Math.max(LOOKUP_BOX_GUARDIAN_ROWS_, maxGuardians || 0));
+  if (want === have) return 0;
+
+  const cols = box.right - box.left + 1;
+  const black = "#000000", thick = SpreadsheetApp.BorderStyle.SOLID_THICK;
+  const maxCols = sheet.getMaxColumns();
+
+  if (want > have) {
+    const n = want - have;
+    const height = sheet.getRowHeight(last);
+    sheet.insertRowsAfter(last, n);
+    sheet.setRowHeights(last + 1, n, height);
+    const colors = [];
+    for (let i = 0; i < n; i++) colors.push(new Array(cols).fill(LOOKUP_BOX_ROW_COLORS_[(have + i) % 2]));
+    sheet.getRange(last + 1, box.left, n, cols).setBackgrounds(colors);
+    // No lines between the guardian rows; the box's thick sides; the thick line under the last row
+    sheet.getRange(last, box.left, n + 1, cols).setBorder(null, null, null, null, null, false);
+    sheet.getRange(last + 1, box.left, n, cols).setBorder(null, true, true, true, null, null, black, thick);
+    recountLookupBoxRowOffsets_(sheet, box.top, box.bottom + n, maxCols,
+      R => R <= last ? R : R > last + n ? R - n : null,   // where a row was before
+      r => r <= last ? r : r + n);                         // where an old row is now
+    return n;
+  }
+
+  // Fewer: delete the extra rows from the bottom (not if one of them holds a formula: the
+  // guardian table is one formula in the header row, so its rows never do)
+  const k = have - want;
+  const first = last - k + 1;
+  if (sheet.getRange(first, 1, k, maxCols).getFormulas().some(row => row.some(f => f !== ""))) {
+    console.warn("Lookup box: extra guardian rows " + first + "-" + last + " hold a formula; not deleted");
+    return 0;
+  }
+  sheet.deleteRows(first, k);
+  sheet.getRange(first - 1, box.left, 1, cols).setBorder(null, null, true, null, null, null, black, thick);
+  recountLookupBoxRowOffsets_(sheet, box.top, box.bottom - k, maxCols,
+    R => R < first ? R : R + k,
+    r => r < first ? r : r > last ? r - k : null);
+  return -k;
+}
+
+/**
+ * After rows were added / deleted inside the lookup box: re-counts every ROW()-n / ROW()+n
+ * in the formulas of rows fromRow..toRow so each still points at the same cell
+ * (oldRowOf(R) = where row R was, null = a new row; newRowOf(r) = where old row r is now,
+ * null = deleted, which is left as it was).
+ */
+function recountLookupBoxRowOffsets_(sheet, fromRow, toRow, maxCols, oldRowOf, newRowOf) {
+  toRow = Math.min(toRow, sheet.getMaxRows());
+  if (toRow < fromRow) return;
+  const formulas = sheet.getRange(fromRow, 1, toRow - fromRow + 1, maxCols).getFormulas();
+  formulas.forEach((rowFormulas, i) => {
+    const R = fromRow + i, r = oldRowOf(R);
+    if (r === null) return;
+    rowFormulas.forEach((f, j) => {
+      if (!f) return;
+      const fixed = f.replace(/(^|[^A-Za-z0-9_.])ROW\(\s*\)\s*([+-])\s*(\d+)/gi, (m, pre, sign, n) => {
+        const target = newRowOf(sign === "-" ? r - Number(n) : r + Number(n));
+        if (target === null) return m;
+        const d = R - target;
+        return pre + "ROW()" + (d > 0 ? "-" + d : d < 0 ? "+" + (-d) : "");
+      });
+      if (fixed !== f) sheet.getRange(R, j + 1).setFormula(fixed);
+    });
+  });
+}
+
 /**
  * The quick notes update for one Contact Log row's OSIS (a sibling group
  * "111, 222" updates the group row and then each sibling). Returns true when it
