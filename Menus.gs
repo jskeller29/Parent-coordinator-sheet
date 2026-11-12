@@ -47,20 +47,20 @@ const GUIDE_LINKS = {
   // 📄 How to download / update your data, step by step (a Google Doc).
   //    Shows on: the welcome pop-up ("How to download your data") and
   //    Getting Started step 1.
-  downloadDataDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit?usp=sharing",
+  downloadDataDoc: "https://docs.google.com/document/d/12GJCUgiyQean7P3qb8GhulXDy73OLGH3/edit?usp=sharing",
 
   // 📄 A short getting-started guide, if you write one apart from the User Guide.
   //    Shows on: the welcome pop-up ("Read the User Guide") and Getting Started Help.
-  guideDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.s72570pfk7er",
+  guideDoc: "https://docs.google.com/document/d/12GJCUgiyQean7P3qb8GhulXDy73OLGH3/edit?usp=sharing",
 
   // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
-  buildDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.uhdsi9wftlg3",
+  buildDoc: "https://docs.google.com/document/d/12GJCUgiyQean7P3qb8GhulXDy73OLGH3/edit#bookmark=id.lxd64bcidr3o",
 
   // 📄 What each setting does.           Shows on: Getting Started step 3.
-  settingsDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.3i6j8ivet57",
+  settingsDoc: "https://docs.google.com/document/d/12GJCUgiyQean7P3qb8GhulXDy73OLGH3/edit#bookmark=id.suv42utnjrnr",
 
   // 📄 How to log a parent contact.       Shows on: Getting Started step 4.
-  contactLogDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.sg80ckkyi6vf"
+  contactLogDoc: "https://docs.google.com/document/d/12GJCUgiyQean7P3qb8GhulXDy73OLGH3/edit#bookmark=id.gymia0d491d6"
 };
 
 // 🗂️ FOLDERS, FORM AND TRACKER (already set; change only if you move them) ----
