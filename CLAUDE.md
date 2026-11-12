@@ -247,8 +247,11 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   C Events / Services, D Parent Coordinator / Principal / PTA / School, E Backpack / DOE Messaging / Parents Square).
   Resets clear A:H rows 2+ (resetSendOut_, clearContent only); fake data writes 9 rows
   A:G column by column (loadFakeSendOut_; a refused column is skipped with console.warn).
-- Contact Log Follow-up (N): options No Followup Needed / Followup Needed / Followup Needed - ASAP / Followed Up /
-  Resolved / Skipped / Newer Interaction. The Contact Log is a Sheets Table and N a "Dropdown" typed column: Apps
+- Contact Log Follow-up (N): the 6 options, EXACT text (owner's screenshot 2026-11-12): "No Followup Needed",
+  "Followup Needed", "Followup Needed - ASAP", "Followed up / Resolved", "Skipped / Newer Interaction", "Waiting for
+  Response". Code writes only these (auto-fill default, Migration map, Z#ContactLog, fake data); tests/test_fixes.js
+  fails if any other value is written. The grey-out rule compares case-insensitively (Sheets <>), so its "Waiting For
+  Response" matches; its "Need to respond" / "Waiting - Check Up" are old options (harmless). The Contact Log is a Sheets Table and N a "Dropdown" typed column: Apps
   Script may not change its options ("not allowed on cells in typed columns"), so code never touches N's dropdown
   (set by hand in the Table; owner removed the reset step that tried). Autofill default for N = "No Followup Needed" (Edits.gs). Hide rule for P
   (getContactLogHideFormula_, owner's 2026-11-04 formula): =AND($B2<>"", INT($B2)<>TODAY(), TRIM($N2)<> Followup Needed / Followup Needed - ASAP / Need to respond / Waiting For Response /

@@ -20,11 +20,11 @@ var CLQ = { A:1, DATE:2, GUARDIAN:3, PERSON:4, OSIS:5, STUDENT:6, COUNT:7,
             SITE:8, CLASS:9, METHOD:10, TYPE:12, NOTES:13, FSTATUS:14, FNOTE:15, HIDE:16, W:16 };
 
 // Follow-up (N) values (2026-11-12; the tool used "Yes" / "No" before the Contact Log
-// got its own options). "Still open" = the same list the Contact Log grey-out rule
+// got its own options; tests/test_fixes.js checks they are real options). "Still open" = the same list the Contact Log grey-out rule
 // keeps showing (getContactLogHideFormula_, Regenerate.gs).
 var CLQ_FOLLOWUP_NEEDED = "Followup Needed";
 var CLQ_NO_FOLLOWUP = "No Followup Needed";
-var CLQ_RESOLVED = "Resolved";
+var CLQ_RESOLVED = "Followed up / Resolved"; // exact dropdown text (owner's list 2026-11-12)
 var CLQ_OPEN_FOLLOWUPS = ["followup needed", "followup needed - asap", "need to respond", "waiting for response", "waiting - check up"];
 function cl_isOpenFollowup_(v) { return CLQ_OPEN_FOLLOWUPS.indexOf(String(v || "").trim().toLowerCase()) !== -1; }
 

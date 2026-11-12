@@ -77,3 +77,24 @@ assert.strictEqual(g2.findInMasterTable_({}, 2, "ann smith").osis, "111");
 assert.strictEqual(g2.findInMasterTable_({}, 3, "Mary  Smith").osis, "111");
 assert.strictEqual(g2.findInMasterTable_({}, 2, "Nobody"), null);
 console.log("typist stray spaces: ok");
+
+// Every Follow-up value the code writes is one of the real dropdown options
+// (the owner's Contact Log Table, 2026-11-12; exact text, case included)
+const fs = require('fs'), path = require('path');
+const { ROOT } = require('./lib/load');
+const FOLLOWUP_OPTIONS = ["No Followup Needed", "Followup Needed", "Followup Needed - ASAP",
+  "Followed up / Resolved", "Skipped / Newer Interaction", "Waiting for Response"];
+const isOption = v => FOLLOWUP_OPTIONS.indexOf(v) !== -1;
+const written = [g.CLQ_FOLLOWUP_NEEDED, g.CLQ_NO_FOLLOWUP, g.CLQ_RESOLVED].concat(Object.values(g.__get("MIGRATION_FOLLOWUP_MAP_")));
+const edits = fs.readFileSync(path.join(ROOT, "Edits.gs"), "utf8");
+const autofill = edits.match(/getRange\(row, 14\)\.setValue\("([^"]+)"\)/);
+assert(autofill, "auto-fill default for N not found");
+written.push(autofill[1]);
+// Fake Contact Log rows (Regenerate.gs): [days, guardian, spoke with, OSIS, student, M1, M2, type, notes, FOLLOW-UP, ...]
+const regen = fs.readFileSync(path.join(ROOT, "Regenerate.gs"), "utf8");
+const fakeRows = regen.split("\n").filter(l => /^\s*\[\d+,"/.test(l)).map(l => JSON.parse(l.trim().replace(/,\s*$/, "")));
+assert(fakeRows.length >= 20, "fake Contact Log rows not found");
+fakeRows.forEach(r => written.push(r[9]));
+const bad = written.filter(v => !isOption(v));
+assert.deepStrictEqual(bad, [], "Follow-up values that are not dropdown options: " + JSON.stringify(bad));
+console.log("follow-up values are real options: ok (" + written.length + " checked)");
