@@ -31,7 +31,7 @@ var NEW_COPY_STEPS_ = [
     { id: "manifest", text: "Project Settings → tick \"Show appsscript.json\", then replace appsscript.json with \"App Scripts (General).Json\" (yours has the email permissions)." },
     { id: "tabs",     text: "Check your own tabs are gone (the reset removes them): Old Master Table, Old Phone Contacts, New Students, 📥 lists." },
     { id: "nosetup",  text: "Don't run Initial Setup on it: each school runs it on its own copy (that makes the automatic jobs under their account)." },
-    { id: "b3",       text: "Master template only: Backend cell B3 = Yes for an upgrade template (opens Import Old Data), No for a new-user template (or run toggleAutoMigratePopup in the editor; 🐞 Debug → 🔄 Copy Sheet and Set to Migrate does it for you)." },
+    { id: "b3",       text: "Master template only: Backend cell B3 = No. There is one template for everyone now: its Initial Setup asks whether to start fresh or bring over last year's tracker (B3 = Yes is only for an old upgrade copy)." },
     { id: "header",   text: "Master template only: Student List header on row 1, frozen, like your sheet." }
   ] },
   { id: "test", title: "A TEST copy for you", steps: [

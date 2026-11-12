@@ -500,10 +500,9 @@ function showWelcomeDialog() {
         <a class="btn pri" href="${guideUrl}" target="_blank" rel="noopener">Read the User Guide</a>
       </div>
       <div class="sub">
-        <p class="help" style="margin:0">Need to share a fresh copy?</p>
+        <p class="help" style="margin:0">Need a fresh copy (for a colleague, or next year)? Its setup asks whether to start fresh or bring over an old tracker.</p>
         <div class="foot" style="justify-content:flex-start">
-          <a class="btn sec" href="${links.blankCopyUrl}" target="_blank" rel="noopener">New copy (blank)</a>
-          <a class="btn sec" href="${links.migrateCopyUrl}" target="_blank" rel="noopener">Upgrade copy (migrate)</a>
+          <a class="btn sec" href="${links.blankCopyUrl}" target="_blank" rel="noopener">Make a new copy</a>
         </div>
       </div>
       <p class="hint">You can open this again any time from <b>🚀 App Menu → 📖 Open User Guide</b>.</p>
@@ -620,7 +619,14 @@ function addGuideMenuItems_(menu) {
   menu.addItem("✅ Getting Started", "openGuideChecklist");
 }
 
-/** Right after Initial Setup on a new-user copy: the checklist, then the welcome pop-up on top. */
+/**
+ * Right after Initial Setup: the checklist, then the welcome pop-up on top. Its first
+ * screen asks "Is this your first PC Tracker?" (owner's request 2026-11-12: one template
+ * for everyone instead of a separate MIGRATE copy): "Start fresh" shows the four steps,
+ * "Bring over last year's tracker" opens the Migration Wizard (which lists the trackers
+ * it finds in the user's Drive, ma_findOldTrackers). An older upgrade copy (Backend B3 =
+ * Yes) still goes straight to the wizard (runInitialSetupWrapper).
+ */
 function showGuideWelcome_() {
   openGuideChecklist();
   const links = zg_links_();
@@ -634,8 +640,31 @@ function showGuideWelcome_() {
       .note-dlg .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
       .note-dlg .sub { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
       .note-dlg .sub .foot { justify-content: flex-start; }
+      .choice { display: flex; flex-direction: column; gap: 10px; }
+      .opt { text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 12px 14px;
+             cursor: pointer; font: inherit; color: var(--ink); display: flex; flex-direction: column; gap: 3px; }
+      .opt:hover { border-color: var(--accent); background: var(--panel); }
+      .opt b { font-size: 15px; color: var(--accent); }
+      .opt span { font-size: 13px; color: var(--muted); line-height: 1.45; }
+      .opt:disabled { opacity: .6; cursor: default; }
     </style>
-    <div class="note-dlg">
+    <div class="note-dlg" id="ask">
+      <h1>Welcome to the PC Tracker</h1>
+      <p>Setup is done. One question before you start:</p>
+      <h2>Is this your first PC Tracker?</h2>
+      <div class="choice">
+        <button type="button" class="opt" id="freshBtn" onclick="fresh()">
+          <b>Yes, start fresh</b>
+          <span>Load your student data and build your sheets, one step at a time.</span>
+        </button>
+        <button type="button" class="opt" id="oldBtn" onclick="bringOver()">
+          <b>No, bring over last year's tracker</b>
+          <span>Copies your Contact Log, events, student changes, lists and settings from your old tracker. Your old tracker isn't changed.</span>
+        </button>
+      </div>
+      <p class="hint">You can do the other one later: 🚀 App Menu → 🔄 Import Old Data, or ✅ Getting Started.</p>
+    </div>
+    <div class="note-dlg hidden" id="fresh">
       <h1>Welcome to the PC Tracker</h1>
       <p>This tracker keeps your parent contacts, events and family directory in one place, and fills in your PCAR for you. Getting started takes four steps:</p>
       <ol>
@@ -657,9 +686,24 @@ function showGuideWelcome_() {
           ${link(links.guideDoc, "Read the User Guide")}
         </div>
       </div>
-      <p class="hint">Moving from last year's tracker? Use 🚀 App Menu → 🔄 Import Old Data instead.</p>
     </div>
     <script>
+      function fresh() {
+        document.getElementById('ask').classList.add('hidden');
+        document.getElementById('fresh').classList.remove('hidden');
+      }
+      function bringOver() {
+        // The Migration Wizard opens in place of this pop-up
+        ['freshBtn', 'oldBtn'].forEach(function (id) { document.getElementById(id).disabled = true; });
+        document.querySelector('#oldBtn b').textContent = 'Opening…';
+        google.script.run
+          .withFailureHandler(function (e) {
+            alert('Could not open the Migration Wizard: ' + e.message + ' Use 🚀 App Menu → 🔄 Import Old Data.');
+            ['freshBtn', 'oldBtn'].forEach(function (id) { document.getElementById(id).disabled = false; });
+            document.querySelector('#oldBtn b').textContent = "No, bring over last year's tracker";
+          })
+          .zg_action('importOld');
+      }
       function go() {
         const b = document.getElementById('goBtn');
         b.disabled = true; b.textContent = 'Opening…';
@@ -669,7 +713,7 @@ function showGuideWelcome_() {
           .zg_action('inputData');
       }
     </script>`;
-  const out = HtmlService.createHtmlOutput(html).setWidth(480).setHeight(440);
+  const out = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(470);
   SpreadsheetApp.getUi().showModalDialog(out, "Welcome to the PC Tracker");
 }
 
@@ -1026,7 +1070,7 @@ var WELCOME_PERMISSIONS_ = [
   ["See, edit, download and permanently delete your contacts",
    "only for the phone sync, which stays off until you turn it on in ⚙️ Settings. It only adds, changes and removes contacts in its own \"School Directory\" label."],
   ["See, edit, create and delete all of your Google Drive files",
-   "saves your end-of-year PDF archive next to this tracker, and finds the newest User Guide and template links."],
+   "saves your end-of-year PDF archive next to this tracker, finds the newest User Guide and template links, and finds your old tracker when you bring it over."],
   ["Connect to an external service",
    "only for that end-of-year PDF, which it downloads from Google's own export page."],
   ["Allow this application to run when you are not present",
@@ -1133,8 +1177,9 @@ function buildWelcomeTab_(ss, opts) {
     upgrade
       ? ["Bring over your old data",
          "When setup is done, this tab is removed, your tabs come back and the Migration Wizard opens to bring your data over from your old sheet."]
-      : ["Load your data",
-         "When setup is done, this tab is removed and your tabs come back. A welcome window then shows you how to load your student data and build your sheets."]
+      : ["Start fresh, or bring over last year's tracker",
+         "When setup is done, this tab is removed and your tabs come back. A window asks whether this is your first PC Tracker: " +
+         "start fresh and load your student data, or bring over your old tracker (it finds it in your Drive)."]
   ];
 
   // One entry per row: h = fixed height (spacers; other rows grow to fit), band =
@@ -2307,10 +2352,42 @@ function processRolloverBackend() {
 // ======================================================================
 function openMigrationWizard() {
   const html = htmlFromFile_('MigrationUI')
-    .setTitle('🔄 System Upgrade Wizard')
+    .setTitle("Bring Over Last Year's Tracker")
     .setWidth(550)
-    .setHeight(600);
-  SpreadsheetApp.getUi().showModalDialog(html, 'System Upgrade Wizard');
+    .setHeight(640);
+  SpreadsheetApp.getUi().showModalDialog(html, "Bring Over Last Year's Tracker");
+}
+
+/**
+ * The wizard's list: spreadsheets in the user's Drive that look like an older PC Tracker,
+ * newest first (owner's request 2026-11-12, so nobody has to find and paste a link).
+ * By name (the template names, "PC Tracker", Rollover's "Retired on"), owned by the user
+ * when Drive allows that filter, this sheet left out. Never throws: [] = nothing found,
+ * and the wizard just shows the paste box. Returns [{ name, url, updated }], at most 8.
+ */
+var MA_TRACKER_NAME_WORDS_ = ["Parent Coordinator", "PC Tracker", "PC Tracking", "Coordinator Tracker", "Retired on"];
+
+function ma_findOldTrackers() {
+  try {
+    const here = SpreadsheetApp.getActiveSpreadsheet().getId();
+    const names = MA_TRACKER_NAME_WORDS_.map(w => "title contains '" + w.replace(/'/g, "\\'") + "'").join(" or ");
+    const query = "mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false and (" + names + ")";
+    let files;
+    try { files = DriveApp.searchFiles(query + " and 'me' in owners"); }
+    catch (e) { files = DriveApp.searchFiles(query); } // an account where the owner filter isn't allowed
+    const found = [];
+    for (let n = 0; files.hasNext() && n < 60; n++) {
+      const f = files.next();
+      if (f.getId() === here) continue;
+      found.push({ name: f.getName(), url: f.getUrl(), ms: f.getLastUpdated().getTime() });
+    }
+    found.sort((a, b) => b.ms - a.ms);
+    const tz = Session.getScriptTimeZone();
+    return found.slice(0, 8).map(f => ({ name: f.name, url: f.url, updated: Utilities.formatDate(new Date(f.ms), tz, "MMM d, yyyy") }));
+  } catch (e) {
+    console.warn("Looking for old trackers failed: " + e.message);
+    return [];
+  }
 }
 
 /**
@@ -3303,7 +3380,11 @@ function scanTemplateFolder_() {
     }
 
     if (blank)   { out.blankCopyUrl   = copyUrlFor_(blank);   out.blankName   = blank.getName(); }
-    if (migrate) { out.migrateCopyUrl = copyUrlFor_(migrate); out.migrateName = migrate.getName(); }
+    // One template for everyone since 2026-11-12: its Initial Setup asks "Is this your first PC
+    // Tracker?", so the upgrade link is the same (BLANK) file. A (MIGRATE) file still in the folder
+    // is only used when there is no (BLANK) one.
+    if (blank) { out.migrateCopyUrl = out.blankCopyUrl; out.migrateName = out.blankName; }
+    else if (migrate) { out.migrateCopyUrl = copyUrlFor_(migrate); out.migrateName = migrate.getName(); }
   } catch (e) {
     console.error("scanTemplateFolder_ failed (folder access?): " + e.message);
   }
@@ -3358,7 +3439,7 @@ function saveTemplateLinksToVersionSheet_(links) {
   sheet.getRange(BACKEND_VERSION.LINKS_ROW, 4, 3, 2).setValues([
     ["TEMPLATE LINKS (auto-managed — do not edit)", ""],
     ["BLANK copy",   links.blankCopyUrl   || ""],
-    ["MIGRATE copy", links.migrateCopyUrl || ""]
+    ["UPGRADE copy (same file as BLANK)", links.migrateCopyUrl || ""]
   ]);
 }
 

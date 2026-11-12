@@ -267,36 +267,8 @@ function listsSheet() {
 }
 
 {
-  // Owner's 🐞 Debug → 🔄 Copy Sheet and Set to Migrate: the COPY gets Backend B3 = Yes before
-  // its reset, so its Welcome tab is the upgrade one; this sheet is not touched
-  const mine = makeSpreadsheet(TABS);
-  const copy = makeSpreadsheet(TABS);
-  copy.getId = () => "COPY_SS"; copy.getUrl = () => "https://example.org/copy";
-  const app = fakeSpreadsheetApp(mine);
-  app.newRichTextValue = () => { const v = {}; const b = new Proxy({}, { get: (t, k) =>
-    k === 'setText' ? (x => { v.text = x; return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
-  const g = loadProject({ owner: true, extra: { SpreadsheetApp: app } });
-  const shown = [];
-  g.ownerCopyThisSheet_ = (ss, label, name) => { assert(/^Parent Coordinator Sheet - \(MIGRATE\) \(/.test(name), name); return copy; };
-  g.ownerShowCopyLink_ = (url, title) => shown.push(title);
-  g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
-  g.getGuideLink_ = () => "https://example.org/guide";
-  let b3AtReset = null;
-  g.resetToDisplayModeSteps_ = ss => { b3AtReset = ss.getSheetByName("Backend").getRange("B3").getValue(); g.showWelcomeAfterReset_(ss); };
-  g.ownerMenuCopyAndSetToMigrate();
-  assert.strictEqual(b3AtReset, "Yes", 'B3 = Yes before the reset');
-  assert.strictEqual(copy.getSheetByName("Backend").getRange("B3").getValue(), "Yes", 'the copy is an upgrade template');
-  assert.strictEqual(mine.getSheetByName("Backend").getRange("B3").getValue(), "", 'this sheet is not touched');
-  const text = Array.from(copy.getSheetByName("👋 Welcome")._cells.values()).join("\n");
-  assert(/Bring over your old data/.test(text), 'the copy\'s Welcome tab: the upgrade step');
-  assert.deepStrictEqual(copy.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"]);
-  assert.strictEqual(mine.getSheetByName("👋 Welcome"), null, 'no Welcome tab on this sheet');
-  assert(/set to Migrate/.test(shown[0]), 'done message: ' + shown[0]);
-  console.log("Debug → Copy Sheet and Set to Migrate: ok");
-}
-{
-  // 🐞 Debug → 📦 Make All 3 Copies: Blank (B3 = No) and Migrate (B3 = Yes) are reset copies,
-  // Example is the fake-data copy; 🔗 My Links lists every link from the YOUR LINKS box
+  // 🐞 Debug → 📦 Make Release Copies: Blank (B3 = No) is a reset copy, Example the fake-data copy
+  // (no Migrate copy any more: one template for everyone); 🔗 My Links lists every link
   const mine = makeSpreadsheet(TABS);
   mine.getName = () => "Mine";
   const app = fakeSpreadsheetApp(mine);
@@ -312,26 +284,27 @@ function listsSheet() {
   const steps = [];
   g.resetToDisplayModeSteps_ = c => steps.push(["reset", c.getSheetByName("Backend").getRange("B3").getValue()]);
   g.ownerRunOnCopy_ = (c, fn) => { steps.push(["fake"]); };
-  const b = g.ownerMakeCopy("blank"), m = g.ownerMakeCopy("migrate"), e = g.ownerMakeCopy("example");
-  // 3. the release names: never this sheet's name ("Mine")
-  assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "MIGRATE", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (11/12/26)"));
-  assert.deepStrictEqual(steps, [["reset", "No"], ["reset", "Yes"], ["fake"]], 'B3 set before each reset; Example loads fake data');
+  const b = g.ownerMakeCopy("blank"), e = g.ownerMakeCopy("example");
+  // the release names: never this sheet's name ("Mine")
+  assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (11/12/26)"));
+  assert.deepStrictEqual(steps, [["reset", "No"], ["fake"]], 'B3 = No before the reset; Example loads fake data');
   assert.strictEqual(made[0].copy.getSheetByName("Backend").getRange("B3").getValue(), "No");
-  assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "Yes");
+  assert.throws(() => g.ownerMakeCopy("migrate"), /Unknown copy/, 'no Migrate copy any more');
   // 1. every copy gets the version date, the Example one too (it has no reset), and B3 = No there
   made.forEach(x => assert(x.copy.getSheetByName("Backend").getRange("A2").getValue() instanceof Date, 'version date in ' + x.label));
-  assert.strictEqual(made[2].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');
+  assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');
   assert.strictEqual(e.stamp, "11/12/26", 'the pop-up shows the version date');
   assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (11/12/26)", url: "https://example.org/0", stamp: "11/12/26" }));
-  assert(m.url && e.url);
+  assert(e.url);
   assert.throws(() => g.ownerMakeCopy("other"), /Unknown copy/);
   let dialog = "";
   app._ui.showModalDialog = (h, title) => { dialog = title + "\n" + h._html; };
   g.include_ = () => "";
   g.HtmlService = { createHtmlOutput: h => { const o = { _html: h }; o.setWidth = () => o; o.setHeight = () => o; return o; } };
   g.ownerMenuMakeAllCopies();
-  assert(/ownerMakeCopy/.test(dialog) && /Parent Coordinator Sheet - \(BLANK\)/.test(dialog) && /\(MIGRATE\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the 3-copies pop-up');
-  assert(/Version date in all three/.test(dialog), 'the pop-up says which date goes in the Version Tracker');
+  assert(/ownerMakeCopy/.test(dialog) && /Parent Coordinator Sheet - \(BLANK\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the release copies pop-up');
+  assert(!/ORDER = \[[^\]]*migrate/.test(dialog), 'no Migrate copy in the pop-up');
+  assert(/Version date in both/.test(dialog), 'the pop-up says which date goes in the Version Tracker');
   g.getGuideLink_ = () => "https://example.org/guide.pdf";
   g.ownerMenuMyLinks();
   Object.keys(g.__get("GUIDE_LINKS")).forEach(k => assert(dialog.indexOf(k) !== -1, 'My Links lists ' + k));
@@ -339,7 +312,7 @@ function listsSheet() {
   // The YOUR LINKS box is the first thing in Menus.gs
   const src = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
   assert(src.indexOf('YOUR LINKS') < src.indexOf('function '), 'links box at the top of Menus.gs');
-  console.log("Debug → Make All 3 Copies + My Links: ok");
+  console.log("Debug → Make Release Copies + My Links: ok");
 }
 
 {
@@ -389,6 +362,48 @@ function listsSheet() {
   be.getRange("G2:AV2").setValues([row("234567892", "Parker")]); be.getRange("G3:AV3").setValues([H]);
   assert.strictEqual(g.fixOverridesHeaderRow_(ss, false), 0, 'a student on row 2 stays');
   console.log("New/Edit Student header row: ok");
+}
+
+{
+  // One template for everyone: the first window after Initial Setup asks "Is this your first PC Tracker?"
+  const ss = makeSpreadsheet(TABS);
+  const app = fakeSpreadsheetApp(ss);
+  let dialog = "";
+  app._ui.showModalDialog = (h, title) => { dialog = h._html; };
+  const g = loadProject({ extra: { SpreadsheetApp: app } });
+  g.include_ = () => ""; g.openGuideChecklist = () => {}; g.getGuideLink_ = () => "https://example.org/guide";
+  g.HtmlService = { createHtmlOutput: h => { const o = { _html: h }; o.setWidth = () => o; o.setHeight = () => o; return o; } };
+  g.showGuideWelcome_();
+  assert(/Is this your first PC Tracker\?/.test(dialog), 'the question');
+  assert(/Yes, start fresh/.test(dialog) && /zg_action\('inputData'\)/.test(dialog), 'start fresh -> Input Data Mode');
+  assert(/No, bring over last year's tracker/.test(dialog) && /zg_action\('importOld'\)/.test(dialog), 'bring over -> the Migration Wizard');
+
+  // The wizard's list: trackers in the user's Drive, newest first, this sheet left out, at most 8
+  const files = [["THIS_SHEET", "Parent Coordinator Sheet - (BLANK) (11/12/26)", 9],
+    ["OLD1", "Copy of Parent Coordinator Tracker 7/22/25 (BLANK) – Retired on 06/20/26", 5],
+    ["OLD2", "PC Tracker 2024", 2]].map(([id, name, day]) => ({
+      getId: () => id, getName: () => name, getUrl: () => "https://docs.google.com/spreadsheets/d/" + id + "/edit",
+      getLastUpdated: () => new Date(2026, 5, day) }));
+  const queries = [];
+  g.SpreadsheetApp.getActiveSpreadsheet = () => ({ getId: () => "THIS_SHEET" });
+  g.DriveApp = { searchFiles: q => { queries.push(q); if (/'me' in owners/.test(q)) throw new Error("not allowed here");
+    let i = 0; return { hasNext: () => i < files.length, next: () => files[i++] }; } };
+  g.Utilities.formatDate = d => d.toISOString().slice(0, 10);
+  const found = g.ma_findOldTrackers();
+  assert.strictEqual(JSON.stringify(found.map(f => f.url.split("/d/")[1].split("/")[0])), JSON.stringify(["OLD1", "OLD2"]), 'newest first, not this sheet');
+  assert.strictEqual(queries.length, 2, 'falls back when the owner filter is refused');
+  assert(/title contains 'Retired on'/.test(queries[1]) && /trashed = false/.test(queries[1]));
+  g.DriveApp = { searchFiles: () => { throw new Error("no Drive"); } };
+  assert.strictEqual(g.ma_findOldTrackers().length, 0, 'never throws: the wizard shows only the paste box');
+
+  // The template folder: the upgrade link is the (BLANK) file; an old (MIGRATE) file is not used
+  const tfile = (id, name) => ({ getId: () => id, getName: () => name, getMimeType: () => "application/vnd.google-apps.spreadsheet",
+    getLastUpdated: () => new Date(2026, 10, 1) });
+  const tfiles = [tfile("NEW_BLANK", "Parent Coordinator Sheet - (BLANK) (11/12/26)"), tfile("OLD_MIG", "Parent Coordinator Tracker 7/22/26 (MIGRATE)")];
+  g.DriveApp = { getFolderById: () => ({ getFiles: () => { let i = 0; return { hasNext: () => i < tfiles.length, next: () => tfiles[i++] }; } }) };
+  const t = g.scanTemplateFolder_();
+  assert(/NEW_BLANK\/copy$/.test(t.blankCopyUrl) && t.migrateCopyUrl === t.blankCopyUrl, 'one template link: ' + JSON.stringify(t));
+  console.log("One template: the question, the Drive list, the template link: ok");
 }
 
 // ---------------------------------------------------------------- new-user flow pieces

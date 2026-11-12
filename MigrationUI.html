@@ -18,21 +18,36 @@
     .running .status-icon { display: none; }
     .done .status-icon { background: var(--accent); border-color: var(--accent); color: #ffffff; }
     .done .spinner { display: none; }
+    /* Trackers found in the user's Drive (ma_findOldTrackers) */
+    .found { display: flex; flex-direction: column; gap: 6px; }
+    .found .looking { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .found .looking .spinner { width: 15px; height: 15px; }
+    .pick { text-align: left; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; padding: 9px 12px;
+            cursor: pointer; font: inherit; color: var(--ink); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+    .pick:hover { background: var(--panel); }
+    .pick.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .pick b { font-weight: 600; overflow-wrap: anywhere; }
+    .pick span { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
   </style>
 </head>
 <body>
 
   <div class="wiz">
-    <h1>Upgrade from an older tracker</h1>
-    <p>Paste the link to your older PC Tracking Sheet. Your Raw Data, event logs, Contact Log and settings are copied into this new version. The old sheet isn't changed.</p>
+    <h1>Bring over last year's tracker</h1>
+    <p>Pick your old tracker, or paste its link. Its Raw Data, Contact Log, events, student changes, lists and settings are copied into this one. The old tracker isn't changed.</p>
+
+    <div class="found" id="found">
+      <div class="lab">Trackers in your Google Drive</div>
+      <div class="looking" id="looking"><span class="spinner"></span>Looking in your Drive…</div>
+    </div>
 
     <div>
-      <label class="lab" for="sheetUrl">Link to your old sheet</label>
+      <label class="lab" for="sheetUrl" id="pasteLabel">Not listed? Paste the link to your old tracker</label>
       <input type="text" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off">
       <div id="error-msg" class="notice err"></div>
     </div>
 
-    <button id="startBtn" class="btn pri wide" onclick="startMigration()">Start upgrade</button>
+    <button id="startBtn" class="btn pri wide" onclick="startMigration()">Bring it over</button>
 
     <div class="checklist" id="checklist">
       <div class="step pending" id="step-1"><span class="spinner"></span><span class="status-icon">○</span> Connect to the old sheet</div>
@@ -49,6 +64,31 @@
     const btn = document.getElementById('startBtn');
     const errorMsg = document.getElementById('error-msg');
     let url = "";
+
+    // The trackers found in the user's Drive: click one to fill in its link
+    google.script.run
+      .withSuccessHandler(list => {
+        const box = document.getElementById('found');
+        document.getElementById('looking').remove();
+        if (!list || !list.length) { box.style.display = 'none'; document.getElementById('pasteLabel').textContent = 'Paste the link to your old tracker'; return; }
+        list.forEach(t => {
+          const b = document.createElement('button');
+          b.type = 'button'; b.className = 'pick';
+          const name = document.createElement('b'); name.textContent = t.name;
+          const when = document.createElement('span'); when.textContent = 'edited ' + t.updated;
+          b.appendChild(name); b.appendChild(when);
+          b.addEventListener('click', () => {
+            document.querySelectorAll('.pick').forEach(p => p.classList.remove('on'));
+            b.classList.add('on');
+            urlInput.value = t.url;
+            errorMsg.style.display = 'none';
+          });
+          box.appendChild(b);
+        });
+      })
+      .withFailureHandler(() => { document.getElementById('found').style.display = 'none'; })
+      .ma_findOldTrackers();
+    urlInput.addEventListener('input', () => document.querySelectorAll('.pick').forEach(p => p.classList.remove('on')));
 
     function setStep(stepNum, status) {
       const el = document.getElementById(`step-${stepNum}`);
@@ -68,13 +108,14 @@
     function startMigration() {
       url = urlInput.value.trim();
       if (!url) {
-        showError("Please paste a valid Google Sheets URL.");
+        showError("Pick your old tracker above, or paste its link.");
         return;
       }
 
       errorMsg.style.display = 'none';
       btn.disabled = true;
-      btn.textContent = "Upgrading…";
+      btn.textContent = "Bringing it over…";
+      document.querySelectorAll('.pick').forEach(p => p.disabled = true);
       document.getElementById('checklist').style.display = 'block';
 
       // Step 1: Verify Connection
@@ -107,7 +148,7 @@
                 setStep(6, 'running');
                 google.script.run.withSuccessHandler(() => {
                   setStep(6, 'done');
-                  btn.textContent = "Upgrade complete";
+                  btn.textContent = "Done: your old tracker is in";
                   setTimeout(() => google.script.host.close(), 3000);
                 }).withFailureHandler(e => showError(e.message)).ma_finish();
                 

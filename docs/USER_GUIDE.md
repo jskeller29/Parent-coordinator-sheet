@@ -31,16 +31,13 @@ Contacts.
 
 ### Get your copy
 
-Every coordinator works in their own copy. The templates are in the
-[PC Tracker template folder](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2):
+Every coordinator works in their own copy, made from the template in the
+[PC Tracker template folder](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2).
+Open the newest file (its name ends in "(BLANK)" and a date) and choose File → Make a copy.
+The copy is private and lives in your own Google Drive.
 
-| File name contains | Use it if |
-|---|---|
-| (BLANK) | You are new to the tracker. |
-| (MIGRATE) | You used last year's tracker and want to bring your data over. |
-
-Open the file and choose File → Make a copy. The copy is private and lives in your own
-Google Drive.
+The same template is for everyone. If you used the tracker last year, you bring your old
+data over during setup.
 
 ## Part 1: Setting up
 
@@ -53,8 +50,8 @@ Setup takes about 10 minutes.
 3. Click 🚀 App Menu → 🚨 Initial Setup (Run Once) and allow it.
 4. Follow the Getting Started checklist that opens on the right.
 
-If you are moving from last year's tracker, run Initial Setup first, then 🚀 App Menu →
-🔄 Import Old Data. A (MIGRATE) copy opens it for you. See Part 3.
+Right after Initial Setup, a window asks whether this is your first PC Tracker. If you
+used one last year, choose "No, bring over last year's tracker" (Part 3).
 
 ### Step 1: Open your copy
 
@@ -72,7 +69,7 @@ tracker can show anything, so here is what each permission is for, in Google's w
 |---|---|
 | See, edit, create and delete all your Google Sheets spreadsheets | Building and updating the tabs in this tracker. It also reads the shared Version Tracker sheet to tell you about a new version, and opens last year's tracker when you use Import Old Data. |
 | See, edit, download and permanently delete your contacts | Only the phone sync, which is off until you turn it on in Settings. It only adds, changes and removes contacts in its own "School Directory" label. |
-| See, edit, create and delete all of your Google Drive files | Saving your end-of-year PDF archive next to the tracker, and finding the newest User Guide and template links. |
+| See, edit, create and delete all of your Google Drive files | Saving your end-of-year PDF archive next to the tracker, finding the newest User Guide and template links, and finding your old tracker when you bring it over. |
 | Connect to an external service | Only the end-of-year PDF, which it downloads from Google's own export page. |
 | Allow this application to run when you are not present | The updates when you type in the Contact Log, the nightly rebuild at 10 PM and the update check when you open the sheet. |
 | Display and run third-party web content in prompts and sidebars | The tracker's own pop-ups and side panels, such as Settings and Input Data Mode. "Third-party" means not made by Google. |
@@ -98,7 +95,9 @@ Setup then:
 - turns on the automatic parts (Contact Log updates, the 10 PM rebuild, the update check),
 - shows your everyday tabs: Contact Log, Combined Contact Tracking, PCAR and Directory
   (you can turn on others in Settings → Tabs & columns),
-- opens a welcome window and the Getting Started checklist.
+- asks "Is this your first PC Tracker?": "Yes, start fresh" shows the first steps, and
+  "No, bring over last year's tracker" opens the Migration Wizard (Part 3),
+- opens the Getting Started checklist.
 
 > [!NOTE]
 > Before setup, the sheet won't let you type. You'll see "Action Blocked:
@@ -337,8 +336,10 @@ picks up where it stopped. With the phone sync on, the nightly run does the same
 
 ### Bring over last year's data
 
-Open 🚀 App Menu → 🔄 Import Old Data (a (MIGRATE) copy opens it for you), paste the link
-to your old tracker and start. It goes through six steps:
+Choose "No, bring over last year's tracker" in the window after Initial Setup, or open
+🚀 App Menu → 🔄 Import Old Data at any time. The wizard lists the trackers it finds in your
+Google Drive: click yours, or paste its link if it isn't listed, then click Bring it over.
+It goes through six steps:
 
 1. Connect to the old sheet.
 2. Bring over your settings.
@@ -356,9 +357,9 @@ version is out, and shows what changed. You can also check with 🚀 App Menu �
 for Updates. In that window you can dismiss the update for now, dismiss it until a
 newer one comes out, ask to hear about major updates only, or stop the automatic check.
 
-An update doesn't change your current sheet. To move to a new version, make a copy of
-the new (MIGRATE) template, run Initial Setup, and let Import Old Data bring your data
-across. Your settings come with it.
+An update doesn't change your current sheet. To move to a new version, click Get the
+latest version, make a copy, run Initial Setup, and choose "No, bring over last year's
+tracker". Your data, lists and settings come with it.
 
 ### End of Year Rollover
 
@@ -367,7 +368,8 @@ When the school year is over, run 🚀 App Menu → 🔄 End of Year Rollover. I
 - saves a PDF archive of your Contact Log, Combined Contact Tracking and your lists in
   the same Drive folder as the tracker,
 - turns off the nightly sync so the old sheet can't change next year's contacts,
-- gives you the links to next year's template.
+- gives you the link to next year's tracker. Make a copy, run Initial Setup, and choose
+  "No, bring over last year's tracker".
 
 Keep the old sheet and the PDF as your record for the year.
 
@@ -392,7 +394,8 @@ These are the only times the tracker looks outside your sheet:
 
 - The update check reads a shared, view-only Version Tracker sheet. It sends nothing
   about your students.
-- Import Old Data opens your old tracker, only when you give it the link.
+- Import Old Data lists the trackers in your Drive by name, and opens only the one you
+  pick.
 - A bug report sends only what you type into the form.
 
 Who else can see your copy is up to you. It is in your Drive, and you decide whether to

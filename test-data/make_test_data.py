@@ -1,10 +1,32 @@
 """Builds the fake test files in this folder (CSV + Excel) from the same 18 students as
-Regenerate.gs "Reset + Load Fake Data". Run: python3 make_test_data.py  (needs openpyxl)."""
-import csv, io, os, re, json, zipfile
-from openpyxl import Workbook
-from openpyxl.styles import Font
+Regenerate.gs "Reset + Load Fake Data". Run: python3 make_test_data.py  (needs openpyxl).
+python3 make_test_data.py --zip-only  rebuilds only "PC Tracker test data.zip" from the files here."""
+import csv, io, os, re, json, sys, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ZIP_NAME = "PC Tracker test data.zip"
+
+# The download zip has ONE file per data set, in the format the real export comes in
+# (owner 2026-11-12): Student Data (ATS) and Parent Square = .csv, NYCSA = .xlsx. Site / Class
+# is typed or pasted, so .csv; Your Lists = .xlsx (lists usually come as spreadsheets, and the
+# bus-routes one has title rows above its headers). This folder keeps both formats: the tests use them.
+ZIP_FORMAT = {"1": ".csv", "2": ".csv", "3": ".xlsx", "4": ".csv", "5": ".xlsx"}
+
+def build_zip():
+    files = [f for f in sorted(os.listdir(HERE))
+             if f.endswith((".csv", ".xlsx")) and os.path.splitext(f)[1] == ZIP_FORMAT.get(f[0])
+             or f.startswith("1c ")]  # the broken ATS file only exists as .csv
+    with zipfile.ZipFile(os.path.join(HERE, ZIP_NAME), "w", zipfile.ZIP_DEFLATED) as z:
+        for f in files + ["README.md"]:
+            z.write(os.path.join(HERE, f), f)
+    return files
+
+if "--zip-only" in sys.argv:
+    print("zip:", ", ".join(build_zip()))
+    sys.exit(0)
+
+from openpyxl import Workbook
+from openpyxl.styles import Font
 REGEN = open(os.path.join(HERE, "..", "Regenerate.gs"), encoding="utf-8").read()
 
 def rows_of(fn):
@@ -126,9 +148,6 @@ write("5d - Your Lists - After School Sign-up (LAST, FIRST)", ["Name","Grade","P
   ["FA, MULAN","4","Dance","Fri"]
 ])
 
-# One zip with everything (README included)
-with zipfile.ZipFile(os.path.join(HERE, "PC Tracker test data.zip"), "w", zipfile.ZIP_DEFLATED) as z:
-    for f in sorted(os.listdir(HERE)):
-        if f.endswith((".csv", ".xlsx")) or f == "README.md":
-            z.write(os.path.join(HERE, f), f)
+# The download zip: one file per data set (ZIP_FORMAT), README included
+print("zip:", ", ".join(build_zip()))
 print("done:", len([f for f in os.listdir(HERE) if f.endswith((".csv", ".xlsx"))]), "files")

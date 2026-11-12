@@ -257,9 +257,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm), "Copy Sheet and Set to Migrate" (2026-11-12: same as the next one, but the copy is named "… - (MIGRATE)
-  (date)" and gets Backend B3 = "Yes" BEFORE its reset, so its Welcome tab shows the upgrade step; isAutoMigrateOn_(ss)
-  reads the copy's own B3; ownerMenuCopyAndSetToMigrate / ownerSetAutoMigrate_), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
+  confirm), "📦 Make Release Copies" (below; "Copy Sheet and Set to Migrate" was removed 2026-11-12 with the MIGRATE
+  template), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
   in the same folder and runs resetToDisplayModeSteps_ on it), "Copy Sheet, Then Load Fake Data on the Copy" (runs
   loadFakeDataSteps_ on the copy via ownerRunOnCopy_: SpreadsheetApp.setActiveSpreadsheet(copy) because the build /
   buildEventTable / buildOverrideReport use the active spreadsheet, then switches back and restores this script's
@@ -381,7 +380,10 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
-- 🐞 Debug → 🔄 Copy Sheet and Set to Migrate (2026-11-12): re-paste Menus and z_MINE (owner sheet), z_NewCopy.
+- 🐞 Debug → 🔄 Copy Sheet and Set to Migrate (2026-11-12; removed again the same day, see ONE TEMPLATE below).
+- One template for everyone (2026-11-12): re-paste Menus (script) and MigrationUI, RolloverWizard (HTML) on every
+  sheet; owner sheet also z_MINE and z_NewCopy. Move old "(MIGRATE)" files out of the template folder and put the
+  (BLANK) copy link in the Version Tracker's column D.
 - Release names + version stamp + New/Edit Student header row (2026-11-12): re-paste Core, Build, Regenerate (every
   sheet) and z_MINE (owner sheet).
 - 📌 YOUR LINKS box + 🔗 My Links + 📦 Make All 3 Copies (2026-11-12): re-paste Menus, GettingStartedSidebar (every
@@ -458,18 +460,28 @@ settingsDoc, contactLogDoc), GUIDE_FOLDER_ID, TEMPLATE_FOLDER_ID, BUG_REPORT_FOR
 from their sections, same names; DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc). setupVideo: Welcome tab "🎬 Watch the
 setup video" (when set) + checklist Help. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
 ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
-Backend D2:E5 "TEMPLATE LINKS" = the tracker's OWN saved copy (D3:E4 BLANK / MIGRATE copy links from the template
+Backend D2:E5 "TEMPLATE LINKS" = the tracker's OWN saved copy (D3:E4 BLANK / upgrade copy links, the same file now, from the template
 folder scan, D5:E5 the guide link): written after every successful scan, read only when a sheet can't read the folders.
 Never the place to paste links. A second "GUIDE link" row at D6:E6 (an older layout) is read by nothing; saving the
 guide link clears it (saveGuideLinkToVersionSheet_).
-🐞 Debug → 📦 Make All 3 Copies (ownerMenuMakeAllCopies, z_MINE.gs): a pop-up makes "… - (EXAMPLE)" (fake data, as
-"Copy Sheet, Then Load Fake Data"), "… - (BLANK)" (B3 = No + display reset) and "… - (MIGRATE)" (B3 = Yes + display
-reset), ONE google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link;
-a failed one doesn't stop the others. This sheet is never changed.
-Release copies (2026-11-12, owner): Make All 3 Copies and Copy Sheet and Set to Migrate name the copy
+🐞 Debug → 📦 Make Release Copies (ownerMenuMakeAllCopies, z_MINE.gs; was "Make All 3 Copies"): a pop-up makes
+"… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data") and "… - (BLANK)" (B3 = No + display reset), ONE
+google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one
+doesn't stop the others. This sheet is never changed.
+ONE TEMPLATE FOR EVERYONE (owner 2026-11-12; there is no MIGRATE template any more): the first window after Initial
+Setup (showGuideWelcome_) asks "Is this your first PC Tracker?": "Yes, start fresh" = the old welcome (4 steps, Input
+Data Mode), "No, bring over last year's tracker" = zg_action('importOld') -> openMigrationWizard (title "Bring Over Last
+Year's Tracker"). The wizard (MigrationUI.html) lists the trackers in the user's Drive (ma_findOldTrackers, Menus.gs:
+DriveApp.searchFiles on spreadsheet names with MA_TRACKER_NAME_WORDS_ incl. Rollover's "Retired on", "'me' in owners"
+with a fallback without it, this sheet left out, newest 8; never throws) to click; pasting a link stays. The Welcome
+tab's step 4 says the question is coming. Old upgrade copies (B3 = Yes) still work as before (straight to the wizard;
+isAutoMigrateOn_ kept). Template links: scanTemplateFolder_ sets migrateCopyUrl = the (BLANK) file (a (MIGRATE) file
+is only used when there is no BLANK one); Backend D4 says "UPGRADE copy (same file as BLANK)". Rollover: one button
+"Get next year's tracker" (+ "choose No, bring over last year's tracker"); 📖 Open User Guide: one "Make a new copy".
+Release copies (2026-11-12, owner): Make Release Copies names the copy
 "Parent Coordinator Sheet - (TYPE) (MM/dd/yy)" (OWNER_RELEASE_NAME_ / ownerReleaseName_, never this sheet's name; the
 two test-copy items keep "<this sheet's name> - Display Mode / Fake Data (date)"). Every release copy gets its version
-stamp (ownerStampVersion_: Backend A2 = today via stampVersionDate_, B3 = Yes for Migrate else No); the Example copy had
+stamp (ownerStampVersion_: Backend A2 = today via stampVersionDate_, B3 = No); the Example copy had
 kept this sheet's old date (fake data has no reset). The pop-up / done message shows that date: it is the date for the
 Version Tracker's column A (a later tracker date makes brand-new copies say "New Version Available").
 Version Tracker (VERSION_TRACKER_ID, first tab): every version of the checker reads only A:D (A date, B Size "Major..." =

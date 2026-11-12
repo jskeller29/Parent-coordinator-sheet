@@ -4,8 +4,12 @@ Fake files for trying everything out on a **copy** of the sheet. All of it is ma
 the same 18 students and parents as 🐞 Debug → 🧪 Reset + Load Fake Data (Simpsons,
 Addams, Belchers, …), so these files also work on a sheet that already has the fake data.
 
-**Download:** `PC Tracker test data.zip` has every file. Each file is there as **.csv**
-and **.xlsx** (Excel). Use either one.
+**Download:** `PC Tracker test data.zip` has one file per data set, in the format the real
+export comes in: Student Data (ATS) and Parent Square as **.csv**, NYCSA as **.xlsx** (Excel),
+Site and Class as .csv, Your Lists as .xlsx. On GitHub: open the zip in this folder, then click
+**Download raw file** (the download arrow at the top right of the file).
+
+This folder also has the other format of each file (the offline tests use them); upload either one.
 
 ## Input Data Mode (🚀 App Menu → 📥 Input Data Mode)
 Upload the file at its step (📂 Upload file), or open it, press Ctrl+A, copy, and paste
