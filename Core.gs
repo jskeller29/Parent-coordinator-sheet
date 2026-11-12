@@ -249,6 +249,48 @@ function getBackendSheet_(ss) {
   return sheet;
 }
 
+// ----------------------------------------------------------------------
+// NEW / EDIT STUDENT header row (owner's report 2026-11-12). The section is title (row 1),
+// header (row 2), students from row 3, like every section. An older sheet can have it
+// one row lower (header on row 3, students from row 4: its old tab had a row above the
+// header). Reading still works (every reader skips rows without a real OSIS), but a
+// reset clears from row 3, i.e. that sheet's header, so copies made from it lost the
+// header row. fixOverridesHeaderRow_ moves such a section up (only columns G:AV) and,
+// with writeIfBlank, writes these headers into an empty row 2 (after a reset).
+// ----------------------------------------------------------------------
+var OVERRIDES_HEADERS_ = ["Date", "Entry Type", "OSIS", "Last Name", "First Name", "Gender", "Age", "Grade", "Class", "Home Language"]
+  .concat([1, 2, 3, 4, 5].reduce(function(all, n) {
+    return all.concat(["Guardian Name " + n, "Guardian Relationship " + n, "Guardian Phone Number " + n,
+                       "Guardian Email " + n, "Guardian Spoken Language " + n, "Guardian Written Language " + n]);
+  }, []))
+  .concat(["Label", "Hide From Report"]); // 42 = BACKEND_BLOCKS.OVERRIDES.width
+
+/** Returns how many rows the section was moved up (0 = it was already right). */
+function fixOverridesHeaderRow_(ss, writeIfBlank) {
+  const sheet = getBackendSheet_(ss);
+  const b = BACKEND_BLOCKS.OVERRIDES;
+  const lastRow = sheet.getLastRow();
+  let moved = 0;
+  if (lastRow > BACKEND_HEADER_ROW) {
+    const probe = sheet.getRange(BACKEND_HEADER_ROW, b.col, Math.min(6, lastRow - BACKEND_HEADER_ROW + 1), 3).getValues();
+    const isHeader = r => /osis/i.test(String(r[2])) && !/\d{6,}/.test(String(r[2]));
+    const h = probe.findIndex(isHeader);
+    const studentAbove = probe.slice(0, Math.max(h, 0)).some(r => isRealStudentId_(toText_(r[2])));
+    if (h > 0 && !studentAbove) {
+      const from = BACKEND_HEADER_ROW + h, count = lastRow - from + 1;
+      const values = sheet.getRange(from, b.col, count, b.width).getValues();
+      sheet.getRange(BACKEND_HEADER_ROW, b.col, count, b.width).setValues(values);
+      sheet.getRange(BACKEND_HEADER_ROW + count, b.col, h, b.width).clearContent();
+      moved = h;
+    }
+  }
+  if (writeIfBlank) {
+    const header = sheet.getRange(BACKEND_HEADER_ROW, b.col, 1, b.width);
+    if (!header.getValues()[0].some(v => String(v).trim() !== "")) header.setValues([OVERRIDES_HEADERS_]);
+  }
+  return moved;
+}
+
 /** Fills in each section's row-1 title where the cell is still blank. */
 function writeBackendTitles_(sheet) {
   Object.keys(BACKEND_BLOCKS).forEach(key => {

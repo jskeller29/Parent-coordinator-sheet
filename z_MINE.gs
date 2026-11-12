@@ -149,13 +149,14 @@ function ownerMenuCopyAndSetToMigrate() {
 
   runAction_("Copy + Set to Migrate", () => {
     ss.toast("Copying the sheet…", "🔄 Copy + Migrate", 30);
-    const copy = ownerCopyThisSheet_(ss, "(MIGRATE)");
+    const copy = ownerCopyThisSheet_(ss, null, ownerReleaseName_("MIGRATE"));
 
     ss.toast("Resetting the copy and turning on Auto-Migrate…", "🔄 Copy + Migrate", 60);
+    let stamped = "";
     try {
       ownerSetAutoMigrate_(copy, true);
       resetToDisplayModeSteps_(copy); // Regenerate.gs: same steps as Reset to Display Mode
-      ownerSetAutoMigrate_(copy, true); // still "Yes" after the reset (it only fills a blank B3)
+      stamped = ownerStampVersion_(copy, true); // still "Yes" after the reset (it only fills a blank B3)
       SpreadsheetApp.flush();
     } catch (e) {
       ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but setting it up stopped partway",
@@ -165,7 +166,8 @@ function ownerMenuCopyAndSetToMigrate() {
 
     ownerShowCopyLink_(copy.getUrl(), "✅ Copy reset and set to Migrate",
       "This sheet was not changed. The copy is empty, opens on the 👋 Welcome tab, and its Initial Setup opens the " +
-      "Migration Wizard (Backend B3 = Yes).<br><br>Before sharing it: delete the z_ files from the copy's " +
+      "Migration Wizard (Backend B3 = Yes). Its version date is <b>" + stamped + "</b>: use that date in the Version " +
+      "Tracker (column A).<br><br>Before sharing it: delete the z_ files from the copy's " +
       "Extensions &gt; Apps Script, use the General manifest, and move it into the template folder. Its name has " +
       "\"(MIGRATE)\", which is how 🔄 End of Year Rollover and the welcome links find the upgrade template.");
   });
@@ -179,9 +181,9 @@ function ownerMenuCopyAndSetToMigrate() {
 // and shows each copy's link as it is done. This sheet is never changed.
 // ----------------------------------------------------------------------
 var OWNER_COPY_KINDS_ = {
-  example: { label: "(EXAMPLE)", title: "Example", what: "fake students, contacts and events, built like a school's sheet" },
-  blank:   { label: "(BLANK)",   title: "Blank",   what: "empty, opens on the 👋 Welcome tab (new coordinators)" },
-  migrate: { label: "(MIGRATE)", title: "Migrate", what: "empty, Auto-Migrate on: Initial Setup opens the Migration Wizard (upgrades)" }
+  example: { type: "EXAMPLE", title: "Example", what: "fake students, contacts and events, built like a school's sheet" },
+  blank:   { type: "BLANK",   title: "Blank",   what: "empty, opens on the 👋 Welcome tab (new coordinators)" },
+  migrate: { type: "MIGRATE", title: "Migrate", what: "empty, Auto-Migrate on: Initial Setup opens the Migration Wizard (upgrades)" }
 };
 
 function ownerMenuMakeAllCopies() {
@@ -191,7 +193,7 @@ function ownerMenuMakeAllCopies() {
   const rows = order.map(k => {
     const c = OWNER_COPY_KINDS_[k];
     return `<div class="row" id="r_${k}"><div class="ck" id="c_${k}"></div><div class="txt"><b>${c.title}</b>
-      <span class="nm">${esc(ss.getName())} - ${c.label}</span><span class="what">${esc(c.what)}</span>
+      <span class="nm">${esc(ownerReleaseName_(c.type))}</span><span class="what">${esc(c.what)}</span>
       <span class="st" id="s_${k}">Waiting</span></div></div>`;
   }).join("");
   const html = include_('Styles') + `
@@ -214,6 +216,8 @@ function ownerMenuMakeAllCopies() {
       <p>Makes three copies of this sheet in the same Drive folder, one after the other (a few minutes in all). <b>This sheet is not changed.</b></p>
       ${rows}
       <div id="after" class="notice">
+        <p style="margin:0 0 6px"><b>Version date in all three: <span id="stamp"></span>.</b> Put that date in the Version Tracker
+        (column A) when you add the release, or new copies will think they are out of date.</p>
         <b>Before you share them:</b> in each copy, delete the z_ files in Extensions → Apps Script and use the General manifest.
         Move Blank and Migrate into the template folder ("(BLANK)" and "(MIGRATE)" in the names are how the
         "make a copy" links find them).
@@ -235,6 +239,7 @@ function ownerMenuMakeAllCopies() {
         google.script.run
           .withSuccessHandler(r => {
             el('r_' + k).className = 'row done'; el('c_' + k).textContent = '✓';
+            if (r.stamp) el('stamp').textContent = r.stamp;
             el('s_' + k).innerHTML = '<a href="' + r.url + '" target="_blank" rel="noopener">Open ' + r.name.replace(/</g, '&lt;') + '</a>';
             next(i + 1);
           })
@@ -249,23 +254,23 @@ function ownerMenuMakeAllCopies() {
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(560), "📦 Make All 3 Copies");
 }
 
-/** One copy for the pop-up above: "example" | "blank" | "migrate". Returns { name, url }. */
+/** One copy for the pop-up above: "example" | "blank" | "migrate". Returns { name, url, stamp }. */
 function ownerMakeCopy(kind) {
   const c = OWNER_COPY_KINDS_[kind];
   if (!c) throw new Error("Unknown copy: " + kind);
   return runAction_("Make copy: " + c.title, () => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const copy = ownerCopyThisSheet_(ss, c.label);
+    const copy = ownerCopyThisSheet_(ss, null, ownerReleaseName_(c.type));
+    const migrate = kind === "migrate";
     if (kind === "example") {
       ownerRunOnCopy_(copy, () => loadFakeDataSteps_(copy)); // same as "Copy Sheet, Then Load Fake Data on the Copy"
     } else {
-      const migrate = kind === "migrate";
       ownerSetAutoMigrate_(copy, migrate); // before the reset: the Welcome tab reads it
       resetToDisplayModeSteps_(copy);
-      ownerSetAutoMigrate_(copy, migrate);
     }
+    const stamp = ownerStampVersion_(copy, migrate); // all three: today's version date + B3
     SpreadsheetApp.flush();
-    return { name: copy.getName(), url: copy.getUrl() };
+    return { name: copy.getName(), url: copy.getUrl(), stamp: stamp };
   });
 }
 
@@ -308,15 +313,45 @@ function ownerSetAutoMigrate_(ss, on) {
   getOrCreateVersionSheet_(ss).getRange(BACKEND_VERSION.MIGRATE_TOGGLE).setValue(on ? "Yes" : "No");
 }
 
-/** Copies this sheet into the same Drive folder as "<name> - <label> (MM/dd/yy)" and opens the copy by ID. */
-function ownerCopyThisSheet_(ss, label) {
+// Release copies (Example / Blank / Migrate) are always named like this, whatever this
+// sheet is called (owner's request 2026-11-12): "Parent Coordinator Sheet - (BLANK) (11/12/26)".
+// "(BLANK)" / "(MIGRATE)" + the date are what the template folder scan looks for (Menus.gs).
+var OWNER_RELEASE_NAME_ = "Parent Coordinator Sheet";
+
+function ownerToday_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
+}
+
+/** "Parent Coordinator Sheet - (TYPE) (MM/dd/yy)". */
+function ownerReleaseName_(type) {
+  return `${OWNER_RELEASE_NAME_} - (${type}) (${ownerToday_()})`;
+}
+
+/**
+ * Copies this sheet into the same Drive folder and opens the copy by ID. Named
+ * "<this sheet's name> - <label> (MM/dd/yy)" (the test copies), or exactly `name` when given
+ * (the release copies, ownerReleaseName_).
+ */
+function ownerCopyThisSheet_(ss, label, name) {
   SpreadsheetApp.flush(); // the copy should include every pending write
   const file = DriveApp.getFileById(ss.getId());
   const parents = file.getParents();
   const folder = parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
-  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
-  const copyFile = file.makeCopy(`${ss.getName()} - ${label} (${stamp})`, folder);
+  const copyFile = file.makeCopy(name || `${ss.getName()} - ${label} (${ownerToday_()})`, folder);
   return SpreadsheetApp.openById(copyFile.getId());
+}
+
+/**
+ * 1. Every release copy's version stamp (owner's request 2026-11-12): Backend A2 = today,
+ * the build date the update checker compares with the Version Tracker's column A, and B3 =
+ * Auto-Migrate for this kind. The reset does A2 for Blank / Migrate; the Example copy only
+ * loads fake data, so without this it kept this sheet's old date. Returns "MM/dd/yy".
+ */
+function ownerStampVersion_(copy, migrate) {
+  stampVersionDate_(copy);          // Regenerate.gs: A2 = today
+  ownerSetAutoMigrate_(copy, migrate);
+  return Utilities.formatDate(getOrCreateVersionSheet_(copy).getRange(BACKEND_VERSION.BUILD_DATE).getValue(),
+    Session.getScriptTimeZone(), "MM/dd/yy");
 }
 
 // ----------------------------------------------------------------------

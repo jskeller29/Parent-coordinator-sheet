@@ -251,10 +251,17 @@ function listsSheet() {
   // Getting Started: no "coming soon"; empty document links use the User Guide / data guide
   const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(TABS)) } });
   g.getGuideLink_ = () => "https://example.org/guide";
+  // A filled-in link is used as is; an empty DOCUMENT link falls back to the User Guide, an empty VIDEO stays empty
+  const L = g.__get("GUIDE_LINKS");
   const links = g.zg_links_();
-  ['guideDoc', 'buildDoc', 'settingsDoc', 'contactLogDoc'].forEach(k => assert.strictEqual(links[k], "https://example.org/guide", k));
-  assert.strictEqual(links.downloadDataDoc, g.__get("DATA_GUIDE_URL"));
-  assert.strictEqual(links.downloadDataVideo, "", 'no video yet: left out');
+  ['guideDoc', 'buildDoc', 'settingsDoc', 'contactLogDoc', 'downloadDataDoc'].forEach(k => assert.strictEqual(links[k], L[k] || "https://example.org/guide", k));
+  ['setupVideo', 'downloadDataVideo'].forEach(k => assert.strictEqual(links[k], L[k], k));
+  const saved = Object.assign({}, L);
+  Object.keys(L).forEach(k => { L[k] = ""; });
+  const empty = g.zg_links_();
+  ['guideDoc', 'buildDoc', 'settingsDoc', 'contactLogDoc', 'downloadDataDoc'].forEach(k => assert.strictEqual(empty[k], "https://example.org/guide", 'empty ' + k + ' -> User Guide'));
+  assert.strictEqual(empty.downloadDataVideo, "", 'no video: left out');
+  Object.assign(L, saved);
   assert(!/coming soon/.test(src) && !/coming soon/.test(fs.readFileSync(path.join(ROOT, 'GettingStartedSidebar.html'), 'utf8')), 'no "coming soon" left');
   console.log("Initial Setup permissions + Getting Started links: ok");
 }
@@ -270,7 +277,7 @@ function listsSheet() {
     k === 'setText' ? (x => { v.text = x; return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
   const g = loadProject({ owner: true, extra: { SpreadsheetApp: app } });
   const shown = [];
-  g.ownerCopyThisSheet_ = (ss, label) => { assert.strictEqual(label, "(MIGRATE)"); return copy; };
+  g.ownerCopyThisSheet_ = (ss, label, name) => { assert(/^Parent Coordinator Sheet - \(MIGRATE\) \(/.test(name), name); return copy; };
   g.ownerShowCopyLink_ = (url, title) => shown.push(title);
   g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
   g.getGuideLink_ = () => "https://example.org/guide";
@@ -295,20 +302,27 @@ function listsSheet() {
   const app = fakeSpreadsheetApp(mine);
   const g = loadProject({ owner: true, extra: { SpreadsheetApp: app } });
   const made = [];
-  g.ownerCopyThisSheet_ = (ss, label) => {
+  g.ownerCopyThisSheet_ = (ss, label, name) => {
     const n = made.length, c = makeSpreadsheet(TABS); c.getId = () => "COPY_" + n; c.getUrl = () => "https://example.org/" + n;
-    c.getName = () => "Mine - " + label; made.push({ label: label, copy: c }); return c;
+    c.getName = () => name; made.push({ label: name, copy: c }); return c;
   };
+  g.stampVersionDate_ = c => c.getSheetByName("Backend").getRange("A2").setValue(new Date(2026, 10, 12));
+  g.Utilities.formatDate = d => (d.getMonth() + 1 + "").padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0") + "/" + String(d.getFullYear()).slice(2);
   g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
   const steps = [];
   g.resetToDisplayModeSteps_ = c => steps.push(["reset", c.getSheetByName("Backend").getRange("B3").getValue()]);
   g.ownerRunOnCopy_ = (c, fn) => { steps.push(["fake"]); };
   const b = g.ownerMakeCopy("blank"), m = g.ownerMakeCopy("migrate"), e = g.ownerMakeCopy("example");
-  assert.deepStrictEqual(made.map(x => x.label), ["(BLANK)", "(MIGRATE)", "(EXAMPLE)"]);
+  // 3. the release names: never this sheet's name ("Mine")
+  assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "MIGRATE", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (11/12/26)"));
   assert.deepStrictEqual(steps, [["reset", "No"], ["reset", "Yes"], ["fake"]], 'B3 set before each reset; Example loads fake data');
   assert.strictEqual(made[0].copy.getSheetByName("Backend").getRange("B3").getValue(), "No");
   assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "Yes");
-  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Mine - (BLANK)", url: "https://example.org/0" }));
+  // 1. every copy gets the version date, the Example one too (it has no reset), and B3 = No there
+  made.forEach(x => assert(x.copy.getSheetByName("Backend").getRange("A2").getValue() instanceof Date, 'version date in ' + x.label));
+  assert.strictEqual(made[2].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');
+  assert.strictEqual(e.stamp, "11/12/26", 'the pop-up shows the version date');
+  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (11/12/26)", url: "https://example.org/0", stamp: "11/12/26" }));
   assert(m.url && e.url);
   assert.throws(() => g.ownerMakeCopy("other"), /Unknown copy/);
   let dialog = "";
@@ -316,7 +330,8 @@ function listsSheet() {
   g.include_ = () => "";
   g.HtmlService = { createHtmlOutput: h => { const o = { _html: h }; o.setWidth = () => o; o.setHeight = () => o; return o; } };
   g.ownerMenuMakeAllCopies();
-  assert(/ownerMakeCopy/.test(dialog) && /\(BLANK\)/.test(dialog) && /\(MIGRATE\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the 3-copies pop-up');
+  assert(/ownerMakeCopy/.test(dialog) && /Parent Coordinator Sheet - \(BLANK\)/.test(dialog) && /\(MIGRATE\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the 3-copies pop-up');
+  assert(/Version date in all three/.test(dialog), 'the pop-up says which date goes in the Version Tracker');
   g.getGuideLink_ = () => "https://example.org/guide.pdf";
   g.ownerMenuMyLinks();
   Object.keys(g.__get("GUIDE_LINKS")).forEach(k => assert(dialog.indexOf(k) !== -1, 'My Links lists ' + k));
@@ -342,6 +357,38 @@ function listsSheet() {
   g.saveGuideLinkToVersionSheet_("https://example.org/guide");
   assert.strictEqual(be.getRange("D6").getValue(), "Something else", 'only a stale "GUIDE link" row is cleared');
   console.log("Backend: stale second GUIDE link row cleared: ok");
+}
+
+{
+  // 2. New/Edit Student (Backend G:AV): title row 1, header row 2, students from row 3. A section one row
+  //    lower (the owner's sheet) is moved up, so a reset (clears rows 3+) keeps its header; an empty header
+  //    row gets the headers back; other sections' columns are never touched.
+  const ss = makeSpreadsheet(TABS);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const be = ss.getSheetByName("Backend");
+  g.getBackendSheet_ = () => be;
+  const H = g.__get("OVERRIDES_HEADERS_");
+  const row = (osis, name) => { const r = Array(42).fill(""); r[0] = "11/01/26"; r[1] = "Edit"; r[2] = osis; r[3] = name; return r; };
+  be.getRange("G1").setValue("NEW / EDIT STUDENT");
+  be.getRange("G3:AV3").setValues([H]);                       // header one row too low
+  be.getRange("G4:AV5").setValues([row("234567890", "Belcher"), row("234567891", "Addams")]);
+  be.getRange("A2:A6").setValues([["11/12/26"], ["Auto-Migrate"], ["x"], ["SAVED SETTINGS"], ["syncToPhones"]]); // Version section
+  be.getRange("AX4").setValue("event row");                    // Event Log section
+  assert.strictEqual(g.fixOverridesHeaderRow_(ss, false), 1, 'moved up one row');
+  assert.strictEqual(be.getRange("I2").getValue(), "OSIS", 'header on row 2');
+  assert.deepStrictEqual([be.getRange("I3").getValue(), be.getRange("I4").getValue(), be.getRange("I5").getValue()], ["234567890", "234567891", ""], 'students from row 3');
+  assert.strictEqual(be.getRange("A6").getValue(), "syncToPhones", 'Version section untouched');
+  assert.strictEqual(be.getRange("AX4").getValue(), "event row", 'Event Log untouched');
+  assert.strictEqual(g.fixOverridesHeaderRow_(ss, false), 0, 'already right: nothing moves');
+  // what a reset does: clear rows 3+, then an empty header row gets the headers
+  be.getRange("G3:AV6").clearContent();
+  be.getRange("G2:AV2").clearContent();
+  g.fixOverridesHeaderRow_(ss, true);
+  assert.strictEqual(be.getRange("G2").getValue(), "Date"); assert.strictEqual(be.getRange("AV2").getValue(), "Hide From Report");
+  // a student above a header-looking row is never moved over
+  be.getRange("G2:AV2").setValues([row("234567892", "Parker")]); be.getRange("G3:AV3").setValues([H]);
+  assert.strictEqual(g.fixOverridesHeaderRow_(ss, false), 0, 'a student on row 2 stays');
+  console.log("New/Edit Student header row: ok");
 }
 
 // ---------------------------------------------------------------- new-user flow pieces

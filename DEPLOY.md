@@ -66,8 +66,11 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       back, and the Welcome tab is gone after a reload (or the first build)
 - [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained
       first), also after reopening it. Then Google's permission page on a copy: Select all → Continue
-- [ ] Your sheet: 🐞 Debug → 📦 Make All 3 Copies: three copies (EXAMPLE / BLANK / MIGRATE) with a link each; 🔗 My Links
+- [ ] Your sheet: 🐞 Debug → 📦 Make All 3 Copies: three copies "Parent Coordinator Sheet - (EXAMPLE / BLANK / MIGRATE)
+      (date)" with a link each and one version date (that date goes in the Version Tracker's column A); 🔗 My Links
       lists every link from the 📌 YOUR LINKS box at the top of Menus
+- [ ] Backend New/Edit Student (G:AV): after one build, the headers are on row 2 and students start on row 3, on your
+      sheet and in each copy
 - [ ] Your sheet: 🐞 Debug → 🔄 Copy Sheet and Set to Migrate: the copy "… - (MIGRATE) (date)" opens on the 👋 Welcome
       tab with "Bring over your old data"; its Initial Setup opens the Migration Wizard; your sheet is unchanged
 

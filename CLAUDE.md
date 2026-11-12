@@ -382,6 +382,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
 - 🐞 Debug → 🔄 Copy Sheet and Set to Migrate (2026-11-12): re-paste Menus and z_MINE (owner sheet), z_NewCopy.
+- Release names + version stamp + New/Edit Student header row (2026-11-12): re-paste Core, Build, Regenerate (every
+  sheet) and z_MINE (owner sheet).
 - 📌 YOUR LINKS box + 🔗 My Links + 📦 Make All 3 Copies (2026-11-12): re-paste Menus, GettingStartedSidebar (every
   sheet) and z_MINE (owner sheet).
 - Welcome tab after a reset + permissions (2026-11-12, later): re-paste Menus, Regenerate (script) and
@@ -464,6 +466,14 @@ guide link clears it (saveGuideLinkToVersionSheet_).
 "Copy Sheet, Then Load Fake Data"), "… - (BLANK)" (B3 = No + display reset) and "… - (MIGRATE)" (B3 = Yes + display
 reset), ONE google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link;
 a failed one doesn't stop the others. This sheet is never changed.
+Release copies (2026-11-12, owner): Make All 3 Copies and Copy Sheet and Set to Migrate name the copy
+"Parent Coordinator Sheet - (TYPE) (MM/dd/yy)" (OWNER_RELEASE_NAME_ / ownerReleaseName_, never this sheet's name; the
+two test-copy items keep "<this sheet's name> - Display Mode / Fake Data (date)"). Every release copy gets its version
+stamp (ownerStampVersion_: Backend A2 = today via stampVersionDate_, B3 = Yes for Migrate else No); the Example copy had
+kept this sheet's old date (fake data has no reset). The pop-up / done message shows that date: it is the date for the
+Version Tracker's column A (a later tracker date makes brand-new copies say "New Version Available").
+Version Tracker (VERSION_TRACKER_ID, first tab): every version of the checker reads only A:D (A date, B Size "Major..." =
+major, C Notes, D Link = "Get the latest version", the newest dated row with a link). Its E "Blank Link" / F are never read.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
@@ -519,6 +529,11 @@ Backend tab (see Core.gs):
   and the build's try/catch around this write (console.warn + toast), so a Backend problem never stops the build. The last three are "grow"
   sections: an existing Backend tab gets their title the first time they are written (backendBlockReady_); before that
   reads return nothing and clears do nothing. A new / migrated Backend tab gets every title at once (writeBackendTitles_).
+- New/Edit Student (G:AV) = title row 1, header row 2, students from row 3 (like every section; the old separate tab had
+  its header on row 1). The owner's sheet had it one row lower (header row 3): readers skip rows without a real OSIS,
+  but a reset clears rows 3+ = that header, so copies lost it. fixOverridesHeaderRow_ (Core.gs, OVERRIDES_HEADERS_ =
+  the 42 names) moves such a section up (G:AV only, never over a student row): at the start of every build and in
+  resetDerivedSheets_ before the clear; after the clear it writes the headers into an empty row 2.
 - Sections share rows: never deleteRow/insertRow, getDataRange/getLastRow, appendRow or writeSheet_ on it.
   Use the backend* helpers in Core.gs, which only touch one section's columns.
 - Old copies migrate automatically the first time getBackendSheet_ runs.

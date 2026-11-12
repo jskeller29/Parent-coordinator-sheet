@@ -51,6 +51,8 @@ function buildAllDerivedSheetsRun_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   // A new copy's 👋 Welcome tab (hidden by Initial Setup) goes now (Menus.gs)
   try { deleteWelcomeTab_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
+  // New/Edit Student header on row 2 (an older sheet has it one row lower; Core.gs)
+  try { fixOverridesHeaderRow_(ss, false); } catch (e) { console.warn("New/Edit Student header: " + e.message); }
   const rawSheet = ss.getSheetByName("Raw Data");
   if (!rawSheet) throw new Error('Sheet "Raw Data" not found.');
   const rawData = rawSheet.getDataRange().getValues();

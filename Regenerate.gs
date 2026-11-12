@@ -993,8 +993,12 @@ function clearTypeDropdownColors_(ss) {
 }
 
 function resetDerivedSheets_(ss) {
-  // Backend tab sections: clear New/Edit Student and the Send Out list rows (keep their headers)
+  // Backend tab sections: clear New/Edit Student and the Send Out list rows (keep their headers).
+  // A New/Edit Student section one row too low is moved up first, so the reset keeps its header
+  // (and an empty header row gets the headers back): Core.gs fixOverridesHeaderRow_
+  try { fixOverridesHeaderRow_(ss, false); } catch (e) { console.warn("New/Edit Student header: " + e.message); }
   backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
+  try { fixOverridesHeaderRow_(ss, true); } catch (e) { console.warn("New/Edit Student header: " + e.message); }
   backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
   writeSendOutListFormulas_(ss); // put the Send Out dropdown lists (BH3:BJ3) back
   // Your Lists (Input Data.gs, part 2): the setups and their Additional Information go with the list tabs
