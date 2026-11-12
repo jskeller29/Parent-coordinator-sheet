@@ -273,6 +273,13 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   including errors that are normally only logged (console.error / console.warn).
 
 Deploying (manual paste into the Apps Script editor; master template + owner sheet):
+- MANIFESTS (2026-11-12; was one "App Scripts.Json"): the editor's appsscript.json (Project Settings → tick "Show
+  'appsscript.json' manifest file in editor") gets "App Scripts (General).Json" on the master template / every
+  school, and "App Scripts (Mine).Json" on the owner's sheet only. Mine = General + script.send_mail +
+  userinfo.email (the owner's summary email). Keep the two in step: a scope added for shared code goes in BOTH.
+  Changing a project's scopes makes its user re-approve once (run any menu item): until then that user's
+  triggers (nightly, edit) stop with "authorization required". So the shared one only changes when shared code
+  needs a new permission.
 - Delete the old files first or the project will not load (duplicate consts/functions): Backend, Build.gs Helpers,
   Build.gs beginning, Constants, Event, LinkResolver, MigrationAssistant, New Copy & On Open, NewStudents, Phone,
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
@@ -580,9 +587,8 @@ CONTACTS SYNC (rewritten 2026-11-12, owner's "fix 1-3"; see "HOW THE SYNC WORKS"
   SYNC_UI_STATE 'done' carries failed + note (ProgressSidebar shows them; log list "failed").
 - Tested offline with a fake People API (test_sync: normal, failed save, quota pause + resume, over-half blocked /
   confirmed, late start, owner rows); not yet run against real Google Contacts.
-Not fixed (owner action): the owner's summary email needs the script.send_mail and userinfo.email scopes in the
-OWNER'S OWN project manifest only (in the shared manifest every school would have to re-authorize and their triggers
-stop until they do).
+The owner's summary email (MailApp + Session.getActiveUser().getEmail(), z_MINE.gs) needs the script.send_mail and
+userinfo.email scopes: they are in "App Scripts (Mine).Json" only (see MANIFESTS under Deploying).
 Fixed 2026-11-12: quick notes ignored the Settings date range (notesDateRange_ / inNotesDateRange_, Build.gs, used by
 the build and notesTextForOsis_); getExistingMasterTable_ now has a header row; EMERGENCY_STOP_SYNC clears
 SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS turns on with the first click; purgeDischargedStudents and the Hide
