@@ -37,30 +37,30 @@ const GUIDE_LINKS = {
   // 🎬 Setting up a new copy: the Welcome tab, the permissions, Initial Setup.
   //    Shows on: the 👋 Welcome tab ("Watch the setup video") and the
   //    Getting Started checklist (Help at the bottom).
-  setupVideo: "",
+  setupVideo: "https://www.youtube.com/watch?v=4WGkEIJrlL8",
 
   // 🎬 How to download your data from ATS, Parent Square and NYCSA.
   //    Shows on: the welcome pop-up after Initial Setup ("Watch the video") and
   //    the Getting Started checklist (step 1 and Help).
-  downloadDataVideo: "",
+  downloadDataVideo: "https://www.youtube.com/watch?v=4WGkEIJrlL8",
 
   // 📄 How to download / update your data, step by step (a Google Doc).
   //    Shows on: the welcome pop-up ("How to download your data") and
   //    Getting Started step 1.
-  downloadDataDoc: "https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing",
+  downloadDataDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit?usp=sharing",
 
   // 📄 A short getting-started guide, if you write one apart from the User Guide.
   //    Shows on: the welcome pop-up ("Read the User Guide") and Getting Started Help.
-  guideDoc: "",
+  guideDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.s72570pfk7er",
 
   // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
-  buildDoc: "",
+  buildDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.uhdsi9wftlg3",
 
   // 📄 What each setting does.           Shows on: Getting Started step 3.
-  settingsDoc: "",
+  settingsDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.3i6j8ivet57",
 
   // 📄 How to log a parent contact.       Shows on: Getting Started step 4.
-  contactLogDoc: ""
+  contactLogDoc: "https://docs.google.com/document/d/1jCg0CJP1Ixs4lKvnPZgihB2ndB7N2r_Q/edit#bookmark=id.sg80ckkyi6vf"
 };
 
 // 🗂️ FOLDERS, FORM AND TRACKER (already set; change only if you move them) ----
