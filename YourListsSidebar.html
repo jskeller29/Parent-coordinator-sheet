@@ -85,6 +85,14 @@
     .big { font: 600 20px var(--font-head); } .big span { font: 400 13px var(--font); color: var(--muted); }
     .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 1px solid var(--line); padding: 10px 14px; }
     .footer .row { margin: 0; } .footer .row button { flex: 1; }
+    /* step 4 View */
+    details.adv { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 8px; }
+    details.adv summary { cursor: pointer; font-weight: 600; color: var(--accent); font-size: 13px; }
+    .ordrow { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .ordrow span { flex: 1; }
+    .pvlines { margin-top: 4px; white-space: pre-wrap; }
+    .pvnav { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    .pvnav b { color: var(--ink); flex: 1; text-align: center; }
   </style>
 </head>
 <body>
@@ -118,7 +126,7 @@
 
   <!-- SETUP -->
   <div id="setupView" class="hidden">
-    <div class="steps"><span id="st1">1 Columns</span><i>→</i><span id="st2">2 Variables</span><i>→</i><span id="st3">3 Match</span></div>
+    <div class="steps"><span id="st1">1 Columns</span><i>→</i><span id="st2">2 Variables</span><i>→</i><span id="st3">3 Match</span><i>→</i><span id="st4">4 View</span></div>
 
     <div id="step1">
       <div id="keptNote" class="ok hidden">Same columns as last time, so your setup was kept. Check it, then go on.</div>
@@ -148,6 +156,10 @@
     <div id="step3" class="hidden">
       <div id="matchBox"></div>
     </div>
+
+    <div id="step4" class="hidden">
+      <div id="viewBox"></div>
+    </div>
   </div>
 
   <!-- SAVED -->
@@ -174,6 +186,7 @@
   var decisions = {};     // row index -> target | "skip"
   var openPicker = {};    // row index -> true while "pick someone else" is open
   var pollTimer = null, busy = false;
+  var advOpen = null, pvIndex = 0, pvCase = 'match'; // step 4: Advanced options open?, preview row, preview case
 
   function $(id) { return document.getElementById(id); }
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
@@ -274,7 +287,9 @@
   function showSetup(v) {
     stopPoll();
     view = v;
-    setup = { by: v.by, roles: JSON.parse(JSON.stringify(v.roles || {})), vars: JSON.parse(JSON.stringify(v.vars || [])) };
+    setup = { by: v.by, roles: JSON.parse(JSON.stringify(v.roles || {})), vars: JSON.parse(JSON.stringify(v.vars || [])),
+              view: JSON.parse(JSON.stringify(v.view || { layout: 'lines', boldNames: false, sep: 'comma', start: 'list', columns: 'each', order: [] })) };
+    advOpen = null; pvIndex = 0; pvCase = 'match';
     decisions = {}; openPicker = {}; match = null;
     $('title').textContent = v.list.name;
     $('listName').value = v.list.name;
@@ -397,7 +412,7 @@
   function setVarText(i, which, text) { setup.vars[i][which].text = text; refreshVar(i); }
 
   // ---------- step 3: match ----------
-  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, decisions: decisions }; }
+  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, view: setup.view, decisions: decisions }; }
   function loadMatch() { loading('Matching every row to the Student List…'); run('od_matchPreview', payload(), function (v) { showMatch(v); }); }
   function showMatch(v) {
     match = v; renderMatch();
@@ -490,16 +505,145 @@
     match.attention.forEach(function (a) { if (openPicker[a.i] && !decisions[a.i]) searchPicker(a.i, ''); });
   }
 
+  // ---------- step 4: view (how the kept values read) ----------
+  // VIEW TEXT: the same as od_viewVars_ / od_viewText_ in Input Data.gs (tests/test_input_flow.js checks they match)
+  var VIEW_SEPS = { comma: ', ', dot: ' · ', bar: ' | ', slash: ' / ' };
+  function txt(v) { return v == null ? '' : String(v).trim(); }
+  function boldText(text, italic) {
+    return String(text == null ? '' : text).replace(/[A-Za-z0-9]/g, function (ch) {
+      var c = ch.charCodeAt(0);
+      if (c >= 65 && c <= 90) return String.fromCodePoint((italic ? 0x1D63C : 0x1D5D4) + c - 65);
+      if (c >= 97 && c <= 122) return String.fromCodePoint((italic ? 0x1D656 : 0x1D5EE) + c - 97);
+      return String.fromCodePoint(0x1D7EC + c - 48);
+    });
+  }
+  function viewVars(s) {
+    var order = (s.view && s.view.order) || [];
+    function rank(v) { var i = order.indexOf(txt(v.header)); return i === -1 ? 1000 + s.vars.indexOf(v) : i; }
+    return s.vars.filter(function (v) { return v.col && (v.show || v.column); }).slice().sort(function (a, b) { return rank(a) - rank(b); });
+  }
+  function viewText(vw, listName, items) {
+    function bold(t) { return boldText(t, vw.italic); }
+    function name(t) { return vw.boldNames ? bold(t) : t; }
+    function val(t) { return vw.boldValues ? bold(t) : t; }
+    var sep = VIEW_SEPS[vw.sep] || ', ';
+    var shown = items.filter(function (x) { return x.show && x.value; });
+    var lines;
+    if (vw.layout === 'oneLine') {
+      var lead = vw.start === 'none' ? '' : vw.start === 'custom' ? txt(vw.startText) : txt(listName);
+      var parts = shown.map(function (x) { return vw.namesBefore ? name(x.label) + ' ' + val(x.value) : val(x.value); });
+      lines = parts.length ? [(lead ? name(lead) + ': ' : '') + parts.join(sep)] : [];
+    } else {
+      lines = shown.map(function (x) { return name(x.label) + ': ' + val(x.value); });
+    }
+    var column = items.filter(function (x) { return x.column && x.value; })
+      .map(function (x) { return vw.namesBefore ? x.label + ' ' + x.value : x.value; }).join(sep);
+    return { lines: lines, column: column };
+  }
+  // END VIEW TEXT
+  function varLabel(v) { var c = view.columns[v.col - 1] || {}; return txt(v.label) || txt(v.header) || ('Column ' + (c.letter || v.col)); }
+  function listNameNow() { return txt($('listName').value) || view.list.name; }
+  /** The kept values of one preview case: a matched row, a blank cell, or someone not on the list. */
+  function previewItems(kept, row) {
+    return kept.map(function (v) {
+      var value;
+      if (pvCase === 'off') value = v.notOnList.mode === 'text' ? txt(v.notOnList.text) : '';
+      else {
+        var cell = pvCase === 'blank' ? '' : txt((row || [])[v.col - 1]);
+        value = cell !== '' ? cell : (v.blank.mode === 'text' ? txt(v.blank.text) : '');
+      }
+      return { label: varLabel(v), value: value, show: !!v.show, column: !!v.column };
+    });
+  }
+  function advancedChanged(vw) {
+    return vw.sep !== 'comma' || !!vw.namesBefore || vw.start !== 'list' || !!vw.boldValues || !!vw.italic || vw.columns === 'one' || (vw.order || []).length > 0;
+  }
+  function renderView() {
+    var vw = setup.view, kept = viewVars(setup);
+    if (!kept.length) { $('viewBox').innerHTML = '<div class="muted" style="margin-top:6px">Nothing is kept from this list (step 2), so there is nothing to show. Click Save.</div>'; return; }
+    if (advOpen === null) advOpen = advancedChanged(vw);
+    var anyCol = kept.some(function (v) { return v.column; });
+    var seg = function (key, opts) {
+      return '<div class="seg">' + opts.map(function (o) { return '<button class="' + (vw[key] === o[0] ? 'on' : '') + '" onclick="setView(\'' + key + '\',\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>';
+    };
+    var html = '<label class="f" style="margin-top:4px">How it reads on the phone</label>' +
+      seg('layout', [['lines', 'One per line'], ['oneLine', 'One line']]) +
+      '<label class="ck"><input type="checkbox" ' + (vw.boldNames ? 'checked' : '') + ' onchange="setView(\'boldNames\', this.checked)"><span>Bold the names<span class="sub">' + esc(boldText(varLabel(kept[0]), vw.italic)) + ': … (character bold, like the notes)</span></span></label>' +
+      '<div id="viewPreview"></div>';
+    // Advanced options
+    html += '<details class="adv"' + (advOpen ? ' open' : '') + ' ontoggle="advOpen = this.open"><summary>Advanced options</summary>';
+    if (vw.layout === 'oneLine') {
+      html += '<label class="f">Start the line with</label><div class="two"><select onchange="setView(\'start\', this.value)">' +
+          '<option value="list"' + (vw.start === 'list' ? ' selected' : '') + '>The list name</option>' +
+          '<option value="none"' + (vw.start === 'none' ? ' selected' : '') + '>Nothing</option>' +
+          '<option value="custom"' + (vw.start === 'custom' ? ' selected' : '') + '>My own words</option></select>' +
+        '<input type="text" maxlength="60" placeholder="e.g. Bus" value="' + esc(vw.startText || '') + '" oninput="setViewText(this.value)"' + (vw.start === 'custom' ? '' : ' disabled') + '></div>' +
+        '<label class="f">Between values</label>' + seg('sep', [['comma', ',&nbsp; comma'], ['dot', '·&nbsp; dot'], ['bar', '|&nbsp; bar'], ['slash', '/&nbsp; slash']]) +
+        '<label class="ck"><input type="checkbox" ' + (vw.namesBefore ? 'checked' : '') + ' onchange="setView(\'namesBefore\', this.checked)"><span>Put each name before its value<span class="sub">“' + esc(varLabel(kept[0])) + ' …, …”</span></span></label>';
+    }
+    html += '<label class="f">Bold</label>' +
+      '<label class="ck"><input type="checkbox" ' + (vw.boldValues ? 'checked' : '') + ' onchange="setView(\'boldValues\', this.checked)"><span>Bold the values too<span class="sub">Bold letters are different characters: a search on the phone for the plain text won\'t find them.</span></span></label>' +
+      '<label class="ck"><input type="checkbox" ' + (vw.italic ? 'checked' : '') + ' onchange="setView(\'italic\', this.checked)"><span>Bold italic instead<span class="sub">' + esc(boldText(varLabel(kept[0]), true)) + '</span></span></label>';
+    if (kept.length > 1) {
+      html += '<label class="f">Order</label>' + kept.map(function (v, i) {
+        return '<div class="ordrow"><span>' + esc(varLabel(v)) + '</span>' +
+          '<button class="small" ' + (i ? '' : 'disabled') + ' onclick="moveVar(' + i + ',-1)" title="Move up">↑</button>' +
+          '<button class="small" ' + (i < kept.length - 1 ? '' : 'disabled') + ' onclick="moveVar(' + i + ',1)" title="Move down">↓</button></div>';
+      }).join('');
+    }
+    if (anyCol) {
+      html += '<label class="f">In the ' + (setup.by === 'guardian' ? 'Parents Divided' : 'Student List') + '</label>' +
+        seg('columns', [['each', 'A column per value'], ['one', 'One column for the list']]) +
+        '<div class="muted" style="margin-top:4px" id="colHint"></div>';
+    }
+    html += '</details>';
+    $('viewBox').innerHTML = html;
+    refreshViewPreview();
+  }
+  function refreshViewPreview() {
+    var vw = setup.view, kept = viewVars(setup);
+    var rows = (match && match.preview) || [];
+    if (pvIndex >= rows.length) pvIndex = 0;
+    var row = rows[pvIndex];
+    var who = pvCase === 'off' ? 'someone not on the list' : pvCase === 'blank' ? 'a row with blank cells' : (row ? row.name : 'an example row');
+    var items = previewItems(kept, row ? row.row : (view.columns || []).map(function (c) { return (c.samples || [])[0] || ''; }));
+    var t = viewText(vw, listNameNow(), items);
+    var nav = pvCase === 'match' && rows.length > 1
+      ? '<div class="pvnav"><button class="small" onclick="flipPreview(-1)">‹</button><b>' + esc(who) + ' (' + (pvIndex + 1) + ' of ' + rows.length + ')</b><button class="small" onclick="flipPreview(1)">›</button></div>'
+      : '<div class="pvnav"><b>' + esc(who) + '</b></div>';
+    var cases = '<div class="seg" style="margin:10px 0 6px">' + [['match', 'Matched'], ['blank', 'Blank cell'], ['off', 'Not on list']].map(function (c) {
+      return '<button class="' + (pvCase === c[0] ? 'on' : '') + '" onclick="setPreviewCase(\'' + c[0] + '\')">' + c[1] + '</button>'; }).join('') + '</div>';
+    $('viewPreview').innerHTML = cases + '<div class="preview"><div class="who">How it reads on the phone</div>' + nav +
+      '<div class="pvlines">' + (t.lines.length ? 'Additional Information:\n' + esc(t.lines.join('\n')) : '<span class="muted">Nothing shown for this one.</span>') + '</div></div>';
+    if ($('colHint')) {
+      $('colHint').textContent = vw.columns === 'one'
+        ? 'One column “' + listNameNow() + '”: ' + (t.column || '(empty)')
+        : 'One column per value: ' + kept.filter(function (v) { return v.column; }).map(varLabel).join(', ');
+    }
+  }
+  function setView(key, value) { setup.view[key] = value; renderView(); }
+  function setViewText(text) { setup.view.startText = text; refreshViewPreview(); }
+  function moveVar(i, d) {
+    var kept = viewVars(setup), j = i + d;
+    if (j < 0 || j >= kept.length) return;
+    var t = kept[i]; kept[i] = kept[j]; kept[j] = t;
+    setup.view.order = kept.map(function (v) { return txt(v.header); });
+    renderView();
+  }
+  function flipPreview(d) { var n = ((match && match.preview) || []).length; if (n) pvIndex = (pvIndex + d + n) % n; refreshViewPreview(); }
+  function setPreviewCase(c) { pvCase = c; refreshViewPreview(); }
+
   // ---------- steps / buttons ----------
   function goStep(n) {
     step = n;
-    show('step1', n === 1); show('step2', n === 2); show('step3', n === 3);
-    ['st1', 'st2', 'st3'].forEach(function (id, i) { $(id).className = (i + 1 === n) ? 'on' : (i + 1 < n ? 'done' : ''); $(id).textContent = (i + 1 < n ? '✓ ' : (i + 1) + ' ') + ['Columns', 'Variables', 'Match'][i]; });
+    show('step1', n === 1); show('step2', n === 2); show('step3', n === 3); show('step4', n === 4);
+    ['st1', 'st2', 'st3', 'st4'].forEach(function (id, i) { $(id).className = (i + 1 === n) ? 'on' : (i + 1 < n ? 'done' : ''); $(id).textContent = (i + 1 < n ? '✓ ' : (i + 1) + ' ') + ['Columns', 'Variables', 'Match', 'View'][i]; });
     show('backBtn', n > 1); show('nextBtn', true);
-    $('nextBtn').textContent = n === 1 ? 'Next: Variables →' : n === 2 ? 'Next: Match →' : 'Save';
+    $('nextBtn').textContent = n === 1 ? 'Next: Variables →' : n === 2 ? 'Next: Match →' : n === 3 ? 'Next: View →' : 'Save';
     if (n === 1) renderStep1();
     if (n === 2) renderStep2();
     if (n === 3) loadMatch();
+    if (n === 4) renderView();
     window.scrollTo(0, 0);
   }
   function next() {
@@ -511,6 +655,7 @@
       show('errorBox', false); goStep(2); return;
     }
     if (step === 2) { goStep(3); return; }
+    if (step === 3) { goStep(4); return; }
     loading('Saving…');
     run('od_saveList', payload(), function (v) { showDone(v); });
   }

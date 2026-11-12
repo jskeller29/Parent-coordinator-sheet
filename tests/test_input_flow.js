@@ -258,3 +258,99 @@ function listsSheet() {
   assert.notStrictEqual(ss.getActiveSheet().getSheetId(), temp.getSheetId(), 'off the temp tab (deleted next call)');
   console.log("closing Input Data Mode hides the Your Lists tabs: ok");
 }
+
+// ---------------------------------------------------------------- Your Lists: View step (how the values read)
+{
+  const { g } = newSheet();
+  // Lists saved before the View step read exactly as before; a new list starts with bold names
+  const old = g.od_fillSetup_({ ready: true, by: "student", roles: {}, vars: [] });
+  assert.strictEqual(old.view.layout, "lines");
+  assert.strictEqual(old.view.boldNames, false, 'saved list: no bold');
+  assert.strictEqual(g.od_emptySetup_().view.boldNames, true, 'new list: bold names');
+  const items = [{ label: "Bus Route", value: "R12", show: true, column: true },
+                 { label: "Stop", value: "", show: true, column: true },
+                 { label: "AM / PM", value: "AM", show: true, column: false }];
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g.od_viewText_(old.view, "Bus Routes", items))),
+    { lines: ["Bus Route: R12", "AM / PM: AM"], column: "R12" }, 'default view = "Name: value" lines');
+  const one = g.od_cleanView_({ layout: "oneLine", boldNames: true, sep: "dot", columns: "one" });
+  const t = g.od_viewText_(one, "Bus Routes", items);
+  assert.deepStrictEqual(Array.from(t.lines), [g.boldText_("Bus Routes") + ": R12 · AM"], 'one line, bold name, dot');
+  assert.strictEqual(g.od_viewText_(Object.assign({}, one, { namesBefore: true, start: "custom", startText: "Bus" }), "Bus Routes", items).lines[0],
+    g.boldText_("Bus") + ": " + g.boldText_("Bus Route") + " R12 · " + g.boldText_("AM / PM") + " AM", 'names before values, own words');
+  assert.strictEqual(g.od_viewText_(Object.assign({}, one, { start: "none", boldValues: true, italic: true }), "x", items).lines[0],
+    g.boldText_("R12", true) + " · " + g.boldText_("AM", true), 'values bold italic, no start');
+  assert.deepStrictEqual(Array.from(g.od_viewText_(one, "x", items.map(i => Object.assign({}, i, { value: "" }))).lines), [], 'nothing to show: no line');
+  // Junk from the sidebar is cleaned
+  const junk = g.od_cleanView_({ layout: "zigzag", sep: "<b>", start: 5, startText: "x".repeat(99), columns: "all", order: "no" });
+  assert.deepStrictEqual([junk.layout, junk.sep, junk.start, junk.startText.length, junk.columns, junk.order.length], ["lines", "comma", "list", 60, "each", 0]);
+  // Order by header (a new version of the list with moved columns keeps it)
+  const setup = { vars: [{ col: 3, header: "Route", show: true }, { col: 4, header: "Stop", column: true }, { col: 5, header: "Driver" }],
+                  view: { order: ["Stop", "Route"] } };
+  assert.deepStrictEqual(g.od_viewVars_(setup).map(v => v.header), ["Stop", "Route"], 'order by header, unkept left out');
+
+  // The sidebar's preview copy (YourListsSidebar.html, VIEW TEXT) gives the same text as the server
+  const html = fs.readFileSync(path.join(ROOT, 'YourListsSidebar.html'), 'utf8');
+  const block = html.slice(html.indexOf('// VIEW TEXT'), html.indexOf('// END VIEW TEXT'));
+  assert(block.length > 500, 'VIEW TEXT block found in the sidebar');
+  const side = require('vm').runInNewContext(block + '; ({ viewText: viewText, viewVars: viewVars, boldText: boldText })', {});
+  const views = [];
+  ["lines", "oneLine"].forEach(layout => [false, true].forEach(boldNames => [false, true].forEach(boldValues =>
+    ["comma", "dot", "bar", "slash"].forEach(sep => ["list", "none", "custom"].forEach(start => [false, true].forEach(namesBefore =>
+      views.push({ layout, boldNames, boldValues, italic: boldValues && sep === "bar", sep, start, startText: " Bus 9 ", namesBefore, columns: "each", order: [] })))))));
+  views.forEach(vw => {
+    const a = JSON.stringify(g.od_viewText_(vw, " Bus Routes ", items)), b = JSON.stringify(side.viewText(vw, " Bus Routes ", items));
+    assert.strictEqual(b, a, 'sidebar preview = server text for ' + JSON.stringify(vw));
+  });
+  assert.deepStrictEqual(side.viewVars(setup).map(v => v.header), ["Stop", "Route"], 'sidebar order = server order');
+  assert.strictEqual(side.boldText("Ab9 é"), g.boldText_("Ab9 é"));
+  console.log("Your Lists View: default = old text, layouts, cleaning, sidebar copy matches (" + views.length + " views): ok");
+}
+{
+  // The build with a View: one line per list on the phone, one column for the list
+  const { g } = newSheet();
+  const ats = csv("1 - Student Data (ATS).csv").slice(1);
+  const raw = [[], [], [], [], [], []].concat(ats);
+  const sm = g.buildStudentMap_(raw, new Map());
+  const master = [["OSIS", "Student", "Guardian", "Site", "Class"]].concat([...sm.entries()].map(([id, s]) => [id, s.student, "", s.site || "", s.classCode || ""]));
+  const guardians = g.buildGuardianObjects_(raw, new Map());
+  const idx = g.od_index_(master.slice(1), guardians);
+  const block = csv("5a - Your Lists - Bus Routes (student list).csv").filter(r => r.some(x => String(x).trim() !== ""));
+  const h = g.od_findHeaderRow_(block), headers = block[h], rows = block.slice(h + 1);
+  const guess = g.od_guessRoles_(headers, rows, idx);
+  const vars = g.od_varsFor_(headers, guess.roles, []).map(v => Object.assign(v, { show: true, column: true }));
+  const make = view => ({ tabId: 1, name: "Bus Routes", sheet: { getSheetId: () => 1 },
+    setup: g.od_fillSetup_({ ready: true, by: guess.by, roles: guess.roles, vars: JSON.parse(JSON.stringify(vars)), picks: {}, headers: headers, view: view }) });
+  let addl = null, list = null;
+  g.od_loadLists_ = () => [list];
+  g.od_readTable_ = () => ({ headers: headers, rows: rows });
+  g.od_writeToolColumns_ = () => {}; g.od_saveLists_ = () => {}; g.backendClearBlock_ = () => {};
+  g.backendWriteBlock_ = (ss, key, r) => { if (key === "ADDL_INFO") addl = r; };
+  list = make(undefined);
+  let out = g.od_buildOutputs_({}, master, guardians);
+  const bart = () => addl.find(r => r[1] === "Bart Simpson");
+  assert.strictEqual(bart()[3].split("\n").length, vars.length, 'no view: one plain line per value');
+  assert(!/[\u{1D400}-\u{1D7FF}]/u.test(bart()[3]), 'no view: no bold');
+  assert.strictEqual(out.studentCols.length, vars.length, 'no view: a column per value');
+  list = make({ layout: "oneLine", boldNames: true, columns: "one" });
+  out = g.od_buildOutputs_({}, master, guardians);
+  assert.strictEqual(bart()[3].split("\n").length, 1, 'one line: a single line');
+  assert(bart()[3].indexOf(g.boldText_("Bus Routes") + ": ") === 0, 'one line starts with the bold list name');
+  assert.strictEqual(out.studentCols.length, 1, 'one column for the list');
+  assert.strictEqual(out.studentCols[0].header, "Bus Routes");
+  assert(out.studentCols[0].byOsis.get("123456789").indexOf(", ") !== -1, 'the column holds the values with commas');
+  console.log("build with a View: one line + one column: ok");
+}
+{
+  // "Save, exit and build": only offered when there is Student Data (or on its step)
+  const { ss, g } = newSheet();
+  startMode(ss, g, 1); // Parent Square, no Student Data yet
+  assert.strictEqual(g.idm_getState().canBuild, false, 'no Student Data: no build');
+  g.idm_goToStep(0);
+  assert.strictEqual(g.idm_getState().canBuild, true, 'on the Student Data step: allowed (a paste may be waiting)');
+  ss.getSheetByName("Raw Data")._put([["School Year", "DBN", "Student ID"], ["2025-2026", "75M094", 123456789]], 6, 1);
+  g.idm_goToStep(2);
+  assert.strictEqual(g.idm_getState().canBuild, true, 'Student Data there: allowed');
+  const v = g.idm_saveAndExit();
+  assert(v.finished && v.exited && v.canBuild === true, 'the exit result says a build can run');
+  console.log("Save, exit and build availability: ok");
+}

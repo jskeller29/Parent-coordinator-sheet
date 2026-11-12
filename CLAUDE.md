@@ -105,6 +105,12 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   build is needed). Closing the mode (idm_cleanup_) shows the tabs it hid EXCEPT the Your Lists tabs (every list in
   OWN_LISTS), and hides those too (owner's request 2026-11-12; od_openList / od_repasteList show one again).
   idm_deleteLeftoverTab (the separate call after the end screen) then runs refreshMenusAfterFirstBuild_.
+  "Finish or exit" (was "Exit Input Data Mode"; owner's request 2026-11-12, build at any point): the panel asks
+  "Leave Input Data Mode?" with "Save, exit and build my sheets" (primary) / "Save and exit (build later)" / "Exit
+  without saving" / Cancel. Build = idm_saveAndExit (a save problem keeps the mode on and shows it), then the sidebar
+  calls idm_build in a SEPARATE call (deletes the temp tab, opens the Build sidebar), unless builtAlready ("already up
+  to date") or no Student Data. idm_view_.canBuild (Student Data in Raw Data, idm_canBuild_, or on the Student Data
+  step) greys the button with a note; the exit result's canBuild is checked again after the save.
 
 - Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
@@ -140,6 +146,21 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     Tested offline on sample names (typos, swapped order, nicknames, initials, siblings); 500 unmatched rows x 1,500
     students = ~0.9 s in Node. Index = Student List OSIS..Class (sidebar: the Backend copy, sibling-group rows
     skipped) + Raw Data guardians (od_indexFromSheet_).
+  - VIEW, step 4 of the setup sidebar (owner's request 2026-11-12; Save moved there): how the kept values read.
+    setup.view (Setup JSON): layout "lines" ("Name: value" per line, as before) | "oneLine" ("List: v1, v2");
+    boldNames / boldValues / italic (character bold via boldText_, like the notes); sep comma / dot / bar / slash;
+    namesBefore; start list / none / custom + startText; columns "each" (a column per value, as before) | "one" (one
+    column named after the list, plain text); order = column HEADERS (survives moved columns). A list saved before
+    has no view: od_fillSetup_ gives od_defaultView_(false) = exactly the old text (checked old-vs-new on the
+    test-data lists: Additional Information + both column sets identical); a NEW list starts with bold names
+    (od_emptySetup_). od_viewText_ (Input Data.gs) is the ONE place the text is made (od_buildOutputs_ via
+    od_viewVars_ + od_varLabel_); the sidebar preview has a copy between "// VIEW TEXT" and "// END VIEW TEXT"
+    (YourListsSidebar.html) that test_input_flow.js compares with the server for 192 views: change both together.
+    SIMPLE + ADVANCED (owner 2026-11-12): the step shows only One per line / One line, "Bold the names" and the
+    preview (Matched rows from od_matchPreview's preview, ‹ › / Blank cell / Not on list); "Advanced options"
+    (<details>, open by itself when one of them is not the default) has start, separator, names before values,
+    bold values, bold italic, order ↑↓, and the Student List / Parents Divided column choice.
+    Not built yet (second round): a "Sentence" layout ("Takes bus {Route} from {Stop}").
   - Sidebar: paste view polls od_wizardCheck every 2 s; 1 Columns (dropdowns 'Column C “OSIS”', "Two columns (first +
     last name)…", OSIS hint "5 of 6 filled cells are OSIS in your Student List"), 2 Variables (keep / name / blank /
     not on list / where, live "How it reads" preview, privacy warning), 3 Match (od_matchPreview; "✓ Accept all N best
@@ -360,6 +381,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
 - Wrong paste cleared, Your Lists upload, build before step 5, new-user flow (2026-11-12): re-paste Menus, Build,
   Input Data (scripts) and InputDataSidebar, YourListsSidebar (HTML).
+- Your Lists View step + "Save, exit and build" (2026-11-12): re-paste Input Data (script) and InputDataSidebar,
+  YourListsSidebar (HTML).
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,
 FULL_MENU_UNLOCKED isn't "true", Input Data Mode is off and the Student List is built. Called at the end of

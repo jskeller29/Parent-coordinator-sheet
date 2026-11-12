@@ -302,7 +302,7 @@ function idm_saveAndExit() {
     const results = state.results;
     idm_cleanup_(ss, state, idm_anyImported_(results));
     return { active: false, finished: true, exited: true, notice: result ? result.notice : null,
-             anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
+             anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   });
 }
 
@@ -313,7 +313,7 @@ function idm_exit() {
     if (!state) return idm_view_(ss, null);
     const results = state.results;
     idm_cleanup_(ss, state, false);
-    return { active: false, finished: true, exited: true, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
+    return { active: false, finished: true, exited: true, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   });
 }
 
@@ -372,6 +372,12 @@ function idm_listsNeedBuild_(ss, state) {
 /** Raw Data has students in the ATS section (Student ID, column C, from row 7). */
 function idm_hasAtsRows_(raw) {
   return raw.getLastRow() >= 7 && String(raw.getRange(7, 3).getValue()).trim() !== "";
+}
+
+/** "Save, exit and build" has something to build from (Student Data in Raw Data). */
+function idm_canBuild_(ss) {
+  const raw = idm_rawSheet_(ss);
+  return !!raw && idm_hasAtsRows_(raw);
 }
 
 /** Step 5's build ran and nothing changed since: the end screen doesn't ask for another build. */
@@ -831,7 +837,7 @@ function idm_advance_(ss, state, notice) {
   if (state.step >= IDM_STEPS.length) {
     const results = state.results;
     idm_cleanup_(ss, state, true);
-    return { active: false, finished: true, notice: notice, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
+    return { active: false, finished: true, notice: notice, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   }
   if (oldTemp) {
     // Same tab, cleared and renamed for the next export (never deleted while the user is on it)
@@ -989,6 +995,8 @@ function idm_view_(ss, state, notice) {
     // Step 5: your lists (+ whether the sidebar must build first, and how that build went)
     lists: step.lists ? od_listSummaries_(ss) : undefined,
     needsBuild: step.lists ? idm_listsNeedBuild_(ss, state) : false,
+    // The exit panel's "Save, exit and build": Student Data is there, or this is its step (a paste may be waiting)
+    canBuild: step.key === 'ats' || idm_canBuild_(ss),
     listsBuild: step.lists ? (state.listsBuild || null) : null,
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
@@ -1162,12 +1170,15 @@ var OD_HEADER_WORDS_ = /osis|student|name|first|last|parent|guardian|mother|fath
 // ======================================================================
 
 function od_emptySetup_() {
-  return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null };
+  return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null,
+           view: od_defaultView_(true) };
 }
 
 function od_fillSetup_(s) {
   const e = od_emptySetup_();
   s = s && typeof s === "object" ? s : {};
+  // A list saved before the View step reads exactly as it did (one plain "Name: value" line each)
+  s.view = od_cleanView_(s.view, od_defaultView_(false));
   Object.keys(e).forEach(k => { if (s[k] === undefined) s[k] = e[k]; });
   if (!s.picks || typeof s.picks !== "object") s.picks = {};
   if (!Array.isArray(s.vars)) s.vars = [];
@@ -2050,6 +2061,80 @@ function od_stats_(results) {
 // ======================================================================
 
 /** A variable's value for one row: the cell, or the blank text, or null (nothing to show). */
+// ======================================================================
+// VIEW (step 4 of the setup sidebar; owner's request 2026-11-12): how a list's
+// kept values read on the phone contact (Additional Information) and in the
+// Student List / Parents Divided. setup.view = { layout: "lines" (one "Name:
+// value" line each, as before) | "oneLine" (one line: "List: v1, v2"), boldNames /
+// boldValues (character bold, boldText_ like the notes; italic = bold italic),
+// sep (comma / dot / bar / slash), namesBefore ("Route R12, Stop 5th"), start
+// ("list" = the list name, "none", "custom" + startText), columns ("each" = one
+// column per value, as before | "one" = one column for the list), order (column
+// headers, so a new version of the list with moved columns keeps it) }. od_viewText_ is the ONE place the text is made; the sidebar's
+// preview has a copy (YourListsSidebar.html, VIEW TEXT), kept equal by a test.
+// ======================================================================
+var OD_VIEW_SEPS_ = { comma: ", ", dot: " · ", bar: " | ", slash: " / " };
+
+/** A new list starts with bold names; a list saved before the View step reads as it did. */
+function od_defaultView_(isNew) {
+  return { layout: "lines", boldNames: !!isNew, boldValues: false, italic: false, sep: "comma",
+           namesBefore: false, start: "list", startText: "", columns: "each", order: [] };
+}
+
+function od_cleanView_(v, fallback) {
+  const d = fallback || od_defaultView_(false);
+  v = v && typeof v === "object" ? v : {};
+  const pick = (val, allowed, def) => (allowed.indexOf(val) !== -1 ? val : def);
+  const flag = (val, def) => (val === undefined ? def : !!val);
+  return {
+    layout: pick(v.layout, ["lines", "oneLine"], d.layout),
+    boldNames: flag(v.boldNames, d.boldNames), boldValues: flag(v.boldValues, d.boldValues), italic: flag(v.italic, d.italic),
+    sep: pick(v.sep, Object.keys(OD_VIEW_SEPS_), d.sep),
+    namesBefore: flag(v.namesBefore, d.namesBefore),
+    start: pick(v.start, ["list", "none", "custom"], d.start),
+    startText: toText_(v.startText === undefined ? d.startText : v.startText).slice(0, 60),
+    columns: pick(v.columns, ["each", "one"], d.columns),
+    order: (Array.isArray(v.order) ? v.order : d.order).map(h => toText_(h).slice(0, 200)).filter(Boolean).slice(0, 200)
+  };
+}
+
+/** A kept value's name: what you called it, else the column's header. */
+function od_varLabel_(v) {
+  return toText_(v.label) || toText_(v.header) || ("Column " + od_colLetter_(v.col));
+}
+
+/** The kept values (Additional Information and / or a column) in the View step's order. */
+function od_viewVars_(setup) {
+  const order = (setup.view && setup.view.order) || [];
+  const rank = v => { const i = order.indexOf(toText_(v.header)); return i === -1 ? 1000 + setup.vars.indexOf(v) : i; };
+  return setup.vars.filter(v => v.col && (v.show || v.column)).slice().sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * One student's / guardian's text for one list. items (in order): { label, value
+ * ("" = nothing to show), show (Additional Information), column }. Returns
+ * { lines: the Additional Information lines, column: the one-column text (plain) }.
+ * The default view gives "Name: value" per line, exactly as before the View step.
+ */
+function od_viewText_(view, listName, items) {
+  const bold = t => boldText_(t, view.italic);
+  const name = t => (view.boldNames ? bold(t) : t);
+  const val = t => (view.boldValues ? bold(t) : t);
+  const sep = OD_VIEW_SEPS_[view.sep] || ", ";
+  const shown = items.filter(x => x.show && x.value);
+  let lines;
+  if (view.layout === "oneLine") {
+    const lead = view.start === "none" ? "" : view.start === "custom" ? toText_(view.startText) : toText_(listName);
+    const parts = shown.map(x => (view.namesBefore ? name(x.label) + " " + val(x.value) : val(x.value)));
+    lines = parts.length ? [(lead ? name(lead) + ": " : "") + parts.join(sep)] : [];
+  } else {
+    lines = shown.map(x => name(x.label) + ": " + val(x.value));
+  }
+  const column = items.filter(x => x.column && x.value)
+    .map(x => (view.namesBefore ? x.label + " " + x.value : x.value)).join(sep);
+  return { lines: lines, column: column };
+}
+
 function od_varValue_(v, row) {
   const cell = toText_(row[v.col - 1]);
   if (cell !== "") return cell;
@@ -2093,8 +2178,9 @@ function od_buildOutputs_(ss, masterTable, guardianRows) {
       od_writeToolColumns_(list.sheet, list, table, results, idx);
       setup.stats = od_stats_(results);
       const by = setup.by === "guardian" ? "guardian" : "student";
-      setup.vars.filter(v => v.col && (v.show || v.column)).forEach(v => {
-        const label = toText_(v.label) || toText_(v.header) || ("Column " + od_colLetter_(v.col));
+      const view = setup.view || od_defaultView_(false);
+      // Each kept value: target -> its values (several rows for one person: joined " / ") + the not-on-list text
+      const kept = od_viewVars_(setup).map(v => {
         const values = new Map(); // target -> [values]
         results.forEach((res, i) => {
           if (res.status !== "ok") return;
@@ -2104,30 +2190,37 @@ function od_buildOutputs_(ss, masterTable, guardianRows) {
           if (values.get(res.target).indexOf(val) === -1) values.get(res.target).push(val);
         });
         const notText = v.notOnList && v.notOnList.mode === "text" ? toText_(v.notOnList.text) : "";
-        if (by === "student") {
-          const byOsis = new Map();
-          idx.students.forEach(st => {
-            const vals = values.get(st.key);
-            const value = vals ? vals.join(" / ") : notText;
-            if (!value) return;
-            byOsis.set(st.osis, value);
-            if (v.show) addLine(st.osis, "", label + ": " + value);
-          });
-          if (v.column) out.studentCols.push({ header: label, byOsis: byOsis });
-        } else {
-          const byGuardian = new Map();
-          idx.persons.forEach(p => {
-            const vals = values.get(p.key);
-            const value = vals ? vals.join(" / ") : notText;
-            if (!value) return;
-            p.kids.forEach(st => {
-              byGuardian.set(st.osis + "|" + p.name.toLowerCase(), value);
-              if (v.show) addLine(st.osis, p.name, label + ": " + value);
-            });
-          });
-          if (v.column) out.guardianCols.push({ header: label, byGuardian: byGuardian });
-        }
+        return { v: v, label: od_varLabel_(v), values: values, notText: notText };
       });
+      const itemsFor = key => kept.map(k => {
+        const vals = k.values.get(key);
+        return { label: k.label, value: vals ? vals.join(" / ") : k.notText, show: !!k.v.show, column: !!k.v.column };
+      });
+      const oneColumn = view.columns === "one" && kept.some(k => k.v.column);
+      const colMaps = kept.map(() => new Map()), listCol = new Map();
+      const addColumns = (key, items, text) => {
+        items.forEach((it, j) => { if (it.column && it.value) colMaps[j].set(key, it.value); });
+        if (text.column) listCol.set(key, text.column);
+      };
+      if (by === "student") {
+        idx.students.forEach(st => {
+          const items = itemsFor(st.key), text = od_viewText_(view, list.name, items);
+          text.lines.forEach(line => addLine(st.osis, "", line));
+          addColumns(st.osis, items, text);
+        });
+        if (oneColumn) out.studentCols.push({ header: list.name, byOsis: listCol });
+        else kept.forEach((k, j) => { if (k.v.column) out.studentCols.push({ header: k.label, byOsis: colMaps[j] }); });
+      } else {
+        idx.persons.forEach(p => {
+          const items = itemsFor(p.key), text = od_viewText_(view, list.name, items);
+          p.kids.forEach(st => {
+            text.lines.forEach(line => addLine(st.osis, p.name, line));
+            addColumns(st.osis + "|" + p.name.toLowerCase(), items, text);
+          });
+        });
+        if (oneColumn) out.guardianCols.push({ header: list.name, byGuardian: listCol });
+        else kept.forEach((k, j) => { if (k.v.column) out.guardianCols.push({ header: k.label, byGuardian: colMaps[j] }); });
+      }
     } catch (e) {
       console.warn("Your Lists: \"" + list.name + "\" skipped: " + e.message);
     }
@@ -2569,7 +2662,8 @@ function od_setupView_(ss, list, table, taken) {
       hint: { osisKnown: s.osisKnown, n: s.n, comma: s.comma >= 0.5 } })),
     roles: roles,
     by: by,
-    vars: od_varsFor_(table.headers, roles, saved.vars)
+    vars: od_varsFor_(table.headers, roles, saved.vars),
+    view: saved.view || od_defaultView_(false)
   };
 }
 
@@ -2592,7 +2686,9 @@ function od_cleanSetupInput_(p, headers) {
     blank: { mode: v.blank && v.blank.mode === "text" ? "text" : "nothing", text: toText_(v.blank && v.blank.text).slice(0, 100) },
     notOnList: { mode: v.notOnList && v.notOnList.mode === "text" ? "text" : "nothing", text: toText_(v.notOnList && v.notOnList.text).slice(0, 100) }
   }));
-  return { by: p.by === "guardian" ? "guardian" : "student", roles: roles, vars: vars };
+  const out = { by: p.by === "guardian" ? "guardian" : "student", roles: roles, vars: vars };
+  if (p.view) out.view = od_cleanView_(p.view); // the View step (an older sidebar without it keeps the saved one)
+  return out;
 }
 
 /**
@@ -2640,8 +2736,16 @@ function od_matchPreview(p) {
       ? idx.students.slice().sort(byStudentLastName_("name")).map(st => ({ target: st.key, text: st.osis + " · " + st.name, sub: st.guardianText }))
       : idx.persons.slice().sort((a, b) => compareNatural_(a.last + " " + a.first, b.last + " " + b.first))
           .map(pp => ({ target: pp.key, text: pp.name, sub: pp.kids.map(k => k.name).join(", ") }));
+    // The View step's preview: a few sure matches with their whole row
+    const preview = [];
+    results.forEach((r, i) => {
+      if (r.status !== "ok" || preview.length >= 25) return;
+      const st = by === "student" ? idx.byOsis.get(r.target) : null;
+      const person = by === "guardian" ? idx.pByKey.get(r.target) : null;
+      preview.push({ name: st ? st.name : person ? person.name : String(r.target), row: table.rows[i].map(toText_) });
+    });
     return { phase: "match", by: by, stats: od_stats_(results), how: howCounts, attention: attention, picker: picker,
-             levels: { high: OD_CONF_HIGH_, medium: OD_CONF_MEDIUM_, min: OD_CONF_MIN_ } };
+             preview: preview, levels: { high: OD_CONF_HIGH_, medium: OD_CONF_MEDIUM_, min: OD_CONF_MIN_ } };
   });
 }
 

@@ -175,17 +175,19 @@
   <div class="footer" id="footer">
     <!-- Exit asks first (shows just above the buttons) -->
     <div id="exitAsk" class="hidden">
-      <b>Save your progress before exiting?</b>
+      <b>Leave Input Data Mode?</b>
       <div class="muted" id="exitAskText"></div>
-      <div class="row">
-        <button class="primary" onclick="saveAndExit()">Save and exit</button>
+      <div class="row" style="flex-direction:column;align-items:stretch">
+        <button class="primary" id="exitBuildBtn" onclick="saveExitAndBuild()">Save, exit and build my sheets</button>
+        <div class="muted hidden" id="exitBuildNote">Load your Student Data (step 1) first: the sheets are built from it.</div>
+        <button onclick="saveAndExit()">Save and exit (build later)</button>
         <button class="danger" onclick="hideExitAsk(); reallyExit()">Exit without saving</button>
         <button onclick="hideExitAsk()">Cancel</button>
       </div>
     </div>
     <div class="row" style="margin:0">
       <button id="skipBtn" onclick="skip()">Skip</button>
-      <button id="exitBtn" class="danger" onclick="exitMode()">Exit Input Data Mode</button>
+      <button id="exitBtn" class="danger" onclick="exitMode()">Finish or exit</button>
     </div>
   </div>
 
@@ -200,6 +202,8 @@
   var stickyError = null;    // a wrong paste was cleared off the tab: its message stays while polling goes on (step index)
   var listsBuildStarted = false; // step 5's build-first ran on this visit (never started twice in a row)
   var buildPollTimer = null; // build progress while step 5 builds first
+  var canBuildNow = false;   // "Save, exit and build" possible (Student Data there, or its step)
+  var buildAfterExit = false; // "Save, exit and build" clicked: build once the mode has closed
 
   function $(id) { return document.getElementById(id); }
 
@@ -251,6 +255,8 @@
       return;
     }
     show('stepView', true); show('doneView', false); show('footer', true);
+    buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
+    canBuildNow = !!v.canBuild;
     renderProgress(v.progress || []);
     $('stepTitle').textContent = 'Data ' + (v.stepIndex + 1) + ' of ' + v.stepCount + ': ' + v.step.zone;
     $('stepPill').textContent = v.step.required ? 'Required' : 'Optional';
@@ -342,11 +348,24 @@
 
   function renderDone(v) {
     stopPolling();
+    // "Save, exit and build": the mode is closed and the user is off the temp tab, so the build (a
+    // separate call, which also deletes that tab) opens the Build sidebar in place of this one
+    if (buildAfterExit && v.exited && v.canBuild && !v.builtAlready) {
+      buildAfterExit = false;
+      show('progress', false); show('stepView', false); show('footer', false); show('doneView', false);
+      $('loading').innerHTML = '<div class="status"><div class="spinner"></div><div>Your tabs are back. Opening the build…</div></div>';
+      show('loading', true);
+      google.script.run.withFailureHandler(onFail).idm_build();
+      return;
+    }
+    var askedBuild = buildAfterExit; buildAfterExit = false;
     show('progress', false);
     show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
     $('doneTitle').textContent = v.exited ? 'Input Data Mode closed' : 'All done';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = plainText(v.notice.message); show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported); show('builtHint', !v.anyImported && !!v.builtAlready);
+    if (askedBuild && !v.builtAlready && !v.canBuild && !(v.notice && v.notice.message)) { $('doneNotice').textContent = 'There is no Student Data in Raw Data yet, so there was nothing to build.'; show('doneNotice', true); }
+    if (askedBuild && v.builtAlready) { $('doneNotice').textContent = 'Your sheets are already up to date, so no build was needed.'; show('doneNotice', true); }
     // The Getting Started checklist (settings, first contact ...): the main button when no build is needed
     show('nextStepsBtn', !!v.guideNext); $('nextStepsBtn').classList.toggle('primary', !v.anyImported);
     // Delete the temp tab now that the user has been moved off it (see IDM_PENDING_DELETE_KEY)
@@ -463,10 +482,12 @@
       ? 'Your lists are saved one by one, so nothing is lost either way.'
       : currentManual
       ? 'Save & exit saves what you typed on the Site / Class tab to Raw Data. Exit without saving loses it.'
-      : 'Everything already moved to Raw Data is saved. Save & exit also moves anything pasted on the tab that hasn\'t moved yet.';
+      : 'Everything already moved to Raw Data is saved. Saving also moves anything pasted on the tab that hasn\'t moved yet.';
+    $('exitBuildBtn').disabled = !canBuildNow; show('exitBuildNote', !canBuildNow);
     show('exitAsk', true);
   }
   function saveAndExit() { hideExitAsk(); working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
+  function saveExitAndBuild() { hideExitAsk(); buildAfterExit = true; working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function reallyExit() { working('Bringing your tabs back…'); call('idm_exit'); }
   function hideExitAsk() { show('exitAsk', false); }
   function retry() {

@@ -78,9 +78,26 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
     'idm_lists_building', async p => { await p.waitForTimeout(3000); });
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, lists, { listsBuild: { ok: true, message: 'Sheets built, so your lists can find your students.' } }) }, 'idm_lists_built');
   await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: false, builtAlready: true, guideNext: true, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '— Your Lists: skipped'] }, idm_deleteLeftoverTab: { deleted: true } }, 'idm_done_built');
+  // "Finish or exit" (2026-11-12): the exit panel with "Save, exit and build my sheets"
+  const ps = Object.assign({}, ats, { stepIndex: 1, canBuild: true, step: Object.assign({}, ats.step, { key: 'ps', zone: 'Parent Square', required: false }), progress: progress(1, {}),
+    done: [{ name: 'Student Data', rows: 120, skipped: false }] });
+  await shoot('InputDataSidebar', { idm_getState: ps, idm_check: ps }, 'idm_exit_build', async p => { await p.click('#exitBtn'); await p.waitForTimeout(150); });
+  await shoot('InputDataSidebar', { idm_getState: Object.assign({}, ps, { canBuild: false }), idm_check: Object.assign({}, ps, { canBuild: false }) }, 'idm_exit_nobuild', async p => { await p.click('#exitBtn'); await p.waitForTimeout(150); });
   await shoot('YourListsSidebar', { od_getWizard: { phase: 'paste', list: { tabId: 1, name: 'Bus Routes', tabName: '📥 Bus Routes', ready: false } }, od_wizardCheck: { pasted: false } }, 'yl_paste');
   await shoot('YourListsSidebar', { od_getWizard: setupView }, 'yl_setup');
   await shoot('YourListsSidebar', { od_getWizard: setupView, od_matchPreview: matchView }, 'yl_match', async p => { await p.click('#nextBtn'); await p.waitForTimeout(200); await p.click('#nextBtn'); await p.waitForTimeout(500); });
   await shoot('YourListsSidebar', { od_getWizard: setupView }, 'yl_vars', async p => { await p.click('#nextBtn'); await p.waitForTimeout(300); });
+  // Step 4 View (2026-11-12): simple, then one line with Advanced options open
+  const viewSetup = Object.assign({}, setupView, {
+    columns: setupView.columns.concat([{ col: 4, letter: 'D', header: 'Stop', samples: ['Main St & 5th'], hint: { osisKnown: 0, n: 40, comma: false } }]),
+    vars: setupView.vars.concat([{ col: 4, header: 'Stop', label: 'Stop', show: true, column: true, blank: { mode: 'text', text: 'No stop yet' }, notOnList: { mode: 'nothing', text: '' } }]),
+    view: { layout: 'lines', boldNames: true, boldValues: false, italic: false, sep: 'comma', namesBefore: false, start: 'list', startText: '', columns: 'each', order: [] } });
+  const viewMatch = Object.assign({}, matchView, { preview: [
+    { name: 'Bart Simpson', row: ['Bart Simpson', '123456789', 'R12', 'Main St & 5th'] },
+    { name: 'Lisa Simpson', row: ['Lisa Simpson', '567891234', 'R12', ''] }] });
+  const toView = async p => { for (let i = 0; i < 3; i++) { await p.click('#nextBtn'); await p.waitForTimeout(300); } };
+  await shoot('YourListsSidebar', { od_getWizard: viewSetup, od_matchPreview: viewMatch }, 'yl_view', toView);
+  await shoot('YourListsSidebar', { od_getWizard: Object.assign({}, viewSetup, { view: Object.assign({}, viewSetup.view, { layout: 'oneLine', sep: 'dot', columns: 'one' }) }), od_matchPreview: viewMatch },
+    'yl_view_advanced', async p => { await toView(p); await p.click('.pvnav button:last-child'); await p.waitForTimeout(150); });
   await browser.close();
 })();

@@ -53,6 +53,9 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       empties by itself. Step 5 builds the sheets first; the end screen only offers Build if something changed
 - [ ] Your Lists: upload a CSV and an Excel list as well as pasting one; after closing Input Data Mode the 📥 list
       tabs are hidden
+- [ ] Your Lists step 4 View: try One line + bold names, Build, and look at a phone contact's Additional Information;
+      a list saved before this version reads exactly as it did
+- [ ] Input Data Mode: "Finish or exit" → "Save, exit and build my sheets" in the middle of the steps
 - [ ] Your Lists: paste a list with a few misspelled names; check the % and the picks
 - [ ] Contact Log: type a parent name, paste a few rows, delete a row; the search bar notes follow
 - [ ] 🧱 Full Sync while you watch (the "more than half" question, if it comes, is asked at the start)
