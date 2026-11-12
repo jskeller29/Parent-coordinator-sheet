@@ -1254,6 +1254,7 @@ var WELCOME_PERMISSIONS_ = [
 var WELCOME_LINKS_OVERRIDE_ = null; // { exampleUrl, guideUrl } for one reset (🐞 Make Release Copies, z_MINE.gs)
 
 function showWelcomeAfterReset_(ss) {
+  clearExampleMark_(ss); // a reset Example copy is a normal new copy again
   const old = ss.getSheetByName(WELCOME_TAB_NAME);
   if (old && old.isSheetHidden()) ss.deleteSheet(old); // an older one the reset didn't delete
   let guideUrl = GUIDE_FOLDER_URL, exampleUrl = "";
@@ -1289,8 +1290,28 @@ function clearWelcomeKeep_(ss) {
   if (props.getProperty(WELCOME_KEEP_KEY_) === ss.getId()) props.deleteProperty(WELCOME_KEEP_KEY_);
 }
 
+/**
+ * The release's Example copy (🐞 Make Release Copies, z_MINE.gs) carries this spreadsheet-level
+ * developer-metadata mark: it has never run Initial Setup, but it must open with all its tabs
+ * showing and no Welcome tab. Travels with the file; a reset removes it (clearExampleMark_).
+ */
+var EXAMPLE_COPY_MARK_ = "PC_EXAMPLE_COPY";
+
+function isExampleCopy_(ss) {
+  try {
+    return ss.createDeveloperMetadataFinder().withKey(EXAMPLE_COPY_MARK_).find().length > 0;
+  } catch (e) { return false; }
+}
+
+function clearExampleMark_(ss) {
+  try {
+    ss.createDeveloperMetadataFinder().withKey(EXAMPLE_COPY_MARK_).find().forEach(function(m) { m.remove(); });
+  } catch (e) { console.warn("Example mark: " + e.message); }
+}
+
 /** Before setup: makes the Welcome tab if needed, shows it and hides every other tab. */
 function showWelcomeTabOnly_(ss) {
+  if (isExampleCopy_(ss)) return; // the Example copy shows every tab
   const tab = ss.getSheetByName(WELCOME_TAB_NAME) || buildWelcomeTab_(ss);
   if (tab.isSheetHidden()) tab.showSheet();
   tab.activate();

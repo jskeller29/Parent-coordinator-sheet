@@ -90,6 +90,15 @@ function makeSpreadsheet(tabNames) {
       if (ss._active === s) throw new Error("fake sheet: deleting the tab the user is on");
       ss._sheets = ss._sheets.filter(x => x !== s);
     },
+    _meta: [],
+    addDeveloperMetadata: (key, value) => { ss._meta.push({ key, value }); return ss; },
+    createDeveloperMetadataFinder: () => {
+      let key = null;
+      const f = { withKey: k => { key = k; return f; },
+        find: () => ss._meta.filter(m => key === null || m.key === key).map(m => ({ getKey: () => m.key, getValue: () => m.value,
+          remove: () => { ss._meta = ss._meta.filter(x => x !== m); } })) };
+      return f;
+    },
     _toasts: [],
     toast: (msg, title) => { ss._toasts.push({ msg: String(msg), title: String(title || "") }); }
   };

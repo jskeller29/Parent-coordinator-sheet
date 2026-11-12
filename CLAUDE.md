@@ -568,7 +568,8 @@ the nightly refreshResolvedLinks_ clears it). 🔗 My Links and Reset to Display
 then the folders as backup, the guide folder's files in rank order with why.
 🐞 Debug → 📦 Make Release Copies (ownerMenuMakeAllCopies, z_MINE.gs; was "Make All 3 Copies"): a pop-up makes
 "… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data"; then every tab shown except Backend, any Welcome
-tab deleted, ownerShowAllTabsButBackend_) and "… - (BLANK)" (B3 = No + display reset), ONE
+tab deleted, ownerShowAllTabsButBackend_; the copy gets developer metadata PC_EXAMPLE_COPY (EXAMPLE_COPY_MARK_,
+Menus.gs) so showWelcomeTabOnly_ does nothing on it when it opens before setup; a Reset to Display Mode removes it) and "… - (BLANK)" (B3 = No + display reset), ONE
 google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one
 doesn't stop the others. This sheet is never changed. The done message shows the Version Tracker row to add: A = the
 version date, D = the Blank copy's /copy link, E = the Example copy's link (trackerLink).

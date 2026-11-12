@@ -522,6 +522,19 @@ function listsSheet() {
   assert.deepStrictEqual(steps, [["reset", "No"], ["fake"]], 'B3 = No before the reset; Example loads fake data');
   assert.strictEqual(made[0].copy.getSheetByName("Backend").getRange("B3").getValue(), "No");
   assert.throws(() => g.ownerMakeCopy("migrate"), /Unknown copy/, 'no Migrate copy any more');
+  // Example: every tab showing except Backend, no Welcome tab, and its open (setup not run) leaves it so
+  {
+    const ex = made[1].copy;
+    assert.strictEqual(ex.getSheetByName(g.WELCOME_TAB_NAME), null, 'Example: no Welcome tab');
+    assert(ex.getSheets().every(sh => sh.isSheetHidden() === (sh.getName() === "Backend")), 'Example: all tabs but Backend show');
+    assert(g.isExampleCopy_(ex) && !g.isExampleCopy_(made[0].copy), 'only the Example is marked');
+    g.showWelcomeTabOnly_(ex);
+    assert.strictEqual(ex.getSheetByName(g.WELCOME_TAB_NAME), null, 'Example open: no Welcome tab made');
+    assert(ex.getSheets().every(sh => sh.isSheetHidden() === (sh.getName() === "Backend")), 'Example open: nothing hidden');
+    g.clearExampleMark_(ex);
+    assert(!g.isExampleCopy_(ex), 'a reset removes the mark');
+    console.log("Example copy: all tabs but Backend, no Welcome: ok");
+  }
   // 1. every copy gets the version date, the Example one too (it has no reset), and B3 = No there
   made.forEach(x => assert(x.copy.getSheetByName("Backend").getRange("A2").getValue() instanceof Date, 'version date in ' + x.label));
   assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');

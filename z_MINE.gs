@@ -268,9 +268,11 @@ function ownerMakeCopy(kind, exampleUrl) {
 /**
  * Example copy (owner 2026-11-12): every tab visible except Backend, and no 👋 Welcome tab
  * (it only tells a new copy to run Initial Setup). Shows first, then hides / deletes,
- * because Sheets refuses to hide or delete the last visible tab.
+ * because Sheets refuses to hide or delete the last visible tab. The mark (Menus.gs,
+ * EXAMPLE_COPY_MARK_) stops its open from bringing the Welcome tab back and hiding the rest.
  */
 function ownerShowAllTabsButBackend_(copy) {
+  if (!isExampleCopy_(copy)) copy.addDeveloperMetadata(EXAMPLE_COPY_MARK_, "true");
   const sheets = copy.getSheets();
   sheets.forEach(sh => { if (sh.getName() !== "Backend" && sh.isSheetHidden()) sh.showSheet(); });
   sheets.forEach(sh => {
