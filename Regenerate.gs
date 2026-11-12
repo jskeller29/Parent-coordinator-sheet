@@ -125,10 +125,10 @@ function loadFakeDataSteps_(ss) {
 
   // --- DATA MODE FORMATTING ---
   sheet.getRange("A5").setValue("No effective students filters. Data selection: Guardian contact information.")
-    .setFontColor("#000000").setFontWeight("normal").setFontFamily("Roboto");
+    .setFontColor("#000000").setFontWeight("normal").setFontFamily(SHEET_LOOK_.font);
 
   sheet.getRange("AG6").setValue("Name")
-    .setFontColor("#000000").setFontWeight("bold").setFontFamily("Roboto");
+    .setFontColor("#000000").setFontWeight("bold").setFontFamily(SHEET_LOOK_.font);
 
   sheet.getRange("AP2").setValue("");
   sheet.getRange("BH2").setValue("");
@@ -311,33 +311,35 @@ function forceVibrantColors_(sheet) {
   const totalCols = columnLetterToNumber_("BI");
   const maxRows = sheet.getMaxRows();
   
-  // 0. ENFORCE CLIPPING & Remove Gridlines
+  // 0. ENFORCE CLIPPING & Remove Gridlines. One font for the whole tab, data rows too
+  // (SHEET_LOOK_, Core.gs; owner 2026-11-12: was Roboto with Montserrat in row 1 only).
+  // Runs after every paste / Input Data Mode load, so pasted rows get it too.
+  const font = SHEET_LOOK_.font;
   sheet.setHiddenGridlines(true);
-  sheet.getRange(1, 1, maxRows, totalCols).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sheet.getRange(1, 1, maxRows, totalCols).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setFontFamily(font);
   
-  // 1. Lock in Rows 1-3 Dark Blue Theme
-  sheet.getRange("A1:AE3").setBackground("#073763").setFontColor("#FFFFFF").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("AG1:AN3").setBackground("#783f04").setFontColor("#FFFFFF").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("AP1:BF3").setBackground("#274e13").setFontColor("#FFFFFF").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("BH1:BI2").setBackground("#4c1130").setFontColor("#FFFFFF").setFontWeight("bold").setFontFamily("Roboto");
-  
-  // Override ONLY Row 1 back to Montserrat
-  sheet.getRange("A1:BI1").setFontFamily("Montserrat");
+  // 1. Lock in Rows 1-3 Dark Blue Theme (one dark color per export)
+  sheet.getRange("A1:AE3").setBackground("#073763").setFontColor("#FFFFFF").setFontWeight("bold");
+  sheet.getRange("AG1:AN3").setBackground("#783f04").setFontColor("#FFFFFF").setFontWeight("bold");
+  sheet.getRange("AP1:BF3").setBackground("#274e13").setFontColor("#FFFFFF").setFontWeight("bold");
+  sheet.getRange("BH1:BI2").setBackground("#4c1130").setFontColor("#FFFFFF").setFontWeight("bold");
 
-  // Keep the title text centered (without overwriting the actual dates!)
-  sheet.getRange("A1:AE1").merge().setHorizontalAlignment("center");
-  sheet.getRange("AG1:AN1").merge().setHorizontalAlignment("center");
-  sheet.getRange("AP1:BF1").merge().setHorizontalAlignment("center");
+  // The "... - DATE UPDATED: 11/12/26" titles start at the LEFT of their band (2026-11-12):
+  // centered over 31 columns (A1:AE1), the ATS one sat off-screen and row 1 looked empty.
+  // (Values are never written here, only the alignment.)
+  sheet.getRange("A1:AE1").merge().setHorizontalAlignment("left");
+  sheet.getRange("AG1:AN1").merge().setHorizontalAlignment("left");
+  sheet.getRange("AP1:BF1").merge().setHorizontalAlignment("left");
   sheet.getRange("BH3:BI3").merge().setHorizontalAlignment("center");
 
   // Make Row 4 and 5 a clean white divider
-  sheet.getRange("A4:BI5").setBackground("#FFFFFF").setFontColor("#000000").setFontFamily("Roboto");
+  sheet.getRange("A4:BI5").setBackground("#FFFFFF").setFontColor("#000000");
 
-  // 2. Lock in Row 6 Headers Theme (Pastel Colors)
-  sheet.getRange("A6:AE6").setBackground("#bcd9ea").setFontColor("#000000").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("AG6:AN6").setBackground("#ff9900").setFontColor("#000000").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("AP6:BF6").setBackground("#d6ecd2").setFontColor("#000000").setFontWeight("bold").setFontFamily("Roboto");
-  sheet.getRange("BH6:BI6").setBackground("#eddbf4").setFontColor("#000000").setFontWeight("bold").setFontFamily("Roboto");
+  // 2. Lock in Row 6 Headers Theme (Pastel Colors; Parent Square: soft tan, was bright orange #ff9900)
+  sheet.getRange("A6:AE6").setBackground("#bcd9ea").setFontColor("#000000").setFontWeight("bold");
+  sheet.getRange("AG6:AN6").setBackground("#f6dfc4").setFontColor("#000000").setFontWeight("bold");
+  sheet.getRange("AP6:BF6").setBackground("#d6ecd2").setFontColor("#000000").setFontWeight("bold");
+  sheet.getRange("BH6:BI6").setBackground("#eddbf4").setFontColor("#000000").setFontWeight("bold");
   
   // 3. Lock in the Yellow Paste Zones & Borders
   const pasteRanges = ["A5", "AG6", "AP2", "BH3"];
@@ -345,7 +347,6 @@ function forceVibrantColors_(sheet) {
     const r = sheet.getRange(rangeA1);
     r.setBackground("#FFF2CC"); // Light yellow
     r.setFontColor("#000000"); // Black text
-    r.setFontFamily("Montserrat"); // FORCE Montserrat exception!
     r.setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
   });
 
@@ -879,9 +880,20 @@ function resetMasterTable_(ss) {
   if (!sheet) return;
   const firstRow = studentListHeaderRow_(sheet) + 1; // row 2 (row 5 on a tab not rebuilt since 2026-11-11)
   if (sheet.getMaxRows() >= firstRow) {
-    sheet.getRange(firstRow, 1, sheet.getMaxRows() - firstRow + 1, 9).clearContent();
+    // A:I, or A:H once a reset has taken the 9th column away (a range past the last column throws)
+    sheet.getRange(firstRow, 1, sheet.getMaxRows() - firstRow + 1, Math.min(9, sheet.getMaxColumns())).clearContent();
+  }
+  // Only A:H are needed: OSIS .. Last Interaction (owner 2026-11-12; a spare 9th column showed as
+  // "Column 9" in the Table). Every reset clears the Your Lists lists too, and the build adds
+  // columns when a list needs one (writeSheet_), so the ones after H can go.
+  const maxCols = sheet.getMaxColumns();
+  if (maxCols > STUDENT_LIST_COLUMNS_) {
+    try {
+      sheet.deleteColumns(STUDENT_LIST_COLUMNS_ + 1, maxCols - STUDENT_LIST_COLUMNS_);
+    } catch (e) { console.warn("Student List: extra columns not deleted: " + e.message); }
   }
 }
+var STUDENT_LIST_COLUMNS_ = 8; // A:H
 
 function fillContactLogHstackFormulas_(ss) {
   const sheet = ss.getSheetByName("Contact Log");

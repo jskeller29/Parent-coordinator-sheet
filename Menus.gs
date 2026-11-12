@@ -2311,6 +2311,25 @@ function getPrefillOsis() {
 }
 
 /**
+ * The Students Override Report's look (also 🎨 Apply Sheet Style): widths, wrapped text,
+ * Montserrat (the report tab is cleared, formats too, every time it is rebuilt) and the
+ * built tabs' navy header (SHEET_LOOK_, Core.gs; was light grey). numRows = header + rows.
+ */
+function styleOverrideReport_(reportSheet, numRows) {
+  const L = SHEET_LOOK_;
+  reportSheet.setColumnWidth(1, 100);
+  reportSheet.setColumnWidth(2, 400);
+  reportSheet.setColumnWidth(3, 400);
+  reportSheet.getRange(1, 1, Math.max(1, numRows), 3).setWrap(true).setVerticalAlignment("middle")
+    .setFontFamily(L.font).setFontColor(L.ink);
+  reportSheet.getRange("A1:C1")
+    .setFontWeight("bold")
+    .setBackground(L.built.header)
+    .setFontColor(L.built.headerText)
+    .setHorizontalAlignment("center");
+}
+
+/**
  * Generates a visual side-by-side Delta report comparing Raw Data vs. Overridden Data.
  * Skips any records that have "Stealth Mode / Hide from Report" checked!
  */
@@ -2495,17 +2514,8 @@ function buildOverrideReport() {
     reportSheet.getRange(2, 3, richTextNewInfo.length, 1).setRichTextValues(richTextNewInfo);
   }
 
-  // 7. Visual Formatting
-  reportSheet.setColumnWidth(1, 100); 
-  reportSheet.setColumnWidth(2, 400); 
-  reportSheet.setColumnWidth(3, 400); 
-  
-  targetRange.setWrap(true).setVerticalAlignment("middle");
-  
-  reportSheet.getRange("A1:C1")
-    .setFontWeight("bold")
-    .setBackground("#f3f3f3")
-    .setHorizontalAlignment("center");
+  // 7. Visual Formatting (styleOverrideReport_: the built tabs' navy header + Montserrat)
+  styleOverrideReport_(reportSheet, reportOutput.length);
 
   reportSheet.setFrozenRows(1);
   reportSheet.showSheet(); 

@@ -286,7 +286,7 @@ function handleEdit_(e) {
     // --- INSTANT ROW REPAIR ---
     sheet.getRange(row, 1, safeNumRows, CL_WIDTH).setBackground(null);
     formatContactLogRows_(sheet, row, safeNumRows);
-    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily("Roboto");
+    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily(SHEET_LOOK_.font); // was Roboto (the one non-Montserrat column)
   }
 
   autoAddBlankRow_(sheet, row, endRow);
@@ -973,82 +973,54 @@ function autoAddBlankRow_(sheet, editedRow, endRow) {
   }
 }
 
+/**
+ * Contact Log Type column (L): each type in the Type List (Backend BL) gets a
+ * text color, the same one every time: its place in the list picks it from
+ * SHEET_LOOK_.typeColors (Core.gs). Before 2026-11-12 the colors were random,
+ * so every reset and 10 PM run (resetContactLogFormatting clears the rules)
+ * gave the types new colors. Every rule that covers only column L is a Type
+ * rule and is drawn again (as before, a type taken off the list loses its
+ * rule); the other rules are kept. Writes nothing when the rules already match.
+ */
 function applyTypeDropdownColors() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const contactLog = ss.getSheetByName('Contact Log');
+  if (!contactLog) return;
   // Type List section of the Backend tab (BL2:BL)
-  const typeValues = backendReadBlock_(ss, "TYPES", true).flat().filter(String);
-  const typeColumnRange = contactLog.getRange('L2:L'); 
-  let existingRules = contactLog.getConditionalFormatRules();
-  
-  let typeRules = [];   
-  let otherRules = [];  
-  
-  let existingTypesMapped = []; 
-  let usedColors = []; 
-  
+  const typeValues = backendReadBlock_(ss, "TYPES", true).flat().map(v => String(v)).filter(String);
+  const uniqueTypes = typeValues.filter((t, i) => typeValues.indexOf(t) === i);
+  const palette = SHEET_LOOK_.typeColors;
+  const wanted = uniqueTypes.map((type, i) => ({ type: type, color: palette[i % palette.length] }));
+
+  const existingRules = contactLog.getConditionalFormatRules();
+  const otherRules = [];
+  const typeNow = []; // what the column L rules say now: { type, color }, or null for any other L rule
   existingRules.forEach(rule => {
     const ranges = rule.getRanges();
-    if (ranges.length === 0) {
-      otherRules.push(rule);
-      return;
-    }
-    
-    const firstCol = ranges[0].getColumn();
-    const lastCol = ranges[0].getLastColumn();
-    
-    if (firstCol === 12 && lastCol === 12) {
-      try {
-        const condition = rule.getBooleanCondition();
-        if (condition && condition.getCriteriaType() === SpreadsheetApp.BooleanCriteria.TEXT_EQUAL_TO) {
-          const textBeingColored = condition.getCriteriaValues()[0];
-          if (typeValues.includes(textBeingColored)) {
-             existingTypesMapped.push(textBeingColored);
-             typeRules.push(rule); 
-             const ruleColor = condition.getFontColor(); 
-             if (ruleColor && !usedColors.includes(ruleColor.toLowerCase())) {
-               usedColors.push(ruleColor.toLowerCase());
-             }
-          }
-        }
-      } catch(e) { console.error(e); }
-    } else {
-      otherRules.push(rule);
-    }
-  });
-  
-  function generateVibrantHex() {
-    let rgb = [
-      Math.floor(Math.random() * 40),       
-      Math.floor(Math.random() * 60) + 140, 
-      Math.floor(Math.random() * 200)       
-    ];
-    for (let i = rgb.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rgb[i], rgb[j]] = [rgb[j], rgb[i]];
-    }
-    return "#" + rgb.map(x => x.toString(16).padStart(2, '0')).join('');
-  }
-  
-  typeValues.forEach(type => {
-    if (!existingTypesMapped.includes(type)) {
-      let colorToUse = generateVibrantHex();
-      while (usedColors.includes(colorToUse.toLowerCase())) {
-        colorToUse = generateVibrantHex();
+    const onlyL = ranges.length > 0 && ranges[0].getColumn() === CL_COL_TYPE && ranges[0].getLastColumn() === CL_COL_TYPE;
+    if (!onlyL) { otherRules.push(rule); return; }
+    let entry = null;
+    try {
+      const condition = rule.getBooleanCondition();
+      if (condition && condition.getCriteriaType() === SpreadsheetApp.BooleanCriteria.TEXT_EQUAL_TO) {
+        entry = { type: String(condition.getCriteriaValues()[0]), color: String(condition.getFontColor() || "").toLowerCase() };
       }
-      const newRule = SpreadsheetApp.newConditionalFormatRule()
-        .whenTextEqualTo(type)
-        .setFontColor(colorToUse) 
-        .setRanges([typeColumnRange])
-        .build();
-      typeRules.push(newRule); 
-      existingTypesMapped.push(type);
-      usedColors.push(colorToUse.toLowerCase());
-    }
+    } catch (e) { console.error(e); }
+    typeNow.push(entry);
   });
-  
-  const finalRulesToApply = [...typeRules, ...otherRules];
-  contactLog.setConditionalFormatRules(finalRulesToApply);
+
+  // Already right (same types, same order, same colors, nothing else on L): no write
+  const same = typeNow.length === wanted.length && wanted.every((w, i) =>
+    typeNow[i] && typeNow[i].type === w.type && typeNow[i].color === w.color.toLowerCase());
+  if (same) return;
+
+  const typeColumnRange = contactLog.getRange('L2:L');
+  const typeRules = wanted.map(w => SpreadsheetApp.newConditionalFormatRule()
+    .whenTextEqualTo(w.type)
+    .setFontColor(w.color)
+    .setRanges([typeColumnRange])
+    .build());
+  contactLog.setConditionalFormatRules([...typeRules, ...otherRules]);
 }
 
 function toggleHideFilter_(sheet, endRow) {
@@ -2108,31 +2080,19 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   sheet.insertColumns(1, 7);
   
   // Clear any residual formatting/validation from neighboring columns
-  sheet.getRange(1, 1, sheet.getMaxRows(), 7).clearDataValidations().setBackground(null);
+  const maxRows = sheet.getMaxRows();
+  sheet.getRange(1, 1, maxRows, 7).clearDataValidations().setBackground(null);
 
-  // Set Row 1 Layout: Merged Title (Cols 1, 2), Category (Col 3), Location (Col 4), Date (Col 5), Delete Box (Col 6)
-  sheet.getRange(1, 1, 1, 2).merge().setValue(eventName).setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
-  sheet.getRange(1, 3).setValue(eventType).setFontWeight("bold").setBackground("#DAA06D").setHorizontalAlignment("center"); // NEW: Event Type
-  sheet.getRange(1, 4).setValue(eventLoc).setFontWeight("bold").setBackground("#fff2cc").setHorizontalAlignment("center");
-  sheet.getRange(1, 5).setValue(eventDate).setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
-  sheet.getRange(1, 6).insertCheckboxes().setBackground("#ea9999");
-  
-  // Set Row 2 Headers
-  const headers = EVENT_TABLE_HEADERS; // Sheet Lock.gs warns on row 2 of every table
-  sheet.getRange("A2:F2").setValues([headers]).setFontWeight("bold").setBackground("#efefef");
+  // The table's look: title row, delete box, header row (EVENT_TABLE_HEADERS; Sheet Lock.gs
+  // warns on row 2 of every table), lines, widths, font. One place: styleEventTableAt_
+  styleEventTableAt_(sheet, 1, maxRows);
 
-  // Format Column Widths
-  sheet.setColumnWidth(1, 100); // OSIS
-  sheet.setColumnWidth(2, 150); // Guardian(s)
-  sheet.setColumnWidth(3, 150); // Parent Attendee
-  sheet.setColumnWidth(4, 150); // Student
-  sheet.setColumnWidth(5, 80);  // # of Indv
-  sheet.setColumnWidth(6, 200); // Notes
-  sheet.setColumnWidth(7, 30);  // Spacer
+  // Row 1: Title (merged over columns 1-2), Category (3), Location (4), Date (5); 6 = Delete Box
+  sheet.getRange(1, 1, 1, 2).setValue(eventName);
+  sheet.getRange(1, 3).setValue(eventType);
+  sheet.getRange(1, 4).setValue(eventLoc);
+  sheet.getRange(1, 5).setValue(eventDate);
 
-  // Apply Borders
-  sheet.getRange("A1:F").setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
-  
   // =======================================================
   // STRICT DROPDOWN MAPPING
   // =======================================================
@@ -2153,31 +2113,49 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
 }
 
 /**
+ * One Events table's look (SHEET_LOOK_, Core.gs; owner 2026-11-12): the 6 columns from
+ * column c and the spacer after them. Title row (event name over the first 2 columns,
+ * type, place, date) in the typing tabs' brown with white bold text; the delete box on a
+ * soft red; the header row (EVENT_TABLE_HEADERS) in light tan; thin lines with a brown
+ * outline; Montserrat; the widths. Was a green / tan / yellow / blue / red title row, a grey
+ * header row and black lines, typed out twice. Used by buildEventTable (a new event),
+ * restyleEventTables_ (Migration) and 🎨 Apply Sheet Style. Writes the header row; other
+ * values are not touched (the delete box becomes a fresh, unticked checkbox).
+ */
+function styleEventTableAt_(sheet, c, maxRows) {
+  const L = SHEET_LOOK_, T = L.typing, S = SpreadsheetApp.BorderStyle;
+  sheet.getRange(1, c, maxRows, 6).setFontFamily(L.font).setFontColor(L.ink)
+    .setBorder(true, true, true, true, true, true, T.line, S.SOLID)
+    .setBorder(true, true, true, true, null, null, T.header, S.SOLID);
+  sheet.getRange(1, c, 1, 2).merge();
+  sheet.getRange(1, c, 1, 5).setBackground(T.header).setFontColor(T.headerText)
+    .setFontWeight("bold").setHorizontalAlignment("center");
+  sheet.getRange(1, c + 5).insertCheckboxes().setBackground(L.danger.fill).setFontColor(L.danger.text);
+  sheet.getRange(2, c, 1, 6).setValues([EVENT_TABLE_HEADERS]).setFontWeight("bold")
+    .setBackground(T.subHeader).setFontColor(T.subHeaderText);
+  [100, 150, 150, 150, 80, 200, 30].forEach((w, i) => sheet.setColumnWidth(c + i, w)); // OSIS, Guardian(s), Parent Attendee, Student, # of Indv, Notes, spacer
+}
+
+/**
  * Migration copies the Events tab as plain values (Menus.gs ma_migrateSimpleSheets): this
  * gives every table (7 columns wide from column A, title in row 1) its look back, the same
- * as buildEventTable makes it: title merge and colors, the red delete checkbox, the header
- * row, borders and widths, and the OSIS / Guardian / Student dropdowns. Values stay as they
- * are (the delete box starts unticked). Returns how many tables it found.
+ * as buildEventTable makes it (styleEventTableAt_), and the OSIS / Guardian / Student
+ * dropdowns. Values stay as they are (the delete box starts unticked). lookOnly (🎨 Apply
+ * Sheet Style): the look only, the dropdowns are left as they are. Returns how many
+ * tables it found.
  */
-function restyleEventTables_(ss, sheet) {
+function restyleEventTables_(ss, sheet, lookOnly) {
   const lastCol = sheet.getLastColumn(), maxRows = sheet.getMaxRows();
   if (lastCol < 1 || sheet.getLastRow() < 1) return 0;
   const row1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const rules = eventDropdownRules_(ss);
+  const rules = lookOnly ? null : eventDropdownRules_(ss);
   let tables = 0;
   for (let c = 1; c <= lastCol; c += 7) {
     if (String(row1[c - 1]).trim() === "") continue;
     try {
       if (sheet.getMaxColumns() < c + 6) sheet.insertColumnsAfter(sheet.getMaxColumns(), c + 6 - sheet.getMaxColumns());
-      sheet.getRange(1, c, 1, 2).merge().setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
-      sheet.getRange(1, c + 2).setFontWeight("bold").setBackground("#DAA06D").setHorizontalAlignment("center");
-      sheet.getRange(1, c + 3).setFontWeight("bold").setBackground("#fff2cc").setHorizontalAlignment("center");
-      sheet.getRange(1, c + 4).setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
-      sheet.getRange(1, c + 5).insertCheckboxes().setBackground("#ea9999");
-      sheet.getRange(2, c, 1, 6).setValues([EVENT_TABLE_HEADERS]).setFontWeight("bold").setBackground("#efefef");
-      [100, 150, 150, 150, 80, 200, 30].forEach((w, i) => sheet.setColumnWidth(c + i, w));
-      sheet.getRange(1, c, maxRows, 6).setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
-      if (maxRows >= 3) {
+      styleEventTableAt_(sheet, c, maxRows);
+      if (rules && maxRows >= 3) {
         sheet.getRange(3, c, maxRows - 2, 1).setDataValidation(rules.osis);
         sheet.getRange(3, c + 1, maxRows - 2, 1).setDataValidation(rules.guardian);
         sheet.getRange(3, c + 3, maxRows - 2, 1).setDataValidation(rules.student);

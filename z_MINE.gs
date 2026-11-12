@@ -70,6 +70,7 @@ function ownerAddMenus_(ui) {
     .addSeparator()
     .addItem("🔗 My Links (videos, documents, folders)", "ownerMenuMyLinks")
     .addItem("🔧 Fix Dropdown Criteria (Student List → Backend)", "ownerMenuFixDropdownCriteria")
+    .addItem("🎨 Apply Sheet Style (colors + fonts)", "ownerMenuApplySheetStyle")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug");
   // z_NewCopy.gs (owner only): what to change in a new copy of this sheet
@@ -631,6 +632,478 @@ function ownerDebugRun_(label, fn) {
 
 function ownerDebugToast_(message, title, seconds) {
   try { SpreadsheetApp.getActiveSpreadsheet().toast(message, title, seconds); } catch (e) {}
+}
+
+// ======================================================================
+// 🎨 APPLY SHEET STYLE (owner's one-time tool, 2026-11-12)
+// One click puts the house look (SHEET_LOOK_, Core.gs) on this sheet:
+// - Montserrat on every tab. The Contact Log keeps its own fonts except column D
+//   (Person Spoke With: every edit used to set it to Roboto).
+// - Sheets Table colors: Notes and Send Out get the Contact Log's brown and cream,
+//   Student List / Parents Divided / Directory / Combined Contact Tracking navy and
+//   light grey. Needs the Sheets API: the "Sheets" service in App Scripts (Mine).Json
+//   (else the same calls go over the web; if Google refuses them, the report lists
+//   the tables to recolor by hand).
+// - Header rows: the table's color with white bold text (also over Send Out's old
+//   orange / coral D1:E1), Your Lists headers after the tables included.
+// - Phone Contacts' colors; PCAR's 3 boxes (navy, the "own dates" box brown with its
+//   2 date cells as yellow input boxes; one label style; a missing section title is
+//   copied from the first box).
+// - Widths: Student List / Parents Divided fit their text (within limits), Send Out B.
+// - Student List: the empty columns after the last header go ("Column 9"); Your Lists
+//   columns have a header, so they stay.
+// - Names: tab "RAW Data" -> "Raw Data", Send Out's table "Table1" -> "Send Out".
+// - Repaints now what the code paints anyway (Events tables, Raw Data, Directory site
+//   colors, Override Report header, Contact Log Type colors), instead of at the next
+//   build / reset.
+// Values are never changed, except PCAR's missing title and the two names. Safe to
+// run again. 📦 Make Release Copies copies all of it into the Example / Blank.
+// A script can't change dropdown chip colors; the Contact Log's widths are yours.
+// ======================================================================
+function ownerMenuApplySheetStyle() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const title = "🎨 Apply Sheet Style";
+  const resp = ui.alert(title,
+    "Puts one look on every tab of this sheet:\n\n" +
+    "• Montserrat everywhere\n" +
+    "• Tabs you type in (Events, Notes, Send Out): the Contact Log's brown headers and cream rows\n" +
+    "• Tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking, " +
+    "Phone Contacts, Students Override Report, PCAR): navy headers and light grey rows\n\n" +
+    "Your data is not changed and the Contact Log keeps its own look. Continue?",
+    ui.ButtonSet.OK_CANCEL);
+  if (resp !== ui.Button.OK) return;
+  const report = runAction_("Apply Sheet Style", () => {
+    ss.toast("Painting every tab… (about a minute)", title, 120);
+    return ownerApplySheetStyle_(ss);
+  });
+  ui.alert(title, ownerSheetStyleReport_(report), ui.ButtonSet.OK);
+}
+
+/** Does the work; returns { done, byHand, failed } (text lines). A step that fails is listed and the rest go on. */
+function ownerApplySheetStyle_(ss) {
+  const L = SHEET_LOOK_;
+  const rep = { done: [], byHand: [], failed: [] };
+  const step = (what, fn) => {
+    try { fn(); } catch (e) {
+      rep.failed.push(what + ": " + e.message);
+      console.warn("Apply Sheet Style, " + what + ": " + e.message);
+    }
+  };
+  const tab = name => (name === STUDENT_LIST_SHEET ? getStudentListSheet_(ss) : ss.getSheetByName(name));
+
+  // 1. The tab name the guide uses (getSheetByName ignores case, so this also finds "Raw Data")
+  step("Raw Data tab name", () => {
+    const raw = ss.getSheetByName("RAW Data");
+    if (raw && raw.getName() === "RAW Data") {
+      raw.setName("Raw Data");
+      rep.done.push('Tab "RAW Data" is now "Raw Data" (the name the guide uses)');
+    }
+  });
+
+  // 2. Student List: the empty columns after the last header ("Column 9" in the table)
+  step("Student List columns", () => {
+    const sh = tab(STUDENT_LIST_SHEET);
+    if (!sh) return;
+    const n = ownerDeleteEmptyTrailingColumns_(sh, studentListHeaderRow_(sh), 8);
+    if (n) rep.done.push("Student List: deleted " + n + " empty column" + (n > 1 ? "s" : "") + " after the last header");
+  });
+
+  // 3. The Sheets Tables (read first: the Contact Log table's colors decide the brown)
+  let api = null, tables = null, tablesError = "";
+  try {
+    api = ownerSheetsApi_();
+    tables = ownerReadTables_(ss, api);
+  } catch (e) {
+    tablesError = e.message;
+    console.warn("Apply Sheet Style, reading the tables: " + e.message);
+  }
+  const typing = ownerTypingColors_(ss, tables);
+  const builtTabs = [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking"];
+  const typingTabs = ["Notes", "Send Out"];
+
+  // 4. One font
+  step("Fonts", () => {
+    const names = ["Raw Data", "Events", "Notes", "Send Out", "PCAR", STUDENT_LIST_SHEET, "Parents Divided", "Directory",
+      "Combined Contact Tracking", "Phone Contacts", "Students Override Report", "New Students"];
+    const done = [];
+    names.forEach(name => {
+      const sh = tab(name);
+      if (!sh) return;
+      sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).setFontFamily(L.font);
+      done.push(name);
+    });
+    const cl = ss.getSheetByName("Contact Log");
+    const end = cl && findEndRowInColumnE_(cl);
+    if (end && end > 2) {
+      cl.getRange(2, CL_COL_SPOKE_WITH, end - 2, 1).setFontFamily(L.font);
+      done.push("Contact Log column D");
+    }
+    rep.done.push("Montserrat on: " + done.join(", "));
+  });
+
+  // 5. Table colors (Sheets API)
+  if (!tables) {
+    rep.byHand.push("Table colors: Google didn't let the script change them (" + (tablesError || "no Sheets API") + "). " +
+      "On each table, click ▾ next to its name → table color. Notes and Send Out: " + typing.header +
+      " (the Contact Log's brown) with cream " + typing.band2 + " rows. Student List, Parents Divided, Directory and " +
+      "Combined Contact Tracking: navy " + L.built.header + " with light grey " + L.built.band + " rows.");
+  } else {
+    step("Table colors", () => {
+      const rows = (header, band1, band2) => ({
+        headerColorStyle: ownerHexColorStyle_(header),
+        firstBandColorStyle: ownerHexColorStyle_(band1),
+        secondBandColorStyle: ownerHexColorStyle_(band2)
+      });
+      const typingRows = rows(typing.header, typing.band1, typing.band2);
+      const builtRows = rows(L.built.header, "#ffffff", L.built.band);
+      const requests = [], painted = [], none = [];
+      typingTabs.concat(builtTabs).forEach(name => {
+        const sh = tab(name);
+        const list = sh ? (tables[sh.getName()] || []) : [];
+        if (!list.length) { if (sh) none.push(name); return; }
+        list.forEach(t => requests.push({ updateTable: {
+          table: { tableId: t.tableId, rowsProperties: typingTabs.indexOf(name) !== -1 ? typingRows : builtRows },
+          fields: "rowsProperties.headerColorStyle,rowsProperties.firstBandColorStyle,rowsProperties.secondBandColorStyle"
+        } }));
+        painted.push(name);
+      });
+      if (requests.length) api.batchUpdate(ss.getId(), requests);
+      if (painted.length) rep.done.push("Table colors: " + painted.join(", ") + " (the brown comes from " + typing.from + ")");
+      if (none.length) rep.done.push("No Sheets Table on " + none.join(", ") + ": header row painted only");
+    });
+    step("Send Out table name", () => {
+      const t = (tables["Send Out"] || [])[0];
+      if (t && /^Table\s*\d*$/i.test(String(t.name || ""))) {
+        api.batchUpdate(ss.getId(), [{ updateTable: { table: { tableId: t.tableId, name: "Send Out" }, fields: "name" } }]);
+        rep.done.push('Send Out\'s table "' + t.name + '" is now called "Send Out"');
+      }
+    });
+  }
+
+  // 6. Header rows: the table color with white bold text (a cell's own fill beats the table's)
+  step("Header rows", () => {
+    const done = [];
+    typingTabs.concat(builtTabs).forEach(name => {
+      const sh = tab(name);
+      if (!sh || sh.getLastColumn() < 1) return;
+      const listCols = name === STUDENT_LIST_SHEET || name === "Parents Divided"; // Your Lists columns after the table
+      const span = ownerHeaderSpan_(sh, tables && tables[sh.getName()], listCols);
+      sh.getRange(span.row, span.col, 1, span.num)
+        .setBackground(typingTabs.indexOf(name) !== -1 ? typing.header : L.built.header)
+        .setFontColor("#ffffff").setFontWeight("bold");
+      done.push(name);
+    });
+    rep.done.push("Header rows (white bold on the table's color): " + done.join(", "));
+  });
+
+  // 7. Phone Contacts (alternating colors, not a Sheets Table)
+  step("Phone Contacts", () => {
+    const sh = ss.getSheetByName("Phone Contacts");
+    if (!sh || sh.getLastColumn() < 1) return;
+    const bands = sh.getBandings();
+    bands.forEach(b => b.setHeaderRowColor(L.built.header).setFirstRowColor("#ffffff").setSecondRowColor(L.built.band));
+    sh.getRange(1, 1, 1, sh.getLastColumn()).setBackground(L.built.header).setFontColor("#ffffff").setFontWeight("bold");
+    rep.done.push("Phone Contacts: navy header" + (bands.length ? ", light grey rows" : ""));
+  });
+
+  // 8. Widths
+  step("Column widths", () => {
+    const done = [];
+    Object.keys(OWNER_STYLE_WIDTHS_).forEach(name => {
+      const sh = tab(name);
+      if (sh && ownerFitColumns_(sh, name === STUDENT_LIST_SHEET ? studentListHeaderRow_(sh) : 1, OWNER_STYLE_WIDTHS_[name])) done.push(name);
+    });
+    const so = ss.getSheetByName("Send Out");
+    if (so && so.getMaxColumns() >= 2 && so.getColumnWidth(2) < 240) { so.setColumnWidth(2, 240); done.push("Send Out B (titles)"); }
+    if (done.length) rep.done.push("Column widths: " + done.join(", "));
+  });
+
+  // 9. PCAR
+  step("PCAR", () => ownerStylePcar_(ss, typing.header, rep));
+
+  // 10. What the code paints itself, now instead of at the next build / reset
+  step("Events tables", () => {
+    const sh = ss.getSheetByName("Events");
+    if (!sh) return;
+    const n = restyleEventTables_(ss, sh, true);
+    rep.done.push("Events: " + n + " event table" + (n === 1 ? "" : "s") + " in the new look");
+  });
+  step("Raw Data", () => {
+    const sh = ss.getSheetByName("Raw Data");
+    if (!sh || sh.getMaxColumns() < 61) return; // the standard layout reaches BI
+    forceVibrantColors_(sh);
+    rep.done.push("Raw Data: date titles on the left (they were off-screen), soft tan Parent Square header");
+  });
+  step("Directory site colors", () => {
+    const sh = ss.getSheetByName("Directory");
+    if (!sh || sh.getLastRow() < 2) return;
+    formatDirectoryAuto_(sh);
+    rep.done.push("Directory: softer site colors");
+  });
+  step("Students Override Report", () => {
+    const sh = ss.getSheetByName("Students Override Report");
+    if (!sh || sh.getLastRow() < 1) return;
+    styleOverrideReport_(sh, sh.getLastRow());
+    rep.done.push("Students Override Report: navy header");
+  });
+  step("Contact Log Type colors", () => {
+    if (!ss.getSheetByName("Contact Log")) return;
+    applyTypeDropdownColors();
+    rep.done.push("Contact Log Type column: one fixed color per type (no new colors every night)");
+  });
+
+  // 11. Send Out's red corner marks
+  step("Send Out dropdowns", () => ownerCheckSendOutDropdowns_(ss, rep));
+
+  // 12. What a script can't do
+  rep.byHand.push("Dropdown chip colors (scripts can't change these): Contact Log J (\"Phone\" is red): a neutral color. " +
+    "N (follow-up): red only for \"Followup Needed - ASAP\", amber for \"Followup Needed\" / \"Waiting for Response\", " +
+    "green for \"No Followup Needed\" / \"Followed up / Resolved\", grey for \"Skipped / Newer Interaction\". " +
+    "Click a cell's ▾ → the pencil.");
+  rep.byHand.push("Contact Log widths (left as you set them): C (Parent shows one letter), K (\"Metho d\"), " +
+    "N (the follow-up chips show only \"F…\").");
+  return rep;
+}
+
+/** The report pop-up's text. */
+function ownerSheetStyleReport_(rep) {
+  const parts = [];
+  if (rep.done.length) parts.push("Done:\n• " + rep.done.join("\n• "));
+  if (rep.failed.length) parts.push("Didn't work (the rest went on):\n• " + rep.failed.join("\n• "));
+  if (rep.byHand.length) parts.push("Still by hand:\n• " + rep.byHand.join("\n• "));
+  return parts.join("\n\n");
+}
+
+// Smallest widths (px) by header: a column is widened to fit its text, up to 320 px; on an
+// empty tab (Display Mode) it gets this width. A header not listed (a Your Lists column): 120.
+var OWNER_STYLE_WIDTHS_ = {
+  "Student List": { "OSIS": 100, "Student": 170, "Guardian": 250, "Site": 60, "Class": 110, "Sibling": 230,
+    "Status": 100, "Last Interaction": 160 },
+  "Parents Divided": { "student_id": 110, "Guardian output": 180, "Student": 170, "Class / Site": 130,
+    "relationship": 115, "language": 105, "email": 250, "mobile": 130, "Sibling": 230, "Parents Square": 135,
+    "NYCSA": 90, "Last Interaction": 160 }
+};
+
+/** Fits each header column between its smallest width and 320 px. Returns false when the tab has no header. */
+function ownerFitColumns_(sh, headerRow, minWidths) {
+  const lastCol = sh.getLastColumn();
+  if (lastCol < 1) return false;
+  const headers = sh.getRange(headerRow, 1, 1, lastCol).getDisplayValues()[0];
+  const hasData = sh.getLastRow() > headerRow;
+  if (hasData) sh.autoResizeColumns(1, lastCol);
+  headers.forEach((h, i) => {
+    const min = minWidths[String(h).trim()] || 120;
+    const w = hasData ? Math.min(Math.max(sh.getColumnWidth(i + 1), min), 320) : min;
+    sh.setColumnWidth(i + 1, w);
+  });
+  return true;
+}
+
+/**
+ * Deletes the columns after the last real header (never below keep columns) when nothing is
+ * in them. A Sheets Table names an empty header cell "Column 9": that counts as empty.
+ * Returns how many columns went.
+ */
+function ownerDeleteEmptyTrailingColumns_(sh, headerRow, keep) {
+  const maxCols = sh.getMaxColumns();
+  if (maxCols <= keep) return 0;
+  const auto = v => /^Column \d+$/i.test(String(v).trim());
+  const header = sh.getRange(headerRow, 1, 1, maxCols).getDisplayValues()[0];
+  let last = keep;
+  header.forEach((h, i) => { if (String(h).trim() !== "" && !auto(h)) last = Math.max(last, i + 1); });
+  if (maxCols <= last) return 0;
+  const lastRow = sh.getLastRow();
+  if (lastRow > headerRow) {
+    const below = sh.getRange(headerRow + 1, last + 1, lastRow - headerRow, maxCols - last).getDisplayValues();
+    if (below.some(r => r.some(v => String(v).trim() !== ""))) return 0; // something is in them: keep
+  }
+  sh.deleteColumns(last + 1, maxCols - last);
+  return maxCols - last;
+}
+
+/** The header cells to paint: the table's header row (Sheets API) or row 1, out to the last header when listCols. */
+function ownerHeaderSpan_(sh, tableList, listCols) {
+  const t = tableList && tableList[0];
+  let row = 1, col = 1, end = 0;
+  if (t && t.range) {
+    row = (t.range.startRowIndex || 0) + 1;
+    col = (t.range.startColumnIndex || 0) + 1;
+    end = t.range.endColumnIndex || 0;
+  }
+  if (!end || listCols) {
+    const head = sh.getRange(row, 1, 1, sh.getLastColumn()).getDisplayValues()[0];
+    head.forEach((h, i) => { if (String(h).trim() !== "") end = Math.max(end, i + 1); });
+  }
+  end = Math.min(end, sh.getMaxColumns());
+  return { row: row, col: col, num: Math.max(1, end - col + 1) };
+}
+
+/** The typing tabs' colors: the Contact Log header's own fill, else its Sheets Table's colors, else SHEET_LOOK_. */
+function ownerTypingColors_(ss, tables) {
+  const L = SHEET_LOOK_;
+  const out = { header: L.typing.header, band1: "#ffffff", band2: L.typing.band, from: "the house brown (Core.gs)" };
+  const cl = tables && (tables["Contact Log"] || [])[0];
+  const rp = cl && cl.rowsProperties;
+  if (rp) {
+    const h = ownerColorStyleHex_(rp.headerColorStyle);
+    const b1 = ownerColorStyleHex_(rp.firstBandColorStyle), b2 = ownerColorStyleHex_(rp.secondBandColorStyle);
+    if (h) { out.header = h; out.from = "the Contact Log table"; }
+    if (b1) out.band1 = b1;
+    if (b2) out.band2 = b2;
+  }
+  try {
+    const sh = ss.getSheetByName("Contact Log");
+    const fill = sh ? String(sh.getRange(1, CL_COL_SPOKE_WITH).getBackground() || "").toLowerCase() : "";
+    if (/^#[0-9a-f]{6}$/.test(fill) && fill !== "#ffffff") { out.header = fill; out.from = "the Contact Log header"; }
+  } catch (e) { /* keep the table's / the house brown */ }
+  return out;
+}
+
+/** "#rrggbb" from a Sheets API ColorStyle (rgbColor only; a theme color gives null). */
+function ownerColorStyleHex_(cs) {
+  const c = cs && cs.rgbColor;
+  if (!c) return null;
+  const h = v => ("0" + Math.round((Number(v) || 0) * 255).toString(16)).slice(-2);
+  return "#" + h(c.red) + h(c.green) + h(c.blue);
+}
+
+/** A Sheets API ColorStyle from "#rrggbb". */
+function ownerHexColorStyle_(hex) {
+  const n = i => parseInt(String(hex).slice(i, i + 2), 16) / 255;
+  return { rgbColor: { red: n(1), green: n(3), blue: n(5) } };
+}
+
+/**
+ * The Sheets API (the only way to change a Sheets Table's colors or name): the "Sheets"
+ * service when App Scripts (Mine).Json has it, else the same calls over the web with this
+ * script's sign-in (Google refuses them when the Sheets API is off for the script).
+ */
+function ownerSheetsApi_() {
+  if (typeof Sheets !== "undefined" && Sheets && Sheets.Spreadsheets) {
+    return {
+      get: (id, fields) => Sheets.Spreadsheets.get(id, { fields: fields }),
+      batchUpdate: (id, requests) => Sheets.Spreadsheets.batchUpdate({ requests: requests }, id)
+    };
+  }
+  const base = "https://sheets.googleapis.com/v4/spreadsheets/";
+  const call = (url, payload) => {
+    const opts = { method: payload ? "post" : "get", muteHttpExceptions: true,
+      headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() } };
+    if (payload) { opts.contentType = "application/json"; opts.payload = JSON.stringify(payload); }
+    const res = UrlFetchApp.fetch(url, opts);
+    const body = res.getContentText();
+    if (res.getResponseCode() >= 300) {
+      let msg = "HTTP " + res.getResponseCode();
+      try { msg = JSON.parse(body).error.message || msg; } catch (e) { /* not JSON */ }
+      throw new Error(msg);
+    }
+    return body ? JSON.parse(body) : {};
+  };
+  return {
+    get: (id, fields) => call(base + id + "?fields=" + encodeURIComponent(fields)),
+    batchUpdate: (id, requests) => call(base + id + ":batchUpdate", { requests: requests })
+  };
+}
+
+/** Tab name -> its Sheets Tables (tableId, name, range, rowsProperties ...). */
+function ownerReadTables_(ss, api) {
+  const meta = api.get(ss.getId(), "sheets(properties(sheetId,title),tables)");
+  const out = {};
+  (meta && meta.sheets || []).forEach(s => { out[s.properties.title] = s.tables || []; });
+  return out;
+}
+
+/**
+ * PCAR's boxes = a title in row 1 over 2 columns (This Week, Last Week, your own dates).
+ * This Week / Last Week: navy title, darker navy date row; the other box: brown title, its
+ * 2 date cells (row 2, typed by you) as yellow input boxes. Section rows (the first box's
+ * 2 columns merged): light navy / light tan with bold text in the box color; a box missing
+ * one gets the first box's title. Label rows: plain text (no italic), wrapped, centered.
+ * Borders are not touched.
+ */
+function ownerStylePcar_(ss, typingHeader, rep) {
+  const L = SHEET_LOOK_;
+  const sh = ss.getSheetByName("PCAR");
+  if (!sh) return;
+  const lastRow = Math.min(Math.max(sh.getLastRow(), 2), 40);
+  const lastCol = Math.min(Math.max(sh.getLastColumn(), 2), 30);
+  const area = sh.getRange(1, 1, lastRow, lastCol);
+  const values = area.getDisplayValues();
+  const merges = area.getMergedRanges().map(m => ({ r: m.getRow(), c: m.getColumn(), nr: m.getNumRows(), nc: m.getNumColumns() }));
+  const pairAt = (r, c) => merges.some(m => m.r === r && m.c === c && m.nr === 1 && m.nc === 2);
+  const text = (r, c) => String((values[r - 1] || [])[c - 1] || "").trim();
+  const boxes = merges.filter(m => m.r === 1 && m.nr === 1 && m.nc === 2 && text(1, m.c) !== "")
+    .sort((a, b) => a.c - b.c).map(m => ({ c: m.c, title: text(1, m.c) }));
+  if (!boxes.length) {
+    rep.byHand.push("PCAR: no boxes found (a title in row 1 over 2 columns), so it was left as is");
+    return;
+  }
+  const first = boxes[0].c;
+  let bottom = 2;
+  for (let r = 3; r <= lastRow; r++) if (text(r, first) !== "" || pairAt(r, first)) bottom = r;
+  const sectionRows = [];
+  for (let r = 3; r <= bottom; r++) if (pairAt(r, first)) sectionRows.push(r);
+
+  let filled = 0;
+  boxes.forEach(box => {
+    const own = !/this week|last week/i.test(box.title); // the box for your own dates
+    const c = box.c;
+    sh.getRange(1, c, 1, 2).setBackground(own ? typingHeader : L.built.header).setFontColor("#ffffff")
+      .setFontWeight("bold").setFontStyle("normal");
+    sh.getRange(2, c, 1, 2).setBackground(own ? L.input : L.built.headerDark)
+      .setFontColor(own ? L.typing.subHeaderText : "#ffffff").setFontWeight("bold");
+    for (let r = 3; r <= bottom; r++) {
+      if (sectionRows.indexOf(r) !== -1) {
+        if (!pairAt(r, c)) sh.getRange(r, c, 1, 2).merge();
+        if (text(r, c) === "" && text(r, first) !== "") { sh.getRange(r, c).setValue(text(r, first)); filled++; }
+        sh.getRange(r, c, 1, 2).setBackground(own ? L.typing.subHeader : L.built.soft)
+          .setFontColor(own ? typingHeader : L.built.header).setFontWeight("bold").setFontStyle("normal")
+          .setHorizontalAlignment("center");
+      } else {
+        sh.getRange(r, c).setBackground(null).setFontColor(L.ink).setFontWeight("normal").setFontStyle("normal")
+          .setWrap(true).setHorizontalAlignment("center").setVerticalAlignment("middle");
+        sh.getRange(r, c + 1).setBackground(null).setFontColor(L.ink)
+          .setHorizontalAlignment("center").setVerticalAlignment("middle");
+      }
+    }
+  });
+  rep.done.push("PCAR: " + boxes.length + " boxes in one look (your own dates: brown, with yellow date boxes)" +
+    (filled ? "; added " + filled + " missing section title" + (filled > 1 ? "s" : "") : ""));
+}
+
+/**
+ * Send Out's 3 dropdowns (C:E) should list the Backend lists the code fills from row 3
+ * (BH3:BJ3 formulas, SEND_OUT_LIST_FORMULAS_). A list read from row 4 down leaves out the
+ * first choice (Events / Parent Coordinator / Backpack: red corner mark). Reported only:
+ * a Sheets Table dropdown can't be changed by a script.
+ */
+function ownerCheckSendOutDropdowns_(ss, rep) {
+  const sh = ss.getSheetByName("Send Out");
+  if (!sh || sh.getMaxRows() < 2 || sh.getMaxColumns() < 5) return;
+  const names = ["Send Out Type", "On Behalf Of", "Where Did You Send"];
+  const letters = ["BH", "BI", "BJ"];
+  const firsts = ["Events", "Parent Coordinator", "Backpack"];
+  const rules = sh.getRange(2, 3, 1, 3).getDataValidations()[0] || [];
+  rules.forEach((rule, i) => {
+    if (!rule || typeof rule.getCriteriaType !== "function") return;
+    const type = rule.getCriteriaType(), args = rule.getCriteriaValues() || [];
+    const fix = BACKEND_SHEET_NAME + "!" + letters[i] + (BACKEND_HEADER_ROW + 1) + ":" + letters[i];
+    if (type === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE) {
+      const src = args[0];
+      if (!src || typeof src.getRow !== "function") return;
+      if (src.getSheet().getName() === BACKEND_SHEET_NAME && src.getRow() !== BACKEND_HEADER_ROW + 1) {
+        rep.byHand.push('Send Out "' + names[i] + '" dropdown lists ' + BACKEND_SHEET_NAME + "!" + src.getA1Notation() +
+          ", one row too low, so \"" + firsts[i] + "\" shows a red corner mark. Click the column's ▾ → edit the dropdown → range " + fix);
+      }
+    } else if (type === SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST) {
+      const list = (args[0] || []).map(String);
+      if (list.length && list.indexOf(firsts[i]) === -1) {
+        rep.byHand.push('Send Out "' + names[i] + '" dropdown is a typed list without "' + firsts[i] +
+          '" (red corner mark). Better: let it read the range ' + fix + " (the code keeps that list).");
+      }
+    }
+  });
 }
 
 // ======================================================================

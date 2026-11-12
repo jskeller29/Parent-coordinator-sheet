@@ -47,6 +47,10 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 5. Your sheet only: **🐞 Debug → 🔧 Fix Dropdown Criteria** once (dropdowns made by hand).
 6. Your sheet only: if Contact Log column **K** (Method 2) is hidden, unhide it.
 7. Master template only: the Student List header on row 1, frozen, as on your sheet.
+8. Your sheet only: **🐞 Debug → 🎨 Apply Sheet Style** once (colors + fonts on every tab; needs the
+   `App Scripts (Mine).Json` manifest pasted, which turns on Google's Sheets service: no new permission).
+   Its pop-up ends with what a script can't do (the Contact Log's dropdown chip colors, its widths).
+   📦 Make Release Copies then gives the Example and Blank copies the same look.
 
 ## 4. Quick test on the copy
 - [ ] 📥 Input Data Mode: all 5 steps with a real export (paste and upload). Paste a wrong export once: the tab
@@ -90,6 +94,12 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       shows "Version Tracker, column D/E/F" with each link, and "See an example tracker" appears in 📖 Open User Guide
 - [ ] Make Release Copies: the Blank copy's 👋 Welcome tab has "See an example tracker" opening the Example copy made
       in the same run (no Initial Setup on the Blank copy, nothing to redo there)
+
+- [ ] 🎨 Apply Sheet Style: Montserrat on every tab; Notes / Send Out brown like the Contact Log; Student List,
+      Parents Divided, Directory, Combined navy; PCAR's boxes navy + brown with yellow date cells; no "Column 9" on
+      the Student List; "Raw Data" tab name; Raw Data's "DATE UPDATED" titles visible at the left. Then: a new event
+      (brown title row), a Type typed in the Contact Log keeps its color after the 10 PM run, a reset leaves the
+      Student List at A:H, a Your Lists list adds its column back with a navy header
 
 ## 5. Going live (after the copy works)
 1. Merge Test-Version into main.

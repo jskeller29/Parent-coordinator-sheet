@@ -855,6 +855,53 @@ function noteLineHeader_(dateText, braceText) {
 }
 
 // ======================================================================
+// SHEET LOOK (owner's pick 2026-11-12)
+// One font and two header colors for the tabs, so every piece of code that
+// paints a tab uses the same values: the Events tables (Edits.gs), Raw Data
+// (Regenerate.gs), the Directory site colors (Build.gs), the Students Override
+// Report (Menus.gs), the Contact Log Type colors (Edits.gs) and the owner's
+// one-time 🐞 Debug → 🎨 Apply Sheet Style (z_MINE.gs).
+// - Tabs you type in (Contact Log, Events, Notes, Send Out): the Contact Log's
+//   brown header and cream rows. The Contact Log keeps its own hand-made look.
+// - Tabs the build makes (Student List, Parents Divided, Directory, Combined
+//   Contact Tracking, Phone Contacts, Students Override Report, PCAR): navy, the
+//   same navy as the pop-ups (Styles.html), the Welcome tab and the guide.
+// - Red / amber / green only where they mean something (follow-up, delete box,
+//   today). The Contact Log's week / today / workshop colors are unchanged.
+// Navy everywhere instead: give typing the same values as built.
+// Only read inside functions (file load order must not matter).
+// ======================================================================
+const SHEET_LOOK_ = {
+  font: "Montserrat",
+  ink: "#1b2430",              // main text (Styles.html --ink)
+  typing: {                    // tabs you type in
+    header: "#6b4e37",         // the Contact Log's brown (🎨 copies the Contact Log table's exact color when it can read it)
+    headerText: "#ffffff",
+    band: "#fff8ee",           // cream rows (the lookup box's cream)
+    subHeader: "#efe3d3",      // light tan: a second header row (Events) and PCAR's section rows
+    subHeaderText: "#4a3526",  // dark brown text on it
+    line: "#e3d8ca"            // thin lines inside a table
+  },
+  built: {                     // tabs the build makes
+    header: "#183e69",         // navy (Styles.html --accent)
+    headerDark: "#0f2d4f",     // a darker second header row (PCAR's dates)
+    headerText: "#ffffff",
+    band: "#f3f5f8",           // light grey rows (Styles.html --panel)
+    soft: "#e3e8ee",           // section rows (Styles.html --accent-soft)
+    line: "#d3d9e1"
+  },
+  input: "#fff2cc",            // a cell you type in on a built tab (PCAR's own dates): the Raw Data paste boxes' yellow
+  danger: { fill: "#f8e9e7", text: "#a3312a" },   // delete boxes (Styles.html --danger-soft / --danger)
+  // Contact Log Type column (L): one text color per type in Type List order (Backend BL),
+  // the same after every reset and 10 PM run (they used to be random and changed every
+  // night). Each one reads at 4.5:1 or better on the white and the cream rows; no red.
+  typeColors: ["#1d4ed8", "#047857", "#7e22ce", "#b45309", "#0e7490", "#be185d", "#4d7c0f", "#475569"],
+  // Directory column A: one soft color per site (or class when no sites), in sort order
+  siteColors: ["#cfe0f3", "#d5ecd9", "#f6dfc4", "#e6d6ef", "#f5d0d0", "#cdebea",
+               "#f2ebc4", "#dcd6f2", "#e4ecc9", "#f1d6e4", "#d6e4ea", "#ecdccd"]
+};
+
+// ======================================================================
 // DIALOG STYLES
 // Every dialog / sidebar shares one look, kept in Styles.html.
 // HTML files pull it in with a scriptlet (<?!= include_('Styles') ?>) and are

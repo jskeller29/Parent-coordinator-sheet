@@ -154,6 +154,12 @@ function buildAllDerivedSheetsRun_() {
   let parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
   if (listOutputs) parentsDivided = addGuardianListColumns_(parentsDivided, listOutputs.guardianCols);
   writeSheet_(ss, "Parents Divided", parentsDivided);
+  // Your Lists columns (after Last Interaction): the look of the Last Interaction header
+  const pdBase = parentsDivided[0].indexOf("Last Interaction") + 1;
+  if (pdBase > 0 && parentsDivided[0].length > pdBase) {
+    styleHeadersLike_(ss.getSheetByName("Parents Divided"), 1, pdBase, pdBase + 1,
+      parentsDivided[0].length - pdBase, "Parents Divided list");
+  }
 
   // Directory draws only from Raw Data: no New/Edit Student overrides, no discharged students
   // (the owner's sheet then merges in Old Phone Contacts and "MASTER" Old Master Table students)
@@ -1668,19 +1674,34 @@ function addLastInteractionColumn_(masterTable, contactLogData, eventLogData) {
   });
 }
 
-/** Gives the Last Interaction header (header row) the look of the Status header next to it. */
+/**
+ * Gives the Last Interaction header and every Your Lists header after it (header row) the
+ * look of the Status header next to it, so list columns the build adds after the Sheets
+ * Table look like the table's own (2026-11-12; was Last Interaction only).
+ */
 function styleLastInteractionHeader_(sheet, headers) {
   const statusCol = headers.indexOf("Status") + 1;
   const lastCol = headers.indexOf("Last Interaction") + 1;
   if (!sheet || statusCol < 1 || lastCol < 1) return;
+  styleHeadersLike_(sheet, STUDENT_LIST_HEADER_ROW, statusCol, lastCol, headers.length - lastCol + 1, "Last Interaction");
+}
+
+/**
+ * Copies one header cell's look (fill, text color, bold, alignment) onto numCols header cells
+ * from fromCol. A source with no fill of its own ("#ffffff": the Sheets Table's color shows
+ * through) gives no fill, never a white one. Never stops a build.
+ */
+function styleHeadersLike_(sheet, row, srcCol, fromCol, numCols, what) {
+  if (!sheet || numCols < 1) return;
   try {
-    const src = sheet.getRange(STUDENT_LIST_HEADER_ROW, statusCol);
-    sheet.getRange(STUDENT_LIST_HEADER_ROW, lastCol)
-      .setBackground(src.getBackground())
+    const src = sheet.getRange(row, srcCol);
+    const bg = src.getBackground();
+    sheet.getRange(row, fromCol, 1, numCols)
+      .setBackground(String(bg).toLowerCase() === "#ffffff" ? null : bg)
       .setFontColor(src.getFontColor())
       .setFontWeight(src.getFontWeight())
       .setHorizontalAlignment(src.getHorizontalAlignment());
-  } catch (e) { console.warn("Last Interaction header not styled: " + e.message); }
+  } catch (e) { console.warn(what + " header not styled: " + e.message); }
 }
 
 /* =========================
@@ -1838,11 +1859,8 @@ function formatDirectoryAuto_(sheet) {
   const targetCol = hasSiteData ? 4 : 5; 
   const targetValues = sheet.getRange(2, targetCol, lastRow - 1, 1).getValues();
 
-  const colors = [
-    "#FFB3BA", "#BAE1FF", "#BAFFC9", "#FFFFBA", "#CBAACB", "#FFDFBA", 
-    "#A9DEF9", "#D0F0C0", "#FFFACD", "#E2B2E8", "#FFDAB3", "#F6D2E6",
-    "#B6CCFE", "#FCF6BD", "#FF99C8", "#D7E3FC", "#D0F4DE", "#FFE5D9"
-  ];
+  // One soft color per site (SHEET_LOOK_.siteColors, Core.gs; 2026-11-12: was 18 bright pastels)
+  const colors = SHEET_LOOK_.siteColors;
 
   const map = new Map();
   let idx = 0;

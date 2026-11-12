@@ -13,7 +13,8 @@ Branches:
 
 Files (shared = every school's sheet):
 - Core.gs: Contact Log column constants, findEndRowInColumnE_, Student List lookup (getStudentListSheet_), Backend
-  tab helpers, owner hook point (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers.
+  tab helpers, owner hook point (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers, SHEET_LOOK_
+  (the tabs' colors and font, see SHEET LOOK).
 - Build.gs: buildAllDerivedSheets + everything it builds (Student List, Combined Contact Tracking, Parents Divided,
   Directory, Phone Contacts), new / discharged student detection, the notes-line helpers, nightlyMasterSync, build
   sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
@@ -32,6 +33,10 @@ Files (shared = every school's sheet):
   Owner asked to keep it as is (not moved, not cleaned); change it only when the owner asks (e.g. KEEP_TABS_).
   Student List rename (owner's request): KEEP_TABS_ says "Student List", deleteLegacySheets_ calls
   getStudentListSheet_ first (an old "Master Table" is renamed, not deleted) and resetMasterTable_ uses it.
+  Sheet look (owner's request 2026-11-12, see SHEET LOOK): forceVibrantColors_ (Raw Data: Montserrat on the whole
+  tab, DATE UPDATED titles left-aligned, Parent Square header #f6dfc4 instead of #ff9900), the fake data's 2 Raw Data
+  fonts, and resetMasterTable_ deletes the Student List's columns after H (STUDENT_LIST_COLUMNS_; clears
+  min(9, columns)).
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -407,9 +412,12 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
 - Make Release Copies: the Blank's Welcome tab links the new Example (2026-11-12): re-paste Menus (every sheet) and
   z_MINE (owner sheet).
-- New-user flow fixes + bug pass (2026-11-12, latest): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
+- New-user flow fixes + bug pass (2026-11-12): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
   GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
   (HTML) on every sheet.
+- Sheet look + 🎨 Apply Sheet Style (2026-11-12, latest): re-paste Core, Build, Edits, Menus, Regenerate on every
+  sheet; owner sheet also z_MINE and the manifest from App Scripts (Mine).Json (adds the Sheets service; same
+  scopes, no re-approval). Then on the owner's sheet 🐞 Debug → 🎨 Apply Sheet Style once, then Make Release Copies.
 
 NEW-USER FLOW (owner's bug lists 2026-11-12, "act as a new user who is not tech savvy"; walked step by step in
 tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# files like the owner's test copy):
@@ -610,6 +618,8 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   ["Student List", "Master Table"], KEEP_TABS_, SHEET_LOCK_BUILT_TABS, Getting Started's tab list (ZG_TABS), BUILD_STEPS. The search
   bar formula (SEARCH_BAR_COMMS_FORMULA) reads 'Student List'!A:B; restoreSearchBarCommunicationsFormula renames an old
   tab first. A tab renamed by hand / by setName keeps its protections, data validations and formula references.
+- A:H only (owner 2026-11-12): every reset deletes the columns after H (the lists are cleared too); a build adds a
+  Your Lists column back through writeSheet_ and gives its header the Status header's look.
 - ONE ROW PER STUDENT (owner's request 2026-11-11): the tab has no sibling-group rows ("111, 222" / "Ann X & Ben X");
   the Sibling column stays. The build keeps the full table in memory (Combined Contact Tracking, Phone Contacts,
   New Students, build report unchanged), writes it OSIS..Status WITH the group rows to the Backend STUDENT_LIST
@@ -697,6 +707,41 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 - Create Event: type buttons (PTC, Workshop, Family event, Meeting) only fill the Type box. New/Edit Student: one grouped
   form, entry type as two buttons over a hidden #entryType input. Manage Overrides: cards. Rollover: step markers.
 
+SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font the code paints on a tab):
+- Montserrat everywhere. Tabs you type in (Contact Log, Events, Notes, Send Out) = the Contact Log's brown header
+  (~#6b4e37) + cream rows; tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking,
+  Phone Contacts, Students Override Report, PCAR) = navy #183e69 (the dialogs' navy) + light grey #f3f5f8 rows.
+  Red / amber / green only where they mean something. The Contact Log keeps its hand-made look (table colors, lookup
+  box, END bar, week / today / workshop rules). Navy everywhere = give typing the built values.
+- Code that paints (so a by-hand change there would come back): Events tables (styleEventTableAt_, Edits.gs: brown
+  title row with white text over name / type / place / date, delete box #f8e9e7, header row #efe3d3, thin #e3d8ca
+  lines + brown outline; used by buildEventTable, restyleEventTables_ (Migration) and 🎨 with lookOnly; was green /
+  tan / yellow / blue / red + grey + black lines, typed out twice); Contact Log Type colors (applyTypeDropdownColors:
+  SHEET_LOOK_.typeColors by Type List place, no write when the L rules already match; they were random and
+  resetContactLogFormatting re-rolled them every night); column D font on every edit (was Roboto); Directory site
+  colors (formatDirectoryAuto_: SHEET_LOOK_.siteColors); Students Override Report (styleOverrideReport_, Menus.gs:
+  navy header, Montserrat; its tab is cleared every rebuild); Raw Data (forceVibrantColors_, see Regenerate.gs).
+  Your Lists headers after a table: styleLastInteractionHeader_ (Student List: every header from Last Interaction on)
+  and Parents Divided's after Last Interaction copy the header before them (styleHeadersLike_; a source with no fill
+  of its own gives no fill, never white).
+- 🐞 Debug → 🎨 Apply Sheet Style (ownerMenuApplySheetStyle, z_MINE.gs; owner's request "a button in debug to fix
+  colors and fonts"): the hand-made parts, once, on the owner's sheet (Make Release Copies carries them on):
+  Montserrat on 12 tabs (Contact Log: column D only); Sheets Table colors through the Sheets API (ownerSheetsApi_:
+  the "Sheets" advanced service, in App Scripts (Mine).Json only, else UrlFetch to sheets.googleapis.com; updateTable
+  rowsProperties header / first / second band) = Notes + Send Out get the Contact Log TABLE's own colors (or its
+  header cell's fill), the 4 built tables navy; Send Out's table "Table1" -> "Send Out"; header rows painted with the
+  table color + white bold (over Send Out's old D1:E1 fills); Phone Contacts banding; widths (Student List / Parents
+  Divided fit within [OWNER_STYLE_WIDTHS_ min, 320], Send Out B 240); PCAR (boxes = row-1 titles over 2 columns;
+  This / Last Week navy, the own-dates box brown with yellow #fff2cc date cells, section rows #e3e8ee / #efe3d3, a
+  missing section title copied from the first box, labels plain + wrapped); the Student List's empty columns after
+  the last header ("Column 9" counts as empty; Your Lists columns stay); tab "RAW Data" -> "Raw Data" (every lookup
+  takes both); then repaints the code-painted parts now. Reports Send Out dropdowns that read Backend BH/BI/BJ from
+  row 4 (the lists start on row 3: the first choice shows a red corner) or a typed list without the first choice.
+  Without the Sheets API: the table colors are listed by hand with the hex codes. Never changes values except the
+  PCAR title and the two names. By hand only: dropdown chip colors (Contact Log J / N), the Contact Log's widths, tab
+  colors (the owner removed Color Tabs before). Tested offline (tests/test_style.js, fake Sheets API); not yet run on
+  a real sheet, so the Sheets API's table fields are untested against Google.
+
 SHEET LOCK (Sheet Lock.gs; on by default, doc property SHEET_LOCK_OFF = "true" turns it off). WARNINGS ONLY (owner's
 choice 2026-11-05): the code never puts cells back after an edit; the earlier undo layer (snapshots, onSelectionChange
 copies, "clear 2+ rows?" popup, column A auto-restore) was removed because its extra script writes made Ctrl+Z need
@@ -759,7 +804,8 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
 Workflow:
 - OFFLINE TESTS (tests/, 2026-11-12): `cd tests && npm install && npm test` runs check.js (whole project compiles as
   one script, no duplicate names, every HTML file / google.script.run call / menu item resolves) and the logic tests
-  (test_matching, test_fixes, test_sync with a fake People API); render_sidebars.js = optional Playwright screenshots.
+  (test_matching, test_fixes, test_sync with a fake People API, test_style with a fake Sheets API; lib/fakesheet.js
+  logs every formatting call in ss._log and keeps fills, merges, widths, rules); render_sidebars.js = optional Playwright screenshots.
   lib/load.js loads the .gs files into one Node context with fake Apps Script services. Run them before every push
   and add a test for logic you change; they don't cover sheet reads / writes / dialogs (try those on a copy).
 - TEST DATA (test-data/, 2026-11-12): fake exports for every Input Data Mode step (ATS incl. a "next month" file with
