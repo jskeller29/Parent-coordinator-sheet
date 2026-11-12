@@ -670,6 +670,12 @@ function writeSheet_(ss, name, values, startRow = 1, startCol = 1) {
   if (!Array.isArray(values) || values.length === 0 || !Array.isArray(values[0]) || values[0].length === 0) {
     return;
   }
+  // setValues needs every row as wide as the widest: one short row (e.g. a student with fewer
+  // list columns) would stop the whole build with "number of columns ... does not match"
+  const width = values.reduce((w, r) => Math.max(w, Array.isArray(r) ? r.length : 0), 0);
+  if (values.some(r => !Array.isArray(r) || r.length !== width)) {
+    values = values.map(r => { const row = Array.isArray(r) ? r.slice() : []; while (row.length < width) row.push(""); return row; });
+  }
 
   const neededRows = startRow - 1 + values.length;
   const neededCols = startCol - 1 + values[0].length;

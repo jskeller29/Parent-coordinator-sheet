@@ -415,6 +415,14 @@ function startBuildOnlyProcess() {
 
 function startBuildOnlyProcessRun_() {
   const cache = CacheService.getScriptCache();
+  // Nothing loaded yet (new copy: Student List never built, no students in Raw Data): say so
+  // instead of building empty tabs and reporting "done" (2026-11-12, "clicked Build first")
+  const first = SpreadsheetApp.getActiveSpreadsheet();
+  if (!studentListIsBuilt_(first) && !idm_canBuild_(first)) {
+    cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed',
+      notice: "There's no student data to build from yet. Load it first: 🚀 App Menu → 📥 Input Data Mode. It builds your sheets for you." }), 21600);
+    return;
+  }
   // (buildAllDerivedSheets takes the build lock; busy = 'killed' with "Another ... is running")
   reportBuildStep_(0); // sidebar's build checklist starts at step 1
   cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building' }), 21600); 

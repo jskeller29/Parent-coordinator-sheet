@@ -38,7 +38,9 @@
   <script>
     window.onload = function() {
        if (typeof google !== 'undefined' && google.script && google.script.run) {
-           google.script.run.withSuccessHandler(renderList).getOverridesList();
+           google.script.run.withSuccessHandler(renderList)
+               .withFailureHandler((err) => { document.getElementById('list').innerHTML = '<div class="state err">Could not load the list: ' + err.message + '</div>'; })
+               .getOverridesList();
        } else {
            // Local test fallback
            renderList([
@@ -89,7 +91,9 @@
         document.getElementById('list').innerHTML = '<div class="state"><div class="spinner"></div>Opening the editor…</div>';
         if (typeof google !== 'undefined' && google.script && google.script.run) {
             // Tells the backend to save the OSIS, close this screen, and open the edit screen!
-            google.script.run.withSuccessHandler(() => google.script.host.close()).setPrefillAndOpenEdit(osis);
+            google.script.run.withSuccessHandler(() => google.script.host.close())
+                .withFailureHandler((err) => alert("Could not open the student: " + err.message))
+                .setPrefillAndOpenEdit(osis);
         }
     }
 
@@ -99,11 +103,15 @@
         document.getElementById('list').innerHTML = '<div class="state err"><div class="spinner"></div>Deleting the entry and rebuilding…</div>';
         
         if (typeof google !== 'undefined' && google.script && google.script.run) {
-            google.script.run.withSuccessHandler(() => {
-                // Refresh the list seamlessly after deletion
+            const refresh = () => {
                 document.getElementById('list').innerHTML = '<div class="state"><div class="spinner"></div>Refreshing…</div>';
-                google.script.run.withSuccessHandler(renderList).getOverridesList();
-            }).deleteOverride(osis);
+                google.script.run.withSuccessHandler(renderList)
+                    .withFailureHandler((err) => { document.getElementById('list').innerHTML = '<div class="state err">Could not load the list: ' + err.message + '</div>'; })
+                    .getOverridesList();
+            };
+            google.script.run.withSuccessHandler(refresh) // the list again, without the deleted one
+                .withFailureHandler((err) => { alert("The override could not be deleted: " + err.message); refresh(); })
+                .deleteOverride(osis);
         }
     }
 

@@ -68,6 +68,11 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       the side panel?" line. Close the sidebar, reload: it comes back on its own. Exit before building: back on the
       Welcome tab. After the first build: Contact Log, Combined, PCAR, Directory appear and the Welcome tab goes.
       Getting Started → Finish setup: a pop-up, and it no longer opens by itself
+- [ ] Mistakes a new user makes: 🏗️ Build Sheets Only before loading data (a note, nothing built); type on the
+      Welcome tab after setup ("Heads up" warning); Skip on Student Data (asks first); empty Site / Class + Save
+      (your saved sites stay); ⚙️ Settings: Save is greyed out until "Loading your settings…" goes away
+- [ ] Bring over last year's tracker: pasting this tracker's own link is refused; the old events come over with their
+      delete box and dropdowns; the archive PDF from 🔄 End of Year Rollover is named for the year that ends
 - [ ] Before Initial Setup: typing in a copy WITHOUT z_ files shows "🔒 Action Blocked" and undoes it; in a copy that
       still has a z_ file, typing works
 - [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained

@@ -330,6 +330,45 @@ function listsSheet() {
   console.log("nightly on a new copy: skipped: ok");
 }
 {
+  // Clicking 🏗️ Build Sheets Only (menu or checklist) before loading anything: a plain note, no empty build
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+  const cache = {};
+  g.CacheService = { getScriptCache: () => ({ put: (k, v) => { cache[k] = v; }, get: k => cache[k] || null, remove: k => { delete cache[k]; } }),
+    getDocumentCache: () => ({ put() {}, get: () => null, remove() {}, getAll: () => ({}), putAll() {}, removeAll() {} }), getUserCache: () => ({ put() {}, get: () => null }) };
+  let builds = 0; g.buildAllDerivedSheets = () => { builds++; };
+  g.startBuildOnlyProcessRun_();
+  const st = JSON.parse(cache.SYNC_UI_STATE);
+  assert.strictEqual(builds, 0, 'nothing built');
+  assert(st.phase === 'killed' && /Input Data Mode/.test(st.notice) && !st.error, 'a note pointing at Input Data Mode, not "failed": ' + cache.SYNC_UI_STATE);
+  const ps = fs.readFileSync(path.join(ROOT, 'ProgressSidebar.html'), 'utf8');
+  assert(/state\.notice/.test(ps), 'the Build sidebar shows the note');
+  console.log("Build before any data: a note: ok");
+}
+{
+  // Site / Class: "Save" with the tab emptied by mistake must not erase the saved sites and classes
+  const { ss, g } = newSheet();
+  const raw = ss.getSheetByName("Raw Data");
+  raw._maxCols = 70;
+  raw._put([["Site", "Class"], ["Site 1", "Y25: Carl\nY24"]], 6, 60);
+  const temp = startMode(ss, g, 3); // Site / Class step: the tab is filled from BH:BI
+  assert.strictEqual(temp.getRange("A2").getValue(), "Y24", 'tab prefilled from Raw Data');
+  for (let r = 2; r <= 10; r++) for (let c = 1; c <= 3; c++) temp._set(r, c, ""); // the user clears it
+  let v = g.idm_saveSiteClass();
+  assert(v.notice && v.notice.code === 'emptySiteClass', 'empty tab + Save: a warning, not a wipe');
+  assert.strictEqual(raw.getRange(7, 60).getValue(), "Site 1", 'saved sites kept');
+  v = g.idm_saveAndExit();
+  assert(v.exited, 'Save and exit with nothing typed just exits');
+  assert.strictEqual(raw.getRange(7, 61).getValue(), "Y25: Carl\nY24", 'still kept after the exit');
+  // A new sheet, nothing typed, nothing saved before: Save moves on (like Skip)
+  const n = newSheet();
+  startMode(n.ss, n.g, 3);
+  v = n.g.idm_saveSiteClass();
+  assert(v.active && v.stepIndex === 4, 'nothing to save on a new sheet: on to Your Lists');
+  console.log("Site / Class: an empty Save never erases: ok");
+}
+{
   // "Finish setup": the checklist stops opening by itself, a pop-up says where it is
   const ss = makeSpreadsheet(TABS);
   const app = fakeSpreadsheetApp(ss);

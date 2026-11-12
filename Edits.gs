@@ -175,7 +175,7 @@ function handleEdit_(e) {
   if (numRows > 1 && (col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT)) {
     try {
       const pasteRows = endRow ? Math.min(numRows, endRow - row) : numRows;
-      if (pasteRows > 0) fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow);
+      if (pasteRows > 0) fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow, range.getNumColumns());
     } catch (err) {
       console.error(err);
       e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
@@ -1190,11 +1190,18 @@ function toastGhostMisses_(ss, filled, missing) {
   ss.toast(`Filled ${filled}. Not found in the Student List: ${shown}`, "Ghost Typist", 8);
 }
 
-/** Contact Log: fills Guardian / OSIS / Student / Site / Class for every pasted row. */
-function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow) {
+/**
+ * Contact Log: fills Guardian / OSIS / Student / Site / Class for every pasted row.
+ * numCols: a paste wider than one column that also covers the OSIS column (E) looks a
+ * row up by its own OSIS when it has one (2026-11-12): looked up by the parent's name,
+ * rows of a parent with two children all got the first child's OSIS.
+ */
+function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow, numCols) {
   const lookup = buildGhostLookup_(ss);
   const siteClass = buildDirectorySiteClassLookup_(ss);
-  const matchCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
+  const startCol = (col === CL_COL_OSIS) ? 0 : (col === CL_COL_STUDENT) ? 1 : 2;
+  const lastCol = col + (numCols || 1) - 1;
+  const osisPasted = col !== CL_COL_OSIS && col <= CL_COL_OSIS && lastCol >= CL_COL_OSIS;
 
   const updateRange = sheet.getRange(row, 3, numRows, 7); // C:I
   const rows = updateRange.getValues();
@@ -1202,14 +1209,18 @@ function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow) {
   const filledRows = [];
 
   rows.forEach((r, i) => {
-    const val = String(r[col - 3]).trim();
+    let val = String(r[col - 3]).trim();
+    let matchCol = startCol;
+    const ownOsis = String(r[CL_COL_OSIS - 3]).trim();
+    if (osisPasted && ownOsis) { val = ownOsis; matchCol = 0; }
     if (!val || val.toUpperCase() === "TRUE" || val.toUpperCase() === "FALSE") return;
     const m = lookup(val, matchCol);
     if (!m) { missing.push(val); return; }
     const sc = siteClass(m.osis);
-    if (col !== CL_COL_GUARDIAN) r[0] = m.guardian; // C
-    if (col !== CL_COL_OSIS) r[2] = m.osis;         // E
-    if (col !== CL_COL_STUDENT) r[3] = m.student;   // F
+    const byCol = matchCol === 0 ? CL_COL_OSIS : matchCol === 1 ? CL_COL_STUDENT : CL_COL_GUARDIAN;
+    if (byCol !== CL_COL_GUARDIAN) r[0] = m.guardian; // C
+    if (byCol !== CL_COL_OSIS) r[2] = m.osis;         // E
+    if (byCol !== CL_COL_STUDENT) r[3] = m.student;   // F
     r[5] = sc.site;                                 // H
     r[6] = sc.cls;                                  // I
     filledRows.push({ row: row + i, val });
@@ -1302,6 +1313,13 @@ function watchNotesSheet_(e) {
   const isChecked = (rawValue === true || String(rawValue).toUpperCase() === "TRUE");
   const editedValue = String(e.value !== undefined ? e.value : range.getDisplayValue()).trim();
 
+  // OSIS (A) cleared or typed over: the student(s) it was lose this row's note (2026-11-12:
+  // the note stayed in their notes until the next build). The typist below adds it to the new one.
+  if (col === 1 && e.oldValue !== undefined && String(e.oldValue).trim() && String(e.oldValue).trim() !== editedValue) {
+    try { updateOsisDeltas_(String(e.oldValue).split(",").map(o => o.trim()).filter(Boolean)); }
+    catch (err) { console.warn("Notes: old OSIS not updated: " + err.message); }
+  }
+
   // =========================================================
   // --- ROW DELETION WITH CONFIRMATION (COLUMN E / 5) ---
   // =========================================================
@@ -1316,8 +1334,8 @@ function watchNotesSheet_(e) {
       );
       isConfirmed = (response === ui.Button.YES);
     } catch (err) {
-      // Fallback if UI alert is blocked: default to executing the delete safely
-      isConfirmed = true; 
+      // The question couldn't be shown: never delete a note without a yes (2026-11-12)
+      isConfirmed = false;
     }
 
     if (isConfirmed) {
@@ -2058,7 +2076,13 @@ function createNewEventTable() {
           const parts = rawDate.split('-');
           const formattedDate = parts[1] + '/' + parts[2] + '/' + parts[0];
 
-          google.script.run.withSuccessHandler(google.script.host.close).buildEventTable(name, loc, formattedDate, type);
+          google.script.run
+            .withSuccessHandler(function () { google.script.host.close(); })
+            .withFailureHandler(function (err) {
+              alert('The event table could not be made: ' + (err && err.message ? err.message : err));
+              btn.disabled = false; btn.innerText = 'Create table';
+            })
+            .buildEventTable(name, loc, formattedDate, type);
         }
       </script>
     </div>
@@ -2126,6 +2150,42 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
 
   // The tables moved right: re-lock every table's header row (Sheet Lock.gs)
   try { applySheetLocks_(ss, ["Events"]); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
+}
+
+/**
+ * Migration copies the Events tab as plain values (Menus.gs ma_migrateSimpleSheets): this
+ * gives every table (7 columns wide from column A, title in row 1) its look back, the same
+ * as buildEventTable makes it: title merge and colors, the red delete checkbox, the header
+ * row, borders and widths, and the OSIS / Guardian / Student dropdowns. Values stay as they
+ * are (the delete box starts unticked). Returns how many tables it found.
+ */
+function restyleEventTables_(ss, sheet) {
+  const lastCol = sheet.getLastColumn(), maxRows = sheet.getMaxRows();
+  if (lastCol < 1 || sheet.getLastRow() < 1) return 0;
+  const row1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const rules = eventDropdownRules_(ss);
+  let tables = 0;
+  for (let c = 1; c <= lastCol; c += 7) {
+    if (String(row1[c - 1]).trim() === "") continue;
+    try {
+      if (sheet.getMaxColumns() < c + 6) sheet.insertColumnsAfter(sheet.getMaxColumns(), c + 6 - sheet.getMaxColumns());
+      sheet.getRange(1, c, 1, 2).merge().setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
+      sheet.getRange(1, c + 2).setFontWeight("bold").setBackground("#DAA06D").setHorizontalAlignment("center");
+      sheet.getRange(1, c + 3).setFontWeight("bold").setBackground("#fff2cc").setHorizontalAlignment("center");
+      sheet.getRange(1, c + 4).setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
+      sheet.getRange(1, c + 5).insertCheckboxes().setBackground("#ea9999");
+      sheet.getRange(2, c, 1, 6).setValues([EVENT_TABLE_HEADERS]).setFontWeight("bold").setBackground("#efefef");
+      [100, 150, 150, 150, 80, 200, 30].forEach((w, i) => sheet.setColumnWidth(c + i, w));
+      sheet.getRange(1, c, maxRows, 6).setBorder(true, true, true, true, true, true, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+      if (maxRows >= 3) {
+        sheet.getRange(3, c, maxRows - 2, 1).setDataValidation(rules.osis);
+        sheet.getRange(3, c + 1, maxRows - 2, 1).setDataValidation(rules.guardian);
+        sheet.getRange(3, c + 3, maxRows - 2, 1).setDataValidation(rules.student);
+      }
+      tables++;
+    } catch (e) { console.warn("Event table at column " + c + " not restyled: " + e.message); }
+  }
+  return tables;
 }
 
 /**

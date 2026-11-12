@@ -358,10 +358,12 @@
           if (state.error) {
             cancelText = (runMode === 'BUILD_ONLY' ? 'Build failed: ' : 'Sync failed: ') + String(state.error);
           }
+          // Nothing to do yet (e.g. no student data on a new copy): a plain note, not a failure
+          if (state.notice) cancelText = String(state.notice);
 
-          if (wasBuilding && lastStepIndex >= 0) setSteps(lastStepIndex, true);
+          if (wasBuilding && lastStepIndex >= 0 && !state.notice) setSteps(lastStepIndex, true);
           if (runMode === 'BUILD_ONLY') {
-             el('buildStatus').className = 'status err';
+             el('buildStatus').className = state.notice ? 'status' : 'status err';
              el('buildStatus').innerText = cancelText;
           } else {
              el('syncBar').classList.add('cancelled');

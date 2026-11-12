@@ -4,11 +4,12 @@
 // Not a full SpreadsheetApp: add what a new test needs.
 
 function colNum(letters) { return letters.toUpperCase().split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0); }
-function parseA1(a1) {
-  const m = String(a1).match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/i);
+function parseA1(a1, maxRows) {
+  const m = String(a1).match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+)?)?$/i);
   if (!m) throw new Error("fake sheet: can't read range " + a1);
   const r1 = Number(m[2]), c1 = colNum(m[1]);
-  const r2 = m[4] ? Number(m[4]) : r1, c2 = m[3] ? colNum(m[3]) : c1;
+  // "Z2:Z" = open-ended: down to the last row of the tab
+  const r2 = m[4] ? Number(m[4]) : (m[3] ? (maxRows || r1) : r1), c2 = m[3] ? colNum(m[3]) : c1;
   return [r1, c1, r2 - r1 + 1, c2 - c1 + 1];
 }
 
@@ -58,7 +59,7 @@ function makeSheet(ss, name) {
     deleteRows: (a, n) => { s._maxRows -= n; return p; }, deleteColumns: (a, n) => { s._maxCols -= n; return p; },
     getLastRow: () => { let m = 0; cells.forEach((v, k) => { m = Math.max(m, Number(k.split(',')[0])); }); return m; },
     getLastColumn: () => { let m = 0; cells.forEach((v, k) => { m = Math.max(m, Number(k.split(',')[1])); }); return m; },
-    getRange: (a, b, c, d) => (typeof a === 'string' ? makeRange(p, ...parseA1(a)) : makeRange(p, a, b, c || 1, d || 1)),
+    getRange: (a, b, c, d) => (typeof a === 'string' ? makeRange(p, ...parseA1(a, s._maxRows)) : makeRange(p, a, b, c || 1, d || 1)),
     getDataRange: () => makeRange(p, 1, 1, Math.max(1, s.getLastRow()), Math.max(1, s.getLastColumn())),
     clear: () => { cells.clear(); return p; },
     clearContents: () => { cells.clear(); return p; },
@@ -113,7 +114,7 @@ function fakeSpreadsheetApp(ss) {
     } };
   return {
     _ui: ui,
-    getActiveSpreadsheet: () => ss, flush() {}, newRichTextValue: builder, newTextStyle: builder,
+    getActiveSpreadsheet: () => ss, flush() {}, newRichTextValue: builder, newTextStyle: builder, newDataValidation: builder,
     BorderStyle: { SOLID: 'SOLID' }, WrapStrategy: { CLIP: 'CLIP', WRAP: 'WRAP', OVERFLOW: 'OVERFLOW' },
     BandingTheme: new Proxy({}, { get: (t, k) => String(k) }),
     getUi: () => ui

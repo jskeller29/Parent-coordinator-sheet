@@ -407,8 +407,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
 - Make Release Copies: the Blank's Welcome tab links the new Example (2026-11-12): re-paste Menus (every sheet) and
   z_MINE (owner sheet).
-- New-user flow fixes (2026-11-12, latest): re-paste Core, Build, Menus, Input Data (scripts) and GettingStartedSidebar,
-  InputDataSidebar (HTML) on every sheet.
+- New-user flow fixes + bug pass (2026-11-12, latest): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
+  GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
+  (HTML) on every sheet.
 
 NEW-USER FLOW (owner's bug lists 2026-11-12, "act as a new user who is not tech savvy"; walked step by step in
 tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# files like the owner's test copy):
@@ -447,6 +448,29 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   🚀 App Menu → ✅ Getting Started", sidebar closes; confirm when steps are left; hidden once all 4 are done).
   zg_setAutoOpen kept for sidebars still open. "Not now" = zg_notNow (toast naming the next step).
 - Clone detector also clears INPUT_DATA_MODE_STATE, INPUT_DATA_MODE_DELETE_TAB, ZG_AUTO_OPEN.
+- Clumsy-user pass (owner 2026-11-12, "do stupid things and make mistakes"): 🏗️ Build Sheets Only with no student data
+  yet (Student List never built + no ATS rows) = a plain note in the Build sidebar (SYNC_UI_STATE killed + notice; the
+  sidebar shows notice in plain text) instead of an empty build reported as done; the Welcome tab after setup has a
+  warning-only range protection (WELCOME_PROTECT_DESC_, not Sheet Lock's tag); Skip on Student Data never loaded asks
+  first; Site / Class Save with nothing filled in never erases BH:BI (error when something was saved, else on like Skip;
+  "Save and exit" just exits).
+
+BUG PASS (owner 2026-11-12, "go through every other feature"; tests/test_edits.js + tests/test_features.js):
+- Contact Log: a paste wider than one column that covers E looks each row up by its own OSIS (fillPastedContactLogRows_
+  numCols); by the parent's name, siblings' rows all got the first child's OSIS.
+- Notes tab: the delete box never deletes without the "are you sure?" (no UI = no delete); an OSIS (A) cleared / typed
+  over updates the old student's notes (e.oldValue).
+- Settings dialog: Save / Reset / Purge are off until getSettings has answered (a quick click or a failed load saved the
+  form's defaults over the real settings); failures of the load and the purge are shown.
+- New / Edit Student: an OSIS with fewer than 6 digits is refused (every reader skips it, so the student never showed).
+  Manage Overrides / New Event: failures are shown (they used to hang on "Deleting…" / "Creating…").
+- writeSheet_ pads ragged rows (one short row stopped the whole build).
+- Migration: ma_verify refuses this tracker's own link and a sheet with no Contact Log (before anything is copied);
+  Raw Data grows to fit last year's rows / columns; Events (copied as values) get each table's look, delete box and
+  dropdowns back (restyleEventTables_, Edits.gs; the tab is cleared of old merges / validations / formats first); a new
+  copy's tabs wait for step 6's build (updateVisualSettings_ columnsOnly while not built).
+- Rollover: archive named for the school year that ends (rolloverArchiveName_: June 2027 = 2026-2027, Sept-Dec = the
+  year that started); sets disableNightlySync so someone else's nightly trigger skips the retired tracker.
 - Notes line with no method and no person: "𝘿𝙖𝙩𝙚 - note", never "{}" (noteLineHeader_, Core.gs). Run a build once.
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,

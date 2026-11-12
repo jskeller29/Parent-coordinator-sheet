@@ -257,6 +257,7 @@
       return;
     }
     show('stepView', true); show('doneView', false); show('footer', true);
+    lastView = v;
     buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
     canBuildNow = !!v.canBuild;
     renderProgress(v.progress || []);
@@ -477,7 +478,13 @@
 
   // --- buttons ---
   function saveSiteClass() { working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
-  function skip() { working('Skipping…'); call('idm_skip'); }
+  var lastView = null;
+  function skip() {
+    // The one required file, never loaded: say what skipping means (a new user may think "later")
+    if (lastView && lastView.step && lastView.step.required && !lastView.lastUpdated &&
+        !confirm('Student Data is the one file the tracker needs: your sheets can\'t be built without it.\n\nSkip it for now?')) return;
+    working('Skipping…'); call('idm_skip');
+  }
   function exitMode() {
     if (busy) return;
     $('exitAskText').textContent = currentLists

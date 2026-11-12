@@ -169,7 +169,7 @@
   <div class="dfoot">
     <button type="button" class="btn txt" id="resetBtn" onclick="resetToDefaults()">Reset to defaults</button>
     <span class="sp"></span>
-    <div id="loading"><div class="spinner"></div>Working…</div>
+    <div id="loading"><div class="spinner"></div><span id="loadingText">Working…</span></div>
     <button type="button" class="btn sec" id="cancelBtn" onclick="google.script.host.close()">Cancel</button>
     <button type="button" class="btn pri" id="saveBtn" onclick="saveSettings()">Save &amp; apply</button>
   </div>
@@ -254,8 +254,19 @@
     function tabBoxes() { return Array.prototype.slice.call(document.querySelectorAll('input[data-tab]')); }
 
     // ---------- 1. Load the current settings ----------
+    // Save stays off until they are here (2026-11-12): a quick click, or a load that failed,
+    // saved the form's blank defaults over the real settings
     if (typeof google !== 'undefined') {
-      google.script.run.withSuccessHandler(function(settings) {
+      setBusy(true);
+      document.getElementById('loadingText').textContent = 'Loading your settings…';
+      document.getElementById('cancelBtn').disabled = false;
+      google.script.run.withFailureHandler(function(err) {
+        document.getElementById('loadingText').textContent = 'Your settings could not be loaded, so nothing can be saved now. Close this and open ⚙️ Settings again. (' + err.message + ')';
+        document.querySelector('#loading .spinner').style.display = 'none';
+        document.getElementById('cancelBtn').disabled = false;
+      }).withSuccessHandler(function(settings) {
+        setBusy(false);
+        document.getElementById('loadingText').textContent = 'Working…';
         document.getElementById('syncToPhones').checked = settings.syncToPhones;
 
         tabBoxes().forEach(function(box) {
@@ -341,6 +352,10 @@
           setTimeout(function() {
             google.script.host.close();
           }, 300);
+        }).withFailureHandler(function(err) {
+          alert("The purge didn't run: " + err.message);
+          setBusy(false);
+          document.getElementById('purgeBtn').innerText = "Purge…";
         }).purgeDischargedStudents();
       } else {
         alert("Preview mode: Purge triggered. (No actual data was deleted)");

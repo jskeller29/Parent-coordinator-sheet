@@ -1357,11 +1357,26 @@ function welcomeTabAfterSetup_(ss, toast) {
   const links = toast ? {} : { guideUrl: zg_safeGuideLink_(), exampleUrl: zg_safeExampleLink_() }; // no Drive in the simple onOpen
   if (!tab) tab = buildWelcomeTab_(ss, Object.assign({ done: true }, links));
   else if (String(tab.getRange("C3").getValue()) !== WELCOME_DONE_TITLE_) buildWelcomeTab_(ss, Object.assign({ done: true, into: tab }, links));
+  protectWelcomeTab_(tab);
   if (tab.isSheetHidden()) tab.showSheet();
   tab.activate();
   if (toast) {
     ss.toast("Next step: 🚀 App Menu → 📥 Input Data Mode. It walks you through loading your data.", "👋 Welcome back", 20);
   }
+}
+
+/**
+ * Typing on the Welcome tab after setup asks "are you sure?" first (Google's warning-only
+ * protection, like Sheet Lock): a stray keystroke there used to wipe a step. Scripts are
+ * not blocked. Once per tab (its own description, which Sheet Lock leaves alone).
+ */
+var WELCOME_PROTECT_DESC_ = "👋 Welcome tab (keeps the next steps from being typed over)";
+function protectWelcomeTab_(tab) {
+  try {
+    const has = tab.getProtections(SpreadsheetApp.ProtectionType.RANGE).some(function(p) { return p.getDescription() === WELCOME_PROTECT_DESC_; });
+    if (has) return;
+    tab.getRange(1, 1, tab.getMaxRows(), tab.getMaxColumns()).protect().setDescription(WELCOME_PROTECT_DESC_).setWarningOnly(true);
+  } catch (e) { console.warn("Welcome tab not protected: " + e.message); }
 }
 
 /** Initial Setup: moves the user to the Contact Log (else the first default tab) and hides the Welcome tab. */
@@ -2498,6 +2513,16 @@ function openRolloverWizard() {
 }
 
 /**
+ * The archive PDF's name: the school year that is ending. Run in June 2027 it is
+ * "PC_Tracker_Archive_2026-2027" (2026-11-12: it said 2027-2028); September to December
+ * = the year that started that September.
+ */
+function rolloverArchiveName_(now) {
+  const startYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return `PC_Tracker_Archive_${startYear}-${startYear + 1}`;
+}
+
+/**
  * Backend function called by the Wizard.
  * 1. Deletes sync triggers.
  * 2. Renames the current sheet to "Retired on [Date]".
@@ -2518,9 +2543,9 @@ function processRolloverBackend() {
     // Find the folder where the current spreadsheet lives so we save the PDF in the same place
     const parentFolder = driveFile.getParents().hasNext() ? driveFile.getParents().next() : DriveApp.getRootFolder();
     
-    const year = new Date().getFullYear();
-    const dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
-    const pdfName = `PC_Tracker_Archive_${year}-${year+1}`;
+    const now = new Date();
+    const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), "MM/dd/yyyy");
+    const pdfName = rolloverArchiveName_(now);
 
     // ---------------------------------------------------------
     // 1. FREEZE THE SHEET (DELETE TRIGGERS)
@@ -2534,9 +2559,12 @@ function processRolloverBackend() {
       }
     }
     
-    // Update settings memory so the UI knows it's off
+    // Update settings memory so the UI knows it's off. Triggers belong to whoever made them, so
+    // someone else's nightly trigger is still there: "never at night" makes it skip (it checks
+    // disableNightlySync when it fires), so the retired tracker stops rebuilding every night
     const props = PropertiesService.getDocumentProperties();
     props.setProperty('syncToPhones', 'false');
+    props.setProperty('disableNightlySync', 'true');
 
     // ---------------------------------------------------------
     // 2. RENAME MAIN SPREADSHEET TO "RETIRED"
@@ -2710,12 +2738,21 @@ function ma_findOldTrackers() {
  * Ensures the URL is valid and the user has access.
  */
 function ma_verify(url) {
+  let oldSS;
   try {
-    const oldSS = SpreadsheetApp.openByUrl(url);
-    return { success: true, name: oldSS.getName() };
+    oldSS = SpreadsheetApp.openByUrl(url);
   } catch (e) {
     return { success: false, error: "Could not open sheet. Ensure the link is correct and you have access." };
   }
+  // Checked before anything is copied (2026-11-12: this tracker's own link, or a sheet that isn't a
+  // tracker, got through, and the second one only failed at step 5 after steps 2-4 had run)
+  if (oldSS.getId() === SpreadsheetApp.getActiveSpreadsheet().getId()) {
+    return { success: false, error: "That's this tracker. Pick last year's tracker (the old one) instead." };
+  }
+  if (!oldSS.getSheetByName("Contact Log")) {
+    return { success: false, error: "\"" + oldSS.getName() + "\" doesn't look like a PC Tracker (it has no Contact Log tab). Pick your old tracker instead." };
+  }
+  return { success: true, name: oldSS.getName() };
 }
 
 /**
@@ -2736,8 +2773,9 @@ function ma_migrateSettings(url) {
   }
   if (pDiv) props.setProperty('parentsDivided', (!pDiv.isSheetHidden()).toString());
   
-  // Trigger a visual update on the new sheet so tabs hide/show correctly
-  updateVisualSettings_(getSettings());
+  // Trigger a visual update on the new sheet so tabs hide/show correctly. A new copy (not built
+  // yet) only gets its columns now: its tabs come out with step 6's build (welcomeTabAfterBuild_)
+  updateVisualSettings_(getSettings(), !studentListIsBuilt_(SpreadsheetApp.getActiveSpreadsheet()));
 }
 
 /**
@@ -2754,7 +2792,12 @@ function ma_migrateRawData(url) {
   const data = oldRaw.getDataRange().getValues();
   newRaw.clearContents();
   if (data.length > 0) {
+    // Last year's tab can be bigger than the template's (more students): make room first, or
+    // setValues throws "outside the dimensions of the sheet" (2026-11-12)
+    if (newRaw.getMaxRows() < data.length) newRaw.insertRowsAfter(newRaw.getMaxRows(), data.length - newRaw.getMaxRows());
+    if (newRaw.getMaxColumns() < data[0].length) newRaw.insertColumnsAfter(newRaw.getMaxColumns(), data[0].length - newRaw.getMaxColumns());
     newRaw.getRange(1, 1, data.length, data[0].length).setValues(data);
+    try { lockRawDataRowHeights_(newRaw); } catch (e) { console.warn("Raw Data row heights: " + e.message); }
   }
 }
 
@@ -2781,7 +2824,11 @@ function ma_migrateSimpleSheets(url) {
       const data = oldSheet.getDataRange().getValues();
       if (data.length > 1) { 
         const maxRows = newSheet.getMaxRows();
-        if (maxRows > 1) {
+        if (sheetName === "Events") {
+          // Events is a plain tab of 7-column tables: start from a clean grid (no leftover merges,
+          // dropdowns or colors in other places), the tables get their look back below
+          newSheet.getRange(1, 1, maxRows, newSheet.getMaxColumns()).breakApart().clearDataValidations().clearFormat().clearContent();
+        } else if (maxRows > 1) {
           newSheet.getRange(2, 1, maxRows - 1, newSheet.getMaxColumns()).clearContent();
         }
         
@@ -2789,6 +2836,10 @@ function ma_migrateSimpleSheets(url) {
         if (newSheet.getMaxColumns() < data[0].length) newSheet.insertColumnsAfter(newSheet.getMaxColumns(), data[0].length - newSheet.getMaxColumns());
         
         newSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+        // Values only came over: each event table gets its title / delete box / headers / dropdowns back
+        if (sheetName === "Events") {
+          try { restyleEventTables_(newSS, newSheet); } catch (e) { console.warn("Migration: event tables not restyled: " + e.message); }
+        }
       }
     }
   });

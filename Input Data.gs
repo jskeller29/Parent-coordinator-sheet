@@ -353,7 +353,7 @@ function idm_saveAndExit() {
     const temp = idm_sheetById_(ss, state.tempId);
     let result = null;
     if (step.manual) {
-      result = idm_saveSiteClass_(ss, state);
+      result = idm_saveSiteClass_(ss, state, true);
     } else if (step.lists) {
       idm_log_("save & exit: lists are saved one by one in their own sidebar");
     } else if (temp && idm_tempHasData_(temp)) {
@@ -837,7 +837,12 @@ function idm_saveSiteClass() {
   });
 }
 
-function idm_saveSiteClass_(ss, state) {
+/**
+ * fromExit ("Save and exit"): nothing filled in = nothing to save (null), the old sites and
+ * classes stay. From the Save button, nothing filled in never erases saved ones (2026-11-12:
+ * a cleared tab + Save used to wipe Raw Data BH:BI and say "0 class(es) saved").
+ */
+function idm_saveSiteClass_(ss, state, fromExit) {
   {
     const step = IDM_STEPS[state.step];
     if (!step.manual) return idm_view_(ss, state);
@@ -871,6 +876,21 @@ function idm_saveSiteClass_(ss, state) {
     if (bad.length) {
       return idm_view_(ss, state, { type: 'error', code: 'badClass', fromUpload: true,
         message: "Class codes can only have letters and numbers (no spaces or dashes): <b>" + bad.slice(0, 5).join(", ") + "</b>. Fix them on the tab, then save again." });
+    }
+    if (classCount === 0) {
+      const lastRaw = raw.getLastRow();
+      const saved = raw.getMaxColumns() >= 61 && lastRaw >= 7 &&
+        raw.getRange(7, 60, lastRaw - 6, 2).getDisplayValues().some(r => r.join("").trim() !== "");
+      if (fromExit) return null; // "Save and exit" with nothing typed: keep what is saved, just exit
+      if (saved) {
+        return idm_view_(ss, state, { type: 'error', code: 'emptySiteClass', fromUpload: true,
+          message: "Nothing is filled in on this tab, so saving would erase the sites and classes you saved before. " +
+            "Type them in again, or click <b>Skip</b> to keep the ones you have." });
+      }
+      // A new sheet with no teachers or sites typed: nothing to save, on to the next step
+      state.results[step.key] = { skipped: true };
+      return idm_advance_(ss, state, { type: 'imported',
+        message: "No teacher names or sites were typed, so nothing was saved. You can add them any time in Input Data Mode." });
     }
 
     if (raw.getMaxColumns() < 61) raw.insertColumnsAfter(raw.getMaxColumns(), 61 - raw.getMaxColumns());

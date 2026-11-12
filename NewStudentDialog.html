@@ -453,6 +453,19 @@
             }
         }
 
+        // Every reader skips an OSIS with fewer than 6 digits, so such a student would never show up
+        if (data.osis.replace(/\D/g, '').length < 6) {
+            alert("Please check the OSIS: it needs at least 6 digits (a student's OSIS usually has 9).");
+            btn.disabled = false;
+            btn.innerHTML = 'Save student';
+            btn.classList.remove('opacity-75');
+            syncBtn.disabled = false;
+            syncBtn.classList.remove('opacity-75');
+            isSyncingSiblings = false;
+            document.getElementById('osis').focus();
+            return;
+        }
+
         let payloads = [data];
 
         if (isSyncingSiblings && currentSiblings.length > 0) {
