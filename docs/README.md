@@ -54,3 +54,20 @@ guide there too.
 
 Keep old versions in a subfolder (for example "Old guides"): the backup only looks at files
 directly in the guide folder.
+
+## Updating the guide that is already in Drive
+
+Edit the Google Doc **in place**; don't upload a new file. Its link stays the same, so the
+Version Tracker's F column, the 👋 Welcome tabs and the document links in 📌 YOUR LINKS
+(`#bookmark=` links into the Doc) keep working.
+
+- Small change: type it in the Doc, or copy that part from the new .docx and paste it.
+- Avoid replacing the whole text with a paste: the bookmarks the YOUR LINKS document
+  links point to would be gone, and those buttons would open the Doc at the top.
+- A brand-new file means a new link: put it in the tracker's F column and update the
+  document links in YOUR LINKS (then paste Menus into the master template).
+
+At every release, update the two links in the **Start here** box on the first page (right-click
+the link → Edit link): Make your copy = the Blank copy's /copy link (tracker column D), See an
+example tracker = the Example copy's link (column E). 📦 Make Release Copies shows both.
+

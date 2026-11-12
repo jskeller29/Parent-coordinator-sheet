@@ -13,6 +13,21 @@ Setting up and using the Parent Coordinator Tracker
 Made by a parent coordinator for parent coordinators. This is not an official DOE document.
 Questions: use 🚀 App Menu → 🐞 Report a Bug, or email jacob.keller@p94m.org.
 
+<!--
+  START HERE box. Update BOTH links at every release, at the same time as the Version Tracker row:
+    Make your copy        = the Blank copy's /copy link (Version Tracker column D)
+    See an example tracker = the Example copy's link   (Version Tracker column E)
+  In the Google Doc: right-click each link → Edit link → paste. Until then the copy link opens the
+  template folder (it always works); so does the example link, until you paste the Example copy's link.
+-->
+
+> [!IMPORTANT]
+> **Start here.** [Make your copy](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2):
+> your own private tracker, in your Google Drive. Then follow Part 1 below.
+>
+> Want to look around first? [See an example tracker](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2)
+> with made-up students (view only).
+
 ## Before you start
 
 ### What the tracker does
@@ -31,16 +46,17 @@ Contacts.
 
 ### Get your copy
 
-Every coordinator works in their own copy, made from the template in the
-[PC Tracker template folder](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2).
-Open the newest file (its name ends in "(BLANK)" and a date) and choose File → Make a copy.
+Every coordinator works in their own copy. Click **Make your copy** in the box at the top of
+this guide, then **Make a copy**. (Or open the
+[PC Tracker template folder](https://drive.google.com/drive/folders/1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2),
+open the newest file, its name ends in "(BLANK)" and a date, and choose File → Make a copy.)
 The copy is private and lives in your own Google Drive.
 
 The same template is for everyone. If you used the tracker last year, you bring your old
 data over during setup.
 
-Want to see one filled in first? "See an example tracker" (on the 👋 Welcome tab, and in
-🚀 App Menu → 📖 Open User Guide) opens a tracker with made-up students. Look around in it,
+Want to see one filled in first? "See an example tracker" (the box at the top of this guide,
+the 👋 Welcome tab, and 🚀 App Menu → 📖 Open User Guide) opens a tracker with made-up students. Look around in it,
 but keep your real work in your own copy.
 
 ## Part 1: Setting up

@@ -464,6 +464,10 @@ thin lines, 3px corners; notes = > [!NOTE] / [!IMPORTANT] / [!WARNING] boxes). W
 decorative emoji (only menu / tab labels), no em dashes, the sheet's own words; maintainer notes in <!-- comments -->.
 Parts: Before you start (what it does, get your copy = the template folder link), 1 Setting up, 2 Daily use, 3 New
 versions and the end of the year, 4 Privacy, 5 Help. docs/README.md = how to rebuild and put it in Drive.
+Title page "Start here" box (2026-11-12): a > [!IMPORTANT] block before the first "##" is the title page's box
+(doc.startBox in build_guide.js, HTML + docx): Make your copy (Blank /copy link) + See an example tracker; both start
+as the template folder link and the owner updates them in the Google Doc at every release. The Doc is edited in place
+(its link = tracker F + the #bookmark= links in GUIDE_LINKS), never re-uploaded.
 
 📌 YOUR LINKS (owner's request 2026-11-12): every link the owner pastes is in ONE box at the very top of Menus.gs, with
 plain-language comments (how to paste, where each shows, empty = no video button / the User Guide opens):

@@ -63,6 +63,15 @@ function parse(md) {
   doc.title = (lines[i++] || "# Guide").slice(2).trim();
   let para = [];
   for (; i < lines.length && !lines[i].startsWith("## "); i++) {
+    if (lines[i].startsWith(">")) { // a box on the title page ("Start here")
+      const body = [];
+      while (i < lines.length && lines[i].startsWith(">")) body.push(lines[i++].replace(/^>\s?/, ""));
+      i--;
+      const kind = (body[0].match(/^\[!(NOTE|IMPORTANT|WARNING)\]/) || [, "NOTE"])[1];
+      if (/^\[!/.test(body[0])) body.shift();
+      doc.startBox = { kind, paras: body.join("\n").split(/\n\s*\n/).map(p => inline(p.replace(/\s*\n\s*/g, " ").trim())).filter(p => p.length) };
+      continue;
+    }
     if (lines[i].trim()) para.push(lines[i].trim());
     else if (para.length) { doc.front.push(para); para = []; }
   }
@@ -192,6 +201,7 @@ function toHtml(doc, updated) {
   .cover .sub { font-size: 14pt; color: var(--muted); margin: 0 0 22pt; }
   .cover .rule { width: 56px; height: 3px; background: var(--navy); margin: 0 0 22pt; }
   .cover .front p { font-size: 10pt; color: var(--muted); margin: 0 0 4pt; }
+  .cover .note.start { margin-top: 22pt; padding: 10pt 12pt 4pt; font-size: 11.5pt; }
   .cover .date { margin-top: 18pt; font-size: 10pt; color: var(--muted); }
   /* contents */
   .contents h2 { break-before: page; }
@@ -213,6 +223,7 @@ function toHtml(doc, updated) {
   ${doc.front[0] ? `<p class="sub">${runsHtml(inline(doc.front[0].join(" ")))}</p>` : ""}
   <div class="rule"></div>
   <div class="front">${doc.front.slice(1).map(p => p.map(l => `<p>${runsHtml(inline(l))}</p>`).join("")).join("")}</div>
+  ${doc.startBox ? `<div class="note start ${doc.startBox.kind.toLowerCase()}">${doc.startBox.paras.map(p => `<p>${runsHtml(p)}</p>`).join("")}</div>` : ""}
   <div class="date">Updated ${esc(updated)}</div>
 </section>
 <section class="contents">
@@ -306,6 +317,10 @@ function toDocx(doc, updated) {
   if (doc.front[0]) out.push(new Paragraph({ spacing: { after: 360 }, children: runs(inline(doc.front[0].join(" ")), { size: 28, color: C.muted }) }));
   out.push(new Paragraph({ spacing: { after: 360 }, border: { top: { style: BorderStyle.SINGLE, size: 18, color: C.navy, space: 1 } }, indent: { right: PAGE_W - 900 }, children: [] }));
   doc.front.slice(1).forEach(p => p.forEach(l => out.push(new Paragraph({ spacing: { after: 60 }, children: runs(inline(l), { size: 20, color: C.muted }) }))));
+  if (doc.startBox) {
+    const box = { border: { left: { style: BorderStyle.SINGLE, size: 18, color: C.navy, space: 8 } }, shading: { type: ShadingType.CLEAR, fill: C.panel, color: "auto" }, indent: { left: 160, right: 160 } };
+    doc.startBox.paras.forEach((p, k) => out.push(new Paragraph(Object.assign({ spacing: { before: k ? 0 : 360, after: 100 }, children: runs(p, { size: 23 }) }, box))));
+  }
   out.push(new Paragraph({ spacing: { before: 300 }, children: [new TextRun({ text: "Updated " + updated, size: 20, color: C.muted })] }));
 
   // Contents (links to the bookmarks on the headings)
