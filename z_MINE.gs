@@ -52,7 +52,8 @@ function ownerHooks_() {
 // 🐞 DEBUG MENU
 // "Reset + Load Fake Data" / "Reset to Display Mode" run the Regenerate.gs
 // tools (after you type RESET, then their own "Are you sure?"). "Copy Sheet, Then
-// Reset the Copy" wipes only a new copy, never this sheet; "Copy Sheet, Then Load
+// Reset the Copy" wipes only a new copy, never this sheet ("Copy Sheet and Set to
+// Migrate" does the same and turns on Auto-Migrate in the copy); "Copy Sheet, Then Load
 // Fake Data on the Copy" fills only a new copy, never this sheet. "Toggle Debug"
 // turns on a toast after every edit, build, sync and sheet open saying whether
 // it worked, including errors the code normally only writes to the log.
@@ -65,6 +66,7 @@ function ownerAddMenus_(ui) {
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
+    .addItem("🔄 Copy Sheet and Set to Migrate", "ownerMenuCopyAndSetToMigrate")
     .addItem("🧪 Copy Sheet, Then Load Fake Data on the Copy", "ownerMenuCopyForFakeData")
     .addSeparator()
     .addItem("🔧 Fix Dropdown Criteria (Student List → Backend)", "ownerMenuFixDropdownCriteria")
@@ -122,6 +124,54 @@ function ownerMenuCopyAndResetToDisplayMode() {
       "This sheet was not changed. Before sharing the copy with another school, delete z_MINE.gs from " +
       "the copy's Extensions &gt; Apps Script.");
   });
+}
+
+/**
+ * Makes the upgrade ("MIGRATE") template: a copy of this sheet, wiped like Reset to
+ * Display Mode, with Backend B3 (Auto-Migrate) = "Yes", so the people who copy it get
+ * the Migration Wizard at Initial Setup. B3 is set BEFORE the reset, so the copy's
+ * 👋 Welcome tab (made at the end of the reset) says "Bring over your old data", and
+ * the reset's version stamp keeps it (it only fills a blank B3). This sheet is never
+ * changed. Owner's request 2026-11-12.
+ */
+function ownerMenuCopyAndSetToMigrate() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const resp = ui.alert(
+    "🔄 Copy Sheet and Set to Migrate",
+    "This makes a copy of this sheet in the same Drive folder, wipes the COPY to Display Mode and turns on " +
+    "Auto-Migrate there (Backend B3 = Yes): whoever copies it gets the Migration Wizard at Initial Setup, " +
+    "to bring over their old sheet.\n\nTHIS sheet is not changed. Continue?",
+    ui.ButtonSet.YES_NO);
+  if (resp !== ui.Button.YES) return;
+
+  runAction_("Copy + Set to Migrate", () => {
+    ss.toast("Copying the sheet…", "🔄 Copy + Migrate", 30);
+    const copy = ownerCopyThisSheet_(ss, "(MIGRATE)");
+
+    ss.toast("Resetting the copy and turning on Auto-Migrate…", "🔄 Copy + Migrate", 60);
+    try {
+      ownerSetAutoMigrate_(copy, true);
+      resetToDisplayModeSteps_(copy); // Regenerate.gs: same steps as Reset to Display Mode
+      ownerSetAutoMigrate_(copy, true); // still "Yes" after the reset (it only fills a blank B3)
+      SpreadsheetApp.flush();
+    } catch (e) {
+      ownerShowCopyLink_(copy.getUrl(), "⚠️ The copy was made but setting it up stopped partway",
+        "Error: " + (e && e.message ? e.message : e) + "<br>This sheet was not changed. You can delete the copy.");
+      throw e;
+    }
+
+    ownerShowCopyLink_(copy.getUrl(), "✅ Copy reset and set to Migrate",
+      "This sheet was not changed. The copy is empty, opens on the 👋 Welcome tab, and its Initial Setup opens the " +
+      "Migration Wizard (Backend B3 = Yes).<br><br>Before sharing it: delete the z_ files from the copy's " +
+      "Extensions &gt; Apps Script, use the General manifest, and move it into the template folder. Its name has " +
+      "\"(MIGRATE)\", which is how 🔄 End of Year Rollover and the welcome links find the upgrade template.");
+  });
+}
+
+/** Backend B3 (Auto-Migrate toggle) of ss: "Yes" = upgrade template, "No" = new-user template. */
+function ownerSetAutoMigrate_(ss, on) {
+  getOrCreateVersionSheet_(ss).getRange(BACKEND_VERSION.MIGRATE_TOGGLE).setValue(on ? "Yes" : "No");
 }
 
 /** Copies this sheet into the same Drive folder as "<name> - <label> (MM/dd/yy)" and opens the copy by ID. */

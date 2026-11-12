@@ -257,7 +257,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   hook then merges Old Phone Contacts and adds non-Raw-Data students from Old Master Table ONLY when its column F
   (Status) is "MASTER".
 - 🐞 Debug menu (owner only): "Reset + Load Fake Data" and "Reset to Display Mode" (type RESET, then Regenerate's own
-  confirm), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
+  confirm), "Copy Sheet and Set to Migrate" (2026-11-12: same as the next one, but the copy is named "… - (MIGRATE)
+  (date)" and gets Backend B3 = "Yes" BEFORE its reset, so its Welcome tab shows the upgrade step; isAutoMigrateOn_(ss)
+  reads the copy's own B3; ownerMenuCopyAndSetToMigrate / ownerSetAutoMigrate_), "Copy Sheet, Then Reset the Copy" (makes a Drive copy
   in the same folder and runs resetToDisplayModeSteps_ on it), "Copy Sheet, Then Load Fake Data on the Copy" (runs
   loadFakeDataSteps_ on the copy via ownerRunOnCopy_: SpreadsheetApp.setActiveSpreadsheet(copy) because the build /
   buildEventTable / buildOverrideReport use the active spreadsheet, then switches back and restores this script's
@@ -379,6 +381,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
+- 🐞 Debug → 🔄 Copy Sheet and Set to Migrate (2026-11-12): re-paste Menus and z_MINE (owner sheet), z_NewCopy.
 - Welcome tab after a reset + permissions (2026-11-12, later): re-paste Menus, Regenerate (script) and
   GettingStartedSidebar (HTML); then run Reset to Display Mode on the master template; upload the new
   docs/PC_Tracker_User_Guide.pdf to the guide folder.

@@ -66,9 +66,9 @@ function applyDefaultSheetVisibility_(ss) {
  * typing directly into B3. Read-only (runs in the simple onOpen): falls back to
  * an older copy's separate "Version" tab (B2) without migrating anything.
  */
-function isAutoMigrateOn_() {
+function isAutoMigrateOn_(ss) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss = ss || SpreadsheetApp.getActiveSpreadsheet(); // ss: another spreadsheet (a copy being made into a template)
     const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
     const legacy = ss.getSheetByName("Version");
     const cell = backend ? backend.getRange(BACKEND_VERSION.MIGRATE_TOGGLE)
@@ -1018,7 +1018,7 @@ function deleteWelcomeTab_(ss) {
 function buildWelcomeTab_(ss, opts) {
   opts = opts || {};
   const NAVY = "#183e69", INK = "#1b2430", MUTED = "#566173", FAINT = "#8a94a3", LINE = "#d3d9e1";
-  const upgrade = isAutoMigrateOn_(); // upgrade-template copy: setup opens the Migration Wizard
+  const upgrade = isAutoMigrateOn_(ss); // upgrade-template copy: setup opens the Migration Wizard
 
   const steps = [
     ["Open 🚀 App Menu",

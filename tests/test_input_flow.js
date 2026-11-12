@@ -259,6 +259,35 @@ function listsSheet() {
   console.log("Initial Setup permissions + Getting Started links: ok");
 }
 
+{
+  // Owner's 🐞 Debug → 🔄 Copy Sheet and Set to Migrate: the COPY gets Backend B3 = Yes before
+  // its reset, so its Welcome tab is the upgrade one; this sheet is not touched
+  const mine = makeSpreadsheet(TABS);
+  const copy = makeSpreadsheet(TABS);
+  copy.getId = () => "COPY_SS"; copy.getUrl = () => "https://example.org/copy";
+  const app = fakeSpreadsheetApp(mine);
+  app.newRichTextValue = () => { const v = {}; const b = new Proxy({}, { get: (t, k) =>
+    k === 'setText' ? (x => { v.text = x; return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
+  const g = loadProject({ owner: true, extra: { SpreadsheetApp: app } });
+  const shown = [];
+  g.ownerCopyThisSheet_ = (ss, label) => { assert.strictEqual(label, "(MIGRATE)"); return copy; };
+  g.ownerShowCopyLink_ = (url, title) => shown.push(title);
+  g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
+  g.getGuideLink_ = () => "https://example.org/guide";
+  let b3AtReset = null;
+  g.resetToDisplayModeSteps_ = ss => { b3AtReset = ss.getSheetByName("Backend").getRange("B3").getValue(); g.showWelcomeAfterReset_(ss); };
+  g.ownerMenuCopyAndSetToMigrate();
+  assert.strictEqual(b3AtReset, "Yes", 'B3 = Yes before the reset');
+  assert.strictEqual(copy.getSheetByName("Backend").getRange("B3").getValue(), "Yes", 'the copy is an upgrade template');
+  assert.strictEqual(mine.getSheetByName("Backend").getRange("B3").getValue(), "", 'this sheet is not touched');
+  const text = Array.from(copy.getSheetByName("👋 Welcome")._cells.values()).join("\n");
+  assert(/Bring over your old data/.test(text), 'the copy\'s Welcome tab: the upgrade step');
+  assert.deepStrictEqual(copy.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"]);
+  assert.strictEqual(mine.getSheetByName("👋 Welcome"), null, 'no Welcome tab on this sheet');
+  assert(/set to Migrate/.test(shown[0]), 'done message: ' + shown[0]);
+  console.log("Debug → Copy Sheet and Set to Migrate: ok");
+}
+
 // ---------------------------------------------------------------- new-user flow pieces
 {
   // A new copy opens: the Welcome tab only, a toast pointing at Initial Setup, no pop-up
