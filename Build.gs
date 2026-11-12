@@ -255,6 +255,9 @@ function buildAllDerivedSheetsRun_() {
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
+
+  // A build finished: an old "last night's rebuild didn't finish" message is out of date now
+  try { PropertiesService.getDocumentProperties().deleteProperty(NIGHTLY_FAILED_KEY_); } catch (e) { /* message only */ }
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
@@ -338,12 +341,22 @@ function claimNightlyTrigger_() {
   } catch (err) { console.warn("Nightly trigger not remembered: " + err.message); }
 }
 
+// A failed / skipped nightly run, said on the next open (buildMenus_, Menus.gs): a school
+// never sees the Apps Script log (owner's pick 2026-11-12). Cleared by any build that finishes.
+var NIGHTLY_FAILED_KEY_ = "NIGHTLY_FAILED_MSG";
+
 function nightlyMasterSyncRun_() {
   try {
     // Build + phone sync as one job: nothing else may build or sync in between
     withBuildLock_("Nightly sync", () => nightlyMasterSyncLocked_(), 30000);
   } catch (e) {
     console.error("Nightly Master Sync failed: " + e.message);
+    try {
+      const why = String((e && e.message) || e).slice(0, 300);
+      PropertiesService.getDocumentProperties().setProperty(NIGHTLY_FAILED_KEY_,
+        (e && e.buildBusy ? "Last night's rebuild didn't run: " : "Last night's rebuild didn't finish: ") + why +
+        " Run 🚀 App Menu → 🏗️ Build Sheets Only to bring the tabs up to date.");
+    } catch (err) { /* the message only */ }
   }
 }
 

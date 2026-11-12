@@ -48,7 +48,7 @@ no longer optional trial files. Their code moved word for word (function names, 
 property / cache / Backend keys unchanged); the typeof guards in shared code and the "file missing" fallbacks were
 removed, so these files are now REQUIRED (a missing one = onOpen error / no menu). Old -> new:
   Z#InputDataMode.gs + Z#OwnData.gs -> Input Data.gs (part 1 / part 2); Z#Guide.gs -> Menus.gs section GETTING
-  STARTED; Z#ContactLogDebug.gs -> end of Edits.gs; HTML: Z#InputDataSidebar -> InputDataSidebar, Z#OwnDataSidebar ->
+  STARTED; Z#ContactLogDebug.gs -> end of Edits.gs (later the owner test file z_ContactLogDebug.gs); HTML: Z#InputDataSidebar -> InputDataSidebar, Z#OwnDataSidebar ->
   YourListsSidebar, Z#GuideSidebar -> GettingStartedSidebar, Z#ContactLogDebugSidebar -> ContactLogDebugSidebar.
   Only behavior change: none on a sheet that had all the Z# files (the guards were always true there).
 
@@ -137,7 +137,7 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     OWN_LISTS. Migration carries them over (owner 2026-11-12): ma_migrateSimpleSheets (step 4 "Copy events, student
     changes and your lists") calls od_migrateLists_: each old list tab is copied (copyTo, same name) with its setup and
     picks under the new tab ID; a same-name list already here is replaced; the old sheet is only read; step 6's build
-    fills the columns. Rollover does not (not built).
+    fills the columns. Rollover puts each list tab in the archive PDF (next year's sheet gets them through Migration).
   - google.script.run endpoints: od_createList, od_openList, od_repasteList, od_renameList, od_deleteList, od_getWizard,
     od_wizardCheck, od_readPaste, od_matchPreview, od_saveList, od_backToInputMode, od_build (+ idm_finishLists).
     Tested offline (own_test: shared + owner) and by a Chromium click-through of both sidebars wired to the real
@@ -348,8 +348,8 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   studentListIsBuilt_ (menus + Getting Started), the lookup fallback, resetMasterTable_ (clears under the header),
   getAllStudentsForEdit and ownerReadMasterStatusSnapshot_ (start under the header), buildMasterTableData_ /
   readMasterStatusSnapshot_ (already scanned for "OSIS"). Your Lists' sidebar index (od_indexFromSheet_) and the Contact
-  Log Debug anonymizer read the Backend copy (studentLookupRows_). Hide Discharged / Purge take row 1 as the header,
-  which is now right.
+  Log Debug anonymizer read the Backend copy (studentLookupRows_). Hide Discharged / Purge start at
+  studentListHeaderRow_ (2026-11-12).
   Last Interaction (added 2026-11-05) = date of the newest Contact Log row (not hidden) or event for that student,
   with anyone (sibling rows: newest of the siblings), else "None logged". interactionsByOsis_ (Build.gs) is shared
   with Parents Divided's per-guardian Last Interaction (moved word for word). Added after the owner's Old Master Table
@@ -470,6 +470,13 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
   same way (typistKey_: trimmed, inner spaces collapsed, any case; owner 2026-11-12).
 
 Workflow:
+- OFFLINE TESTS (tests/, 2026-11-12): `cd tests && npm install && npm test` runs check.js (whole project compiles as
+  one script, no duplicate names, every HTML file / google.script.run call / menu item resolves) and the logic tests
+  (test_matching, test_fixes, test_sync with a fake People API); render_sidebars.js = optional Playwright screenshots.
+  lib/load.js loads the .gs files into one Node context with fake Apps Script services. Run them before every push
+  and add a test for logic you change; they don't cover sheet reads / writes / dialogs (try those on a copy).
+- DEPLOY.md (repo root): the owner's one-page checklist (files to delete, the files each copy should have, manifests,
+  after-deploy steps, a quick test, going live). Keep it in step when files are added / renamed.
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
   changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
 - OTHER CLAUDE SESSIONS (owner's request 2026-11-12): two sessions pushing to Test-Version at once collide. At the
@@ -562,6 +569,9 @@ NIGHTLY_TRIGGER_UID (+ _SET) / NIGHTLY_LAST_RUN: a firing trigger that isn't the
 (e.triggerUid; it runs as its maker), unless the remembered one hasn't run for 3 days (then it takes over);
 manageNightlyTrigger_ makes none for another person; checkVersionOnOpen (runs as the setup person) remembers their
 trigger on older sheets (claimNightlyTrigger_); the trigger itself checks disableNightlySync when it fires.
+A failed / skipped nightly run (error, or the build lock busy) leaves doc property NIGHTLY_FAILED_MSG ("Last night's
+rebuild didn't finish / didn't run: <reason> ..."); buildMenus_ toasts it on the next open (before the sync message,
+which then waits for the open after), and any finished build clears it (end of buildAllDerivedSheetsRun_).
 BUILD / SYNC LOCK (2026-11-12, withBuildLock_ in Core.gs): ScriptLock around buildAllDerivedSheets (body now
 buildAllDerivedSheetsRun_), syncToGoogleContacts, Full Sync (build + sync as one job) and the nightly; re-entrant within
 a run; busy = Error.buildBusy "Another \"X\" is running right now" (Build Only / Full Sync show it in the sidebar; a busy

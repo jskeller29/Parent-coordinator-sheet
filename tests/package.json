@@ -1,0 +1,12 @@
+{
+  "name": "pc-tracker-tests",
+  "private": true,
+  "description": "Offline tests for the PC Tracker Apps Script project (nothing here is pasted into Apps Script)",
+  "scripts": {
+    "test": "node run_all.js",
+    "check": "node check.js"
+  },
+  "devDependencies": {
+    "acorn": "8.11.3"
+  }
+}

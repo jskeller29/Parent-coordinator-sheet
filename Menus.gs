@@ -191,6 +191,7 @@ function buildMenus_() {
     props.deleteProperty('SETUP_COMPLETE');
     props.deleteProperty('WELCOME_DIALOG_SHOWN');
     props.deleteProperty('MISSED_SYNC_MSG');
+    props.deleteProperty(NIGHTLY_FAILED_KEY_);
     
     // 🆕 Fresh copies start with clean version-check memory so any
     // dismissals/preferences from the template never leak into copies.
@@ -204,8 +205,16 @@ function buildMenus_() {
     // to preserve here.
   }
 
+  // LAST NIGHT'S REBUILD FAILED (Build.gs nightlyMasterSyncRun_): said first; a sync
+  // message then waits for the next open (only one toast shows at a time)
+  const nightlyFailed = props.getProperty(NIGHTLY_FAILED_KEY_);
+  if (nightlyFailed) {
+    SpreadsheetApp.getActiveSpreadsheet().toast(nightlyFailed, "⚠️ Last night's rebuild", 20);
+    props.deleteProperty(NIGHTLY_FAILED_KEY_);
+  }
+
   // OFFLINE SYNC DETECTOR
-  const missedSync = props.getProperty('MISSED_SYNC_MSG');
+  const missedSync = nightlyFailed ? null : props.getProperty('MISSED_SYNC_MSG');
   if (missedSync) {
     SpreadsheetApp.getActiveSpreadsheet().toast(
       missedSync, 
