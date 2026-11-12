@@ -271,7 +271,7 @@ function buildMenus_() {
     addInputDataModeMenuItem_(getStartedMenu);   // Input Data.gs
     getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
     addGuideMenuItems_(getStartedMenu);          // ✅ Getting Started (below)
-    addContactLogDebugMenuItem_(getStartedMenu); // 🐞 Contact Log Debug (Edits.gs)
+    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(getStartedMenu); // owner test file z_ContactLogDebug.gs
     getStartedMenu.addToUi();
 
     // =======================================================
@@ -301,7 +301,7 @@ function buildMenus_() {
     menu.addItem("📖 Open User Guide", "showWelcomeDialog");
     menu.addItem("🐞 Report a Bug", "reportABug");
     menu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
-    addContactLogDebugMenuItem_(menu); // 🐞 Contact Log Debug (Edits.gs)
+    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(menu); // owner test file z_ContactLogDebug.gs
     // Sheet Lock.gs: turn the baby-proofing off for layout changes, then back on
     menu.addItem(isSheetLockOn_() ? "🔓 Unlock Sheet (change headers / layout)" : "🔒 Lock Sheet", "toggleSheetLock");
     
@@ -788,11 +788,9 @@ function runInitialSetupWrapper() {
     sendOut: 'false',        // FALSE: Hidden by default
     siteClass: 'false',      // FALSE: Hidden by default
     typeCol: 'false',        // FALSE: Hidden by default
-    autoOverride: 'true',
     autoNotes: 'true',
     disableHiddenNotes: 'false',
-    ignoreHideCheckboxes: 'false',
-    emailNotifications: 'false',
+    // (autoOverride / ignoreHideCheckboxes / emailNotifications removed 2026-11-12: nothing read them)
     dataReminder: 'week'     // data update reminder: week / 2weeks / month / off
   };
 
@@ -877,8 +875,8 @@ const SETTING_KEYS = [
   'syncToPhones', 'phoneContacts', 'parentsDivided', 'notesTab', 'sendOut',
   'showContactLog', 'showCombined', 'showPcar', 'showDirectory', 'showRawData',
   'showMasterTable', 'showEvents', 'showOverrideReport', 'showNewStudents',
-  'siteClass', 'typeCol', 'autoOverride', 'autoNotes', 'disableHiddenNotes',
-  'ignoreHideCheckboxes', 'emailNotifications', 'disableRebuilds',
+  'siteClass', 'typeCol', 'autoNotes', 'disableHiddenNotes',
+  'disableRebuilds',
   'disableNightlySync', 'disableContactAutofill', 'notesStartDate',
   'notesEndDate', 'hideDischarged', 'contactLogTodayOnly', 'dataReminder'
 ];
@@ -1845,6 +1843,16 @@ function processRolloverBackend() {
       combinedLog.copyTo(tempSs).setName("Combined Contact Tracking");
       hasData = true;
     }
+
+    // Your Lists (owner 2026-11-12): each list tab goes into the archive PDF too. This sheet
+    // keeps them, and "Upgrade and bring over last year's data" (Migration) copies them into
+    // next year's sheet (od_migrateLists_).
+    try {
+      od_listSummaries_(ss).forEach(l => {
+        const tab = ss.getSheets().filter(x => x.getSheetId() === l.tabId)[0];
+        if (tab) tab.copyTo(tempSs).setName(l.tabName);
+      });
+    } catch (e) { console.warn("Rollover: Your Lists not archived: " + e.message); }
     
     if (!hasData) {
       DriveApp.getFileById(tempSsId).setTrashed(true);

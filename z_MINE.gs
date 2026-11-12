@@ -29,14 +29,14 @@ function ownerHooks_() {
     buildPhoneContactsData: ownerBuildPhoneContactsData_,
     contactLogSiteColumn: 8,  // H holds the site on the owner's Contact Log too (K is Method 2; owner 2026-11-12)
     logNewStudents: ownerLogNewStudents_, // the "New Students" tab
-    montserratSheets: [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"],
+    montserratSheets: [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"], // New Students too (owner 2026-11-12)
 
     // --- Quick update (updateOsisDeltas_) ---
     updateOsisDeltas: ownerUpdateOsisDeltas_,
 
     // --- Google Contacts sync (syncToGoogleContacts) ---
     contactsSync: {
-      listContactGroups: () => People.ContactGroups.list(),
+      listContactGroups: () => People.ContactGroups.list({ pageSize: 1000 }), // all labels (was the small default page: could miss "School Directory")
       rowReader: ownerPhoneContactsRowReader_,
       afterSync: ownerEmailSyncSummary_
     },
@@ -1379,13 +1379,14 @@ function ownerPhoneContactsRowReader_(headers) {
 
     return {
       parentName: parentName,
-      upsert: directoryResourceName => ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, directoryResourceName)
+      nameKey: contactNameKey_(parentName, studentNames), // Contacts Sync.gs: is a contact still used by a row
+      upsert: (directoryResourceName, index) => ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, directoryResourceName, index)
     };
   };
 }
 
 /** After a finished sync: emails the results and the build's new / discharged students (when turned on). */
-function ownerEmailSyncSummary_(deletedCount, createdCount, editedCount) {
+function ownerEmailSyncSummary_(deletedCount, createdCount, editedCount, failedCount, note) {
   // --- NEW: EMAIL NOTIFICATION LOGIC ---
   const emailEnabled = PropertiesService.getDocumentProperties().getProperty('EMAIL_NOTIFICATIONS_ENABLED');
   
@@ -1402,7 +1403,8 @@ function ownerEmailSyncSummary_(deletedCount, createdCount, editedCount) {
                        `\n\nDischarged (no longer in ATS): ${(report.discharged || []).length}\n${list(report.discharged)}`;
       }
     } catch (e) {}
-    const body = `Your Google Contacts sync has finished!\n\nResults:\nDeleted: ${deletedCount}\nCreated: ${createdCount}\nEdited: ${editedCount}${studentLines}\n\nCheck your spreadsheet for full logs.`;
+    const body = `Your Google Contacts sync has finished!\n\nResults:\nDeleted: ${deletedCount}\nCreated: ${createdCount}\nEdited: ${editedCount}` +
+      (failedCount ? `\nNot saved: ${failedCount}` : "") + (note ? `\n\n${note}` : "") + `${studentLines}\n\nCheck your spreadsheet for full logs.`;
     
     try {
       MailApp.sendEmail(userEmail, subject, body);
@@ -1414,14 +1416,18 @@ function ownerEmailSyncSummary_(deletedCount, createdCount, editedCount) {
 
 /**
  * The owner's single-contact push (all of a row's emails / phones).
- * STRICT MATCHING: Searches Google Contacts by Name, Phone, and Email without making assumptions.
+ * STRICT MATCHING: same name AND the row's first phone (or email) must be on the contact.
+ * Uses the sync's one list of contacts (index, Contacts Sync.gs) instead of paging
+ * through every contact for every row (2026-11-12). Returns like
+ * searchAndUpsertSingleContact: { failed: true, ... } when it could not be saved (its
+ * contact is then kept), a Google "limit reached" error is thrown (the sync pauses).
  */
-function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, directoryResourceName = null) {
+function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, notes, orgName, orgTitle, directoryResourceName = null, index = null) {
+  const fullName = String(parentName || "").trim();
+  const fNameStr = String(studentNames || "").trim(); 
+  if (!fullName) return null;
+  let existingContact = null;
   try {
-    const fullName = String(parentName || "").trim();
-    const fNameStr = String(studentNames || "").trim(); 
-    if (!fullName) return null;
-
     const cache = CacheService.getScriptCache();
     
     // 1. STRICT CACHE KEY: Stop assuming blanks are matches. Extract exact identifiers.
@@ -1438,58 +1444,22 @@ function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, not
     for (let i = 0; i < rowIdentity.length; i++) hash = ((hash << 5) - hash) + rowIdentity.charCodeAt(i) | 0; 
     const cacheKey = "CONTACT_V7_" + Math.abs(hash); // Bumping to V7 to clear old buggy cached identities
 
-    let existingContact = null;
-    let cachedResourceName = cache.get(cacheKey);
-
-    if (cachedResourceName) {
-      try { existingContact = People.People.get(cachedResourceName, { personFields: 'names,phoneNumbers,emailAddresses,memberships,organizations,biographies' }); } 
-      catch (e) { cache.remove(cacheKey); }
-    }
-
-    if (!existingContact) {
-      let pageToken;
-      do {
-        const response = People.People.Connections.list('people/me', { pageSize: 1000, personFields: 'names,phoneNumbers,emailAddresses,memberships,organizations,biographies', pageToken: pageToken });
-        if (response.connections) {
-          for (const person of response.connections) {
-            if (person.names && person.names.length > 0) {
-              const apiGiven = String(person.names[0].givenName || "").toLowerCase().trim();
-              const apiFamily = String(person.names[0].familyName || "").toLowerCase().trim();
-              
-              if (apiGiven === fullName.toLowerCase() && apiFamily === fNameStr.toLowerCase()) {
-                
-                // NO ASSUMPTIONS: Strictly evaluate exact strings to prevent false overwriting
-                const apiPhonesClean = person.phoneNumbers ? person.phoneNumbers.map(p => normalizePhoneForMerge_(p.value)) : [];
-                const apiPhonesRaw = person.phoneNumbers ? person.phoneNumbers.map(p => String(p.value).toLowerCase().trim()) : [];
-                const apiEmails = person.emailAddresses ? person.emailAddresses.map(e => String(e.value).toLowerCase().trim()) : [];
-                
-                let hasMatchingPhone = false;
-                
-                if (searchPhone === "") {
-                   // If the row on the sheet literally has no phone, check the email
-                   if (primaryEmail !== "") {
-                       hasMatchingPhone = apiEmails.includes(primaryEmail);
-                   } else {
-                       // If the row has NO phone and NO email, only match if the API contact also has neither
-                       hasMatchingPhone = (apiPhonesRaw.length === 0 && apiEmails.length === 0);
-                   }
-                } else {
-                   // Match by exact digit sequence OR exact raw text (e.g. "discharge")
-                   hasMatchingPhone = (primaryPhoneClean !== "" && apiPhonesClean.includes(primaryPhoneClean)) || apiPhonesRaw.includes(searchPhone);
-                }
-                
-                if (hasMatchingPhone) {
-                  existingContact = person; 
-                  break; 
-                }
-              }
-            }
-          }
-        }
-        if (existingContact) break;
-        pageToken = response.nextPageToken;
-      } while (pageToken);
-    }
+    // NO ASSUMPTIONS: same name, and the phone (or email) must agree
+    const phoneOrEmailAgrees = person => {
+      const apiPhonesClean = person.phoneNumbers ? person.phoneNumbers.map(p => normalizePhoneForMerge_(p.value)) : [];
+      const apiPhonesRaw = person.phoneNumbers ? person.phoneNumbers.map(p => String(p.value).toLowerCase().trim()) : [];
+      const apiEmails = person.emailAddresses ? person.emailAddresses.map(e => String(e.value).toLowerCase().trim()) : [];
+      if (searchPhone === "") {
+        // If the row on the sheet literally has no phone, check the email
+        if (primaryEmail !== "") return apiEmails.includes(primaryEmail);
+        // If the row has NO phone and NO email, only match if the API contact also has neither
+        return apiPhonesRaw.length === 0 && apiEmails.length === 0;
+      }
+      // Match by exact digit sequence OR exact raw text (e.g. "discharge")
+      return (primaryPhoneClean !== "" && apiPhonesClean.includes(primaryPhoneClean)) || apiPhonesRaw.includes(searchPhone);
+    };
+    if (!index) index = buildContactsIndex_(directoryResourceName); // a single push outside the sync
+    existingContact = findIndexedContact_(index, cacheKey, contactNameKey_(fullName, fNameStr), phoneOrEmailAgrees);
 
     // Build the payload
     const contactData = {
@@ -1503,6 +1473,12 @@ function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, not
     
     emailsArr.forEach(e => { if (String(e.val).trim() !== "") contactData.emailAddresses.push({ value: String(e.val), type: String(e.label || "home") }); });
     phonesArr.forEach(p => { if (String(p.val).trim() !== "") contactData.phoneNumbers.push({ value: String(p.val), type: String(p.label || "mobile") }); });
+
+    // Already exactly like the row (and in the label): nothing to write
+    if (existingContact && contactMatchesPayload_(existingContact, contactData, directoryResourceName)) {
+      cache.put(cacheKey, existingContact.resourceName, 21600);
+      return { resourceName: existingContact.resourceName, isNew: false, isEdited: false, wrote: false, name: fullName };
+    }
     
     let attempts = 0;
     while (attempts < 3) {
@@ -1519,19 +1495,26 @@ function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, not
           const changes = ownerContactChanges_(existingContact, contactData); // what really differs (for the summary)
           const updated = People.People.updateContact(contactData, existingContact.resourceName, { updatePersonFields: 'names,phoneNumbers,emailAddresses,biographies,memberships,organizations' });
           cache.put(cacheKey, updated.resourceName, 21600);
-          return { resourceName: updated.resourceName, isNew: false, isEdited: changes.length > 0, name: fullName, logStr: changes.join('<br>') }; 
+          index.add(storedContact_(contactData, updated));
+          return { resourceName: updated.resourceName, isNew: false, isEdited: changes.length > 0, wrote: true, name: fullName, logStr: changes.join('<br>') }; 
         } else {
           const created = People.People.createContact(contactData);
           cache.put(cacheKey, created.resourceName, 21600);
-          return { resourceName: created.resourceName, isNew: true, isEdited: false, name: fullName }; 
+          index.add(storedContact_(contactData, created));
+          return { resourceName: created.resourceName, isNew: true, isEdited: false, wrote: true, name: fullName }; 
         }
       } catch (e) {
         if (String(e).includes("404")) throw e;
+        if (isQuotaError_(e)) throw e;
         if (attempts >= 3) throw e; 
         Utilities.sleep(2000 * attempts); 
       }
     }
-  } catch (err) { return null; }
+  } catch (err) {
+    if (isQuotaError_(err)) throw err; // the sync pauses 15 minutes and carries on
+    console.error("Owner sync error for " + fullName + ": " + String(err && err.message || err));
+    return { failed: true, name: fullName, error: String(err && err.message || err), resourceName: existingContact ? existingContact.resourceName : null };
+  }
 }
 
 /**

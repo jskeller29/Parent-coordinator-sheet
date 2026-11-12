@@ -19,8 +19,8 @@ Files (shared = every school's sheet):
   sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
   (cache key BUILD_STEP; getSyncStatus returns buildSteps / buildStep with the state).
 - Edits.gs: installedOnEdit, ghost typists (Contact Log / Notes / Events), Raw Data paste clean-up, quick updates
-  (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables, and at the end the
-  temporary 🐞 Contact Log Debug sidebar (see below).
+  (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables. (The temporary
+  🐞 Contact Log Debug sidebar is the owner's test file z_ContactLogDebug.gs, see below.)
 - Menus.gs: onOpen menus, setup, Getting Started (welcome + checklist, see below), Settings, Student Overrides +
   report, Rollover, Migration, Version Check, data update reminder, links.
 - Input Data.gs: Input Data Mode (part 1) + Your Lists (part 2), see below.
@@ -157,8 +157,10 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   (Settings tabs: ⚙️ Settings → Tabs & columns; others: View → Hidden sheets). Link PLACEHOLDERS: GUIDE_LINKS at the
   top of the GETTING STARTED section (empty = "link coming soon").
 
-- 🐞 Contact Log Debug (end of Edits.gs + ContactLogDebugSidebar.html; was Z#ContactLogDebug.gs): TEMPORARY sidebar
-  (🚀 App Menu, both menus, the 2 addContactLogDebugMenuItem_ lines in buildMenus_; shown on every school's sheet). Live list of runs (Contact Log / Notes / Events
+- 🐞 Contact Log Debug (z_ContactLogDebug.gs + z_ContactLogDebugSidebar.html since 2026-11-12, owner's testing only;
+  was Z#ContactLogDebug.gs, then briefly the end of Edits.gs): TEMPORARY sidebar (🚀 App Menu, both menus, the 2
+  guarded `typeof addContactLogDebugMenuItem_` lines in buildMenus_). Delete both z_ files for schools: no menu item,
+  and the Core.gs recorder never turns on. Live list of runs (Contact Log / Notes / Events
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
   Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
@@ -169,7 +171,9 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   around installedOnEdit / installedOnChange): on only while doc cache key CL_DEBUG_ON exists (the sidebar re-puts it
   every 2 s poll, 5-min TTL); runs in CL_DEBUG_LOG (newest 25). Off = one cache read per edit.
 
-Owner testing file: z_InputDataDebug.gs (2026-11-12): the Input Data Mode debug log (idm_debugEnabled_ +
+Owner testing files (2026-11-12; keep them on the owner's sheet, DELETE them from the master template / schools'
+copies; shared code reaches them only through typeof checks): z_ContactLogDebug.gs + z_ContactLogDebugSidebar.html
+(above) and z_InputDataDebug.gs: the Input Data Mode debug log (idm_debugEnabled_ +
 idm_debugSheets_). With it every Input Data Mode sidebar reply carries its step log and the sidebar shows the Debug
 panel; without it idm_log_ does nothing and the panel stays hidden. Input Data.gs reaches it only through typeof
 checks. Keep it on the owner's sheet while testing; DELETE it from the master template / schools' copies.
@@ -182,7 +186,8 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Hooks: Student List status snapshot, Old Master Table history (Student List + Directory), Old Master Table OSIS
   that Combined Contact Tracking also keeps (oldMasterTableOsis), Old Phone Contacts merge,
   last-word name split (splitFullName_), tall Phone Contacts layout, quick update that also rewrites Phone Contacts,
-  contacts sync (4 phones / 3 emails per row, group list without pageSize, no 50% delete check, summary email),
+  contacts sync (4 phones / 3 emails per row, match = name AND phone / email, summary email incl. "Not saved" and
+  the note; since 2026-11-12 the same label lookup (pageSize 1000) and "more than half" check as every sheet),
   Contact Log site column (H like the shared sheets since 2026-11-12: K is Method 2), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
   toasts.
 - 🐞 Debug → "🔧 Fix Dropdown Criteria (Student List → Backend)" (ownerMenuFixDropdownCriteria, one-time tool,
@@ -290,12 +295,17 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   1. DELETE these 8 files first (their code now lives in the files below; keeping them = duplicate functions / consts,
      the project will not load): Z#InputDataMode, Z#InputDataSidebar, Z#OwnData, Z#OwnDataSidebar, Z#Guide,
      Z#GuideSidebar, Z#ContactLogDebug, Z#ContactLogDebugSidebar.
-  2. ADD the script file "Input Data" and the HTML files InputDataSidebar, YourListsSidebar, GettingStartedSidebar,
-     ContactLogDebugSidebar (HTML file names must match exactly, without ".html").
+  2. ADD the script file "Input Data" and the HTML files InputDataSidebar, YourListsSidebar, GettingStartedSidebar
+     (HTML file names must match exactly, without ".html"). Owner's sheet only: z_ContactLogDebug (script) +
+     z_ContactLogDebugSidebar (HTML) and z_InputDataDebug (script); never on the master template / schools.
   3. RE-PASTE Core, Build, Edits, Menus (owner sheet: also z_MINE); Regenerate too if the two 2026-11-11 steps above
      are not deployed yet. Contacts Sync, Sheet Lock, the other HTML files, Z#ContactLog / Z#ContactLogSidebar and the
      manifest are unchanged by the coalesce.
-  All of these are now required (no longer optional). Needs Styles.html (Getting Started, Contact Log Debug).
+  All of these are now required (no longer optional; the z_ test files excepted). Needs Styles.html.
+- Sync rewrite + owner picks (2026-11-12, later): re-paste Core, Edits, Menus, Contacts Sync, Regenerate (fake data
+  "Resolved") and the HTML ProgressSidebar, RolloverWizard; owner sheet also z_MINE. The Contact Log Debug files are
+  now z_ContactLogDebug (script) + z_ContactLogDebugSidebar (HTML): on the owner's sheet delete ContactLogDebugSidebar
+  and add both z_ files; on the master template / schools delete ContactLogDebugSidebar and add neither.
 - Fixes + Your Lists confidence + restyle (2026-11-12): re-paste Core, Build, Edits, Menus, Contacts Sync, Sheet Lock,
   Regenerate, Input Data, Z#ContactLog (scripts) and InputDataSidebar, YourListsSidebar, MigrationUI (HTML); owner sheet
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
@@ -448,8 +458,9 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
      reads the Combined tab; never rewrites Combined, which could put back older notes). The early write never falls
      back to updateContactAndPhoneOnly on the owner's sheet.
   Pastes / rows whose OSIS appears later use the old end-of-edit sync. Notes typist: writes only the cells it fills
-  and flushes before the checkbox / sync. Events typist unchanged. TextFinder lookups (Notes / Events) kept on
-  purpose: the in-memory cache would change matches with stray spaces.
+  and flushes before the checkbox / sync. Events typist unchanged. Notes / Events lookups (findInMasterTable_): TextFinder
+  first, then (only when it misses) an in-memory scan that ignores stray spaces; the Contact Log typist compares the
+  same way (typistKey_: trimmed, inner spaces collapsed, any case; owner 2026-11-12).
 
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
@@ -518,10 +529,12 @@ Must keep: 15 menu handler names (+6 owner Debug items, + toggleSheetLock), 39 g
 handlers (installedOnEdit, installedOnChange, nightlyMasterSync, checkVersionOnOpen, syncToGoogleContacts),
 all sheet names (except the owner's Master Table -> Student List rename), Backend cells,
 property/cache keys.
-Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
-to owner sync?; Montserrat on New Students (owner build skips it); owner splitFullName_ changes the shared Directory
-name split - intended?; ghost typist TextFinder vs in-memory scan (differ only on stray spaces); Your Lists at Rollover.
-Decided 2026-11-12: site column = H on the owner's sheet too; Your Lists carried over at Migration.
+Owner decisions still open (current behavior kept): owner splitFullName_ changes the shared Directory name split
+(owner: keep it).
+Decided 2026-11-12: site column = H on the owner's sheet too; Your Lists carried over at Migration and archived in
+the Rollover PDF (processRolloverBackend copies each list tab into the archive; next year's sheet gets them through
+Migration); the owner sync has the label pageSize + "more than half" check; Montserrat on New Students (owner's
+montserratSheets); ghost typists ignore stray spaces (typistKey_).
 Data update reminder (Menus.gs, replaced the old 30-day ATS-only reminder; same checkRawDataFreshness_ name): centered
 pop-up when Raw Data A1 / AG1 / AP1 (ATS / Parent Square / NYCSA, only sections ever loaded) is older than setting
 "dataReminder" (week default / 2weeks / month / off; in SETTING_KEYS so it is saved to the Backend settings block and
@@ -530,8 +543,9 @@ once an hour); once a day (ATS_REMINDER_LAST_SHOWN); not during Input Data Mode.
 the coalesce; DATA_GUIDE_URL is kept but no longer linked). Skip -> Remind After 2 Weeks / 1 Month (setting + wait in doc
 property DATA_REMINDER_SNOOZE_UNTIL) / Remove Reminders / Just skip for today. Endpoints dataReminderOpenInputMode,
 dataReminderChoose. Saving a different choice in Settings clears the wait.
-Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications (defaults in getSettings, kept in
-SETTING_KEYS / the Backend settings block; no feature or Settings control uses them).
+Settings autoOverride, ignoreHideCheckboxes, emailNotifications were saved but never read: removed from getSettings'
+defaults and SETTING_KEYS (owner 2026-11-12). Old values stay in existing sheets' properties, unused; loading the
+Backend settings block skips keys not in SETTING_KEYS.
 Nightly trigger (nightlyMasterSync): 10 PM, NIGHTLY_SYNC_HOUR (Menus.gs), both at Initial Setup and when a Settings
 save re-makes it (owner's pick 2026-11-05; was 11 PM at setup but 2 AM after a Settings save). Existing triggers keep
 their old hour until Settings is saved once or Initial Setup is run again.
@@ -546,17 +560,29 @@ buildAllDerivedSheetsRun_), syncToGoogleContacts, Full Sync (build + sync as one
 a run; busy = Error.buildBusy "Another \"X\" is running right now" (Build Only / Full Sync show it in the sidebar; a busy
 resume re-schedules itself in 2 min). Contact Log edits / Input Data Mode use the Document lock, so builds never hold
 them up. Full Sync errors end as 'killed' with the error (was stuck on 'building' for 6 h).
-Bugs NOT fixed yet (2026-11-11 review; owner asked for recommendations first):
-- Contacts sync: searchAndUpsertSingleContact (and ownerUpsertContact_) catch EVERY error and return null, so a failed
-  row's contact stays in the stale map and is DELETED in the cleanup phase; the "quota -> pause 15 min" branch in
-  syncToGoogleContactsRun_ is unreachable (on a quota hit every remaining row fails and is deleted). The 50% check
-  only runs when startRow === 1 and not on the owner's sheet.
-- Full Sync / nightly: the sync's 4.5-min budget starts after the build in the same execution, so build + sync can
-  pass the 6-min limit; a killed run saves no SYNC_START_ROW, so the next run starts at row 1 again.
-- Sync speed / quota: every row not in the 6 h cache (every row at night) pages through ALL the user's contacts.
-- Owner email: MailApp needs the script.send_mail scope and Session.getActiveUser().getEmail() userinfo.email; the
-  repo manifest has neither. Add them ONLY to the owner's own project manifest (adding them to the shared manifest
-  would make every school re-authorize, and their triggers stop until they do).
+CONTACTS SYNC (rewritten 2026-11-12, owner's "fix 1-3"; see "HOW THE SYNC WORKS" in Contacts Sync.gs):
+- One Connections.list pass per run (buildContactsIndex_: byResource / byName "given|family" / label members); rows
+  find their contact there (findIndexedContact_: the 6 h row cache first, People.get only for a cached contact not
+  listed yet; owner: name AND phone / email filter). A contact identical to its row (contactMatchesPayload_: names,
+  phones + types, emails + types, notes, organization, label) is not written; the 0.75 s sleep only after a write.
+- searchAndUpsertSingleContact / ownerUpsertContact_ return { failed: true, resourceName } instead of null and THROW a
+  quota error (isQuotaError_), so the loop's 15-minute pause works. A failed row's contact is kept, and any failure
+  in a sync = no deletions this time (note shown). Deletion = label members not used by a row of this run nor
+  (rows done in an earlier run) any contact with a row's names (protectByName).
+- "More than half" (label > 10 contacts): worked out at row 1 of a sync from the whole sheet; pop-up if someone is
+  there (askMassDeletion_), else blocked + note; SYNC_DELETE_DECISION = confirmed / blocked / none-needed, read by the
+  clean-up of the last run (asks again only for none-needed). Now on the owner's sheet too.
+- Time: SCRIPT_START_MS_ (Core.gs, set when the files load = run start); rows stop at 4.5 min after it, and with less
+  than 45 s left at the start (a long build) the sync starts in a fresh run (SYNC_START_ROW kept, so a busy lock
+  re-schedules it). Contacts can't be read: retry in 15 min (3 times), then stop with a message, nothing changed.
+- State in script props: SYNC_START_ROW / _CREATED_COUNT / _EDITED_COUNT / _FAILED_COUNT / SYNC_DELETE_DECISION /
+  SYNC_LIST_RETRIES (clearSyncRunState_, also used by EMERGENCY_STOP_SYNC). The old STALE_CHUNK_* cache is no longer used.
+  SYNC_UI_STATE 'done' carries failed + note (ProgressSidebar shows them; log list "failed").
+- Tested offline with a fake People API (test_sync: normal, failed save, quota pause + resume, over-half blocked /
+  confirmed, late start, owner rows); not yet run against real Google Contacts.
+Not fixed (owner action): the owner's summary email needs the script.send_mail and userinfo.email scopes in the
+OWNER'S OWN project manifest only (in the shared manifest every school would have to re-authorize and their triggers
+stop until they do).
 Fixed 2026-11-12: quick notes ignored the Settings date range (notesDateRange_ / inNotesDateRange_, Build.gs, used by
 the build and notesTextForOsis_); getExistingMasterTable_ now has a header row; EMERGENCY_STOP_SYNC clears
 SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS turns on with the first click; purgeDischargedStudents and the Hide

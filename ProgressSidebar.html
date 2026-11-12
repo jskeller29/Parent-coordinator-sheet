@@ -379,12 +379,13 @@
           clearInterval(poller);
           markBuildDone();
           setSyncBar(state.total, state.total, 'done');
-          el('syncStatus').className = 'status ok';
-          el('syncStatus').innerText = 'Sync complete';
+          // A row that couldn't be saved, or a skipped removal (over half), is said here
+          el('syncStatus').className = state.note || state.failed ? 'status err' : 'status ok';
+          el('syncStatus').innerText = 'Sync complete' + (state.note ? '. ' + state.note : '');
           el('etaText').innerText = "";
 
           if (!buildReportShown) { showBuildReport(); buildReportShown = true; }
-          showFinalReport(state.created, state.deleted, state.edited);
+          showFinalReport(state.created, state.deleted, state.edited, state.failed);
 
           showControls(false);
           google.script.run.resetSyncStatus();
@@ -468,13 +469,14 @@
         el('buildStatus').innerText = 'Error: ' + error.message;
       }
 
-      function showFinalReport(created, deleted, edited) {
+      function showFinalReport(created, deleted, edited, failed) {
         el('summaryReport').innerHTML = `
           <div class="box rep">
             <div class="rh">Phone sync report</div>
             <a onclick="openDetails('created')">New contacts<b>${created || 0}</b></a>
             <a onclick="openDetails('edited')">Edited contacts<b>${edited || 0}</b></a>
             <a onclick="openDetails('deleted')">Old contacts removed<b>${deleted || 0}</b></a>
+            ${failed ? `<a onclick="openDetails('failed')">Not saved (kept as they were)<b>${failed}</b></a>` : ''}
           </div>
         `;
       }
@@ -536,6 +538,7 @@
         if (type === 'created') { titleStr = "New contacts"; cssClass = "created"; }
         if (type === 'edited') { titleStr = "Edited contacts"; cssClass = "edited"; }
         if (type === 'deleted') { titleStr = "Old contacts removed"; cssClass = "deleted"; }
+        if (type === 'failed') { titleStr = "Not saved this time"; cssClass = "deleted"; }
         fillList(titleStr, arr, cssClass);
       }
 

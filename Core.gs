@@ -10,6 +10,11 @@
 // Single source of truth for the Contact Log columns (1-based), plus the
 // shared data-row formatter, so a future column shift is changed here only.
 // ======================================================================
+// When this run started (every run loads the script files first). Google stops a run
+// 6 minutes after this, so the phone sync counts its time from here (Contacts Sync.gs):
+// a build in the same run uses part of it.
+var SCRIPT_START_MS_ = Date.now();
+
 const CL_WIDTH = 16;                // Full row width, A:P
 const CL_COL_GUARDIAN = 3;          // C — Guardian name
 const CL_COL_SPOKE_WITH = 4;        // D — Person spoken with
@@ -552,8 +557,8 @@ function withBuildLock_(what, fn, waitMs) {
 }
 
 // ======================================================================
-// EDIT DEBUG LOG (read by the temporary 🐞 Contact Log Debug sidebar, end of
-// Edits.gs). Off unless that sidebar is open: it keeps the
+// EDIT DEBUG LOG (read by the temporary 🐞 Contact Log Debug sidebar, the owner's
+// test file z_ContactLogDebug.gs). Off unless that sidebar is open: it keeps the
 // document cache key CL_DEBUG_ON alive while it polls, so recording stops by
 // itself a few minutes after the sidebar is closed. When off, each edit costs
 // one cache read. Each run's steps (ms since the script started) go to the
