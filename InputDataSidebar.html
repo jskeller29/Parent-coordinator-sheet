@@ -119,7 +119,6 @@
     <div class="card" id="listsCard">
       <b>Your lists</b>
       <div id="listItems"></div>
-      <div id="listsMissing" class="error hidden">Your Lists needs the <b>Z#OwnData</b> script and <b>Z#OwnDataSidebar</b> file in Extensions → Apps Script.</div>
       <div id="newListForm" class="hidden">
         <b>New list</b>
         <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
@@ -210,7 +209,7 @@
   function dbgReply(v, what) {
     dbg.lastAt = new Date().toLocaleTimeString();
     dbg.lastMs = dbg.lastSent ? (Date.now() - dbg.lastSent) : null;
-    var lines = (v && v.debug) ? v.debug : ['(reply had no debug info — is the new Z#InputDataMode.gs pasted in?)'];
+    var lines = (v && v.debug) ? v.debug : ['(reply had no debug info — is the new Input Data.gs pasted in?)'];
     var summary = v ? ('active=' + v.active + ' step=' + v.stepIndex + ' tab=' + v.tabName +
       (v.notice ? ' notice=' + v.notice.type + '/' + (v.notice.code || '') : '')) : '(empty reply)';
     $('dbgServer').textContent = 'SERVER (' + what + ' @ ' + dbg.lastAt + ')\n' + summary + '\n' + lines.join('\n');
@@ -446,11 +445,10 @@
     google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
   }
 
-  // --- step 5: Your Lists (Z#OwnData.gs) ---
+  // --- step 5: Your Lists (Input Data.gs, part 2) ---
   function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function renderLists(lists) {
-    show('listsMissing', lists === null);
-    show('addListBtn', lists !== null); show('newListForm', false); show('finishListsBtn', true);
+    show('addListBtn', true); show('newListForm', false); show('finishListsBtn', true);
     var icons = ['🚌', '🎒', '🏫', '📋', '🗂️'];
     $('listItems').innerHTML = (lists || []).map(function (l, i) {
       var st = l.stats, chips = '';

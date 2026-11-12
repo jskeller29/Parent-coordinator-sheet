@@ -178,8 +178,8 @@ function columnLetter_(col) {
  *   BH:BJ  Send Out List        (feeds the "Send Out" sheet; not used by code)
  *   BL     Type List            (was "Type List")
  *   BN:BQ  Additional Information (OSIS / Student / Guardian / lines; written by
- *          every build from Your Lists, Z#OwnData.gs; read by the phone contacts)
- *   BS:BV  Your Lists setup     (one row per list tab, Z#OwnData.gs)
+ *          every build from Your Lists, Input Data.gs; read by the phone contacts)
+ *   BS:BV  Your Lists setup     (one row per list tab, Input Data.gs)
  *   BX:CD  Student List         (OSIS..Status WITH the sibling-group rows;
  *          written by every build, read by the autofill, studentLookupSource_)
  * The last three are "grow" sections: an older Backend tab gets their columns the
@@ -509,8 +509,8 @@ function runAction_(label, fn) {
 }
 
 // ======================================================================
-// EDIT DEBUG LOG (read by the optional 🐞 Contact Log Debug sidebar,
-// Z#ContactLogDebug.gs). Off unless that sidebar is open: it keeps the
+// EDIT DEBUG LOG (read by the temporary 🐞 Contact Log Debug sidebar, end of
+// Edits.gs). Off unless that sidebar is open: it keeps the
 // document cache key CL_DEBUG_ON alive while it polls, so recording stops by
 // itself a few minutes after the sidebar is closed. When off, each edit costs
 // one cache read. Each run's steps (ms since the script started) go to the

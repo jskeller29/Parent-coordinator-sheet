@@ -942,7 +942,7 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
 
   const masterMap = new Map(masterTable.slice(1).filter(r => isRealStudentId_(r[0])).map(r => [toText_(r[0]), r]));
   const tracking = buildTrackingNotesMap_(ss, combinedContactTrackingArray); 
-  const additionalInfo = readAdditionalInfo_(ss); // Backend section filled from Your Lists (Z#OwnData.gs)
+  const additionalInfo = readAdditionalInfo_(ss); // Backend section filled from Your Lists (Input Data.gs)
   
   const oldContactsMap = getOldContactsMap_(ss);
 

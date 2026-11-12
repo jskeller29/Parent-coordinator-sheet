@@ -92,16 +92,12 @@ function buildAllDerivedSheets() {
   let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
   if (owner) masterTable = owner.adjustMasterTable(ss, masterTable); // Old Master Table history
   masterTable = addLastInteractionColumn_(masterTable, contactLogData, freshEventData);
-  // Your Lists (optional trial file Z#OwnData.gs): matches every list tab, writes the
-  // Backend's Additional Information (read by the phone contacts) and returns the
+  // Your Lists (Input Data.gs): matches every list tab, writes the Backend's
+  // Additional Information (read by the phone contacts) and returns the
   // Student List / Parents Divided columns. A problem there never stops the build.
   let listOutputs = null;
-  if (typeof od_buildOutputs_ === "function") {
-    try { listOutputs = od_buildOutputs_(ss, masterTable, guardianRows); }
-    catch (e) { console.warn("Your Lists skipped: " + e.message); }
-  } else {
-    backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW); // file removed: its old lines go too (no-op if never written)
-  }
+  try { listOutputs = od_buildOutputs_(ss, masterTable, guardianRows); }
+  catch (e) { console.warn("Your Lists skipped: " + e.message); }
   if (listOutputs) masterTable = addListColumns_(masterTable, listOutputs.studentCols);
   // The full table (OSIS..Status, sibling-group rows included) goes to the Backend
   // (BX:CD) for the autofill; the Student List tab gets one row per student. The
@@ -592,7 +588,7 @@ function buildClassReferenceMap_(rawData) {
  * Raw Data BI ("Class") cell -> [{ code, teacher }]. One class per line:
  * "Y25: Carl" or just "Y24" (no teacher). A line can also hold several classes
  * the old way, "Y41: Tessa Y25: Sam" (read exactly as before).
- * Also used by Input Data Mode (Z#InputDataMode.gs) to read / write BH:BI.
+ * Also used by Input Data Mode (Input Data.gs) to read / write BH:BI.
  */
 function parseClassCell_(text) {
   const out = [];
@@ -1878,8 +1874,8 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
 
 /* =========================
    YOUR LISTS: OUTPUT COLUMNS + ADDITIONAL INFORMATION
-   Z#OwnData.gs (optional) works out the values; these only place them, so they
-   are harmless without it: no columns, an empty Backend section, no extra lines.
+   Your Lists (Input Data.gs) works out the values; these only place them. No
+   lists = no columns, an empty Backend section, no extra lines.
 ========================= */
 
 /**

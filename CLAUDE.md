@@ -19,8 +19,11 @@ Files (shared = every school's sheet):
   sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
   (cache key BUILD_STEP; getSyncStatus returns buildSteps / buildStep with the state).
 - Edits.gs: installedOnEdit, ghost typists (Contact Log / Notes / Events), Raw Data paste clean-up, quick updates
-  (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables.
-- Menus.gs: onOpen menus, setup, Settings, Student Overrides + report, Rollover, Migration, Version Check, links.
+  (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables, and at the end the
+  temporary 🐞 Contact Log Debug sidebar (see below).
+- Menus.gs: onOpen menus, setup, Getting Started (welcome + checklist, see below), Settings, Student Overrides +
+  report, Rollover, Migration, Version Check, data update reminder, links.
+- Input Data.gs: Input Data Mode (part 1) + Your Lists (part 2), see below.
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
 - Sheet Lock.gs: "baby-proofing" (see SHEET LOCK below): Google warning-only protections + toggleSheetLock
@@ -34,11 +37,24 @@ Files (shared = every school's sheet):
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
   dialogs built as strings in .gs (Welcome, Report a Bug, ATS reminder, Create Event) start with include_('Styles').
   No other <? ... ?> tags may appear in the HTML files. Z#ContactLogSidebar keeps its own style (left as is).
-- Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool; left as is.
+- Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool (➕ New Interaction /
+  🔔 Manage Notes / Follow-ups); left as is. It is the ONLY Z# file left: the owner keeps it as Z# for later
+  (2026-11-11, when every other Z# file was coalesced into the shared files).
   "Z#" = a temporary file for trying out a new feature: no other code may rely on Z# files (the only link is the
   guarded `if (typeof buildContactLogMenu_ === "function")` line in onOpen, a no-op without the file).
-- Z#InputDataMode.gs (+ Z#InputDataSidebar.html): optional "📥 Input Data Mode" (🚀 App Menu, both the getting-started
-  and full menus, via 2 guarded `addInputDataModeMenuItem_` lines in onOpen). Hides all visible tabs (remembered),
+
+COALESCED Z# FILES (owner's request 2026-11-11): Input Data Mode, Your Lists, Getting Started and Contact Log Debug are
+no longer optional trial files. Their code moved word for word (function names, google.script.run endpoints, document
+property / cache / Backend keys unchanged); the typeof guards in shared code and the "file missing" fallbacks were
+removed, so these files are now REQUIRED (a missing one = onOpen error / no menu). Old -> new:
+  Z#InputDataMode.gs + Z#OwnData.gs -> Input Data.gs (part 1 / part 2); Z#Guide.gs -> Menus.gs section GETTING
+  STARTED; Z#ContactLogDebug.gs -> end of Edits.gs; HTML: Z#InputDataSidebar -> InputDataSidebar, Z#OwnDataSidebar ->
+  YourListsSidebar, Z#GuideSidebar -> GettingStartedSidebar, Z#ContactLogDebugSidebar -> ContactLogDebugSidebar.
+  Only behavior change: none on a sheet that had all the Z# files (the guards were always true there).
+
+- Input Data Mode (Input Data.gs part 1 + InputDataSidebar.html; was Z#InputDataMode.gs): "📥 Input Data Mode"
+  (🚀 App Menu, both the getting-started and full menus, via the 2 `addInputDataModeMenuItem_` lines in buildMenus_;
+  also opened by the data update reminder and Getting Started). Hides all visible tabs (remembered),
   then one temp tab at a time ("Student Data", "Parent Square Data", "NYCSA Data"); paste anywhere or upload the
   CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Sidebar polls every 2s, finds the header row, refuses the
   wrong export and numbers Excel cut off (E+ / #### / ID-phone columns ending in 000; "Use it anyway" allowed),
@@ -48,7 +64,7 @@ Files (shared = every school's sheet):
   dropdown = hidden col Z formula of every typed site (other values allowed). Save rewrites BH:BI rows 7+ as ONE ROW
   PER SITE (owner's format): BH = site, BI = that site's classes, one per line, "Y25: Carl" or bare "Y24" (no
   teacher); sites in number order, no-site classes last. Read by parseClassCell_ (Build.gs, used by
-  buildClassReferenceMap_ and Z#): one class per line, a line may still hold the old "Y41: Tessa Y25: Sam" (read
+  buildClassReferenceMap_ and Input Data Mode): one class per line, a line may still hold the old "Y41: Tessa Y25: Sam" (read
   exactly as before; bare-code lines are the only addition). ":" stripped from names, classes with no teacher and
   no site dropped, codes must be letters/digits. Raw Data rows 7+ are forced to 21px (lockRawDataRowHeights_, Edits.gs:
   after every Raw Data edit/paste and Input Data Mode write) so multi-line BI cells do not make rows tall; date in doc property
@@ -60,14 +76,14 @@ Files (shared = every school's sheet):
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
-  Step 5 "Your Lists" (step key lists, lists: true; needs Z#OwnData.gs, every od_* call guarded): no paste / upload /
-  polling / Skip; the lists card shows od_listSummaries_ (idm_view_ "lists", null = files missing -> note, Finish still
-  works) with Paste new version / Edit setup / ✏️ rename / 🗑️ delete, "➕ Add another list" (od_createList opens
-  Z#OwnDataSidebar IN PLACE of this sidebar; od_backToInputMode reopens it) and Finish (idm_finishLists:
+  Step 5 "Your Lists" (step key lists, lists: true; part 2 of the same file): no paste / upload /
+  polling / Skip; the lists card shows od_listSummaries_ (idm_view_ "lists")
+  with Paste new version / Edit setup / ✏️ rename / 🗑️ delete, "➕ Add another list" (od_createList opens
+  YourListsSidebar IN PLACE of this sidebar; od_backToInputMode reopens it) and Finish (idm_finishLists:
   results.lists = { saved, rows: ready lists, lists: true } or skipped, so the end screen offers Build). Site / Class
   is no longer the last step: its button is "✅ Save Site / Class".
 
-- Z#OwnData.gs (+ Z#OwnDataSidebar.html): optional "Your Lists" (owner's request 2026-11-05): your own lists (bus
+- Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
   One tab per list "📥 <name>" (rows 1-3 = OWN DATA band / status / column chips, header row 4 after a paste, data from
   row 5, tool columns "✔ Matched" / "How" after one blank spacer column). Its setup = one row in the Backend OWN_LISTS
@@ -89,7 +105,7 @@ Files (shared = every school's sheet):
     Done view: during Input Data Mode only "← Back to Input Data Mode" (a build then would run with the tabs hidden);
     outside it "🏗️ Build Sheets Now" (od_build).
   - Build: buildAllDerivedSheets calls od_buildOutputs_(ss, masterTable, guardianRows) right after
-    addLastInteractionColumn_ (guarded typeof + try/catch: an error only logs "Your Lists skipped"). It re-matches every
+    addLastInteractionColumn_ (try/catch: an error only logs "Your Lists skipped"). It re-matches every
     ready list, rewrites the tool columns, returns studentCols (Student List columns after Last Interaction, siblings'
     values joined " / ", addListColumns_) and guardianCols (Parents Divided, keyed OSIS|guardian name,
     addGuardianListColumns_), and rewrites the Backend ADDL_INFO section (OSIS, Student, Guardian, Additional
@@ -101,8 +117,8 @@ Files (shared = every school's sheet):
     readAdditionalInfo_ keeps the rows in the doc cache (ADDL_INFO_ROWS_<spreadsheet id>, 6 h) because the owner's
     per-edit Phone Contacts update (ownerUpdateOsisDeltas_) calls it; backendClearBlock_ / backendAppendRows_ /
     backendBlockRange_ on ADDL_INFO clear it (a write clears first). Keyed by spreadsheet ID: the owner's "copy, then
-    load fake data on the copy" builds the copy with this script's cache. A build without Z#OwnData.gs clears ADDL_INFO
-    (no-op if never written), so removing the file also removes its lines.
+    load fake data on the copy" builds the copy with this script's cache. od_buildOutputs_ clears ADDL_INFO when there
+    are no lists (no-op if never written).
   - Resets: list tabs are deleted by deleteLegacySheets_ (not in KEEP_TABS_); resetDerivedSheets_ clears ADDL_INFO +
     OWN_LISTS. Migration and Rollover do NOT carry lists over (not built; owner to decide).
   - google.script.run endpoints: od_createList, od_openList, od_repasteList, od_renameList, od_deleteList, od_getWizard,
@@ -110,21 +126,22 @@ Files (shared = every school's sheet):
     Tested offline (own_test: shared + owner) and by a Chromium click-through of both sidebars wired to the real
     server code on the mock sheet (not yet tried on a real sheet).
 
-- Z#Guide.gs (+ Z#GuideSidebar.html): optional "✅ Getting Started" (bare-bones version, owner's pick 2026-11-05; a full
-  tour / tab pop-ups / Start Here tab / header notes were proposed and NOT built). 3 guarded hooks in Menus.gs:
-  addGuideMenuItems_ (both 🚀 App Menus), showGuideWelcome_ (runInitialSetupWrapper, instead of showWelcomeDialog on
-  new-user copies; "📖 Open User Guide" still opens showWelcomeDialog), guideOnOpen_ (checkVersionOnOpen).
-  Welcome pop-up after setup: 4 steps, "Start with Input Data Mode" (only if openInputDataMode exists), video / guide
+- Getting Started (Menus.gs section GETTING STARTED + GettingStartedSidebar.html; was Z#Guide.gs): "✅ Getting Started"
+  (bare-bones version, owner's pick 2026-11-05; a full tour / tab pop-ups / Start Here tab / header notes were proposed
+  and NOT built). Called from Menus.gs: addGuideMenuItems_ (both 🚀 App Menus), showGuideWelcome_
+  (runInitialSetupWrapper, instead of showWelcomeDialog on new-user copies; "📖 Open User Guide" still opens
+  showWelcomeDialog), guideOnOpen_ (checkVersionOnOpen, in a try/catch).
+  Welcome pop-up after setup: 4 steps, "Start with Input Data Mode", video / guide
   links. Checklist sidebar: 1 load data (ticks when Raw Data A1 has a real date; also shows Parent Square AG1, NYCSA
   AP1, Sites and classes BH7:BI7 / INPUT_DATA_MODE_SITECLASS_UPDATED), 2 build (Student List lastRow > 4, same test as
   the menus), 3 settings (doc property ZG_SETTINGS_SEEN, set when opened from the checklist), 4 first contact (any
   Contact Log C above END). (Step 2 = studentListIsBuilt_, Core.gs, since 2026-11-11.) Opens by itself on every open until all 4 are done, not during Input Data Mode, unless
   unticked (doc property ZG_AUTO_OPEN = "off"). "This tab" panel (zg_activeTab polled every 3 s) + "Hidden tabs" list
   (Settings tabs: ⚙️ Settings → Tabs & columns; others: View → Hidden sheets). Link PLACEHOLDERS: GUIDE_LINKS at the
-  top of Z#Guide.gs (empty = "link coming soon").
+  top of the GETTING STARTED section (empty = "link coming soon").
 
-- Z#ContactLogDebug.gs (+ Z#ContactLogDebugSidebar.html): TEMPORARY "🐞 Contact Log Debug" sidebar (🚀 App Menu, both
-  menus, guarded addContactLogDebugMenuItem_ lines in buildMenus_). Live list of runs (Contact Log / Notes / Events
+- 🐞 Contact Log Debug (end of Edits.gs + ContactLogDebugSidebar.html; was Z#ContactLogDebug.gs): TEMPORARY sidebar
+  (🚀 App Menu, both menus, the 2 addContactLogDebugMenuItem_ lines in buildMenus_; shown on every school's sheet). Live list of runs (Contact Log / Notes / Events
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
   Communications cell + formula?, OSIS box, notes shown, Combined vs logs for that OSIS, newest rows); "Copy report";
@@ -230,26 +247,29 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Quick Updates Installed, QuickUpdates, RolloverBackend, Settings Backend, Student Override Report,
   Student Overrides Backend, VersionCheck, ZProduction, z_PhoneOverride, z_PhoneOverride 4+, z_PhoneOverride.gs Add On.
 - Then paste Core, Build (replaces the old Build), Edits, Menus, Contacts Sync, Sheet Lock (new); owner sheet also z_MINE.
-  Student List rename (2026-11-05): also Regenerate, SettingsDialog, ProgressSidebar, Z#Guide, Z#ContactLogDebug,
-  Z#InputDataSidebar (they name the tab).
+  Student List rename (2026-11-05): also Regenerate, SettingsDialog, ProgressSidebar and the (now coalesced) Getting
+  Started / Contact Log Debug / Input Data Mode files (they name the tab).
   UI refresh: also add Styles.html (new) and re-paste SettingsDialog, ProgressSidebar, NewStudentDialog,
   ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog. Regenerate (re-paste: KEEP_TABS_ tab clean-up, Color Tabs removed), the Z# files
   and the manifest are unchanged. The Contact Log tool is now named
   Z#ContactLog / Z#ContactLogSidebar (delete the old #ContactLog / ContactLogSidebar files, or they define it twice).
-- Input Data Mode: also paste Z#InputDataMode (script) + Z#InputDataSidebar (HTML); optional, menu item only appears
-  with them.
-- Your Lists (2026-11-05): paste the new Z#OwnData (script) + Z#OwnDataSidebar (HTML) and re-paste Core, Build,
-  Regenerate, Z#InputDataMode, Z#InputDataSidebar (owner sheet: also z_MINE). Optional: without the two new files step 5
-  says they are missing and every build / phone contact is exactly as before.
-- Getting Started: also paste Z#Guide (script) + Z#GuideSidebar (HTML); optional, needs Styles.html; works best with
-  Input Data Mode.
-- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug, Build (the box itself is set up by
+- Lookup box layout (2026-11-11): re-paste Regenerate, Edits, Z#ContactLogDebug (now in Edits), Build (the box itself is set up by
   hand in the sheet; the code finds it, cleans under it, outlines it and adds / removes guardian rows).
 - Student List without sibling rows + header on row 1 (2026-11-11): re-paste Core, Build, Edits, Menus, Regenerate,
-  Z#OwnData, Z#Guide, Z#ContactLogDebug (owner sheet: also z_MINE), then Build Sheets once (fills Backend BX:CD,
+  Z#OwnData, Z#Guide, Z#ContactLogDebug (now Input Data, Menus, Edits; owner sheet: also z_MINE), then Build Sheets once (fills Backend BX:CD,
   writes the Student List from row 1, repoints the Events dropdowns); owner sheet: then 🐞 Debug → Fix Dropdown
   Criteria for dropdowns made by hand. The master template's Student List tab needs the same row-1 layout (the build
   writes from row 1 anyway, but frozen rows / header look are set by hand).
+- Coalesced Z# files (2026-11-11), the newest step, on top of the above:
+  1. DELETE these 8 files first (their code now lives in the files below; keeping them = duplicate functions / consts,
+     the project will not load): Z#InputDataMode, Z#InputDataSidebar, Z#OwnData, Z#OwnDataSidebar, Z#Guide,
+     Z#GuideSidebar, Z#ContactLogDebug, Z#ContactLogDebugSidebar.
+  2. ADD the script file "Input Data" and the HTML files InputDataSidebar, YourListsSidebar, GettingStartedSidebar,
+     ContactLogDebugSidebar (HTML file names must match exactly, without ".html").
+  3. RE-PASTE Core, Build, Edits, Menus (owner sheet: also z_MINE); Regenerate too if the two 2026-11-11 steps above
+     are not deployed yet. Contacts Sync, Sheet Lock, the other HTML files, Z#ContactLog / Z#ContactLogSidebar and the
+     manifest are unchanged by the coalesce.
+  All of these are now required (no longer optional). Needs Styles.html (Getting Started, Contact Log Debug).
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
@@ -258,7 +278,7 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   only) is a different tab and keeps its name. Function / variable / key names were NOT renamed (buildMasterTableData_,
   masterTable, findInMasterTable_, Settings key showMasterTable).
 - Lists built when the files load spell the name out (file load order must not matter): TAB_VISIBILITY
-  ["Student List", "Master Table"], KEEP_TABS_, SHEET_LOCK_BUILT_TABS, Z#Guide's tab list, BUILD_STEPS. The search
+  ["Student List", "Master Table"], KEEP_TABS_, SHEET_LOCK_BUILT_TABS, Getting Started's tab list (ZG_TABS), BUILD_STEPS. The search
   bar formula (SEARCH_BAR_COMMS_FORMULA) reads 'Student List'!A:B; restoreSearchBarCommunicationsFormula renames an old
   tab first. A tab renamed by hand / by setName keeps its protections, data validations and formula references.
 - ONE ROW PER STUDENT (owner's request 2026-11-11): the tab has no sibling-group rows ("111, 222" / "Ann X & Ben X");
@@ -278,7 +298,7 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
 - Header on ROW 1, data from row 2 (owner moved it 2026-11-11; was row 4 / row 5): OSIS, Student, Guardian, Site, Class,
   Sibling, Status, Last Interaction (H). STUDENT_LIST_HEADER_ROW (Core.gs) = where the build writes it. Readers find the
   header themselves (studentListHeaderRow_: "OSIS" in A1:A10, else row 1), so a tab not rebuilt since still works:
-  studentListIsBuilt_ (menus + Z#Guide), the lookup fallback, resetMasterTable_ (clears under the header),
+  studentListIsBuilt_ (menus + Getting Started), the lookup fallback, resetMasterTable_ (clears under the header),
   getAllStudentsForEdit and ownerReadMasterStatusSnapshot_ (start under the header), buildMasterTableData_ /
   readMasterStatusSnapshot_ (already scanned for "OSIS"). Your Lists' sidebar index (od_indexFromSheet_) and the Contact
   Log Debug anonymizer read the Backend copy (studentLookupRows_). Hide Discharged / Purge take row 1 as the header,
@@ -295,7 +315,7 @@ Backend tab (see Core.gs):
   Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
-  BN:BQ Additional Information and BS:BV Your Lists setup (both Z#OwnData.gs), BX:CD Student List (OSIS..Status incl.
+  BN:BQ Additional Information and BS:BV Your Lists setup (both Your Lists, Input Data.gs), BX:CD Student List (OSIS..Status incl.
   the sibling-group rows; every build; read by the autofill). PLAIN RANGE, no Sheets Table (owner's choice 2026-11-11):
   the Contact Log's dropdowns read Backend!$BX$3:$BX (OSIS) / $BY$3:$BY (Student) / $BZ$3:$BZ (Guardian), open-ended, so
   every student is included. A Table was tried first and dropped: it had its header on row 3 (it took the first student
@@ -337,8 +357,8 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
   dropdown fills the same dates as the old preset buttons. Checked offline: 96 save / reset payloads identical to the old dialog.
 - Build & Sync sidebar: live build checklist (from getSyncStatus's buildSteps / buildStep, see BUILD_STEPS in Build.gs;
   the current step shows its detail line) + phone-sync progress bar.
-- Data update reminder (showDataReminderDialog_) restyled; Settings has it under Student data. Z#InputDataSidebar
-  (trial file) keeps its own style.
+- Data update reminder (showDataReminderDialog_) restyled; Settings has it under Student data. InputDataSidebar
+  and YourListsSidebar (from the trial files) still keep their own style (not Styles.html).
 - Create Event: type buttons (PTC, Workshop, Family event, Meeting) only fill the Type box. New/Edit Student: one grouped
   form, entry type as two buttons over a hidden #entryType input. Manage Overrides: cards. Rollover: step markers.
 
@@ -468,8 +488,8 @@ Data update reminder (Menus.gs, replaced the old 30-day ATS-only reminder; same 
 pop-up when Raw Data A1 / AG1 / AP1 (ATS / Parent Square / NYCSA, only sections ever loaded) is older than setting
 "dataReminder" (week default / 2weeks / month / off; in SETTING_KEYS so it is saved to the Backend settings block and
 shown in ⚙️ Settings). Checked by checkVersionOnOpen and by installedOnEdit (checkDataReminderWhileOpen_, user cache:
-once an hour); once a day (ATS_REMINDER_LAST_SHOWN); not during Input Data Mode. "Go to Input Data Mode" only if
-openInputDataMode exists (guarded), else the guide link. Skip -> Remind After 2 Weeks / 1 Month (setting + wait in doc
+once an hour); once a day (ATS_REMINDER_LAST_SHOWN); not during Input Data Mode. "Go to Input Data Mode" (always, since
+the coalesce; DATA_GUIDE_URL is kept but no longer linked). Skip -> Remind After 2 Weeks / 1 Month (setting + wait in doc
 property DATA_REMINDER_SNOOZE_UNTIL) / Remove Reminders / Just skip for today. Endpoints dataReminderOpenInputMode,
 dataReminderChoose. Saving a different choice in Settings clears the wait.
 Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications.

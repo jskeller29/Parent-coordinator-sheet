@@ -137,7 +137,6 @@
 
         const btns = document.createElement('div'); btns.className = 'btns';
         s.buttons.forEach(bt => {
-          if (bt.needsInputMode && !state.hasInputMode) return;
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'btn ' + (bt.primary && i === nextIndex ? 'pri' : 'sec');
