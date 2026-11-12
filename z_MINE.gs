@@ -654,8 +654,8 @@ function ownerDebugToast_(message, title, seconds) {
 //   columns have a header, so they stay.
 // - Names: tab "RAW Data" -> "Raw Data", Send Out's table "Table1" -> "Send Out".
 // - Repaints now what the code paints anyway (Events tables, Raw Data, Directory site
-//   colors, Override Report header, Contact Log Type colors), instead of at the next
-//   build / reset.
+//   colors, Override Report header, the Contact Log's color rules: Workshop rows + Type
+//   colors), instead of at the next build / reset / 10 PM run.
 // Values are never changed, except PCAR's missing title and the two names. Safe to
 // run again. 📦 Make Release Copies copies all of it into the Example / Blank.
 // A script can't change dropdown chip colors; the Contact Log's widths are yours.
@@ -847,10 +847,10 @@ function ownerApplySheetStyle_(ss) {
     styleOverrideReport_(sh, sh.getLastRow());
     rep.done.push("Students Override Report: navy header");
   });
-  step("Contact Log Type colors", () => {
+  step("Contact Log colors", () => {
     if (!ss.getSheetByName("Contact Log")) return;
-    applyTypeDropdownColors();
-    rep.done.push("Contact Log Type column: one fixed color per type (no new colors every night)");
+    resetContactLogFormatting(); // the 10 PM run's redraw: week colors, pale green Workshop rows, Type colors ...
+    rep.done.push("Contact Log: pale green Workshop rows, one fixed color per Type (no new colors every night)");
   });
 
   // 11. Send Out's red corner marks

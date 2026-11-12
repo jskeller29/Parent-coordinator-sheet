@@ -9,7 +9,8 @@
 //    Your Lists headers after Last Interaction get the Status header's look
 //  - 🐞 Debug → 🎨 Apply Sheet Style (z_MINE.gs) with a fake Sheets API: table colors and the
 //    Send Out table's name, header rows, PCAR, the empty "Column 9", RAW Data -> Raw Data, the
-//    Contact Log's fonts left alone except column D, Send Out's dropdown ranges reported;
+//    Contact Log's fonts left alone except column D, its color rules redrawn (pale green
+//    Workshop rows), Send Out's dropdown ranges reported;
 //    without the Sheets API the table colors are listed to do by hand
 const assert = require('assert');
 const { loadProject } = require('./lib/load');
@@ -286,6 +287,10 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
   assert(calls(ss, "Raw Data", "setHorizontalAlignment").some(c => c.row === 1 && c.col === 1 && c.args[0] === "left"), "Raw Data repainted");
   assert.strictEqual(t("Students Override Report").getRange(1, 1).getBackground(), L.built.header, "Override Report repainted");
   assert(L.siteColors.includes(t("Directory").getRange(2, 1).getBackground()), "Directory site color from the new set");
+  const clRules = t("Contact Log")._cf.map(r => r._st);
+  assert(clRules.some(r => r.formula === '=$J2="Workshop"' && r.bg === L.workshopRow), "Contact Log rules redrawn: pale green Workshop rows");
+  assert(!clRules.some(r => r.bg === "#b6d7a8"), "the old solid Workshop green is gone");
+  assert(clRules.some(r => /TODAY\(\)/.test(r.formula || "") && r.bg === "#d9ead3"), "the week / today colors stay as they were");
 
   // Reported: Send Out's dropdown ranges, the chip colors, the Contact Log widths
   assert(rep.byHand.some(l => /Send Out Type/.test(l) && /BH4/.test(l) && /Backend!BH3:BH/.test(l)), "C's list one row too low");

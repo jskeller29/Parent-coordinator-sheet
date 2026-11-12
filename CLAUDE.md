@@ -35,8 +35,9 @@ Files (shared = every school's sheet):
   getStudentListSheet_ first (an old "Master Table" is renamed, not deleted) and resetMasterTable_ uses it.
   Sheet look (owner's request 2026-11-12, see SHEET LOOK): forceVibrantColors_ (Raw Data: Montserrat on the whole
   tab, DATE UPDATED titles left-aligned, Parent Square header #f6dfc4 instead of #ff9900), the fake data's 2 Raw Data
-  fonts, and resetMasterTable_ deletes the Student List's columns after H (STUDENT_LIST_COLUMNS_; clears
-  min(9, columns)).
+  fonts, resetMasterTable_ deletes the Student List's columns after H (STUDENT_LIST_COLUMNS_; clears
+  min(9, columns)), and resetContactLogFormatting's Workshop rows (J = "Workshop", C:O) are pale green
+  SHEET_LOOK_.workshopRow #e6f1ea (was solid #b6d7a8).
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -712,7 +713,12 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   (~#6b4e37) + cream rows; tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking,
   Phone Contacts, Students Override Report, PCAR) = navy #183e69 (the dialogs' navy) + light grey #f3f5f8 rows.
   Red / amber / green only where they mean something. The Contact Log keeps its hand-made look (table colors, lookup
-  box, END bar, week / today / workshop rules). Navy everywhere = give typing the built values.
+  box, END bar, week / today rules); its Workshop rows are pale green now (SHEET_LOOK_.workshopRow, owner 2026-11-12).
+  Navy everywhere = give typing the built values.
+- Dropdown chip colors (by hand, Table column settings; owner was given this scheme 2026-11-12): Follow-up N = dark
+  red ASAP (the only dark chip), light orange Needed, light yellow Waiting, light green Resolved, light gray No Followup
+  / Skipped (most rows = quiet); Method J = light chips only, Phone light gray (most rows), Walk In light blue,
+  Workshop light green, Workshop Attendee light cyan, Parent-Teacher light purple, Internal light yellow.
 - Code that paints (so a by-hand change there would come back): Events tables (styleEventTableAt_, Edits.gs: brown
   title row with white text over name / type / place / date, delete box #f8e9e7, header row #efe3d3, thin #e3d8ca
   lines + brown outline; used by buildEventTable, restyleEventTables_ (Migration) and 🎨 with lookOnly; was green /
@@ -735,7 +741,8 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   This / Last Week navy, the own-dates box brown with yellow #fff2cc date cells, section rows #e3e8ee / #efe3d3, a
   missing section title copied from the first box, labels plain + wrapped); the Student List's empty columns after
   the last header ("Column 9" counts as empty; Your Lists columns stay); tab "RAW Data" -> "Raw Data" (every lookup
-  takes both); then repaints the code-painted parts now. Reports Send Out dropdowns that read Backend BH/BI/BJ from
+  takes both); then repaints the code-painted parts now (the Contact Log's rules via resetContactLogFormatting, as the
+  10 PM run does). Reports Send Out dropdowns that read Backend BH/BI/BJ from
   row 4 (the lists start on row 3: the first choice shows a red corner) or a typed list without the first choice.
   Without the Sheets API: the table colors are listed by hand with the hex codes. Never changes values except the
   PCAR title and the two names. By hand only: dropdown chip colors (Contact Log J / N), the Contact Log's widths, tab

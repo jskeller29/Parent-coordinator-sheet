@@ -891,6 +891,7 @@ const SHEET_LOOK_ = {
     line: "#d3d9e1"
   },
   input: "#fff2cc",            // a cell you type in on a built tab (PCAR's own dates): the Raw Data paste boxes' yellow
+  workshopRow: "#e6f1ea",      // Contact Log rows whose Method (J) is "Workshop" (C:O, resetContactLogFormatting): pale green, was #b6d7a8
   danger: { fill: "#f8e9e7", text: "#a3312a" },   // delete boxes (Styles.html --danger-soft / --danger)
   // Contact Log Type column (L): one text color per type in Type List order (Backend BL),
   // the same after every reset and 10 PM run (they used to be random and changed every

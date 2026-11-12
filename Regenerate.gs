@@ -1086,10 +1086,11 @@ function resetContactLogFormatting() {
     .setBackground("#fce5cd")
     .setRanges([rangeA2B]).build());
 
-  // 3. Workshop (C2:O) -> ⚡ Uses Col J (Method 1)
+  // 3. Workshop (C2:O) -> ⚡ Uses Col J (Method 1). Pale green (SHEET_LOOK_, Core.gs; owner 2026-11-12:
+  // the solid #b6d7a8 across the row was the loudest thing in the log)
   rules.push(SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$J2="Workshop"')
-    .setBackground("#b6d7a8")
+    .setBackground(SHEET_LOOK_.workshopRow)
     .setRanges([rangeC2O]).build());
 
   // 4. Missing Interactions (G2:G) -> ⚡ Checks Col G
