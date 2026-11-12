@@ -15,7 +15,12 @@ function resetToDisplayMode() {
 
   resetToDisplayModeSteps_(ss);
 
-  SpreadsheetApp.getUi().alert("Display Mode Reset complete.");
+  SpreadsheetApp.getUi().alert(
+    "Display Mode Reset complete.",
+    "Only the 👋 Welcome tab is showing now: that is what a new coordinator's copy opens on, until they run Initial Setup.\n\n" +
+    "To look at the other tabs without changing that, use View → Hidden sheets, then hide them again before sharing " +
+    "(or run Reset to Display Mode once more).",
+    SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 /**
@@ -48,8 +53,9 @@ function resetToDisplayModeSteps_(ss) {
   // this template inherits them (see Settings Backend.gs).
   if (typeof saveSettingsToVersionSheet_ === "function") saveSettingsToVersionSheet_(ss);
 
-  // Reset the view to only the default-shown tabs (hide everything else).
-  if (typeof applyDefaultSheetVisibility_ === "function") applyDefaultSheetVisibility_(ss);
+  // Only a fresh 👋 Welcome tab shows (owner's request 2026-11-12), so a copy opens
+  // on it; Initial Setup on the copy hides and then deletes it (Menus.gs, WELCOME TAB).
+  showWelcomeAfterReset_(ss);
 }
 
 /**
@@ -192,6 +198,15 @@ function deleteLegacySheets_(ss) {
   getBackendSheet_(ss);
   // An older copy's "Master Table" becomes "Student List" first, so it is kept.
   getStudentListSheet_(ss);
+
+  // A display-mode sheet shows only the 👋 Welcome tab, which goes below (a reset
+  // makes a fresh one). Sheets can't delete the last visible tab: the default tabs first.
+  // (The Welcome tab's "keep after setup" mark goes too; a display reset sets it again.)
+  try {
+    const welcome = ss.getSheetByName(WELCOME_TAB_NAME);
+    if (welcome && !welcome.isSheetHidden()) applyDefaultSheetVisibility_(ss);
+    clearWelcomeKeep_(ss);
+  } catch (e) { console.warn("Welcome tab: " + e.message); }
 
   // Never leave the user standing on a tab that is about to be deleted.
   try {

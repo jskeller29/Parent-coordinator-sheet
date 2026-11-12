@@ -87,15 +87,12 @@
     const WHO = { type: 'You type here', data: 'Filled in by Input Data Mode', report: 'Filled in for you', built: 'Filled in for you' };
     let STATE = null;
 
-    function linkEl(label, url) {
-      if (url) {
-        const a = document.createElement('a');
-        a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
-        return a;
-      }
-      const s = document.createElement('span');
-      s.textContent = label + ': link coming soon';
-      return s;
+    // A link that isn't set yet (e.g. a video not recorded yet) is simply left out
+    function addLink(box, label, url) {
+      if (!url) return;
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+      box.appendChild(a);
     }
 
     function setStatus(text, err) {
@@ -148,7 +145,7 @@
 
         if (s.links && s.links.length) {
           const links = document.createElement('div'); links.className = 'links';
-          s.links.forEach(l => links.appendChild(linkEl(l.label, l.url)));
+          s.links.forEach(l => addLink(links, l.label, l.url));
           body.appendChild(links);
         }
 
@@ -170,9 +167,10 @@
 
       const help = el('helpLinks');
       help.innerHTML = '';
-      help.appendChild(linkEl('Getting started guide', state.links.guideDoc));
-      help.appendChild(linkEl('Video: how to download your data', state.links.downloadDataVideo));
-      if (state.userGuideUrl) help.appendChild(linkEl('User Guide', state.userGuideUrl));
+      if (state.links.guideDoc !== state.userGuideUrl) addLink(help, 'Getting started guide', state.links.guideDoc);
+      addLink(help, 'Video: how to download your data', state.links.downloadDataVideo);
+      addLink(help, 'User Guide', state.userGuideUrl);
+      addLink(help, 'Report a bug or ask a question', state.links.bugReport);
 
       el('autoOpen').checked = state.autoOpen;
     }

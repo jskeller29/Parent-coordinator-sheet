@@ -64,6 +64,8 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 - [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
 - [ ] A fresh copy of the master template: only the 👋 Welcome tab shows; after 🚨 Initial Setup your tabs are
       back, and the Welcome tab is gone after a reload (or the first build)
+- [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained
+      first), also after reopening it. Then Google's permission page on a copy: Select all → Continue
 
 ## 5. Going live (after the copy works)
 1. Merge Test-Version into main.

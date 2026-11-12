@@ -379,6 +379,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
+- Welcome tab after a reset + permissions (2026-11-12, later): re-paste Menus, Regenerate (script) and
+  GettingStartedSidebar (HTML); then run Reset to Display Mode on the master template; upload the new
+  docs/PC_Tracker_User_Guide.pdf to the guide folder.
 - Wrong paste cleared, Your Lists upload, build before step 5, new-user flow (2026-11-12): re-paste Menus, Build,
   Input Data (scripts) and InputDataSidebar, YourListsSidebar (HTML).
 - Your Lists View step + "Save, exit and build" (2026-11-12): re-paste Input Data (script) and InputDataSidebar,
@@ -407,8 +410,29 @@ needed a reload. Getting Started texts: step 2 "Build your sheets (Input Data Mo
   default tabs come back, and the next open / build deletes it.
 - applyDefaultSheetVisibility_ now shows the default tabs first, then hides the rest (same end result; Sheets refuses
   to hide the last visible tab, which the Welcome tab is on a new copy).
-- Not in KEEP_TABS_ (a reset deletes it; the next pre-setup open makes it again). The tabs are hidden only when the
-  copy is first opened (a second or two after it loads), since the template's own tabs are what the copy starts with.
+- Not in KEEP_TABS_: every reset deletes it (deleteLegacySheets_ first shows the default tabs when it is the only
+  visible one, since Sheets can't delete the last visible tab, and clears the keep mark below).
+- Reset to Display Mode (owner's request 2026-11-12, "the welcome the only tab open"): ends with
+  showWelcomeAfterReset_ (fresh tab, User Guide link = getGuideLink_, then only it shows), so a copy of the template
+  OPENS on it (no flash of the template's tabs before the copy's onOpen runs). On the reset sheet itself setup may have
+  run, and the next open / build would delete the tab: doc property WELCOME_TAB_KEEP (= that sheet's ID; not set on
+  the owner's "Copy Sheet, Then Reset the Copy" copy, whose setup hasn't run anyway) makes deleteWelcomeTab_ keep it
+  until Initial Setup runs there (clearWelcomeKeep_) or the next reset / fake-data load. Reset alert says so.
+- Permissions BEFORE the click (owner's request 2026-11-12): the tab starts with "BEFORE YOU START: WHAT GOOGLE WILL
+  ASK YOU TO ALLOW", WELCOME_PERMISSIONS_ = the 6 manifest scopes in Google's words (name bold via rich text, reason
+  plain), then SET UP YOUR COPY; step 3 = the real screens (Authorization required → OK → account; hasn't verified →
+  Advanced → Go to … (unsafe); Select all → Continue). A menu click can't show anything of ours before Google's
+  screens, so the explanation has to be on the tab. "Connect to an external service" = only Rollover's PDF download
+  (UrlFetchApp); the update check uses the Sheets permission (openById). Keep this list in step with the manifest.
+- Initial Setup starts with ScriptApp.requireAllScopes(FULL) (granular consent: an unticked permission is asked for
+  again before anything runs; typeof-guarded).
+- Getting-started 🚀 App Menu order: ✅ Getting Started, 📥 Input Data Mode, 🏗️ Build Sheets Only, ---, Import Old Data,
+  User Guide, Report a Bug, Updates. showWelcomeDialog's "Next steps" point at Getting Started (was "paste into the
+  RAW Data tab"). Getting Started links: zg_links_() fills empty DOCUMENT links with the User Guide (download data:
+  DATA_GUIDE_URL); an empty VIDEO link is left out (no more "coming soon").
+- docs (2026-11-12): Part 1 rewritten for this path (md is the source; scratchpad script regenerated Part 1 of
+  guide.html / build_guide.js from it; docx + pdf rebuilt), plus Settings labels, Follow-up values, search bar position,
+  Events type buttons, Your Lists upload + View step, "RAW Data" -> "Raw Data", the external-service row.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first

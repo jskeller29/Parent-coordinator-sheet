@@ -3,6 +3,7 @@
 //  - a list can be uploaded (CSV / Excel rows) like a paste; a list with no rows is cleared
 //  - step 5 builds the sheets first on a new sheet / after new data, and hides what the build showed
 //  - the 👋 Welcome tab on a new copy: only tab shown, hidden by setup, deleted afterwards
+//  - Reset to Display Mode: a fresh Welcome tab (permissions explained first) is the only tab, kept until setup
 const fs = require('fs'), path = require('path'), assert = require('assert');
 const { loadProject, ROOT } = require('./lib/load');
 const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
@@ -193,6 +194,69 @@ function listsSheet() {
   assert.strictEqual(g.deleteWelcomeTab_(ss), true, 'deleted at the next open / build');
   assert.strictEqual(ss.getSheetByName("👋 Welcome"), null);
   console.log("Welcome tab: ok");
+}
+
+// ---------------------------------------------------------------- 👋 Welcome tab after Reset to Display Mode
+{
+  // Reset to Display Mode ends with a fresh Welcome tab as the only tab showing,
+  // with every permission explained before the setup steps, and keeps it on the
+  // sheet that was reset (setup may have run there) until Initial Setup runs again.
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const app = fakeSpreadsheetApp(ss);
+  // rich text that remembers its text (the fake's default builder doesn't)
+  app.newRichTextValue = () => { const v = {}; const b = new Proxy({}, { get: (t, k) =>
+    k === 'setText' ? (x => { v.text = x; return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
+  const g = loadProject({ extra: { SpreadsheetApp: app }, props: { SETUP_COMPLETE: 'true' } });
+  g.isAutoMigrateOn_ = () => false;
+  g.getGuideLink_ = () => "https://example.org/guide";
+  const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
+
+  g.showWelcomeAfterReset_(ss);
+  const w = ss.getSheetByName("👋 Welcome");
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], 'after the reset: only the Welcome tab');
+  assert.strictEqual(ss.getSheets()[0], w, 'first tab');
+  assert.strictEqual(ss.getActiveSheet(), w, 'the tab a copy opens on');
+  const text = Array.from(w._cells.values()).join("\n");
+  g.__get("WELCOME_PERMISSIONS_").forEach(p => assert(text.indexOf(p[0]) !== -1, 'permission explained: ' + p[0]));
+  assert(text.indexOf("WHAT GOOGLE WILL ASK") < text.indexOf("SET UP YOUR COPY"), 'permissions come before the steps');
+  assert(/Select all/.test(text) && /Go to … \(unsafe\)/.test(text), 'the real consent screens');
+
+  // Next open of the reset sheet (setup ran there before): the tab stays
+  assert.strictEqual(g.deleteWelcomeTab_(ss), false, 'kept after the reset');
+  g.buildMenus_();
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], 'still the only tab after an open');
+
+  // A second reset: the Welcome tab (the only visible one) goes, a fresh one comes back
+  g.getBackendSheet_ = () => ss.getSheetByName("Backend");
+  g.getStudentListSheet_ = () => ss.getSheetByName("Student List");
+  g.deleteLegacySheets_(ss);
+  assert.strictEqual(ss.getSheetByName("👋 Welcome"), null, 'the reset deletes the old Welcome tab');
+  assert(vis().indexOf("Contact Log") !== -1, 'without leaving no visible tab');
+  assert.strictEqual(g.__props.WELCOME_TAB_KEEP, undefined, 'its keep mark goes with it');
+  g.showWelcomeAfterReset_(ss);
+  assert.deepStrictEqual(vis(), ["👋 Welcome"]);
+
+  // Initial Setup on that sheet: the keep mark ends, the tab is hidden, then deleted
+  g.clearWelcomeKeep_(ss); g.leaveWelcomeTab_(ss); g.applyDefaultSheetVisibility_(ss);
+  assert.deepStrictEqual(vis(), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'after setup: default tabs');
+  assert.strictEqual(g.deleteWelcomeTab_(ss), true, 'deleted at the next open');
+  console.log("Welcome tab after Reset to Display Mode: ok");
+}
+{
+  // Initial Setup asks again for any permission left unticked (granular consent)
+  const src = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
+  const setup = src.slice(src.indexOf('function runInitialSetupWrapper()'));
+  assert(/requireAllScopes\(ScriptApp\.AuthMode\.FULL\)/.test(setup.slice(0, 600)), 'requireAllScopes first in Initial Setup');
+  // Getting Started: no "coming soon"; empty document links use the User Guide / data guide
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(TABS)) } });
+  g.getGuideLink_ = () => "https://example.org/guide";
+  const links = g.zg_links_();
+  ['guideDoc', 'buildDoc', 'settingsDoc', 'contactLogDoc'].forEach(k => assert.strictEqual(links[k], "https://example.org/guide", k));
+  assert.strictEqual(links.downloadDataDoc, g.__get("DATA_GUIDE_URL"));
+  assert.strictEqual(links.downloadDataVideo, "", 'no video yet: left out');
+  assert(!/coming soon/.test(src) && !/coming soon/.test(fs.readFileSync(path.join(ROOT, 'GettingStartedSidebar.html'), 'utf8')), 'no "coming soon" left');
+  console.log("Initial Setup permissions + Getting Started links: ok");
 }
 
 // ---------------------------------------------------------------- new-user flow pieces

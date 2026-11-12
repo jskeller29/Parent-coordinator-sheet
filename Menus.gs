@@ -275,15 +275,16 @@ function buildMenus_() {
     props.setProperty('FULL_MENU_UNLOCKED', 'false'); // Mark as locked
     // Using the EXACT SAME "🚀 App Menu" name allows us to overwrite the Setup button 
     // instantly without forcing the user to refresh the page!
+    // New-user order (2026-11-12): the checklist, its first two steps, then the rest
     const getStartedMenu = ui.createMenu("🚀 App Menu"); 
+    addGuideMenuItems_(getStartedMenu);          // ✅ Getting Started (below)
+    addInputDataModeMenuItem_(getStartedMenu);   // Input Data.gs
+    getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
+    getStartedMenu.addSeparator();
     getStartedMenu.addItem("🔄 Import Old Data", "openMigrationWizard");
     getStartedMenu.addItem("📖 Open User Guide", "showWelcomeDialog");
     getStartedMenu.addItem("🐞 Report a Bug", "reportABug");
     getStartedMenu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
-    getStartedMenu.addSeparator();
-    addInputDataModeMenuItem_(getStartedMenu);   // Input Data.gs
-    getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
-    addGuideMenuItems_(getStartedMenu);          // ✅ Getting Started (below)
     if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(getStartedMenu); // owner test file z_ContactLogDebug.gs
     getStartedMenu.addToUi();
 
@@ -406,7 +407,8 @@ function showWelcomeDialog() {
     <div class="note-dlg">
       <h1>Welcome to the PC Tracker</h1>
       <p>This system builds your directory, tracks your parent interactions, and compiles your PCAR data for you.</p>
-      <p><b>Next steps:</b> click <b>🚀 App Menu</b> at the top of your screen to <b>Import Old Data</b> from a previous version, or close this window and paste your new student data into the <b>RAW Data</b> tab.</p>
+      <p><b>Next steps:</b> open <b>🚀 App Menu → ✅ Getting Started</b>. Its checklist walks you through loading your student data (📥 Input Data Mode), building your sheets, your settings and your first parent contact.</p>
+      <p>Moving from last year's tracker? Use <b>🚀 App Menu → 🔄 Import Old Data</b>.</p>
       <div class="foot">
         <a class="btn pri" href="${guideUrl}" target="_blank" rel="noopener">Read the User Guide</a>
       </div>
@@ -417,13 +419,13 @@ function showWelcomeDialog() {
           <a class="btn sec" href="${links.migrateCopyUrl}" target="_blank" rel="noopener">Upgrade copy (migrate)</a>
         </div>
       </div>
-      <p class="hint">You can open this again any time from <b>🚀 App Menu ➔ 📖 Open User Guide</b>.</p>
+      <p class="hint">You can open this again any time from <b>🚀 App Menu → 📖 Open User Guide</b>.</p>
     </div>
   `;
 
   const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
     .setWidth(460)
-    .setHeight(420);
+    .setHeight(480);
 
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, "PC Tracker User Guide");
 }
@@ -448,8 +450,10 @@ function showWelcomeDialog() {
 // ======================================================================
 
 // ----------------------------------------------------------------------
-// LINKS — PLACEHOLDERS. Paste the links here when they're ready.
-// An empty link shows as "link coming soon".
+// LINKS — paste the links here when they're ready.
+// An empty DOCUMENT link uses the User Guide instead (the newest file in the guide
+// folder, getGuideLink_; "how to download your data" uses DATA_GUIDE_URL), so every
+// document button works today. An empty VIDEO link is simply not shown.
 // ----------------------------------------------------------------------
 const GUIDE_LINKS = {
   guideDoc: "",          // DOCUMENT: the getting-started guide (what each tab does, first steps)
@@ -459,6 +463,20 @@ const GUIDE_LINKS = {
   settingsDoc: "",       // DOCUMENT: what each setting does
   contactLogDoc: ""      // DOCUMENT: how to log a parent contact
 };
+
+/** GUIDE_LINKS with the fallbacks filled in (videos stay empty when not set). */
+function zg_links_() {
+  const guide = zg_safeGuideLink_();
+  return {
+    downloadDataVideo: GUIDE_LINKS.downloadDataVideo,
+    guideDoc: GUIDE_LINKS.guideDoc || guide,
+    downloadDataDoc: GUIDE_LINKS.downloadDataDoc || DATA_GUIDE_URL || guide,
+    buildDoc: GUIDE_LINKS.buildDoc || guide,
+    settingsDoc: GUIDE_LINKS.settingsDoc || guide,
+    contactLogDoc: GUIDE_LINKS.contactLogDoc || guide,
+    bugReport: BUG_REPORT_FORM_URL
+  };
+}
 
 /**
  * What each tab is for, for the "This tab" panel. type: "data" | "type" (you
@@ -504,9 +522,8 @@ function addGuideMenuItems_(menu) {
 /** Right after Initial Setup on a new-user copy: the checklist, then the welcome pop-up on top. */
 function showGuideWelcome_() {
   openGuideChecklist();
-  const link = (url, label) => url
-    ? `<a class="btn sec" href="${url}" target="_blank" rel="noopener">${label}</a>`
-    : `<span class="btn sec" aria-disabled="true" title="Link coming soon">${label} (coming soon)</span>`;
+  const links = zg_links_();
+  const link = (url, label) => url ? `<a class="btn sec" href="${url}" target="_blank" rel="noopener">${label}</a>` : ``;
 
   const html = include_('Styles') + `
     <style>
@@ -534,8 +551,9 @@ function showGuideWelcome_() {
       <div class="sub">
         <p class="help" style="margin:0">Before you start: how to download your data from ATS, Parent Square and NYCSA.</p>
         <div class="foot">
-          ${link(GUIDE_LINKS.downloadDataVideo, "Watch the video")}
-          ${link(GUIDE_LINKS.guideDoc, "Read the guide")}
+          ${link(links.downloadDataVideo, "Watch the video")}
+          ${link(links.downloadDataDoc, "How to download your data")}
+          ${link(links.guideDoc, "Read the User Guide")}
         </div>
       </div>
       <p class="hint">Moving from last year's tracker? Use 🚀 App Menu → 🔄 Import Old Data instead.</p>
@@ -582,7 +600,7 @@ function zg_getState() {
     autoOpen: props.getProperty('ZG_AUTO_OPEN') !== 'off',
     tab: zg_activeTab(),
     hiddenTabs: zg_hiddenTabs_(ss),
-    links: GUIDE_LINKS,
+    links: zg_links_(),
     userGuideUrl: zg_safeGuideLink_()
   };
 }
@@ -644,6 +662,7 @@ function zg_setAutoOpen(on) {
 function zg_checklist_(ss) {
   const props = PropertiesService.getDocumentProperties();
   const data = zg_dataStatus_(ss);
+  const links = zg_links_();
   const steps = [
     { id: "data", title: "Load your student data", done: data.ats.loaded,
       text: "Input Data Mode walks you through it: paste or upload your ATS, Parent Square and NYCSA exports, then your sites and classes, then your own lists.",
@@ -655,20 +674,20 @@ function zg_checklist_(ss) {
       ],
       buttons: [{ action: "inputData", label: "Open Input Data Mode", primary: true },
                 { action: "importOld", label: "Import last year's tracker" }],
-      links: [{ label: "Video: how to download your data", url: GUIDE_LINKS.downloadDataVideo },
-              { label: "Guide: how to download your data", url: GUIDE_LINKS.downloadDataDoc }] },
+      links: [{ label: "Video: how to download your data", url: links.downloadDataVideo },
+              { label: "Guide: how to download your data", url: links.downloadDataDoc }] },
     { id: "build", title: "Build your sheets", done: zg_isBuilt_(ss),
       text: "Input Data Mode builds them for you before Your Lists (step 5). Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
       buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
-      links: [{ label: "Guide: what Build Sheets does", url: GUIDE_LINKS.buildDoc }] },
+      links: [{ label: "Guide: what Build Sheets does", url: links.buildDoc }] },
     { id: "settings", title: "Check your settings", done: props.getProperty('ZG_SETTINGS_SEEN') === 'true',
       text: "Choose which tabs to show, when sheets rebuild, phone sync, and how the Contact Log behaves.",
       buttons: [{ action: "settings", label: "Open Settings" }],
-      links: [{ label: "Guide: what each setting does", url: GUIDE_LINKS.settingsDoc }] },
+      links: [{ label: "Guide: what each setting does", url: links.settingsDoc }] },
     { id: "contact", title: "Log your first parent contact", done: zg_hasContact_(ss),
       text: "Type the parent's name in column C of the Contact Log. The student and OSIS fill in for you.",
       buttons: [{ action: "contactLog", label: "Go to the Contact Log" }],
-      links: [{ label: "Guide: how to log a parent contact", url: GUIDE_LINKS.contactLogDoc }] }
+      links: [{ label: "Guide: how to log a parent contact", url: links.contactLogDoc }] }
   ];
   return { steps: steps, doneCount: steps.filter(s => s.done).length, allDone: steps.every(s => s.done) };
 }
@@ -782,6 +801,11 @@ function openProgressBarSidebar() {
 // 1.5. SETUP WRAPPER 
 // ==========================================
 function runInitialSetupWrapper() {
+  // Google lets people untick some permissions on its "allow" page. Setup needs all of
+  // them (triggers, contacts, Drive, the update check): if one is missing, Google stops
+  // here and asks again for the missing ones, before anything is set up.
+  if (typeof ScriptApp.requireAllScopes === "function") ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
+
   setupAllInstallableTriggers();
   const props = PropertiesService.getDocumentProperties();
   
@@ -822,8 +846,9 @@ function runInitialSetupWrapper() {
   // HIDE UNNECESSARY SHEETS — start from the default-visible set...
   // =======================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // New copy: move to the Contact Log and hide the 👋 Welcome tab (deleted at the next open / build)
-  try { leaveWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
+  // New copy: move to the Contact Log and hide the 👋 Welcome tab (deleted at the next open / build;
+  // a Reset to Display Mode on this very sheet had kept it, and that ends here)
+  try { clearWelcomeKeep_(ss); leaveWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
   applyDefaultSheetVisibility_(ss);
 
   // ...then reveal the optional tabs/columns the inherited settings ask for.
@@ -880,6 +905,69 @@ function refreshMenusAfterFirstBuild_() {
 // ==========================================
 var WELCOME_TAB_NAME = "👋 Welcome";
 
+// Reset to Display Mode (Regenerate.gs) leaves a fresh Welcome tab as the only tab
+// showing, so a copy of the template opens straight on it. On the sheet that was
+// reset, setup may already have run, and the next open would delete the tab: this
+// document property (value = that sheet's ID) keeps it until Initial Setup runs there
+// again (or the next reset / fake-data load). Copies don't get it (document
+// properties don't travel), and their setup hasn't run, so they keep the tab anyway.
+var WELCOME_KEEP_KEY_ = "WELCOME_TAB_KEEP";
+
+/**
+ * Every permission Google lists on its "wants to access your Google Account" page
+ * (the oauthScopes in the manifest), in Google's words, and what the tool uses it
+ * for. On the Welcome tab BEFORE Initial Setup: a menu click can't show anything of
+ * ours before Google's own screens (the script may not run until it is allowed), so
+ * the explanation has to be on the tab. Same list as the User Guide (Part 1, Step 2).
+ */
+var WELCOME_PERMISSIONS_ = [
+  ["See, edit, create and delete all your Google Sheets spreadsheets",
+   "builds the tabs in this tracker, checks the shared update list for a newer version, and opens last year's tracker when you import it."],
+  ["See, edit, download and permanently delete your contacts",
+   "only for the phone sync, which stays off until you turn it on in ⚙️ Settings. It only adds, changes and removes contacts in its own \"School Directory\" label."],
+  ["See, edit, create and delete all of your Google Drive files",
+   "saves your end-of-year PDF archive next to this tracker, and finds the newest User Guide and template links."],
+  ["Connect to an external service",
+   "only for that end-of-year PDF, which it downloads from Google's own export page."],
+  ["Allow this application to run when you are not present",
+   "the instant updates when you type in the Contact Log, the nightly rebuild at 10 PM, and the update check when you open the sheet."],
+  ["Display and run third-party web content in prompts and sidebars",
+   "the tool's own pop-ups and side panels (Settings, Input Data Mode, Getting Started). \"Third-party\" just means not made by Google."]
+];
+
+/**
+ * End of Reset to Display Mode: a fresh Welcome tab (the reset deleted the old one,
+ * see deleteLegacySheets_) as the only tab showing, kept on this sheet until
+ * Initial Setup runs here. Works on a copy that isn't the open sheet too
+ * (owner's "Copy Sheet, Then Reset the Copy").
+ */
+function showWelcomeAfterReset_(ss) {
+  const old = ss.getSheetByName(WELCOME_TAB_NAME);
+  if (old && old.isSheetHidden()) ss.deleteSheet(old); // an older one the reset didn't delete
+  let guideUrl = GUIDE_FOLDER_URL;
+  try { guideUrl = getGuideLink_() || GUIDE_FOLDER_URL; } catch (e) { console.warn("Guide link: " + e.message); }
+  if (!ss.getSheetByName(WELCOME_TAB_NAME)) buildWelcomeTab_(ss, { guideUrl: guideUrl });
+  try {
+    showWelcomeTabOnly_(ss);
+  } catch (e) {
+    // a copy opened by ID can't be "activated": hide the other tabs without it
+    const tab = ss.getSheetByName(WELCOME_TAB_NAME);
+    tab.showSheet();
+    ss.getSheets().forEach(function(sheet) {
+      if (sheet.getSheetId() !== tab.getSheetId() && !sheet.isSheetHidden()) sheet.hideSheet();
+    });
+  }
+  if (SpreadsheetApp.getActiveSpreadsheet().getId() === ss.getId()) {
+    PropertiesService.getDocumentProperties().setProperty(WELCOME_KEEP_KEY_, ss.getId());
+  }
+}
+
+/** The "keep the Welcome tab after setup" mark goes (Initial Setup, every reset). */
+function clearWelcomeKeep_(ss) {
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty(WELCOME_KEEP_KEY_) === ss.getId()) props.deleteProperty(WELCOME_KEEP_KEY_);
+}
+
 /** Before setup: makes the Welcome tab if needed, shows it and hides every other tab. */
 function showWelcomeTabOnly_(ss) {
   const tab = ss.getSheetByName(WELCOME_TAB_NAME) || buildWelcomeTab_(ss);
@@ -911,6 +999,8 @@ function leaveWelcomeTab_(ss) {
 function deleteWelcomeTab_(ss) {
   const tab = ss.getSheetByName(WELCOME_TAB_NAME);
   if (!tab) return false;
+  // Reset to Display Mode on this sheet: the tab stays until Initial Setup runs here
+  if (PropertiesService.getDocumentProperties().getProperty(WELCOME_KEEP_KEY_) === ss.getId()) return false;
   if (!tab.isSheetHidden() && ss.getActiveSheet().getSheetId() === tab.getSheetId()) {
     leaveWelcomeTab_(ss);
     applyDefaultSheetVisibility_(ss);
@@ -920,8 +1010,13 @@ function deleteWelcomeTab_(ss) {
   return true;
 }
 
-/** Makes the Welcome tab (first tab, 4 columns, no gridlines) in the "District" colors. */
-function buildWelcomeTab_(ss) {
+/**
+ * Makes the Welcome tab (first tab, 4 columns, no gridlines) in the "District" colors.
+ * opts.guideUrl: the User Guide link (Reset to Display Mode resolves the newest file;
+ * the simple onOpen can't read Drive, so it uses the guide folder).
+ */
+function buildWelcomeTab_(ss, opts) {
+  opts = opts || {};
   const NAVY = "#183e69", INK = "#1b2430", MUTED = "#566173", FAINT = "#8a94a3", LINE = "#d3d9e1";
   const upgrade = isAutoMigrateOn_(); // upgrade-template copy: setup opens the Migration Wizard
 
@@ -930,9 +1025,10 @@ function buildWelcomeTab_(ss) {
      "It's in the menu bar at the top of the screen, after Help. Don't see it? Wait a few seconds, or reload the page."],
     ["Click 🚨 Initial Setup (Run Once)",
      "It turns on the sheet's automatic updates and brings back your tabs."],
-    ["Allow access",
-     "Google asks you to allow the script: choose your Google account and click Allow. If Google says it hasn't " +
-     "verified this app, click Advanced, then the \"Go to …\" link. If setup doesn't start after you allow it, " +
+    ["Allow access (the permissions above)",
+     "\"Authorization required\": click OK, then choose your Google account. \"Google hasn't verified this app\": " +
+     "click Advanced, then \"Go to … (unsafe)\" (Google shows this for tools made by a person instead of a company). " +
+     "On the list of permissions, tick Select all, then click Continue. If setup doesn't start after that, " +
      "click 🚨 Initial Setup (Run Once) again."],
     upgrade
       ? ["Bring over your old data",
@@ -951,9 +1047,20 @@ function buildWelcomeTab_(ss) {
     { band: true, c: "Your parent contacts, events and family directory in one place, with your PCAR filled in for you.", style: "subtitle" },
     { h: 18, band: true },
     { h: 26 },
-    { c: "SET UP YOUR COPY", style: "label" },
-    { h: 10 }
+    // First what Google will ask and why, then the steps that make it ask
+    { c: "BEFORE YOU START: WHAT GOOGLE WILL ASK YOU TO ALLOW", style: "label" },
+    { h: 8 },
+    { c: "Setting up asks Google for permission once. Its screens can look scary, so here is what each permission is for, in Google's own words:", style: "body" },
+    { h: 6 }
   ];
+  WELCOME_PERMISSIONS_.forEach(function(perm) {
+    rows.push({ c: "•  " + perm[0] + ": " + perm[1], boldTo: perm[0].length + 4, style: "perm" });
+  });
+  rows.push({ h: 6 });
+  rows.push({ c: "Everything runs inside your own Google account. Nothing about your families is sent to the person who made this tool, or to anyone else.", style: "body" });
+  rows.push({ h: 26 });
+  rows.push({ c: "SET UP YOUR COPY", style: "label" });
+  rows.push({ h: 10 });
   steps.forEach(function(step, i) {
     if (i) rows.push({ h: 18 });
     rows.push({ b: i + 1, c: step[0], style: "step" });
@@ -962,7 +1069,7 @@ function buildWelcomeTab_(ss) {
   rows.push({ h: 26 });
   rows.push({ h: 16, style: "divider" });
   rows.push({ c: "Need help?", style: "help" });
-  rows.push({ c: "📖 Open the User Guide", link: GUIDE_FOLDER_URL });
+  rows.push({ c: "📖 Open the User Guide", link: opts.guideUrl || GUIDE_FOLDER_URL });
   rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
   rows.push({ h: 12 });
   rows.push({ c: "This tab is only here until Initial Setup has run. It is then deleted for you.", style: "hint" });
@@ -996,6 +1103,10 @@ function buildWelcomeTab_(ss) {
       sh.getRange(row, 3).setRichTextValue(SpreadsheetApp.newRichTextValue().setText(r.c).setLinkUrl(r.link)
         .setTextStyle(SpreadsheetApp.newTextStyle().setForegroundColor(NAVY).setUnderline(true).build()).build());
     }
+    if (r.boldTo) { // the permission's name in bold, its reason plain
+      sh.getRange(row, 3).setRichTextValue(SpreadsheetApp.newRichTextValue().setText(r.c)
+        .setTextStyle(0, r.boldTo, SpreadsheetApp.newTextStyle().setBold(true).setForegroundColor(INK).build()).build());
+    }
   });
   const look = function(style, apply) { if (byStyle[style]) apply(sh.getRangeList(byStyle[style])); };
   look("band", function(l) { l.setBackground(NAVY); });
@@ -1005,6 +1116,7 @@ function buildWelcomeTab_(ss) {
   look("number", function(l) { l.setFontSize(16).setFontWeight("bold").setFontColor(NAVY).setHorizontalAlignment("center"); });
   look("step", function(l) { l.setFontSize(13).setFontWeight("bold"); });
   look("body", function(l) { l.setFontColor(MUTED); });
+  look("perm", function(l) { l.setFontColor(MUTED); });
   look("divider", function(l) { l.setBorder(true, null, null, null, null, null, LINE, SpreadsheetApp.BorderStyle.SOLID); });
   look("help", function(l) { l.setFontSize(12).setFontWeight("bold"); });
   look("hint", function(l) { l.setFontSize(10).setFontColor(FAINT); });
