@@ -78,7 +78,12 @@
     <div class="sec">
       <div class="eyebrow">Help</div>
       <div class="links" id="helpLinks"></div>
-      <label class="cbx" for="autoOpen" style="margin-top:6px"><input type="checkbox" id="autoOpen" checked><span>Open this by itself when the sheet opens<span class="help" style="display:block">Stops by itself once all four steps are done.</span></span></label>
+    </div>
+
+    <div class="sec" id="finishSec">
+      <div class="eyebrow">Done with this checklist?</div>
+      <p class="help" style="margin:0" id="finishText">It opens by itself each time you open the sheet until you click Finish setup.</p>
+      <button type="button" class="btn sec" id="finishBtn" style="align-self:flex-start">Finish setup</button>
     </div>
   </div>
 
@@ -174,7 +179,9 @@
       addLink(help, 'See an example tracker', state.links.example);
       addLink(help, 'Report a bug or ask a question', state.links.bugReport);
 
-      el('autoOpen').checked = state.autoOpen;
+      // "Finish setup": shown while the checklist still opens by itself
+      el('finishSec').style.display = state.autoOpen && !c.allDone ? 'flex' : 'none';
+      el('finishBtn').className = 'btn ' + (c.doneCount >= 2 ? 'pri' : 'sec');
     }
 
     function showTab(tab) {
@@ -200,11 +207,16 @@
         .zg_action(action);
     }
 
-    el('autoOpen').addEventListener('change', () => {
+    el('finishBtn').addEventListener('click', () => {
+      const left = STATE ? 4 - STATE.checklist.doneCount : 0;
+      if (left > 0 && !confirm(left + (left === 1 ? ' step isn\'t' : ' steps aren\'t') + ' done yet. Finish setup anyway?')) return;
+      const b = el('finishBtn');
+      b.disabled = true;
+      // The server shows a pop-up saying where to find this again, then the sidebar closes
       google.script.run
-        .withSuccessHandler(on => setStatus(on ? 'This will open by itself until the steps are done.' : 'This won\'t open by itself. Find it in 🚀 App Menu → ✅ Getting Started.'))
-        .withFailureHandler(err => setStatus(err.message, true))
-        .zg_setAutoOpen(el('autoOpen').checked);
+        .withSuccessHandler(() => google.script.host.close())
+        .withFailureHandler(err => { b.disabled = false; setStatus(err.message, true); })
+        .zg_finishSetup();
     });
 
     function load() {

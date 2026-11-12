@@ -77,8 +77,10 @@ used one last year, choose "No, bring over last year's tracker" (Part 3).
 
 Until setup is done, your copy shows only the 👋 Welcome tab. It explains the
 permissions, lists the setup steps and links to this guide and the bug report form. A
-message at the bottom of the screen points you to Initial Setup. Setup removes the
-Welcome tab and brings your other tabs back.
+message at the bottom of the screen points you to Initial Setup. After setup, the
+Welcome tab stays and shows what to do next. It comes back each time you open the
+sheet, so a window you closed by accident is never a dead end. It goes away by itself
+once your sheets are built.
 
 ### Step 2: What Google will ask for
 
@@ -110,11 +112,12 @@ nothing about your families is sent to the person who made the tracker. Part 4 h
    them. If one is left unticked, Google asks again.
 6. If nothing happens after that, click 🚨 Initial Setup (Run Once) again.
 
-Setup then:
+A "Setting up your tracker" window opens right away. Keep it open: setup takes about
+20 seconds. Setup then:
 
 - turns on the automatic parts (Contact Log updates, the 10 PM rebuild, the update check),
-- shows your everyday tabs: Contact Log, Combined Contact Tracking, PCAR and Directory
-  (you can turn on others in Settings → Tabs & columns),
+- shows your everyday tabs next to the Welcome tab: Contact Log, Combined Contact
+  Tracking, PCAR and Directory (you can turn on others in Settings → Tabs & columns),
 - asks "Is this your first PC Tracker?": "Yes, start fresh" shows the first steps, and
   "No, bring over last year's tracker" opens the Migration Wizard (Part 3),
 - opens the Getting Started checklist.
@@ -132,8 +135,10 @@ The checklist opens on the right after setup and ticks each step off by itself:
 3. Check your settings (Part 2).
 4. Log your first parent contact (Part 2).
 
-It opens each time you open the sheet until all four are done. Untick "Open this by
-itself" to stop that. You can always reopen it from 🚀 App Menu → ✅ Getting Started.
+It opens each time you open the sheet until all four are done, or until you click
+Finish setup at the bottom of it. You can always reopen it from 🚀 App Menu → ✅ Getting
+Started. If you close Input Data Mode half way, it opens again by itself the next time
+you open the sheet, or from 🚀 App Menu → 📥 Input Data Mode.
 Below the steps, "This tab" explains the tab you are on, and "Hidden tabs" lists the
 tabs you can turn on.
 

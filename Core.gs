@@ -839,8 +839,12 @@ function boldText_(text, italic) {
   });
 }
 
-/** Header of one notes line: "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻}" (date bold italic sans, braces bold sans). */
+/**
+ * Header of one notes line: "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻}" (date bold italic sans, braces bold sans).
+ * Nothing for the braces (no method, no person; owner 2026-11-12) = "𝘿𝙖𝙩𝙚 -", never "{}".
+ */
 function noteLineHeader_(dateText, braceText) {
+  if (String(braceText || "").trim() === "") return `${boldText_(dateText, true)} -`;
   return `${boldText_(dateText, true)} - {${boldText_(braceText)}}`;
 }
 

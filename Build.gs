@@ -49,8 +49,6 @@ function buildAllDerivedSheets() {
 function buildAllDerivedSheetsRun_() {
   reportBuildStep_(0); // Reading your data
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // A new copy's 👋 Welcome tab (hidden by Initial Setup) goes now (Menus.gs)
-  try { deleteWelcomeTab_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
   // New/Edit Student header on row 2 (an older sheet has it one row lower; Core.gs)
   try { fixOverridesHeaderRow_(ss, false); } catch (e) { console.warn("New/Edit Student header: " + e.message); }
   const rawSheet = ss.getSheetByName("Raw Data");
@@ -262,6 +260,10 @@ function buildAllDerivedSheetsRun_() {
 
   // A build finished: an old "last night's rebuild didn't finish" message is out of date now
   try { PropertiesService.getDocumentProperties().deleteProperty(NIGHTLY_FAILED_KEY_); } catch (e) { /* message only */ }
+
+  // A new copy's 👋 Welcome tab ("what to do next" since Initial Setup) goes once the sheets
+  // are built (Menus.gs; at the END, so a build that fails half way leaves the guide there)
+  try { deleteWelcomeTab_(ss, true); } catch (e) { console.warn("Welcome tab: " + e.message); }
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */

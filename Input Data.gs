@@ -151,15 +151,25 @@ function openInputDataMode() {
         SpreadsheetApp.getUi().alert('📥 Input Data Mode', 'The "Raw Data" tab is missing, so there is nowhere to put the data.', SpreadsheetApp.getUi().ButtonSet.OK);
         return;
       }
-      const active = ss.getActiveSheet();
+      let active = ss.getActiveSheet();
+      // Started from the 👋 Welcome tab (new copy): come back to the Contact Log, not to it
+      if (active && active.getName() === WELCOME_TAB_NAME) active = ss.getSheetByName("Contact Log") || null;
       state = { step: 0, tempId: null, hiddenIds: [], prevActiveId: active ? active.getSheetId() : null, results: {} };
       idm_saveState_(state);
       idm_ensureTempSheet_(ss, state);
       idm_hideOtherSheets_(ss, state);
     } else {
-      idm_ensureTempSheet_(ss, state);
+      // Resumed (menu, Getting Started, the open trigger): the same screen as a fresh start. Before
+      // 2026-11-12 it only made sure the temp tab existed, so the user stayed on the tab they were
+      // on with every other tab showing (owner: "it stays on the Contact Log").
+      const temp = idm_ensureTempSheet_(ss, state);
+      const active = ss.getActiveSheet();
+      const listIds = IDM_STEPS[state.step].lists ? idm_listTabIds_(ss) : []; // step 5 opens list tabs: those may stay open
+      if (!active || active.isSheetHidden() || listIds.indexOf(active.getSheetId()) === -1) temp.activate();
+      idm_hideOtherSheets_(ss, state, listIds);
     }
     idm_saveState_(state);
+    SpreadsheetApp.flush(); // the tab switch shows before the sidebar opens
   } finally {
     lock.releaseLock();
   }
@@ -931,7 +941,7 @@ function idm_resetTempSheet_(sheet) {
   idm_clearTab_(sheet);
   sheet.getRange("A1").setValue(IDM_PLACEHOLDER)
     .setBackground("#FFF2CC").setFontWeight("bold").setFontSize(14)
-    .setNote("Paste anywhere on this tab — it doesn't have to be A1.");
+    .setNote("Paste anywhere on this tab — it doesn't have to be A1.\n\nClosed the side panel? 🚀 App Menu → 📥 Input Data Mode brings it back.");
   sheet.setColumnWidth(1, 160);
 }
 
@@ -940,23 +950,35 @@ function idm_tempHasData_(sheet) {
   return String(sheet.getRange("A1").getValue()).trim() !== IDM_PLACEHOLDER;
 }
 
-/** Hides every visible tab except the temp tab and remembers which ones they were. */
-function idm_hideOtherSheets_(ss, state) {
-  const hidden = [];
+/**
+ * Hides every visible tab except the temp tab (and keepIds) and remembers which ones they
+ * were (added to the ones already remembered). The 👋 Welcome tab is hidden but not
+ * remembered: the end of the mode shows it again only while the sheets aren't built.
+ */
+function idm_hideOtherSheets_(ss, state, keepIds) {
+  const hidden = (state.hiddenIds || []).slice();
+  keepIds = keepIds || [];
   ss.getSheets().forEach(s => {
-    if (s.getSheetId() === state.tempId || s.isSheetHidden()) return;
-    try { s.hideSheet(); hidden.push(s.getSheetId()); } catch (e) { console.warn("Input Data Mode could not hide " + s.getName() + ": " + e.message); }
+    if (s.getSheetId() === state.tempId || s.isSheetHidden() || keepIds.indexOf(s.getSheetId()) !== -1) return;
+    try {
+      s.hideSheet();
+      if (s.getName() !== WELCOME_TAB_NAME && hidden.indexOf(s.getSheetId()) === -1) hidden.push(s.getSheetId());
+    } catch (e) { console.warn("Input Data Mode could not hide " + s.getName() + ": " + e.message); }
   });
   state.hiddenIds = hidden;
+}
+
+/** The Your Lists tabs' ids ([] when there are none / they can't be read). */
+function idm_listTabIds_(ss) {
+  try { return od_loadLists_(ss).filter(l => l.sheet).map(l => l.sheet.getSheetId()); }
+  catch (e) { console.warn("Your Lists tabs: " + e.message); return []; }
 }
 
 /** Shows the tabs we hid, deletes the temp tab, clears the saved state. */
 function idm_cleanup_(ss, state, goToRawData) {
   // Your Lists tabs stay hidden once the mode ends (owner's request 2026-11-12): they are opened
   // from step 5 (od_openList shows the tab again). Hidden after the others are back, so a tab still shows.
-  let listIds = [];
-  try { listIds = od_loadLists_(ss).filter(l => l.sheet).map(l => l.sheet.getSheetId()); }
-  catch (e) { console.warn("Your Lists tabs not hidden: " + e.message); }
+  const listIds = idm_listTabIds_(ss);
   (state.hiddenIds || []).forEach(id => {
     if (listIds.indexOf(id) !== -1) return;
     const s = idm_sheetById_(ss, id);
@@ -967,7 +989,14 @@ function idm_cleanup_(ss, state, goToRawData) {
     if (s && !s.isSheetHidden()) { try { s.hideSheet(); } catch (e) { console.warn("Could not hide " + s.getName() + ": " + e.message); } }
   });
   const raw = idm_rawSheet_(ss);
-  const target = (goToRawData && raw && !raw.isSheetHidden()) ? raw : (idm_sheetById_(ss, state.prevActiveId) || raw);
+  let target = (goToRawData && raw && !raw.isSheetHidden()) ? raw : (idm_sheetById_(ss, state.prevActiveId) || raw);
+  // New copy, sheets not built yet: back to the 👋 Welcome tab ("what to do next"; Menus.gs)
+  const welcome = ss.getSheetByName(WELCOME_TAB_NAME);
+  if (welcome) {
+    let built = true;
+    try { built = studentListIsBuilt_(ss); } catch (e) { console.warn(e.message); }
+    if (!built) { try { welcome.showSheet(); target = welcome; } catch (e) { console.warn("Welcome tab: " + e.message); } }
+  }
   const temp = idm_sheetById_(ss, state.tempId);
   let landing = (target && !target.isSheetHidden() && (!temp || target.getSheetId() !== temp.getSheetId())) ? target : null;
   if (!landing) landing = ss.getSheets().filter(s => !s.isSheetHidden() && (!temp || s.getSheetId() !== temp.getSheetId()))[0] || null;

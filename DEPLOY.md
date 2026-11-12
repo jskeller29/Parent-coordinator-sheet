@@ -62,8 +62,11 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 - [ ] On a fresh template copy, before its first build: 🚀 App Menu → 🔄 Import Old Data from last year's tracker
       (Follow-ups translated, lists copied; the menu item is gone once a sheet is built)
 - [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
-- [ ] A fresh copy of the master template: only the 👋 Welcome tab shows; after 🚨 Initial Setup your tabs are
-      back, and the Welcome tab is gone after a reload (or the first build)
+- [ ] A fresh copy of the master template: only the 👋 Welcome tab shows; 🚨 Initial Setup opens "Setting up your
+      tracker" at once, you stay on the Welcome tab (now "You're set up"), the 4 default tabs come back beside it.
+      Close the window: reload = back on the Welcome tab with a toast. Start fresh → Input Data Mode: only the
+      Student Data tab shows. Close its sidebar, reload: the sidebar comes back on its own. The Welcome tab is gone
+      after the first build. Getting Started → Finish setup: a pop-up, and it no longer opens by itself
 - [ ] Before Initial Setup: typing in a copy WITHOUT z_ files shows "🔒 Action Blocked" and undoes it; in a copy that
       still has a z_ file, typing works
 - [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained

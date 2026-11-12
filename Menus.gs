@@ -152,9 +152,12 @@ var DEFAULT_VISIBLE_SHEETS = TAB_VISIBILITY
  * first: on a new copy the 👋 Welcome tab is the only visible one, and Sheets
  * refuses to hide the last visible tab.
  */
-function applyDefaultSheetVisibility_(ss) {
+function applyDefaultSheetVisibility_(ss, keepWelcome) {
   const sheets = ss.getSheets();
-  const isDefault = function(sheet) { return DEFAULT_VISIBLE_SHEETS.indexOf(sheet.getName()) !== -1; };
+  // keepWelcome: Initial Setup keeps the 👋 Welcome tab ("what to do next") showing too
+  const isDefault = function(sheet) {
+    return DEFAULT_VISIBLE_SHEETS.indexOf(sheet.getName()) !== -1 || (keepWelcome && sheet.getName() === WELCOME_TAB_NAME);
+  };
   sheets.forEach(function(sheet) { if (isDefault(sheet)) sheet.showSheet(); });
   sheets.forEach(function(sheet) { if (!isDefault(sheet)) sheet.hideSheet(); });
 }
@@ -187,7 +190,7 @@ function isAutoMigrateOn_(ss) {
  * Automatically creates the necessary installable triggers.
  * It deletes old triggers first to prevent duplicate firings.
  */
-function setupAllInstallableTriggers() {
+function setupAllInstallableTriggers(quiet) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   if (!ss) {
@@ -250,7 +253,8 @@ function setupAllInstallableTriggers() {
   // 5. Change trigger: a deleted Contact Log row takes its note out of the notes (Edits.gs)
   ensureChangeTrigger_(ss);
 
-  ss.toast("Setup 100% Complete! The script is fully authorized and all automatic triggers are running.", "Success", 8);
+  // quiet: Initial Setup's own window says it's done
+  if (!quiet) ss.toast("Setup 100% Complete! The script is fully authorized and all automatic triggers are running.", "Success", 8);
 }
 
 /**
@@ -277,11 +281,12 @@ function ensureChangeTrigger_(ss, fromOpen) {
 // ==========================================
 // 1. MENUS (simple onOpen trigger; also re-run after settings / setup changes)
 // ==========================================
-function onOpen() {
-  return runAction_("Open (menus)", () => buildMenus_());
+function onOpen(e) {
+  // e: only a real open has the trigger's event (code that calls onOpen() to redraw the menus has none)
+  return runAction_("Open (menus)", () => buildMenus_(!!e));
 }
 
-function buildMenus_() {
+function buildMenus_(realOpen) {
   const ui = SpreadsheetApp.getUi();
   const props = PropertiesService.getDocumentProperties();
 
@@ -306,6 +311,10 @@ function buildMenus_() {
     props.deleteProperty('VERSION_DISMISS_FOREVER');
     props.deleteProperty('VERSION_MAJORS_ONLY');
     props.deleteProperty('VERSION_LAST_CHECK');
+    // A copy never starts half way through Input Data Mode, or with the checklist "finished"
+    props.deleteProperty('INPUT_DATA_MODE_STATE');
+    props.deleteProperty('INPUT_DATA_MODE_DELETE_TAB');
+    props.deleteProperty('ZG_AUTO_OPEN');
     // ℹ️ The Auto-Migrate toggle now lives in the Backend tab cell B3, not
     // a document property, so it travels with copies automatically — nothing
     // to preserve here.
@@ -364,9 +373,11 @@ function buildMenus_() {
   // ==============================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // The 👋 Welcome tab Initial Setup hid is deleted now (not in the setup call itself: see WELCOME TAB)
-  if (!IS_RUNNING_SETUP) {
-    try { deleteWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
+  // 👋 Welcome tab after setup: "what to do next" until the sheets are built (shown and opened
+  // on every open, so a closed pop-up / sidebar is never a dead end), then deleted (see WELCOME TAB)
+  // Only on a real open: a menu redraw (⚙️ Settings save ...) never moves the user
+  if (realOpen && !IS_RUNNING_SETUP) {
+    try { welcomeTabAfterSetup_(ss, true); } catch (e) { console.error("Welcome tab: " + e.message); }
   }
 
   // Check if the sheets have ACTUALLY been built (a student under the Student List header)
@@ -657,8 +668,11 @@ function addGuideMenuItems_(menu) {
  * it finds in the user's Drive, ma_findOldTrackers). An older upgrade copy (Backend B3 =
  * Yes) still goes straight to the wizard (runInitialSetupWrapper).
  */
-function showGuideWelcome_() {
-  openGuideChecklist();
+function showGuideWelcome_(opts) {
+  opts = opts || {};
+  // opts.setup (Initial Setup, 2026-11-12): the window opens AT ONCE with "Setting up…" and runs
+  // the setup itself (zg_runSetup), so the click answers right away; it then asks the question.
+  if (!opts.setup) openGuideChecklist();
   const links = zg_links_();
   const link = (url, label) => url ? `<a class="btn sec" href="${url}" target="_blank" rel="noopener">${label}</a>` : ``;
 
@@ -678,7 +692,21 @@ function showGuideWelcome_() {
       .opt span { font-size: 13px; color: var(--muted); line-height: 1.45; }
       .opt:disabled { opacity: .6; cursor: default; }
     </style>
-    <div class="note-dlg" id="ask">
+    <div class="note-dlg${opts.setup ? '' : ' hidden'}" id="setup">
+      <h1>Setting up your tracker</h1>
+      <div style="display:flex;gap:10px;align-items:center"><div class="spinner"></div><p style="margin:0">Turning on the automatic updates and getting your tabs ready. This takes about 20 seconds.</p></div>
+      <p class="help" style="margin:0">Please keep this window open.</p>
+    </div>
+    <div class="note-dlg hidden" id="setupErr">
+      <h1>Setup didn't finish</h1>
+      <div class="notice err" id="setupErrText"></div>
+      <p class="help" style="margin:0">Nothing is broken. Try again, or close this and click 🚀 App Menu → 🚨 Initial Setup (Run Once) again.</p>
+      <div class="foot">
+        <button type="button" class="btn sec" onclick="google.script.host.close()">Close</button>
+        <button type="button" class="btn pri" onclick="runSetup()">Try again</button>
+      </div>
+    </div>
+    <div class="note-dlg${opts.setup ? ' hidden' : ''}" id="ask">
       <h1>Welcome to the PC Tracker</h1>
       <p>Setup is done. One question before you start:</p>
       <h2>Is this your first PC Tracker?</h2>
@@ -703,9 +731,9 @@ function showGuideWelcome_() {
         <li><b>Check your settings</b></li>
         <li><b>Log your first parent contact</b></li>
       </ol>
-      <p class="help" style="margin:0">Your checklist is open on the right. It opens by itself until you've done all four.</p>
+      <p class="help" style="margin:0">Your checklist is open on the right. It opens by itself until you click <b>Finish setup</b> at the bottom of it. Closed something by accident? Everything is in 🚀 App Menu.</p>
       <div class="foot">
-        <button type="button" class="btn sec" onclick="google.script.host.close()">Not now</button>
+        <button type="button" class="btn sec" onclick="notNow()">Not now</button>
         <button type="button" class="btn pri" id="goBtn" onclick="go()">Start with Input Data Mode</button>
       </div>
       <div class="sub">
@@ -719,6 +747,29 @@ function showGuideWelcome_() {
       </div>
     </div>
     <script>
+      function show(id) {
+        ['setup', 'setupErr', 'ask', 'fresh'].forEach(function (v) { document.getElementById(v).classList.toggle('hidden', v !== id); });
+      }
+      function runSetup() {
+        show('setup');
+        google.script.run
+          .withSuccessHandler(function (r) {
+            // An older upgrade copy: the server opened the Migration Wizard in place of this window
+            if (r && r.migrate) return;
+            show('ask');
+          })
+          .withFailureHandler(function (e) {
+            document.getElementById('setupErrText').textContent = e.message;
+            show('setupErr');
+          })
+          .zg_runSetup();
+      }
+      function notNow() {
+        // a toast saying where to pick up again, then close
+        google.script.run.withSuccessHandler(function () { google.script.host.close(); })
+          .withFailureHandler(function () { google.script.host.close(); }).zg_notNow();
+      }
+      ${opts.setup ? 'runSetup();' : ''}
       function fresh() {
         document.getElementById('ask').classList.add('hidden');
         document.getElementById('fresh').classList.remove('hidden');
@@ -748,11 +799,15 @@ function showGuideWelcome_() {
   SpreadsheetApp.getUi().showModalDialog(out, "Welcome to the PC Tracker");
 }
 
-/** Installable on open (checkVersionOnOpen): opens the checklist until its four steps are done. */
+/**
+ * Installable on open (checkVersionOnOpen): Input Data Mode left on = its sidebar comes back
+ * (the tabs are hidden, so without it the user is stuck on a "PASTE HERE" tab); else the
+ * checklist, until its four steps are done or "Finish setup" was clicked (ZG_AUTO_OPEN = off).
+ */
 function guideOnOpen_() {
   const props = PropertiesService.getDocumentProperties();
   if (props.getProperty('SETUP_COMPLETE') !== 'true') return;
-  if (props.getProperty('INPUT_DATA_MODE_STATE')) return; // Input Data Mode has the sidebar
+  if (props.getProperty('INPUT_DATA_MODE_STATE')) { openInputDataMode(); return; }
   if (props.getProperty('ZG_AUTO_OPEN') === 'off') return;
   if (zg_checklist_(SpreadsheetApp.getActiveSpreadsheet()).allDone) return;
   openGuideChecklist();
@@ -824,7 +879,39 @@ function zg_action(name) {
   throw new Error("Unknown step: " + name);
 }
 
-/** "Open this by itself when the sheet opens". */
+/**
+ * "Finish setup" (bottom of the checklist; owner's request 2026-11-12, was the "Open this by
+ * itself" checkbox): the checklist stops opening by itself, and a pop-up says where it is.
+ */
+function zg_finishSetup() {
+  PropertiesService.getDocumentProperties().setProperty('ZG_AUTO_OPEN', 'off');
+  const ui = SpreadsheetApp.getUi();
+  ui.alert("✅ Setup finished",
+    "This checklist won't open by itself any more.\n\n" +
+    "You can always open it again: 🚀 App Menu → ✅ Getting Started.\n" +
+    "The User Guide is there too: 🚀 App Menu → 📖 Open User Guide.", ui.ButtonSet.OK);
+  return true;
+}
+
+/** Initial Setup's window, step 1 (see showGuideWelcome_): the setup itself. */
+function zg_runSetup() {
+  const migrate = runInitialSetup_();
+  // replaces the 30-second "click Initial Setup" toast from the open
+  SpreadsheetApp.getActiveSpreadsheet().toast("Your tracker is set up.", "✅ Setup done", 5);
+  if (migrate) openMigrationWizard(); // replaces the setup window
+  else openGuideChecklist();
+  return { migrate: migrate };
+}
+
+/** Welcome window "Not now": where to pick up again. */
+function zg_notNow() {
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    "Whenever you're ready: 🚀 App Menu → 📥 Input Data Mode. The 👋 Welcome tab and ✅ Getting Started show the next steps.",
+    "👋 Next step", 20);
+  return true;
+}
+
+/** "Open this by itself when the sheet opens" (kept for older sidebars still open). */
 function zg_setAutoOpen(on) {
   const props = PropertiesService.getDocumentProperties();
   if (on) props.deleteProperty('ZG_AUTO_OPEN'); else props.setProperty('ZG_AUTO_OPEN', 'off');
@@ -986,7 +1073,18 @@ function runInitialSetupWrapper() {
   // here and asks again for the missing ones, before anything is set up.
   if (typeof ScriptApp.requireAllScopes === "function") ScriptApp.requireAllScopes(ScriptApp.AuthMode.FULL);
 
-  setupAllInstallableTriggers();
+  // The window opens AT ONCE ("Setting up…") and runs the setup itself (zg_runSetup ->
+  // runInitialSetup_), so the click answers right away (owner 2026-11-12: there was a long
+  // pause with nothing on screen). It then asks "Is this your first PC Tracker?".
+  showGuideWelcome_({ setup: true });
+}
+
+/**
+ * The setup itself (called by the setup window). True = an older upgrade copy (Backend B3 =
+ * Yes): the caller opens the Migration Wizard.
+ */
+function runInitialSetup_() {
+  setupAllInstallableTriggers(true);
   const props = PropertiesService.getDocumentProperties();
   
   props.setProperty('SETUP_COMPLETE', 'true');
@@ -1026,10 +1124,12 @@ function runInitialSetupWrapper() {
   // HIDE UNNECESSARY SHEETS — start from the default-visible set...
   // =======================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // New copy: move to the Contact Log and hide the 👋 Welcome tab (deleted at the next open / build;
-  // a Reset to Display Mode on this very sheet had kept it, and that ends here)
-  try { clearWelcomeKeep_(ss); leaveWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
-  applyDefaultSheetVisibility_(ss);
+  // New copy: the user STAYS on the 👋 Welcome tab, now "what to do next" (owner 2026-11-12: the
+  // tabs flashed to the Contact Log while the window was still loading); the default tabs come
+  // back next to it. It is deleted once the sheets are built (a Reset to Display Mode on this
+  // very sheet had kept it, and that ends here).
+  try { clearWelcomeKeep_(ss); welcomeTabAfterSetup_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
+  applyDefaultSheetVisibility_(ss, true);
 
   // ...then reveal the optional tabs/columns the inherited settings ask for.
   try { updateVisualSettings_(getSettings()); } catch (e) { console.error(e); }
@@ -1041,22 +1141,10 @@ function runInitialSetupWrapper() {
   // for this synchronous call so the wizard isn't opened twice — the
   // authoritative open happens in the if/else right below.
   IS_RUNNING_SETUP = true;
-  onOpen();
-  IS_RUNNING_SETUP = false;
+  try { onOpen(); } finally { IS_RUNNING_SETUP = false; }
 
-  // =======================================================
-  // 🆕 UPGRADE TEMPLATE vs NEW-USER TEMPLATE
-  // Only one modal can be open at a time, so we pick the right one:
-  //   Backend!B3 = "Yes" -> jump straight into the Migration Wizard
-  //   Backend!B3 = "No"  -> show the normal Welcome guide
-  // =======================================================
-  if (isAutoMigrateOn_()) {
-    openMigrationWizard();
-  } else {
-    // POP UP THE WELCOME DIALOG NOW THAT THE USER HAS CLICKED!
-    // Getting Started: its welcome + the checklist (📖 Open User Guide still opens showWelcomeDialog)
-    showGuideWelcome_();
-  }
+  // Backend!B3 = "Yes" (older upgrade copy) -> the Migration Wizard, else the setup window's question
+  return isAutoMigrateOn_();
 }
 
 /**
@@ -1169,6 +1257,31 @@ function showWelcomeTabOnly_(ss) {
   });
 }
 
+var WELCOME_DONE_TITLE_ = "You're set up";
+
+/**
+ * After Initial Setup, until the sheets are built (owner 2026-11-12: "if they close out of one
+ * thing it easily guides them back"): the Welcome tab becomes "what to do next" and is shown
+ * and opened on every open (Initial Setup, buildMenus_), with a toast when opened. Built ->
+ * deleted. Left alone while Input Data Mode is on (it hid the tab) and on a sheet a Reset to
+ * Display Mode kept the setup version on.
+ */
+function welcomeTabAfterSetup_(ss, toast) {
+  const props = PropertiesService.getDocumentProperties();
+  if (studentListIsBuilt_(ss)) { deleteWelcomeTab_(ss, true); return; }
+  if (props.getProperty('INPUT_DATA_MODE_STATE')) return;
+  if (props.getProperty(WELCOME_KEEP_KEY_) === ss.getId()) return;
+  let tab = ss.getSheetByName(WELCOME_TAB_NAME);
+  const links = toast ? {} : { guideUrl: zg_safeGuideLink_(), exampleUrl: zg_safeExampleLink_() }; // no Drive in the simple onOpen
+  if (!tab) tab = buildWelcomeTab_(ss, Object.assign({ done: true }, links));
+  else if (String(tab.getRange("C3").getValue()) !== WELCOME_DONE_TITLE_) buildWelcomeTab_(ss, Object.assign({ done: true, into: tab }, links));
+  if (tab.isSheetHidden()) tab.showSheet();
+  tab.activate();
+  if (toast) {
+    ss.toast("Next step: 🚀 App Menu → 📥 Input Data Mode. It walks you through loading your data.", "👋 Welcome back", 20);
+  }
+}
+
 /** Initial Setup: moves the user to the Contact Log (else the first default tab) and hides the Welcome tab. */
 function leaveWelcomeTab_(ss) {
   const tab = ss.getSheetByName(WELCOME_TAB_NAME);
@@ -1183,15 +1296,17 @@ function leaveWelcomeTab_(ss) {
 }
 
 /**
- * After setup (next open / build): deletes the Welcome tab. If the user is on it
- * (setup stopped half way), the default tabs come back and it is only hidden now,
- * then deleted the next time.
+ * After setup: deletes the Welcome tab once the sheets are built (force = the end of a
+ * build; without force it is kept while the Student List is empty, as the "what to do
+ * next" page). If the user is on it, the default tabs come back and it is only hidden
+ * now, then deleted the next time.
  */
-function deleteWelcomeTab_(ss) {
+function deleteWelcomeTab_(ss, force) {
   const tab = ss.getSheetByName(WELCOME_TAB_NAME);
   if (!tab) return false;
   // Reset to Display Mode on this sheet: the tab stays until Initial Setup runs here
   if (PropertiesService.getDocumentProperties().getProperty(WELCOME_KEEP_KEY_) === ss.getId()) return false;
+  if (!force && !studentListIsBuilt_(ss)) return false;
   if (!tab.isSheetHidden() && ss.getActiveSheet().getSheetId() === tab.getSheetId()) {
     leaveWelcomeTab_(ss);
     applyDefaultSheetVisibility_(ss);
@@ -1209,6 +1324,9 @@ function deleteWelcomeTab_(ss) {
  */
 function buildWelcomeTab_(ss, opts) {
   opts = opts || {};
+  // opts.done: the version after Initial Setup ("what to do next"); opts.into: rewrite this
+  // existing tab in place (never deleted: the user may be on it)
+  if (opts.done) return writeWelcomeTab_(ss, welcomeDoneRows_(opts), opts.into);
   const NAVY = "#183e69", INK = "#1b2430", MUTED = "#566173", FAINT = "#8a94a3", LINE = "#d3d9e1";
   const upgrade = isAutoMigrateOn_(ss); // upgrade-template copy: setup opens the Migration Wizard
 
@@ -1224,9 +1342,9 @@ function buildWelcomeTab_(ss, opts) {
      "click 🚨 Initial Setup (Run Once) again."],
     upgrade
       ? ["Bring over your old data",
-         "When setup is done, this tab is removed, your tabs come back and the Migration Wizard opens to bring your data over from your old sheet."]
+         "When setup is done, your tabs come back and the Migration Wizard opens to bring your data over from your old sheet."]
       : ["Start fresh, or bring over last year's tracker",
-         "When setup is done, this tab is removed and your tabs come back. A window asks whether this is your first PC Tracker: " +
+         "When setup is done, your tabs come back and this tab shows what to do next. A window asks whether this is your first PC Tracker: " +
          "start fresh and load your student data, or bring over your old tracker (it finds it in your Drive)."]
   ];
 
@@ -1267,11 +1385,64 @@ function buildWelcomeTab_(ss, opts) {
   if (opts.exampleUrl) rows.push({ c: "👀 See an example tracker (made-up students)", link: opts.exampleUrl });
   rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
   rows.push({ h: 12 });
-  rows.push({ c: "This tab is only here until Initial Setup has run. It is then deleted for you.", style: "hint" });
+  rows.push({ c: "After Initial Setup this tab shows what to do next, and it goes away by itself once your sheets are built.", style: "hint" });
   rows.push({ h: 24 });
+  return writeWelcomeTab_(ss, rows, opts.into);
+}
 
-  const sh = ss.insertSheet(WELCOME_TAB_NAME, 0);
+/** The Welcome tab after Initial Setup: what to do next, and how to get back to it. */
+function welcomeDoneRows_(opts) {
+  const steps = [
+    ["Open 🚀 App Menu → 📥 Input Data Mode",
+     "It takes your ATS, Parent Square and NYCSA files one at a time (upload the file or paste it), then your sites and classes, " +
+     "and builds your sheets for you. Download your files first: the links below show how."],
+    ["Bringing over last year's tracker instead?",
+     "🚀 App Menu → 🔄 Import Old Data copies your Contact Log, events, student changes and settings from it. Your old tracker isn't changed."],
+    ["Closed a window by accident?",
+     "Nothing is lost. 🚀 App Menu → ✅ Getting Started shows your checklist, and 📥 Input Data Mode picks up where you left off."]
+  ];
+  const rows = [
+    { h: 20 },
+    { h: 16, band: true },
+    { h: 44, band: true, c: WELCOME_DONE_TITLE_, style: "title" },
+    { band: true, c: "Next: load your student data. Input Data Mode walks you through it, one file at a time.", style: "subtitle" },
+    { h: 18, band: true },
+    { h: 26 },
+    { c: "WHAT TO DO NEXT", style: "label" },
+    { h: 10 }
+  ];
+  steps.forEach(function(step, i) {
+    if (i) rows.push({ h: 18 });
+    rows.push({ b: i + 1, c: step[0], style: "step" });
+    rows.push({ c: step[1], style: "body" });
+  });
+  rows.push({ h: 26 });
+  rows.push({ h: 16, style: "divider" });
+  rows.push({ c: "Need help?", style: "help" });
+  if (GUIDE_LINKS.downloadDataVideo) rows.push({ c: "🎬 Video: how to download your data", link: GUIDE_LINKS.downloadDataVideo });
+  if (GUIDE_LINKS.downloadDataDoc) rows.push({ c: "📄 Guide: how to download your data", link: GUIDE_LINKS.downloadDataDoc });
+  rows.push({ c: "📖 Open the User Guide", link: opts.guideUrl || GUIDE_FOLDER_URL });
+  if (opts.exampleUrl) rows.push({ c: "👀 See an example tracker (made-up students)", link: opts.exampleUrl });
+  rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
+  rows.push({ h: 12 });
+  rows.push({ c: "This tab goes away by itself once your sheets are built.", style: "hint" });
+  rows.push({ h: 24 });
+  return rows;
+}
+
+/** Writes the Welcome tab's rows (a new first tab, or into = that tab, cleared first). */
+function writeWelcomeTab_(ss, rows, into) {
+  const NAVY = "#183e69", INK = "#1b2430", MUTED = "#566173", FAINT = "#8a94a3", LINE = "#d3d9e1";
   const n = rows.length;
+  let sh = into;
+  if (sh) {
+    sh.clear();
+    if (sh.getMaxColumns() < 4) sh.insertColumnsAfter(sh.getMaxColumns(), 4 - sh.getMaxColumns());
+    if (sh.getMaxRows() < n) sh.insertRowsAfter(sh.getMaxRows(), n - sh.getMaxRows());
+    sh.setRowHeights(1, n, 21);
+  } else {
+    sh = ss.insertSheet(WELCOME_TAB_NAME, 0);
+  }
   if (sh.getMaxColumns() > 4) sh.deleteColumns(5, sh.getMaxColumns() - 4);
   if (sh.getMaxRows() > n) sh.deleteRows(n + 1, sh.getMaxRows() - n);
   sh.setHiddenGridlines(true);

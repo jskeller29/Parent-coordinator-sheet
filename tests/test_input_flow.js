@@ -178,6 +178,53 @@ function listsSheet() {
   assert.strictEqual(g.idm_getState().needsBuild, false, 'only step 5 builds');
 }
 
+// ---------------------------------------------------------------- Input Data Mode resumed
+{
+  // Opened again while on (Getting Started, the open trigger): on its tab, every other tab hidden
+  const { ss, g } = newSheet();
+  g.htmlFromFile_ = () => ({ setTitle() { return this; }, setWidth() { return this; } });
+  const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
+  g.openInputDataMode();
+  assert.deepStrictEqual(vis(), ["Student Data"], 'started: only the Student Data tab');
+  ss.getSheetByName("Contact Log").showSheet(); ss.getSheetByName("PCAR").showSheet();
+  ss.getSheetByName("Contact Log").activate();
+  g.openInputDataMode();
+  assert.strictEqual(ss.getActiveSheet().getName(), "Student Data", 'resumed: back on its tab');
+  assert.deepStrictEqual(vis(), ["Student Data"], 'resumed: the other tabs hidden again');
+  g.idm_exit();
+  assert(vis().indexOf("Contact Log") !== -1 && vis().indexOf("PCAR") !== -1, 'exit: they come back');
+  console.log("Input Data Mode resumed: ok");
+}
+{
+  // Started from the Welcome tab: it is hidden, not remembered, and comes back at the end while not built
+  const { ss, g } = newSheet();
+  g.htmlFromFile_ = () => ({ setTitle() { return this; }, setWidth() { return this; } });
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  g.welcomeTabAfterSetup_(ss); g.applyDefaultSheetVisibility_(ss, true);
+  g.openInputDataMode();
+  const st = g.idm_loadState_();
+  assert.strictEqual(ss.getSheetByName("👋 Welcome").isSheetHidden(), true, 'Welcome hidden during the mode');
+  assert.strictEqual(st.prevActiveId, ss.getSheetByName("Contact Log").getSheetId(), 'comes back to the Contact Log, not the Welcome tab id');
+  g.idm_exit();
+  assert.strictEqual(ss.getActiveSheet().getName(), "👋 Welcome", 'not built: the end lands on "what to do next"');
+  console.log("Input Data Mode from the Welcome tab: ok");
+}
+{
+  // "Finish setup": the checklist stops opening by itself, a pop-up says where it is
+  const ss = makeSpreadsheet(TABS);
+  const app = fakeSpreadsheetApp(ss);
+  const g = loadProject({ extra: { SpreadsheetApp: app }, props: { SETUP_COMPLETE: 'true' } });
+  g.zg_finishSetup();
+  assert.strictEqual(g.__props.ZG_AUTO_OPEN, 'off');
+  assert(app._ui._alerts.some(a => /Getting Started/.test(JSON.stringify(a))), 'pop-up names ✅ Getting Started');
+  let opened = 0; g.openGuideChecklist = () => opened++;
+  g.guideOnOpen_();
+  assert.strictEqual(opened, 0, 'no longer opens by itself');
+  const html = fs.readFileSync(path.join(ROOT, 'GettingStartedSidebar.html'), 'utf8');
+  assert(/zg_finishSetup/.test(html) && !/id="autoOpen"/.test(html), 'button instead of the checkbox');
+  console.log("Finish setup: ok");
+}
+
 // ---------------------------------------------------------------- 👋 Welcome tab
 {
   const { ss, g } = newSheet();
@@ -188,10 +235,23 @@ function listsSheet() {
   assert.strictEqual(ss.getSheets()[0].getName(), "👋 Welcome", 'first tab');
   g.showWelcomeTabOnly_(ss);
   assert.strictEqual(ss.getSheets().filter(s => s.getName() === "👋 Welcome").length, 1, 'made once');
-  g.leaveWelcomeTab_(ss); g.applyDefaultSheetVisibility_(ss);
-  assert.deepStrictEqual(vis(), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'after setup: default tabs');
-  assert.strictEqual(ss.getActiveSheet().getName(), "Contact Log");
-  assert.strictEqual(g.deleteWelcomeTab_(ss), true, 'deleted at the next open / build');
+  // Initial Setup: the user stays on it, now "what to do next"; the default tabs come back beside it
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  g.welcomeTabAfterSetup_(ss); g.applyDefaultSheetVisibility_(ss, true);
+  const w = ss.getSheetByName("👋 Welcome");
+  assert.deepStrictEqual(vis(), ["👋 Welcome", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'after setup: Welcome + default tabs');
+  assert.strictEqual(ss.getActiveSheet(), w, 'after setup: still on the Welcome tab');
+  assert.strictEqual(w.getRange("C3").getValue(), "You're set up", 'rewritten in place as "what to do next"');
+  assert(/Input Data Mode/.test(Array.from(w._cells.values()).join("\n")), 'next step named');
+  assert.strictEqual(ss.getSheets().filter(s => s.getName() === "👋 Welcome").length, 1, 'same tab, not a second one');
+  // Not built yet: kept (an open shows it again); the end of a build deletes it
+  assert.strictEqual(g.deleteWelcomeTab_(ss), false, 'kept until the sheets are built');
+  ss.getSheetByName("Contact Log").activate(); w.hideSheet();
+  g.welcomeTabAfterSetup_(ss, true);
+  assert.strictEqual(ss.getActiveSheet(), w, 'an open brings the user back to it');
+  assert(ss._toasts.some(t => /Input Data Mode/.test(t.msg)), 'with a toast naming the next step');
+  ss.getSheetByName("Contact Log").activate();
+  assert.strictEqual(g.deleteWelcomeTab_(ss, true), true, 'deleted at the end of a build');
   assert.strictEqual(ss.getSheetByName("👋 Welcome"), null);
   console.log("Welcome tab: ok");
 }
@@ -239,8 +299,8 @@ function listsSheet() {
 
   // Initial Setup on that sheet: the keep mark ends, the tab is hidden, then deleted
   g.clearWelcomeKeep_(ss); g.leaveWelcomeTab_(ss); g.applyDefaultSheetVisibility_(ss);
-  assert.deepStrictEqual(vis(), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'after setup: default tabs');
-  assert.strictEqual(g.deleteWelcomeTab_(ss), true, 'deleted at the next open');
+  assert.deepStrictEqual(vis(), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'default tabs');
+  assert.strictEqual(g.deleteWelcomeTab_(ss, true), true, 'deleted by the build once the keep mark is gone');
   console.log("Welcome tab after Reset to Display Mode: ok");
 }
 {
@@ -248,6 +308,9 @@ function listsSheet() {
   const src = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
   const setup = src.slice(src.indexOf('function runInitialSetupWrapper()'));
   assert(/requireAllScopes\(ScriptApp\.AuthMode\.FULL\)/.test(setup.slice(0, 600)), 'requireAllScopes first in Initial Setup');
+  // The click answers at once: the menu handler only opens the setup window, which runs the setup
+  const wrapper = setup.slice(0, setup.indexOf('\n}\n'));
+  assert(/showGuideWelcome_\(\{ setup: true \}\)/.test(wrapper) && !/setupAllInstallableTriggers/.test(wrapper), 'Initial Setup opens the window first');
   // Getting Started: no "coming soon"; empty document links use the User Guide / data guide
   const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(TABS)) } });
   g.getGuideLink_ = () => "https://example.org/guide";
