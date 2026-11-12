@@ -567,7 +567,8 @@ the nightly refreshResolvedLinks_ clears it). 🔗 My Links and Reset to Display
 (refreshResolvedLinks_). My Links shows the tracker's D / E / F first (which column, or 'no column named "Example"'),
 then the folders as backup, the guide folder's files in rank order with why.
 🐞 Debug → 📦 Make Release Copies (ownerMenuMakeAllCopies, z_MINE.gs; was "Make All 3 Copies"): a pop-up makes
-"… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data") and "… - (BLANK)" (B3 = No + display reset), ONE
+"… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data"; then every tab shown except Backend, any Welcome
+tab deleted, ownerShowAllTabsButBackend_) and "… - (BLANK)" (B3 = No + display reset), ONE
 google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one
 doesn't stop the others. This sheet is never changed. The done message shows the Version Tracker row to add: A = the
 version date, D = the Blank copy's /copy link, E = the Example copy's link (trackerLink).

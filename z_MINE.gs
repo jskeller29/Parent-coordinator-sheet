@@ -247,6 +247,7 @@ function ownerMakeCopy(kind, exampleUrl) {
     const migrate = false; // one template for everyone: Auto-Migrate (Backend B3) stays off
     if (kind === "example") {
       ownerRunOnCopy_(copy, () => loadFakeDataSteps_(copy)); // same as "Copy Sheet, Then Load Fake Data on the Copy"
+      ownerShowAllTabsButBackend_(copy); // the example shows every tab (owner 2026-11-12)
     } else {
       ownerSetAutoMigrate_(copy, migrate); // before the reset: the Welcome tab reads it
       // Nobody runs Initial Setup on the Blank copy, and its Welcome tab's links are written by
@@ -261,6 +262,20 @@ function ownerMakeCopy(kind, exampleUrl) {
     const base = "https://docs.google.com/spreadsheets/d/" + copy.getId();
     return { name: copy.getName(), url: copy.getUrl(), stamp: stamp,
              trackerLink: kind === "blank" ? base + "/copy" : base + "/edit?usp=sharing" };
+  });
+}
+
+/**
+ * Example copy (owner 2026-11-12): every tab visible except Backend, and no 👋 Welcome tab
+ * (it only tells a new copy to run Initial Setup). Shows first, then hides / deletes,
+ * because Sheets refuses to hide or delete the last visible tab.
+ */
+function ownerShowAllTabsButBackend_(copy) {
+  const sheets = copy.getSheets();
+  sheets.forEach(sh => { if (sh.getName() !== "Backend" && sh.isSheetHidden()) sh.showSheet(); });
+  sheets.forEach(sh => {
+    if (sh.getName() === WELCOME_TAB_NAME) copy.deleteSheet(sh);
+    else if (sh.getName() === "Backend" && !sh.isSheetHidden()) sh.hideSheet();
   });
 }
 
