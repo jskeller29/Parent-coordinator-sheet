@@ -509,6 +509,49 @@ function runAction_(label, fn) {
 }
 
 // ======================================================================
+// BUILD / SYNC LOCK (2026-11-12)
+// One build or phone sync at a time for the whole sheet: the nightly run, a
+// sync's auto-resume trigger, Build Sheets Only and Full Sync used to be able
+// to run side by side (two builds writing the same tabs, two syncs creating the
+// same contact twice). A Script lock, so the Contact Log edits (Document lock)
+// and Input Data Mode are not held up by a build. Re-entrant within one run:
+// Full Sync and the nightly hold it for build + sync, and the
+// buildAllDerivedSheets / syncToGoogleContacts calls inside just carry on.
+// ======================================================================
+var BUILD_LOCK_DEPTH_ = 0;
+var BUILD_LOCK_WHAT_KEY_ = "BUILD_LOCK_WHAT";
+
+/**
+ * Runs fn holding the build lock. Busy: throws an Error whose .buildBusy is
+ * true and whose message says what is running (waitMs: how long to wait first,
+ * default 10 s).
+ */
+function withBuildLock_(what, fn, waitMs) {
+  if (BUILD_LOCK_DEPTH_ > 0) {
+    BUILD_LOCK_DEPTH_++;
+    try { return fn(); } finally { BUILD_LOCK_DEPTH_--; }
+  }
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(waitMs === undefined ? 10000 : waitMs)) {
+    let running = "";
+    try { running = CacheService.getScriptCache().get(BUILD_LOCK_WHAT_KEY_) || ""; } catch (e) { running = ""; }
+    const err = new Error("Another " + (running ? "\"" + running + "\"" : "build or phone sync") +
+      " is running right now. Try again in a few minutes.");
+    err.buildBusy = true;
+    throw err;
+  }
+  BUILD_LOCK_DEPTH_ = 1;
+  try { CacheService.getScriptCache().put(BUILD_LOCK_WHAT_KEY_, String(what), 900); } catch (e) { /* name only */ }
+  try {
+    return fn();
+  } finally {
+    BUILD_LOCK_DEPTH_ = 0;
+    try { CacheService.getScriptCache().remove(BUILD_LOCK_WHAT_KEY_); } catch (e) { /* name only */ }
+    try { lock.releaseLock(); } catch (e) { /* released when the run ends anyway */ }
+  }
+}
+
+// ======================================================================
 // EDIT DEBUG LOG (read by the temporary 🐞 Contact Log Debug sidebar, end of
 // Edits.gs). Off unless that sidebar is open: it keeps the
 // document cache key CL_DEBUG_ON alive while it polls, so recording stops by

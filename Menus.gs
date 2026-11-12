@@ -114,13 +114,15 @@ function setupAllInstallableTriggers() {
     console.error("Error creating OnEdit trigger: " + e.message);
   }
 
-  // 3. Create the Nightly Sync Trigger unconditionally (10 PM every day, NIGHTLY_SYNC_HOUR)
+  // 3. Create the Nightly Sync Trigger unconditionally (10 PM every day, NIGHTLY_SYNC_HOUR);
+  //    the sheet remembers it as its one nightly trigger (Build.gs)
   try {
-    ScriptApp.newTrigger("nightlyMasterSync")
+    const nightly = ScriptApp.newTrigger("nightlyMasterSync")
       .timeBased()
       .atHour(NIGHTLY_SYNC_HOUR)
       .everyDays(1)
       .create();
+    rememberNightlyTrigger_(PropertiesService.getDocumentProperties(), nightly.getUniqueId());
   } catch (e) {
     console.error("Error creating Nightly Sync trigger: " + e.message);
   }
@@ -1028,11 +1030,16 @@ function updateVisualSettings_(settings) {
   }
 
   // --- Student List Filter (Hide Discharged) ---
+  // The filter starts at the header row (studentListHeaderRow_: row 1 since the
+  // 2026-11-11 build, row 4 on a tab not rebuilt since)
   try {
     const masterSheet = getStudentListSheet_(ss);
     if (masterSheet) {
-      const range = masterSheet.getDataRange();
-      let filter = range.getFilter();
+      const headerRow = studentListHeaderRow_(masterSheet);
+      const lastRow = Math.max(masterSheet.getLastRow(), headerRow);
+      const range = masterSheet.getRange(headerRow, 1, lastRow - headerRow + 1, Math.max(1, masterSheet.getLastColumn()));
+      let filter = masterSheet.getFilter();
+      if (filter && filter.getRange().getRow() !== headerRow) { filter.remove(); filter = null; } // an old filter on the wrong row
       
       if (settings.hideDischarged) {
         if (!filter) filter = range.createFilter();
@@ -1056,24 +1063,33 @@ function updateVisualSettings_(settings) {
 }
 
 // --- TRIGGER MANAGEMENT ---
+// The sheet has ONE nightly trigger (see "ONE NIGHTLY JOB PER SHEET" in Build.gs):
+// a Settings save by someone who isn't its maker makes no second one (the
+// trigger reads the "never at night" choice itself when it fires), unless the
+// remembered one has stopped running.
 function manageNightlyTrigger_(disableSync) {
   try {
     const triggers = ScriptApp.getProjectTriggers();
     const syncFunctionName = 'nightlyMasterSync'; 
+    const props = PropertiesService.getDocumentProperties();
+    const owned = props.getProperty(NIGHTLY_UID_KEY_);
+    const mine = triggers.filter(t => t.getHandlerFunction() === syncFunctionName);
+    const someoneElses = !!owned && !mine.some(t => t.getUniqueId() === owned) && nightlyOwnerAlive_(props);
 
-    for (let i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === syncFunctionName) {
-        ScriptApp.deleteTrigger(triggers[i]);
-      }
-    }
+    for (let i = 0; i < mine.length; i++) ScriptApp.deleteTrigger(mine[i]);
 
-    if (!disableSync) {
-      ScriptApp.newTrigger(syncFunctionName)
-        .timeBased()
-        .atHour(NIGHTLY_SYNC_HOUR)
-        .everyDays(1)
-        .create();
+    if (someoneElses) return; // another person's trigger does the job (and reads disableNightlySync)
+    if (disableSync) {
+      props.deleteProperty(NIGHTLY_UID_KEY_);
+      props.deleteProperty(NIGHTLY_UID_SET_KEY_);
+      return;
     }
+    const t = ScriptApp.newTrigger(syncFunctionName)
+      .timeBased()
+      .atHour(NIGHTLY_SYNC_HOUR)
+      .everyDays(1)
+      .create();
+    rememberNightlyTrigger_(props, t.getUniqueId());
   } catch (e) {
     console.warn("Trigger management failed: " + e.message);
   }
@@ -1085,8 +1101,11 @@ function purgeDischargedStudents() {
   const masterSheet = getStudentListSheet_(ss);
   if (!masterSheet) return false;
   
-  const data = masterSheet.getDataRange().getValues();
-  if (data.length < 2) return 0; 
+  // From the header row down (row 1 since the 2026-11-11 build; row 4 on a tab not rebuilt since)
+  const headerRow = studentListHeaderRow_(masterSheet);
+  const lastRow = masterSheet.getLastRow(), lastCol = masterSheet.getLastColumn();
+  if (lastRow <= headerRow || lastCol < 1) return 0;
+  const data = masterSheet.getRange(headerRow, 1, lastRow - headerRow + 1, lastCol).getValues();
   
   const headers = data[0];
   const statusColIdx = headers.indexOf("Status");
@@ -1108,12 +1127,12 @@ function purgeDischargedStudents() {
     const filter = masterSheet.getFilter();
     if (filter) filter.remove(); 
     
-    masterSheet.clearContents();
-    masterSheet.getRange(1, 1, currentData.length, currentData[0].length).setValues(currentData);
+    masterSheet.getRange(headerRow, 1, lastRow - headerRow + 1, lastCol).clearContent(); // rows above the header stay
+    masterSheet.getRange(headerRow, 1, currentData.length, currentData[0].length).setValues(currentData);
     
     const props = PropertiesService.getDocumentProperties();
     if (props.getProperty('hideDischarged') === 'true') {
-      const newFilter = masterSheet.getDataRange().createFilter();
+      const newFilter = masterSheet.getRange(headerRow, 1, currentData.length, currentData[0].length).createFilter();
       const criteria = SpreadsheetApp.newFilterCriteria().setHiddenValues(["Discharged"]).build();
       newFilter.setColumnFilterCriteria(statusColIdx + 1, criteria);
     }
@@ -1985,6 +2004,22 @@ function ma_migrateSimpleSheets(url) {
       }
     }
   });
+
+  // Your Lists (owner's pick 2026-11-12: they come along): each 📥 list tab + its setup.
+  // The final rebuild (step 6) then fills their columns / Additional Information.
+  try {
+    const moved = od_migrateLists_(oldSS, newSS);
+    if (moved) console.log("Migration: " + moved + " of Your Lists copied.");
+  } catch (e) { console.warn("Migration: Your Lists not copied: " + e.message); }
+}
+
+// Contact Log Follow-up column (N) and the old values (trackers before 2026-11-04) -> the new options
+const MIGRATION_FOLLOWUP_COL_ = 14;
+const MIGRATION_FOLLOWUP_MAP_ = { "yes": "Followup Needed", "yes - important": "Followup Needed - ASAP", "no": "No Followup Needed" };
+
+function migrateFollowupValue_(val) {
+  const key = String(val == null ? "" : val).trim().toLowerCase().replace(/\s*-\s*/g, " - ");
+  return MIGRATION_FOLLOWUP_MAP_[key] || val;
 }
 
 /**
@@ -2069,6 +2104,9 @@ function ma_migrateContactLog(url) {
       
       // Final sweep to prevent stray 1899 ghost dates from entering the array
       if (val instanceof Date && val.getFullYear() < 1970) val = "";
+
+      // Follow-up (N): last year's Yes / Yes - Important / No become today's options
+      if (newIdx === MIGRATION_FOLLOWUP_COL_ - 1) val = migrateFollowupValue_(val);
       
       newRow[newIdx] = val;
     });
@@ -2212,7 +2250,10 @@ const VERSION_CHECK_HOURS = 6;
  */
 function checkVersionOnOpen() {
   // Sheets set up before the change trigger existed get it now (only after setup)
-  if (PropertiesService.getDocumentProperties().getProperty('SETUP_COMPLETE') === 'true') ensureChangeTrigger_(null, true);
+  if (PropertiesService.getDocumentProperties().getProperty('SETUP_COMPLETE') === 'true') {
+    ensureChangeTrigger_(null, true);
+    claimNightlyTrigger_(); // runs as the person who ran setup: their nightly trigger is the sheet's one (Build.gs)
+  }
   try {
     const shownVersionDialog = checkForUpdates_(false);
     // Only nag about stale ATS data when we didn't just open the version

@@ -982,7 +982,7 @@ function resetDerivedSheets_(ss) {
   backendClearBlock_(ss, "OVERRIDES", BACKEND_HEADER_ROW + 1);
   backendClearBlock_(ss, "SEND_OUT", BACKEND_HEADER_ROW + 1);
   writeSendOutListFormulas_(ss); // put the Send Out dropdown lists (BH3:BJ3) back
-  // Your Lists (Z#OwnData.gs): the setups and their Additional Information go with the list tabs
+  // Your Lists (Input Data.gs, part 2): the setups and their Additional Information go with the list tabs
   backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
   // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
@@ -1067,13 +1067,10 @@ function resetContactLogFormatting() {
     .setBackground("#990000")
     .setRanges([rangeG2G]).build());
 
-  // 5. Yes - Important (N2:N) -> ⚡ Checks Col N
-  rules.push(SpreadsheetApp.newConditionalFormatRule()
-    .whenTextContains("Yes - Important")
-    .setBold(true)
-    .setRanges([rangeN2N]).build());
+  // (The old "Yes - Important" bold rule on N is gone: that value is now
+  // "Followup Needed - ASAP", which has its own dropdown color. Owner 2026-11-12.)
 
- // 6. Grey Checkboxes (P2:P) -> ⚡ Regex checks Col N
+ // 5. Grey Checkboxes (P2:P) -> ⚡ Regex checks Col N
   rules.push(SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied(getContactLogHideFormula_())
     .setFontColor("#999999")

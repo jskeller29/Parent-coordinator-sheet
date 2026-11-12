@@ -8,7 +8,7 @@
 // Warned (every tab except Raw Data, Backend and the owner-only tabs):
 //   - Row 1 (headers) of Contact Log, Notes and Send Out.
 //   - Contact Log: the END bar row (except its O "FILTER?" checkbox) and
-//     everything below it.
+//     everything below it, except the lookup box's OSIS box and name switch.
 //   - Events: the header row (row 2) of every event table.
 //   - PCAR: everything except H2:I2 ("PUT YOUR OWN INPUT" dates).
 //   - Tabs the build writes (Student List, Combined Contact Tracking, Parents
@@ -126,9 +126,56 @@ function desiredSheetLocks_(sheet, name) {
       // The O cell (FILTER? checkbox) on the END bar stays free
       range(endRow, 1, endRow, CL_COL_FILTER_TOGGLE - 1, "Contact Log END bar and below");
       range(endRow, CL_COL_FILTER_TOGGLE + 1, endRow, maxC, "Contact Log END bar and below");
-      range(endRow + 1, 1, maxR, maxC, "Contact Log END bar and below");
+      // Below END: everything except the lookup box cells you type in (2026-11-12)
+      if (endRow < maxR) {
+        rangesAround_(endRow + 1, 1, maxR, maxC, lookupBoxInputCells_(sheet, endRow))
+          .forEach(r => range(r[0], r[1], r[2], r[3], "Contact Log END bar and below"));
+      }
     }
   }
+  return out;
+}
+
+/**
+ * The lookup box cells below END that are typed in, as [row, col]: the OSIS box (the
+ * cell right of the "OSIS" label) and the name switch (one row up, two columns right
+ * of the label; the Communications formula reads both, searchBarCommsFormula_ in
+ * Edits.gs). Before 2026-11-12 they were warned too, so every lookup asked "are you sure?".
+ */
+function lookupBoxInputCells_(sheet, endRow) {
+  const maxR = sheet.getMaxRows(), maxC = sheet.getMaxColumns();
+  if (endRow >= maxR) return [];
+  const label = sheet.getRange(endRow + 1, 1, maxR - endRow, maxC)
+    .createTextFinder("OSIS").matchEntireCell(true).findNext();
+  if (!label) return [];
+  const r = label.getRow(), c = label.getColumn();
+  const cells = [];
+  if (c + 1 <= maxC) cells.push([r, c + 1]);
+  if (r - 1 > endRow && c + 2 <= maxC) cells.push([r - 1, c + 2]);
+  return cells;
+}
+
+/** Rectangles [r1, c1, r2, c2] covering r1..r2 x c1..c2 except the given [row, col] cells. */
+function rangesAround_(r1, c1, r2, c2, holes) {
+  const out = [];
+  const byRow = new Map();
+  holes.forEach(h => {
+    if (h[0] < r1 || h[0] > r2 || h[1] < c1 || h[1] > c2) return;
+    if (!byRow.has(h[0])) byRow.set(h[0], []);
+    byRow.get(h[0]).push(h[1]);
+  });
+  let row = r1;
+  [...byRow.keys()].sort((a, b) => a - b).forEach(hr => {
+    if (hr > row) out.push([row, c1, hr - 1, c2]);
+    let col = c1;
+    byRow.get(hr).sort((a, b) => a - b).forEach(hc => {
+      if (hc > col) out.push([hr, col, hr, hc - 1]);
+      col = hc + 1;
+    });
+    if (col <= c2) out.push([hr, col, hr, c2]);
+    row = hr + 1;
+  });
+  if (row <= r2) out.push([row, c1, r2, c2]);
   return out;
 }
 

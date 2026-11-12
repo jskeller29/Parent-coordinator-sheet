@@ -371,7 +371,9 @@ function handleEdit_(e) {
   // --- DYNAMIC DELTA SYNC TRIGGER ---
   let targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
 
-  if (!isValidOsis_(targetOsis)) {
+  // A formula OSIS still "Loading...": wait a second and look again. A blank OSIS
+  // has nothing to wait for (before 2026-11-12 every such edit waited 1 s).
+  if (!isValidOsis_(targetOsis) && /loading/i.test(targetOsis)) {
     Utilities.sleep(1000);
     SpreadsheetApp.flush();
     targetOsis = String(sheet.getRange(row, CL_COL_OSIS).getDisplayValue()).trim();
@@ -1763,6 +1765,7 @@ function knownStudentOsis_(ss) {
  */
 function notesTextForOsis_(targetOsis, contactData, eventData, nData, disableHiddenNotes) {
   const combinedInteractions = [];
+  const range = notesDateRange_(); // ⚙️ Settings date range, same as the full build
 
   if (contactData) {
     for (let i = 1; i < contactData.length; i++) {
@@ -1772,7 +1775,7 @@ function notesTextForOsis_(targetOsis, contactData, eventData, nData, disableHid
       if (!osisCellIncludes_(row[4], targetOsis)) continue;
 
       const entry = contactLogNoteLine_(row, disableHiddenNotes);
-      if (entry) combinedInteractions.push(entry);
+      if (entry && inNotesDateRange_(entry, range)) combinedInteractions.push(entry);
     }
   }
 
@@ -1780,7 +1783,8 @@ function notesTextForOsis_(targetOsis, contactData, eventData, nData, disableHid
     for (let i = 1; i < eventData.length; i++) {
       const row = eventData[i];
       if (!osisCellIncludes_(row[3], targetOsis)) continue;
-      combinedInteractions.push(eventNoteLine_(row));
+      const entry = eventNoteLine_(row);
+      if (inNotesDateRange_(entry, range)) combinedInteractions.push(entry);
     }
   }
 
@@ -1835,11 +1839,16 @@ function updateContactAndPhoneOnly() {
   writeSheet_(ss, "Phone Contacts", phoneContacts);
 }
 
-/** Student List rows (OSIS, Student, Guardian, Site) incl. sibling groups, from the Backend copy. */
+/**
+ * Student List rows (OSIS, Student, Guardian, Site) incl. sibling groups, from the
+ * Backend copy, WITH a header row first: the builders it feeds skip row 0 like the
+ * build's own Student List (before 2026-11-12 there was no header, so the first
+ * student lost their Student List details in Phone Contacts after a quick rebuild).
+ */
 function getExistingMasterTable_(ss) {
+  const header = ["OSIS", "Student", "Guardian", "Site"];
   const data = studentLookupRows_(ss, 4);
-  if (data.length === 0) return [["OSIS", "Student", "Guardian", "Class"]];
-  return data.filter(row => row[0] && !String(row[0]).includes("#"));
+  return [header].concat(data.filter(row => row[0] && !String(row[0]).includes("#")));
 }
 
 // ----------------------------------------------------------------------

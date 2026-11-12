@@ -42,6 +42,11 @@ function getBuildProgress_() {
  * Phone Contacts layout (see ownerHooks_).
  */
 function buildAllDerivedSheets() {
+  // One build / sync at a time (Core.gs); a Full Sync or nightly run already holds it
+  return withBuildLock_("Build", () => buildAllDerivedSheetsRun_());
+}
+
+function buildAllDerivedSheetsRun_() {
   reportBuildStep_(0); // Reading your data
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const rawSheet = ss.getSheetByName("Raw Data");
@@ -253,12 +258,97 @@ function buildAllDerivedSheets() {
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
-function nightlyMasterSync() {
+function nightlyMasterSync(e) {
+  if (!nightlyTriggerShouldRun_(e)) return;
   return runAction_("Nightly sync", () => nightlyMasterSyncRun_());
+}
+
+// ----------------------------------------------------------------------
+// ONE NIGHTLY JOB PER SHEET (2026-11-12)
+// Triggers belong to the person who makes them, and each person only sees their
+// own. So when a second person saved ⚙️ Settings (manageNightlyTrigger_) they got a
+// second nightly trigger: two builds at 10 PM, and with phone sync on, the
+// families' contacts also went into that person's Google Contacts.
+// Now the sheet remembers which trigger does the job (doc property
+// NIGHTLY_TRIGGER_UID) and when it last ran (NIGHTLY_LAST_RUN, ms):
+//   - a nightly trigger that is not the remembered one deletes itself when it
+//     fires (it runs as its maker, so it can), unless the remembered one has not
+//     run for NIGHTLY_TAKEOVER_DAYS_ (its maker lost access?): then it takes over;
+//   - manageNightlyTrigger_ does not make a second one for another person;
+//   - checkVersionOnOpen (runs as the person who ran Initial Setup) remembers
+//     that person's trigger on sheets set up before this;
+//   - "Rebuild sheets: never at night" in Settings is checked when the trigger
+//     fires, so it works whoever's trigger it is.
+// ----------------------------------------------------------------------
+var NIGHTLY_UID_KEY_ = "NIGHTLY_TRIGGER_UID";
+var NIGHTLY_UID_SET_KEY_ = "NIGHTLY_TRIGGER_UID_SET";   // ms, when it was remembered
+var NIGHTLY_LAST_RUN_KEY_ = "NIGHTLY_LAST_RUN";         // ms, last time a nightly trigger fired
+var NIGHTLY_TAKEOVER_DAYS_ = 3;
+
+function rememberNightlyTrigger_(props, uid) {
+  props.setProperty(NIGHTLY_UID_KEY_, String(uid));
+  props.setProperty(NIGHTLY_UID_SET_KEY_, String(Date.now()));
+}
+
+/** The remembered nightly trigger ran (or was made) within NIGHTLY_TAKEOVER_DAYS_. */
+function nightlyOwnerAlive_(props) {
+  const last = Math.max(Number(props.getProperty(NIGHTLY_LAST_RUN_KEY_)) || 0, Number(props.getProperty(NIGHTLY_UID_SET_KEY_)) || 0);
+  return Date.now() - last < NIGHTLY_TAKEOVER_DAYS_ * 86400000;
+}
+
+function nightlyTriggerShouldRun_(e) {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const uid = e && e.triggerUid ? String(e.triggerUid) : "";
+    const owned = props.getProperty(NIGHTLY_UID_KEY_);
+    if (uid && !owned) rememberNightlyTrigger_(props, uid); // first one to fire keeps the job
+    else if (uid && owned !== uid) {
+      if (nightlyOwnerAlive_(props)) {
+        if (props.getProperty(NIGHTLY_LAST_RUN_KEY_)) {
+          // A second copy (another person's) while the remembered one runs every night: remove it
+          ScriptApp.getProjectTriggers().forEach(t => { if (t.getUniqueId() === uid) ScriptApp.deleteTrigger(t); });
+          console.warn("Nightly sync: removed a second nightly trigger (" + uid + "); " + owned + " does the job.");
+        } else {
+          console.warn("Nightly sync: skipped trigger " + uid + " (" + owned + " is the sheet's nightly trigger).");
+        }
+        return false;
+      }
+      rememberNightlyTrigger_(props, uid); // the remembered one stopped running: take over
+      console.warn("Nightly sync: trigger " + uid + " took over from " + owned + " (no run for " + NIGHTLY_TAKEOVER_DAYS_ + " days).");
+    }
+    props.setProperty(NIGHTLY_LAST_RUN_KEY_, String(Date.now()));
+    if (props.getProperty('disableNightlySync') === 'true') {
+      console.log("Nightly sync: off in Settings (Rebuild sheets), nothing done.");
+      return false;
+    }
+  } catch (err) { console.warn("Nightly trigger check failed (running anyway): " + err.message); }
+  return true;
+}
+
+/**
+ * Remembers the current user's nightly trigger as the sheet's one when none is
+ * remembered yet (checkVersionOnOpen runs as the person who ran Initial Setup).
+ */
+function claimNightlyTrigger_() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    if (props.getProperty(NIGHTLY_UID_KEY_)) return;
+    const mine = ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === "nightlyMasterSync")[0];
+    if (mine) rememberNightlyTrigger_(props, mine.getUniqueId());
+  } catch (err) { console.warn("Nightly trigger not remembered: " + err.message); }
 }
 
 function nightlyMasterSyncRun_() {
   try {
+    // Build + phone sync as one job: nothing else may build or sync in between
+    withBuildLock_("Nightly sync", () => nightlyMasterSyncLocked_(), 30000);
+  } catch (e) {
+    console.error("Nightly Master Sync failed: " + e.message);
+  }
+}
+
+function nightlyMasterSyncLocked_() {
+  {
     buildAllDerivedSheets();
     resetContactLogFormatting();
 
@@ -278,9 +368,6 @@ function nightlyMasterSyncRun_() {
     try {
       refreshResolvedLinks_();
     } catch (e) { console.error("Resolved link refresh failed: " + e.message); }
-
-  } catch(e) {
-    console.error("Nightly Master Sync failed: " + e.message);
   }
 }
 
@@ -302,6 +389,7 @@ function startBuildOnlyProcess() {
 
 function startBuildOnlyProcessRun_() {
   const cache = CacheService.getScriptCache();
+  // (buildAllDerivedSheets takes the build lock; busy = 'killed' with "Another ... is running")
   reportBuildStep_(0); // sidebar's build checklist starts at step 1
   cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building' }), 21600); 
   try { 
@@ -942,21 +1030,8 @@ function buildCombinedContactTrackingData_(ss, masterTable, contactLogData, even
   const props = PropertiesService.getDocumentProperties();
   const disableHiddenNotes = props.getProperty('disableHiddenNotes') === 'true';
 
-  // --- Retrieve Custom Date Range Filter ---
-  const notesStartDateStr = props.getProperty('notesStartDate');
-  const notesEndDateStr = props.getProperty('notesEndDate');
-
-  let filterStartDate = null;
-  let filterEndDate = null;
-
-  if (notesStartDateStr) {
-    const parts = notesStartDateStr.split("-");
-    if (parts.length === 3) filterStartDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0);
-  }
-  if (notesEndDateStr) {
-    const parts = notesEndDateStr.split("-");
-    if (parts.length === 3) filterEndDate = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59);
-  }
+  // --- Custom Date Range Filter (⚙️ Settings; the quick update uses the same one) ---
+  const notesRange = notesDateRange_(true);
 
   const out = [[ "OSIS", "Guardians", "Student", "Notes" ]];
 
@@ -1052,17 +1127,14 @@ function buildCombinedContactTrackingData_(ss, masterTable, contactLogData, even
     // --- Process Contact Log ---
     for (const row of contactRowsByOsis.get(osis) || []) {
       const entry = contactLogNoteLine_(row, disableHiddenNotes);
-      if (!entry) continue;
-      if (filterStartDate && entry.dateObj < filterStartDate) continue;
-      if (filterEndDate && entry.dateObj > filterEndDate) continue;
+      if (!entry || !inNotesDateRange_(entry, notesRange)) continue;
       combinedInteractions.push(entry);
     }
 
     // --- Process Event Log ---
     for (const row of eventRowsByOsis.get(osis) || []) {
       const entry = eventNoteLine_(row);
-      if (filterStartDate && entry.dateObj < filterStartDate) continue;
-      if (filterEndDate && entry.dateObj > filterEndDate) continue;
+      if (!inNotesDateRange_(entry, notesRange)) continue;
       combinedInteractions.push(entry);
     }
 
@@ -1150,6 +1222,34 @@ function contactLogNoteLine_(row, disableHiddenNotes) {
   if (rVal !== "") line += ` [${rVal}]`;
 
   return { dateObj: dateObj, text: line.trim() };
+}
+
+/**
+ * ⚙️ Settings notes date range ("Show notes from / to", YYYY-MM-DD) as
+ * { start, end } Dates (null = no limit): start = that day 00:00, end = that day
+ * 23:59:59. Read once per run (fresh = read again, the build does). Used by the
+ * full build and the quick notes update (notesTextForOsis_), so both give the
+ * same text; before 2026-11-12 the quick update ignored it, so with a range set
+ * every row delete / paste looked like "everyone changed" and rebuilt everything.
+ */
+var NOTES_DATE_RANGE_ = null;
+function notesDateRange_(fresh) {
+  if (NOTES_DATE_RANGE_ && !fresh) return NOTES_DATE_RANGE_;
+  const props = PropertiesService.getDocumentProperties();
+  const parse = (text, endOfDay) => {
+    const parts = String(text || "").split("-");
+    if (parts.length !== 3) return null;
+    return endOfDay ? new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59) : new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0);
+  };
+  NOTES_DATE_RANGE_ = { start: parse(props.getProperty('notesStartDate'), false), end: parse(props.getProperty('notesEndDate'), true) };
+  return NOTES_DATE_RANGE_;
+}
+
+/** A note line ({ dateObj }) is inside the Settings date range. */
+function inNotesDateRange_(entry, range) {
+  if (range.start && entry.dateObj < range.start) return false;
+  if (range.end && entry.dateObj > range.end) return false;
+  return true;
 }
 
 /** A Backend Event Log row (A date, B event, F guardian, G attendee, I notes) as { dateObj, text }. */

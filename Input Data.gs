@@ -43,11 +43,15 @@
 
 var IDM_STATE_KEY = 'INPUT_DATA_MODE_STATE';
 
-// 🐞 TEMPORARY DEBUG: every sidebar call returns a step-by-step log (shown in the
-// sidebar's Debug panel) and script errors are shown instead of retried silently.
-// Set to false (or delete the idm_log_ lines) once Input Data Mode works.
-var IDM_DEBUG = true;
+// Debug log: only with the owner's test file z_InputDataDebug.gs (it defines
+// idm_debugEnabled_ and the tab snapshot idm_debugSheets_). With it, every sidebar
+// call returns a step-by-step log for the sidebar's Debug panel; without it the
+// idm_log_ lines do nothing and the panel never shows (delete that file on the
+// copies that go to schools). Script errors are always shown, never retried silently.
 var IDM_DBG = null;
+function idm_debugOn_() {
+  try { return typeof idm_debugEnabled_ === "function" && !!idm_debugEnabled_(); } catch (e) { return false; }
+}
 function idm_log_(msg) {
   if (!IDM_DBG) return;
   IDM_DBG.push("+" + (Date.now() - IDM_DBG.t0) + "ms " + msg);
@@ -159,7 +163,7 @@ function openInputDataMode() {
   } finally {
     lock.releaseLock();
   }
-  const html = HtmlService.createHtmlOutputFromFile('InputDataSidebar').setTitle('📥 Input Data Mode');
+  const html = htmlFromFile_('InputDataSidebar').setTitle('Input Data Mode'); // template: pulls in Styles.html
   SpreadsheetApp.getUi().showSidebar(html.setWidth(340));
 }
 
@@ -183,7 +187,7 @@ function idm_check() {
     if (!state) return idm_view_(ss, null);
     const temp = idm_ensureTempSheet_(ss, state);
     idm_saveState_(state);
-    idm_debugSheets_(ss, state, temp);
+    if (IDM_DBG && typeof idm_debugSheets_ === "function") idm_debugSheets_(ss, state, temp); // z_InputDataDebug.gs
     if (IDM_STEPS[state.step].manual || IDM_STEPS[state.step].lists) return idm_view_(ss, state);
     const hasData = idm_tempHasData_(temp);
     idm_log_("temp tab has data: " + hasData);
@@ -599,8 +603,7 @@ function idm_fillSiteClassTab_(ss, sheet) {
   const sorted = [...codes].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   idm_log_("site/class tab: " + sorted.length + " class codes (" + existing.size + " already in BH:BI)");
 
-  sheet.clear();
-  sheet.getDataRange().clearDataValidations();
+  idm_clearTab_(sheet);
   const rows = sorted.map(code => {
     const e = existing.get(code) || { site: "", teacher: "" };
     return [code, e.teacher, e.site];
@@ -770,8 +773,7 @@ function idm_prepareTab_(ss, sheet, step) {
 
 /** Step 5's tab: just a list of your lists (they are opened from the sidebar). */
 function idm_fillListsTab_(ss, sheet) {
-  sheet.getDataRange().clearDataValidations();
-  sheet.clear();
+  idm_clearTab_(sheet);
   const lists = od_listSummaries_(ss);
   const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [""],
                 ["List", "Tab", "By", "Rows", "Matched", "Need you", "Updated"]];
@@ -784,9 +786,21 @@ function idm_fillListsTab_(ss, sheet) {
   sheet.setColumnWidth(1, 160);
 }
 
-function idm_resetTempSheet_(sheet) {
-  sheet.getDataRange().clearDataValidations();
+/**
+ * Empties the temp tab completely before the next step uses it: values, formats,
+ * EVERY dropdown (the Site / Class step puts them on 100+ rows, more than its data,
+ * so clearing only the data range left some behind), the hidden site-list column Z
+ * and the frozen header row.
+ */
+function idm_clearTab_(sheet) {
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
   sheet.clear();
+  try { sheet.showColumns(1, sheet.getMaxColumns()); } catch (e) { /* none hidden */ }
+  try { sheet.setFrozenRows(0); } catch (e) { /* cosmetic */ }
+}
+
+function idm_resetTempSheet_(sheet) {
+  idm_clearTab_(sheet);
   sheet.getRange("A1").setValue(IDM_PLACEHOLDER)
     .setBackground("#FFF2CC").setFontWeight("bold").setFontSize(14)
     .setNote("Paste anywhere on this tab — it doesn't have to be A1.");
@@ -932,8 +946,8 @@ function idm_saveState_(state) {
 }
 
 function idm_withLock_(fn) {
-  IDM_DBG = [];
-  IDM_DBG.t0 = Date.now();
+  IDM_DBG = idm_debugOn_() ? [] : null;
+  if (IDM_DBG) IDM_DBG.t0 = Date.now();
   let result;
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(20000)) {
@@ -950,7 +964,7 @@ function idm_withLock_(fn) {
       lock.releaseLock();
     }
   }
-  if (IDM_DEBUG && result && typeof result === "object") {
+  if (IDM_DBG && result && typeof result === "object") {
     idm_log_("done");
     result.debug = IDM_DBG.slice();
   }
@@ -968,22 +982,6 @@ function idm_errorView_(e) {
     return { active: true, stepIndex: 0, stepCount: IDM_STEPS.length,
              step: { key: '', zone: '(unknown)', required: false, howTo: [] }, tabName: '?', lastUpdated: null, notice: notice };
   }
-}
-
-/** Snapshot of what the server sees, for the Debug panel. */
-function idm_debugSheets_(ss, state, temp) {
-  if (!IDM_DBG) return;
-  try {
-    const active = ss.getActiveSheet();
-    idm_log_("state: " + JSON.stringify(state));
-    idm_log_("active tab (as the script sees it): " + (active ? active.getName() + " #" + active.getSheetId() : "none"));
-    idm_log_("tabs: " + ss.getSheets().map(s => s.getName() + " #" + s.getSheetId() + (s.isSheetHidden() ? " (hidden)" : "")).join(" | "));
-    if (temp) {
-      idm_log_("temp tab: " + temp.getName() + " #" + temp.getSheetId() + " lastRow=" + temp.getLastRow() +
-        " lastCol=" + temp.getLastColumn() + " maxRows=" + temp.getMaxRows() + " maxCols=" + temp.getMaxColumns() +
-        " A1=" + JSON.stringify(String(temp.getRange("A1").getValue())));
-    }
-  } catch (e) { idm_log_("debug snapshot failed: " + e.message); }
 }
 
 // ======================================================================
@@ -1255,7 +1253,8 @@ function od_nameParts_(text) {
   }
   const tokens = firstT.concat(lastT);
   if (!tokens.length) return null;
-  return { raw: s, tokens: tokens, first: firstT[0] || "", last: lastT.length ? lastT[lastT.length - 1] : "" };
+  return { raw: s, tokens: tokens, first: firstT[0] || "", last: lastT.length ? lastT[lastT.length - 1] : "",
+           firstTokens: firstT, lastTokens: lastT };
 }
 
 /** Name from two columns (first name, last name). */
@@ -1263,7 +1262,8 @@ function od_namePartsTwo_(firstText, lastText) {
   const firstT = nameTokens_(firstText), lastT = nameTokens_(lastText);
   const tokens = firstT.concat(lastT);
   if (!tokens.length) return null;
-  return { raw: (toText_(firstText) + " " + toText_(lastText)).trim(), tokens: tokens, first: firstT[0] || "", last: lastT.length ? lastT[lastT.length - 1] : "" };
+  return { raw: (toText_(firstText) + " " + toText_(lastText)).trim(), tokens: tokens, first: firstT[0] || "", last: lastT.length ? lastT[lastT.length - 1] : "",
+           firstTokens: firstT, lastTokens: lastT };
 }
 
 function od_tokenKey_(tokens) {
@@ -1286,16 +1286,20 @@ function od_addTo_(map, key, item) {
 function od_index_(studentRows, guardianRows) {
   const idx = {
     byOsis: new Map(), students: [], byNameKey: new Map(), byToken: new Map(), byFirst: new Map(), byLast: new Map(),
-    persons: [], pByKey: new Map(), pByNameKey: new Map(), pByToken: new Map(), pByLast: new Map(), byPhone: new Map(), byEmail: new Map(), classes: new Set()
+    persons: [], pByKey: new Map(), pByNameKey: new Map(), pByToken: new Map(), pByLast: new Map(), byPhone: new Map(), byEmail: new Map(), classes: new Set(),
+    byInitial: new Map(), pByInitial: new Map(),        // first letter of any name part -> students / guardians
+    byLastInitial: new Map(), pByLastInitial: new Map() // first letter of a LAST name part (who to score for a full name)
   };
+  const addInitials = (map, tokens, item) => new Set(tokens.map(t => t.charAt(0))).forEach(ch => od_addTo_(map, ch, item));
   studentRows.forEach(r => {
     const osis = toText_(r[0]);
     if (!osis || osis.indexOf(",") !== -1 || !isRealStudentId_(osis)) return;
     const key = normalizeOsis_(osis);
     if (idx.byOsis.has(key)) return;
-    const parts = od_nameParts_(r[1]) || { tokens: [], first: "", last: "" };
+    const parts = od_nameParts_(r[1]) || { tokens: [], first: "", last: "", firstTokens: [], lastTokens: [] };
     const st = {
       osis: osis, key: key, name: toText_(r[1]), tokens: parts.tokens, first: parts.first, last: parts.last,
+      firstTokens: parts.firstTokens, lastTokens: parts.lastTokens,
       cls: toText_(r[4]).split(/[:\/]/)[0].trim().toUpperCase(), guardianText: toText_(r[2]), persons: []
     };
     idx.byOsis.set(key, st);
@@ -1304,6 +1308,8 @@ function od_index_(studentRows, guardianRows) {
     st.tokens.forEach(t => od_addTo_(idx.byToken, t, st));
     od_addTo_(idx.byFirst, st.first, st);
     od_addTo_(idx.byLast, st.last, st);
+    addInitials(idx.byInitial, st.tokens, st);
+    addInitials(idx.byLastInitial, st.lastTokens.length ? st.lastTokens : st.tokens, st);
     if (st.cls) idx.classes.add(st.cls);
   });
 
@@ -1321,12 +1327,14 @@ function od_index_(studentRows, guardianRows) {
     if (!person) {
       const n = (idx.pByNameKey.get(nameKey) || []).length;
       person = { key: nameKey + (n ? "#" + (n + 1) : ""), name: name, tokens: parts.tokens, first: parts.first, last: parts.last,
-                 phones: new Set(), emails: new Set(), kids: [] };
+                 firstTokens: parts.firstTokens, lastTokens: parts.lastTokens, phones: new Set(), emails: new Set(), kids: [] };
       idx.persons.push(person);
       idx.pByKey.set(person.key, person);
       od_addTo_(idx.pByNameKey, nameKey, person);
       od_addTo_(idx.pByLast, person.last, person);
       parts.tokens.forEach(t => od_addTo_(idx.pByToken, t, person));
+      addInitials(idx.pByInitial, parts.tokens, person);
+      addInitials(idx.pByLastInitial, parts.lastTokens.length ? parts.lastTokens : parts.tokens, person);
     }
     if (phone) { person.phones.add(phone); od_addTo_(idx.byPhone, phone, person); }
     if (email) { person.emails.add(email); od_addTo_(idx.byEmail, email, person); }
@@ -1448,10 +1456,266 @@ function od_rowKey_(cells) {
   return h1.toString(36) + h2.toString(36);
 }
 
+// ----------------------------------------------------------------------
+// HOW ALIKE TWO NAMES ARE (owner's request 2026-11-12): every possible student /
+// guardian gets a confidence 0-100% from the first and last names (last name 55%,
+// first name 45%), so typos ("Simpsn"), the other order ("SIMPSON BART"), short
+// names, nicknames and initials still find someone. A confidence is only ever a
+// recommendation: a person says yes in the sidebar (Your pick), nothing is used
+// before that. High = OD_CONF_HIGH_+ with first AND last name each close; medium
+// = OD_CONF_MEDIUM_+; low = OD_CONF_MIN_+; under that the closest few are still
+// listed as suggestions. Two candidates within OD_CONF_TIE_ points = "pick one".
+// ----------------------------------------------------------------------
+var OD_CONF_HIGH_ = 90, OD_CONF_MEDIUM_ = 75, OD_CONF_MIN_ = 60, OD_CONF_TIE_ = 4;
+var OD_SCORE_FLOOR_ = 0.5; // below this a name is not worth suggesting
+var OD_SIM_MEMO_ = null;
+
+function od_pct_(x) { return Math.round(Math.min(1, Math.max(0, Number(x) || 0)) * 100); }
+function od_confLevel_(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return "";
+  return pct >= OD_CONF_HIGH_ ? "high" : pct >= OD_CONF_MEDIUM_ ? "medium" : pct >= OD_CONF_MIN_ ? "low" : "weak";
+}
+
+/** Jaro-Winkler similarity of two lowercase name parts (0-1). */
+function od_jaroWinkler_(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const range = Math.max(0, Math.floor(Math.max(a.length, b.length) / 2) - 1);
+  const aHit = new Array(a.length).fill(false), bHit = new Array(b.length).fill(false);
+  let matches = 0;
+  for (let i = 0; i < a.length; i++) {
+    const lo = Math.max(0, i - range), hi = Math.min(b.length - 1, i + range);
+    for (let j = lo; j <= hi; j++) {
+      if (!bHit[j] && a[i] === b[j]) { aHit[i] = bHit[j] = true; matches++; break; }
+    }
+  }
+  if (!matches) return 0;
+  let k = 0, half = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (!aHit[i]) continue;
+    while (!bHit[k]) k++;
+    if (a[i] !== b[k]) half++;
+    k++;
+  }
+  const jaro = (matches / a.length + matches / b.length + (matches - half / 2) / matches) / 3;
+  let prefix = 0;
+  while (prefix < 4 && prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+  return jaro + prefix * 0.1 * (1 - jaro);
+}
+
+/** 1 - edits / longer length (0-1). */
+function od_editRatio_(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  let prev = [];
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return 1 - prev[b.length] / Math.max(a.length, b.length);
+}
+
+/** Spelling likeness of two name parts: Jaro-Winkler and edit distance averaged (JW alone over-rewards a shared start: Mary / Mark). */
+function od_spellAlike_(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  if (!OD_SIM_MEMO_) OD_SIM_MEMO_ = new Map();
+  const key = a < b ? a + "|" + b : b + "|" + a;
+  if (OD_SIM_MEMO_.has(key)) return OD_SIM_MEMO_.get(key);
+  let v = (od_jaroWinkler_(a, b) + od_editRatio_(a, b)) / 2;
+  if ((a.length === 1 && b.charAt(0) === a) || (b.length === 1 && a.charAt(0) === b)) v = Math.max(v, 0.7); // an initial
+  OD_SIM_MEMO_.set(key, v);
+  return v;
+}
+
+/** First names: the rules (same / nickname / "Sam" for Samuel / initial) or the spelling, whichever is more. */
+function od_firstScore_(a, b) {
+  if (!a || !b) return 0;
+  const how = od_firstLike_(a, b);
+  const rule = how === "same" ? 1 : how === "nickname" ? 0.95 : how === "start" ? 0.9 : how === "initial" ? 0.72 : 0;
+  return Math.max(rule, od_spellAlike_(a, b));
+}
+
+/** Best likeness between any part of one list and any part of the other. */
+function od_bestPair_(as, bs) {
+  let best = 0;
+  as.forEach(a => bs.forEach(b => { best = Math.max(best, od_spellAlike_(a, b)); }));
+  return best;
+}
+
+/** Share of the shorter name's parts found (closely) in the longer one: middle names, two last names. */
+function od_tokenShare_(a, b) {
+  const small = a.length <= b.length ? a : b, big = small === a ? b : a;
+  if (small.length < 2) return { score: 0, gate: false };
+  let sum = 0, worst = 1;
+  small.forEach(t => { let m = 0; big.forEach(u => { m = Math.max(m, od_spellAlike_(t, u)); }); sum += m; worst = Math.min(worst, m); });
+  return { score: 0.95 * sum / small.length, gate: worst >= 0.9 };
+}
+
+/**
+ * How alike a row's name is to a student's / guardian's (0-1). Variants: the
+ * normal order, the last name written first without a comma, and the share of
+ * name parts; the best one counts. "High" needs each name part close (else 0.89 max).
+ */
+function od_nameScore_(n, p) {
+  if (!n || !p || !n.tokens.length || !p.tokens.length) return 0;
+  const nf = n.firstTokens && n.firstTokens.length ? n.firstTokens : n.tokens.slice(0, 1);
+  const nl = n.lastTokens && n.firstTokens && n.firstTokens.length ? n.lastTokens : n.tokens.slice(1);
+  const pf = p.firstTokens && p.firstTokens.length ? p.firstTokens : p.tokens.slice(0, 1);
+  const pl = p.lastTokens && p.firstTokens && p.firstTokens.length ? p.lastTokens : p.tokens.slice(1);
+  const highGate = (score, ok) => (score >= OD_CONF_HIGH_ / 100 && !ok ? (OD_CONF_HIGH_ - 1) / 100 : score);
+  if (!nl.length || !pl.length) {
+    // One name part on one side ("Bart"): it can be the first or the last name, never more than low
+    return 0.7 * od_bestPair_(n.tokens, p.tokens);
+  }
+  const first = od_firstScore_(nf[0], pf[0]), last = od_bestPair_(nl, pl);
+  const normal = highGate(0.45 * first + 0.55 * last, first >= 0.9 && last >= 0.9);
+  const sf = od_firstScore_(nl[nl.length - 1], pf[0]), sl = od_bestPair_(nf, pl);
+  const swapped = highGate(0.45 * sf + 0.55 * sl - 0.02, sf >= 0.9 && sl >= 0.9);
+  const share = od_tokenShare_(n.tokens, p.tokens);
+  return Math.max(normal, swapped, highGate(share.score, share.gate));
+}
+
+/**
+ * Who is worth scoring. A full name: people whose LAST name starts with the same
+ * letter as one of the row's name parts (either order); a one-word name: anyone
+ * with a name part starting with its letter. (A typo in the first letter of a last
+ * name is not caught; it keeps big lists fast.)
+ */
+function od_candidates_(parts, byInitial, byLastInitial) {
+  const seen = new Set();
+  const map = parts.tokens.length > 1 && byLastInitial ? byLastInitial : byInitial;
+  parts.tokens.forEach(t => (map.get(t.charAt(0)) || []).forEach(x => seen.add(x)));
+  return [...seen];
+}
+
+/** "Close spelling: last name “Simpsn” ≈ “Simpson”" (what differs). */
+function od_alikeWhy_(n, p) {
+  const cap = x => x ? x.charAt(0).toUpperCase() + x.slice(1) : x;
+  const bits = [];
+  if (n.first && p.first && n.first !== p.first) bits.push("first name “" + cap(n.first) + "” ≈ “" + cap(p.first) + "”");
+  if (n.last && p.last && n.last !== p.last) bits.push("last name “" + cap(n.last) + "” ≈ “" + cap(p.last) + "”");
+  return bits.length ? "Close spelling: " + bits.join(", ") : "Same name parts in another order";
+}
+
+/** Students for a row, best first: [{ item: student, score 0-1, why }]. */
+function od_rankStudents_(cells, idx, contact) {
+  const best = new Map();
+  const put = (st, score, why) => {
+    const o = best.get(st);
+    if (!o || score > o.score) best.set(st, { item: st, score: score, why: why || (o ? o.why : "") });
+  };
+  const n = cells.name;
+  if (n) {
+    od_candidates_(n, idx.byInitial, idx.byLastInitial).forEach(st => {
+      const sc = od_nameScore_(n, st);
+      if (sc >= OD_SCORE_FLOOR_) put(st, sc, od_alikeWhy_(n, st));
+    });
+  } else if (cells.guardian) {
+    // No student name on the row: guardians with a close name -> their children
+    od_candidates_(cells.guardian, idx.pByInitial, idx.pByLastInitial).forEach(p => {
+      const sc = od_nameScore_(cells.guardian, p) * 0.95;
+      if (sc >= OD_SCORE_FLOOR_) p.kids.forEach(st => put(st, sc, "Parent “" + cells.guardian.raw + "” looks like " + p.name));
+    });
+  }
+  // The rules (short name, nickname, initial, part of the name) give their reason and a floor.
+  // With a student name on the row, the parent's name only adds the small boost below
+  // (else every sibling would get the parent rule's floor).
+  od_studentGuesses_(n ? { name: n, guardian: null } : cells, idx).forEach(g => {
+    const o = best.get(g.st);
+    best.set(g.st, { item: g.st, score: Math.max(o ? o.score : 0, g.floor), why: g.why });
+  });
+  // What else on the row agrees with it: the parent's name, the phone / email, the class
+  best.forEach(o => {
+    const st = o.item, extra = [];
+    if (n && cells.guardian && st.persons.some(p => od_personFits_(cells.guardian, p))) { o.score += 0.05; extra.push("parent matches"); }
+    if (contact && contact.kids.indexOf(st) !== -1) { o.score += 0.06; extra.push("same " + (cells.phone ? "phone" : "email")); }
+    if (cells.cls && st.cls === cells.cls) { o.score += 0.04; extra.push("same class"); }
+    o.score = Math.min(o.score, 0.99);
+    if (extra.length) o.why = (o.why ? o.why + "; " : "") + extra.join(", ");
+  });
+  return [...best.values()].sort((a, b) => b.score - a.score);
+}
+
+/** Guardians for a row of a guardian list, best first (same shape). */
+function od_rankPersons_(cells, idx, contactPersons) {
+  const best = new Map();
+  const put = (p, score, why) => {
+    const o = best.get(p);
+    if (!o || score > o.score) best.set(p, { item: p, score: score, why: why || (o ? o.why : "") });
+  };
+  if (cells.guardian) {
+    od_candidates_(cells.guardian, idx.pByInitial, idx.pByLastInitial).forEach(p => {
+      const sc = od_nameScore_(cells.guardian, p);
+      if (sc >= OD_SCORE_FLOOR_) put(p, sc, od_alikeWhy_(cells.guardian, p));
+    });
+    // The old rules (one name inside the other, same last name + short / initial first name) as a floor
+    od_personCandidates_(cells.guardian, idx).forEach(p => {
+      const fit = od_personFits_(cells.guardian, p);
+      if (!fit) return;
+      const o = best.get(p);
+      best.set(p, { item: p, score: Math.max(o ? o.score : 0, fit === "same" || fit === "inside" ? 0.9 : 0.8), why: "“" + cells.guardian.raw + "” looks like " + p.name });
+    });
+  }
+  if (cells.name) {
+    // The list also names the child: that child's guardians
+    od_rankStudents_({ name: cells.name, guardian: null, cls: cells.cls }, idx, null).forEach(r => {
+      if (r.score < OD_CONF_MEDIUM_ / 100) return;
+      r.item.persons.forEach(p => {
+        const o = best.get(p);
+        if (o) { o.score += 0.06; o.why += "; child " + r.item.name; }
+        else if (!cells.guardian) put(p, r.score * 0.85, "Guardian of " + r.item.name + " (child's name " + od_pct_(r.score) + "% alike)");
+      });
+    });
+  }
+  best.forEach(o => {
+    if (contactPersons && contactPersons.indexOf(o.item) !== -1) { o.score += 0.06; o.why += (o.why ? "; " : "") + "same " + (cells.phone ? "phone" : "email"); }
+    o.score = Math.min(o.score, 0.99);
+  });
+  return [...best.values()].sort((a, b) => b.score - a.score);
+}
+
+/** Ranked candidates -> a best guess or "pick one" (null when nobody reaches OD_CONF_MIN_). */
+function od_decideRanked_(ranked, keyOf, label, word, note) {
+  const good = ranked.filter(r => od_pct_(r.score) >= OD_CONF_MIN_);
+  if (!good.length) return null;
+  const top = good[0];
+  const scores = {};
+  good.slice(0, 5).forEach(r => { scores[keyOf(r.item)] = od_pct_(r.score); });
+  const close = good.filter(r => od_pct_(top.score) - od_pct_(r.score) < OD_CONF_TIE_);
+  if (close.length > 1) {
+    return od_pick_(close.slice(0, 5).map(r => keyOf(r.item)), close.length + " " + word + " are about as close to “" + label + "”" + note, scores);
+  }
+  return od_guess_(keyOf(top.item), (top.why || "The names are alike") + note, od_pct_(top.score),
+    good.slice(1, 3).map(r => keyOf(r.item)), scores);
+}
+
+/** The closest few under OD_CONF_MIN_, still offered on a "not found" row. */
+function od_suggestions_(ranked, keyOf) {
+  const list = ranked.filter(r => r.score >= OD_SCORE_FLOOR_).slice(0, 3);
+  const scores = {};
+  list.forEach(r => { scores[keyOf(r.item)] = od_pct_(r.score); });
+  return { targets: list.map(r => keyOf(r.item)), scores: scores };
+}
+
+/** { target: 100 } for every target (exact matches offered side by side). */
+function od_fullScores_(targets) {
+  const out = {};
+  targets.forEach(t => { out[t] = 100; });
+  return out;
+}
+
 function od_ok_(target, how) { return { status: "ok", target: target, how: how }; }
-function od_guess_(target, why) { return { status: "guess", target: target, how: "Best guess", reason: why }; }
-function od_pick_(targets, why) { return { status: "pick", options: targets, how: "Check", reason: why }; }
-function od_none_(why) { return { status: "none", how: "—", reason: why }; }
+// confidence: 0-100 (how alike the names are); scores: { target: 0-100 } for the options
+function od_guess_(target, why, confidence, alternatives, scores) {
+  return { status: "guess", target: target, how: "Best guess", reason: why, confidence: confidence === undefined ? null : confidence,
+           options: alternatives || [], scores: scores || {} };
+}
+function od_pick_(targets, why, scores) { return { status: "pick", options: targets, how: "Check", reason: why, scores: scores || {} }; }
+// suggestions: the closest few (under OD_CONF_MIN_), still offered to pick from
+function od_none_(why, suggestions, scores) { return { status: "none", how: "—", reason: why, options: suggestions || [], scores: scores || {} }; }
 
 /** Guardian name fits a person: same name, one name inside the other, or same last name with a short / initial first name. */
 function od_personFits_(parts, p) {
@@ -1485,7 +1749,8 @@ function od_studentsByContact_(cells, idx) {
 /** Best-guess students for a name (never used without a person saying yes). */
 function od_studentGuesses_(cells, idx) {
   const out = [];
-  const add = (st, why) => { if (!out.some(o => o.st === st)) out.push({ st: st, why: why }); };
+  // floor: the least confidence this kind of match gets (the name score can be higher)
+  const add = (st, why, floor) => { if (!out.some(o => o.st === st)) out.push({ st: st, why: why, floor: floor || 0.8 }); };
   const n = cells.name;
   if (n) {
     const seen = new Set();
@@ -1494,15 +1759,16 @@ function od_studentGuesses_(cells, idx) {
     // a short first name ("Mira") with no shared token yet: students with that last name
     if (n.last) (idx.byLast.get(n.last) || []).forEach(st => seen.add(st));
     seen.forEach(st => {
-      if (namesMatch_(n.tokens, st.tokens) && !sameNameExactly_(n.tokens, st.tokens)) { add(st, "“" + n.raw + "” is part of " + st.name); return; }
+      if (namesMatch_(n.tokens, st.tokens) && !sameNameExactly_(n.tokens, st.tokens)) { add(st, "“" + n.raw + "” is part of " + st.name, 0.9); return; }
       if (n.last) {
         const f = od_firstLike_(n.first, st.first), l = od_lastLike_(n.last, st.last);
         if (f && l && !(f === "initial" && l === "initial")) {
           add(st, l === "initial" ? "Same first name, “" + n.last.toUpperCase() + ".” could be " + st.last.charAt(0).toUpperCase() + st.last.slice(1)
-                                  : (f === "same" ? "Same name" : od_firstWhy_(f, n.first, st.name) + ", same last name"));
+                                  : (f === "same" ? "Same name" : od_firstWhy_(f, n.first, st.name) + ", same last name"),
+              l === "initial" ? 0.78 : f === "initial" ? 0.76 : 0.88);
         }
       } else if (n.tokens.length === 1 && st.first === n.first) {
-        add(st, "First name only");
+        add(st, "First name only", 0.6);
       }
     });
   }
@@ -1510,7 +1776,7 @@ function od_studentGuesses_(cells, idx) {
     // No student name to go on: the parent's name ("Martha K.") -> their children
     od_personCandidates_(cells.guardian, idx).forEach(p => {
       const fit = od_personFits_(cells.guardian, p);
-      if (fit) p.kids.forEach(st => add(st, "Parent “" + cells.guardian.raw + "” looks like " + p.name));
+      if (fit) p.kids.forEach(st => add(st, "Parent “" + cells.guardian.raw + "” looks like " + p.name, fit === "same" ? 0.85 : 0.75));
     });
   }
   return out;
@@ -1532,12 +1798,13 @@ function od_matchStudentRow_(cells, idx) {
 
   if (exact.length === 1) {
     if (!osisUnknown) return od_ok_(exact[0].key, "Name");
-    return od_guess_(exact[0].key, "Same name, but OSIS " + cells.osis + " isn't on the Student List");
+    return od_guess_(exact[0].key, "Same name, but OSIS " + cells.osis + " isn't on the Student List", 100);
   }
   if (exact.length > 1) {
     const n = narrow(exact);
     if (n.length === 1 && !osisUnknown) return od_ok_(n[0].key, "Name + parent");
-    return od_pick_((n.length ? n : exact).map(st => st.key), exact.length + " students named " + exact[0].name);
+    const targets = (n.length ? n : exact).map(st => st.key);
+    return od_pick_(targets, exact.length + " students named " + exact[0].name, od_fullScores_(targets));
   }
   if (contact.kids.length === 1 && !osisUnknown) {
     // One family with one child: the phone / email says who it is (a name, if any, must not say otherwise)
@@ -1548,20 +1815,20 @@ function od_matchStudentRow_(cells, idx) {
     const byName = cells.name ? od_studentGuesses_(cells, idx).filter(g => contact.kids.indexOf(g.st) !== -1) : [];
     if (byName.length === 1 && !osisUnknown) return od_ok_(byName[0].st.key, (cells.phone ? "Phone" : "Email") + " + name");
   }
-  let guesses = od_studentGuesses_(cells, idx);
-  if (guesses.length > 1) {
-    const n = guesses.filter(g => narrow([g.st]).length);
-    if (n.length) guesses = n;
+  // Best guesses with a confidence (how alike the names are); never used before a person says yes
+  const ranked = od_rankStudents_(cells, idx, contact);
+  const osisNote = osisUnknown ? " (OSIS " + cells.osis + " isn't on the Student List)" : "";
+  const label = cells.name ? cells.name.raw : (cells.guardian ? cells.guardian.raw : "this row");
+  const decided = od_decideRanked_(ranked, st => st.key, label, "students", osisNote);
+  if (decided) return decided;
+  if (contact.kids.length > 1) {
+    const targets = contact.kids.map(st => st.key);
+    return od_pick_(targets, "That phone / email belongs to " + contact.kids.length + " students");
   }
-  if (guesses.length === 1) return od_guess_(guesses[0].st.key, guesses[0].why + (osisUnknown ? " (OSIS " + cells.osis + " isn't on the Student List)" : ""));
-  if (guesses.length > 1) {
-    const first = cells.name ? cells.name.raw : (cells.guardian ? cells.guardian.raw : "this row");
-    return od_pick_(guesses.map(g => g.st.key), guesses.length + " possible students for “" + first + "”");
-  }
-  if (contact.kids.length > 1) return od_pick_(contact.kids.map(st => st.key), "That phone / email belongs to " + contact.kids.length + " students");
-  if (osisUnknown) return od_none_("OSIS " + cells.osis + " isn't on the Student List");
+  const sugg = od_suggestions_(ranked, st => st.key);
+  if (osisUnknown) return od_none_("OSIS " + cells.osis + " isn't on the Student List", sugg.targets, sugg.scores);
   if (!cells.name && !cells.guardian && !cells.phone && !cells.email) return od_none_("This row has no OSIS, name, phone or email");
-  return od_none_("No student on the Student List matches this row");
+  return od_none_(sugg.targets.length ? "No close match on the Student List" : "No student on the Student List matches this row", sugg.targets, sugg.scores);
 }
 
 /** One row of a GUARDIAN list -> ok / guess / pick / none (targets = person keys). */
@@ -1575,7 +1842,11 @@ function od_matchGuardianRow_(cells, idx) {
       } else if (st.persons.length === 1) {
         return od_ok_(st.persons[0].key, "OSIS");
       }
-      if (st.persons.length) return od_pick_(st.persons.map(p => p.key), "Which guardian of " + st.name + "?");
+      if (st.persons.length) {
+        const scores = {};
+        if (cells.guardian) st.persons.forEach(p => { scores[p.key] = od_pct_(od_nameScore_(cells.guardian, p)); });
+        return od_pick_(st.persons.map(p => p.key), "Which guardian of " + st.name + "?", scores);
+      }
     }
   }
   const exact = cells.guardian ? (idx.pByNameKey.get(od_tokenKey_(cells.guardian.tokens)) || []) : [];
@@ -1584,19 +1855,18 @@ function od_matchGuardianRow_(cells, idx) {
   if (exact.length > 1) {
     const n = exact.filter(p => contact.indexOf(p) !== -1);
     if (n.length === 1) return od_ok_(n[0].key, "Name + phone");
-    return od_pick_(exact.map(p => p.key), exact.length + " guardians named " + exact[0].name);
+    const targets = exact.map(p => p.key);
+    return od_pick_(targets, exact.length + " guardians named " + exact[0].name, od_fullScores_(targets));
   }
   if (contact.length === 1) return od_ok_(contact[0].key, cells.phone ? "Phone" : "Email");
-  const guesses = [];
-  if (cells.guardian) od_personCandidates_(cells.guardian, idx).forEach(p => { if (od_personFits_(cells.guardian, p)) guesses.push(p); });
-  if (!guesses.length && cells.name) {
-    // A guardian list that also names the child: that child's guardians
-    od_studentGuesses_({ name: cells.name }, idx).forEach(g => g.st.persons.forEach(p => { if (guesses.indexOf(p) === -1) guesses.push(p); }));
-  }
-  if (guesses.length === 1) return od_guess_(guesses[0].key, "“" + (cells.guardian ? cells.guardian.raw : cells.name.raw) + "” looks like " + guesses[0].name);
-  if (guesses.length > 1) return od_pick_(guesses.map(p => p.key), guesses.length + " possible guardians");
+  // Best guesses with a confidence (guardian's name, the child's name, phone / email)
+  const ranked = od_rankPersons_(cells, idx, contact);
+  const label = cells.guardian ? cells.guardian.raw : (cells.name ? cells.name.raw : "this row");
+  const decided = od_decideRanked_(ranked, p => p.key, label, "guardians", "");
+  if (decided) return decided;
   if (contact.length > 1) return od_pick_(contact.map(p => p.key), "That phone / email belongs to " + contact.length + " guardians");
-  return od_none_("No guardian matches this row");
+  const sugg = od_suggestions_(ranked, p => p.key);
+  return od_none_(sugg.targets.length ? "No close match among the guardians" : "No guardian matches this row", sugg.targets, sugg.scores);
 }
 
 /** Every data row of a list -> its result, your decisions (setup.picks) first. */
@@ -1751,10 +2021,14 @@ function od_writeToolColumns_(sheet, list, table, results, idx) {
   results.forEach(r => {
     let text, color;
     if (r.status === "ok") { text = od_targetText_(by, r.target, idx).text; color = OD_COLORS.ok; }
-    else if (r.status === "guess") { text = "? " + od_targetText_(by, r.target, idx).text + " (best guess)"; color = OD_COLORS.guess; }
+    else if (r.status === "guess") { text = "? " + od_targetText_(by, r.target, idx).text + " (best guess" + (r.confidence !== null && r.confidence !== undefined ? ", " + r.confidence + "%" : "") + ")"; color = OD_COLORS.guess; }
     else if (r.status === "pick") { text = "? " + r.reason; color = OD_COLORS.guess; }
     else if (r.status === "skip") { text = "— skipped"; color = OD_COLORS.skip; }
-    else { text = "✗ " + r.reason; color = OD_COLORS.none; }
+    else {
+      const closest = (r.options || [])[0];
+      text = "✗ " + r.reason + (closest ? " (closest: " + od_targetText_(by, closest, idx).text + ", " + ((r.scores || {})[closest] || 0) + "%)" : "");
+      color = OD_COLORS.none;
+    }
     cells.push([text, r.how || ""]);
     colors.push([color, color]);
   });
@@ -2029,7 +2303,7 @@ function od_deleteList(tabId) {
 
 function od_showWizard_(tabId) {
   PropertiesService.getDocumentProperties().setProperty(OD_WIZARD_KEY, String(tabId));
-  const html = HtmlService.createHtmlOutputFromFile("YourListsSidebar").setTitle("📥 Your Lists");
+  const html = htmlFromFile_("YourListsSidebar").setTitle("Your Lists"); // template: pulls in Styles.html
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
@@ -2157,17 +2431,21 @@ function od_matchPreview(p) {
       if (r.cells.osis) extra.push("OSIS " + r.cells.osis);
       if (by === "student" && r.cells.guardian) extra.push("parent “" + r.cells.guardian.raw + "”");
       setup.vars.filter(v => v.show || v.column).slice(0, 1).forEach(v => { if (toText_(row[v.col - 1])) extra.push(v.label + " " + toText_(row[v.col - 1])); });
+      const conf = t => (r.scores && r.scores[t] !== undefined ? r.scores[t] : null);
       attention.push({
         i: i, row: OD_HEADER_ROW + 1 + i, label: label(row, r.cells), sub: extra.join(" · "), status: r.status, reason: r.reason || "",
         target: r.target || null, targetText: r.target ? od_targetText_(by, r.target, idx) : null,
-        options: (r.options || []).map(t => Object.assign({ target: t }, od_targetText_(by, t, idx)))
+        confidence: r.confidence === undefined ? null : r.confidence, level: od_confLevel_(r.confidence),
+        // pick: the choices; guess: other close ones; none: the closest few (all with their confidence)
+        options: (r.options || []).map(t => Object.assign({ target: t, confidence: conf(t), level: od_confLevel_(conf(t)) }, od_targetText_(by, t, idx)))
       });
     });
     const picker = by === "student"
       ? idx.students.slice().sort(byStudentLastName_("name")).map(st => ({ target: st.key, text: st.osis + " · " + st.name, sub: st.guardianText }))
       : idx.persons.slice().sort((a, b) => compareNatural_(a.last + " " + a.first, b.last + " " + b.first))
           .map(pp => ({ target: pp.key, text: pp.name, sub: pp.kids.map(k => k.name).join(", ") }));
-    return { phase: "match", by: by, stats: od_stats_(results), how: howCounts, attention: attention, picker: picker };
+    return { phase: "match", by: by, stats: od_stats_(results), how: howCounts, attention: attention, picker: picker,
+             levels: { high: OD_CONF_HIGH_, medium: OD_CONF_MEDIUM_, min: OD_CONF_MIN_ } };
   });
 }
 
@@ -2208,6 +2486,46 @@ function od_saveList(p) {
     return { phase: "done", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName() }, stats: setup.stats,
              inputMode: !!idm_loadState_() };
   });
+}
+
+/**
+ * Migration Wizard (Menus.gs ma_migrateSimpleSheets): copies every list of the old
+ * tracker (its "📥" tab + its setup, your picks included) into this one. The old sheet
+ * is only read. A list with the same name already here (the wizard run again) is
+ * replaced. Returns how many lists were copied.
+ */
+function od_migrateLists_(oldSS, newSS) {
+  const oldRows = readBackendBlockFromOtherSpreadsheet_(oldSS, "OWN_LISTS").slice(1)
+    .filter(r => String(r[0]).trim() !== "");
+  if (!oldRows.length) return 0;
+  let lists = od_loadLists_(newSS);
+  let moved = 0;
+  oldRows.forEach(r => {
+    const oldSheet = od_sheetById_(oldSS, r[0]);
+    if (!oldSheet) return; // its tab was deleted on the old sheet
+    const name = toText_(r[1]) || oldSheet.getName().replace(OD_TAB_PREFIX, "");
+    let setup = null;
+    try { setup = JSON.parse(String(r[2] || "{}")); } catch (e) { setup = null; }
+
+    // Same list already here: replace it (never the tab the user is on)
+    lists.filter(l => l.name.toLowerCase() === name.toLowerCase()).forEach(l => {
+      if (!l.sheet) return;
+      const active = newSS.getActiveSheet();
+      if (active && active.getSheetId() === l.sheet.getSheetId()) {
+        const other = newSS.getSheets().filter(s => !s.isSheetHidden() && s.getSheetId() !== l.sheet.getSheetId())[0];
+        if (other) other.activate();
+      }
+      newSS.deleteSheet(l.sheet);
+    });
+    lists = lists.filter(l => l.name.toLowerCase() !== name.toLowerCase());
+
+    const copy = oldSheet.copyTo(newSS);
+    copy.setName(od_uniqueTabName_(newSS, oldSheet.getName(), copy));
+    lists.push({ tabId: copy.getSheetId(), name: name, setup: od_fillSetup_(setup), updated: toText_(r[3]), sheet: copy });
+    moved++;
+  });
+  od_saveLists_(newSS, lists);
+  return moved;
 }
 
 /** Back to Input Data Mode's sidebar (when it is on), else just close. */

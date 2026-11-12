@@ -5,67 +5,71 @@
   <meta charset="utf-8">
   <!-- Reads uploaded Excel files in the browser (no extra Google permissions) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <?!= include_('Styles') ?>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 14px 14px 120px; color: #0F172A; font-size: 13px; line-height: 1.45; }
-    h2 { font-size: 17px; margin: 0 0 4px; }
-    h3 { font-size: 14px; margin: 14px 0 6px; }
-    .muted { color: #64748B; font-size: 12px; }
-    .pill { display: inline-block; background: #E0F2FE; color: #075985; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
-    .pill.opt { background: #F1F5F9; color: #475569; }
-    .card { border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin: 10px 0; background: #fff; }
-    .card.yellow { background: #FFFBEB; border-color: #FDE68A; }
+    /* Input Data Mode sidebar: the shared "District" look (Styles.html); restyled 2026-11-12 */
+    body { padding: 14px 14px 130px; font-size: 13.5px; }
+    h2 { font-size: 18px; margin: 0 0 4px; }
+    h3 { font-size: 15px; margin: 14px 0 6px; }
+    .muted { color: var(--muted); font-size: 12.5px; }
+    .pill.opt { background: var(--panel); color: var(--muted); }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin: 10px 0; background: #ffffff; }
+    .card.yellow { background: var(--warn-soft); border-color: #ecd9a8; }
     ol { margin: 4px 0 0 18px; padding: 0; }
     li { margin-bottom: 3px; }
-    kbd { background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 4px; font-size: 11px; font-family: inherit; }
-    .status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 8px; background: #F0F9FF; color: #075985; margin: 10px 0; }
-    .spinner { width: 14px; height: 14px; border: 2px solid #BAE6FD; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.9s linear infinite; flex: none; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+    kbd { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 0 4px; font: 600 11px var(--font); }
+    .status { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); color: var(--accent); margin: 10px 0; font-weight: 600; font-size: 13px; }
+    .error { background: var(--danger-soft); color: var(--danger); border: 1px solid #e9c3bf; border-radius: var(--radius); padding: 10px 12px; margin: 10px 0; }
+    .ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #c3dccb; border-radius: var(--radius); padding: 8px 12px; margin: 10px 0; }
     /* Progress bar: click a step to jump to it */
-    #progress { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 1px; margin: 12px 0 4px; padding-bottom: 2px; border-bottom: 1px solid #E2E8F0; }
-    #progress .pstep { background: none; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 4px 2px 5px; font-size: 11px; color: #64748B; cursor: pointer; white-space: nowrap; }
-    #progress .pstep:hover:not(:disabled) { color: #1D4ED8; }
-    #progress .pstep.current { color: #1D4ED8; font-weight: 700; border-bottom-color: #1D4ED8; }
-    #progress .pstep.done { color: #166534; }
-    #progress .parrow { color: #CBD5E1; font-size: 10px; padding: 0 0 7px; }
+    #progress { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 1px; margin: 12px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--line); }
+    #progress .pstep { height: auto; background: none; border: none; border-bottom: 3px solid transparent; border-radius: 0; padding: 4px 3px 5px; font: 600 11.5px var(--font); color: var(--faint); cursor: pointer; white-space: nowrap; }
+    #progress .pstep:hover:not(:disabled) { color: var(--accent); background: none; }
+    #progress .pstep.current { color: var(--accent); font-weight: 700; border-bottom-color: var(--accent); }
+    #progress .pstep.done { color: var(--ok); }
+    #progress .parrow { color: var(--line); font-size: 10px; padding: 0 0 7px; }
+    .mk { display: inline-block; width: 14px; font-weight: 700; }
+    .mk.yes { color: var(--ok); } .mk.skip, .mk.none { color: var(--faint); }
     .done-line { font-weight: 600; margin: 2px 0; }
-    .done-line.skip { color: #64748B; font-weight: 400; }
-    .ok { background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 12px; margin: 10px 0; }
-    button { font-family: inherit; font-size: 13px; border-radius: 6px; padding: 7px 12px; cursor: pointer; border: 1px solid #CBD5E1; background: #fff; color: #0F172A; }
-    button.primary { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
-    button.danger { color: #B91C1C; }
-    button:disabled { opacity: 0.5; cursor: default; }
+    .done-line.skip { color: var(--muted); font-weight: 400; }
+    button { font: 600 13px var(--font); height: 32px; border-radius: var(--radius); padding: 0 12px; cursor: pointer; border: 1px solid var(--line); background: #ffffff; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    button:hover:not(:disabled) { background: var(--panel); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+    button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+    button.danger { color: var(--danger); border-color: var(--danger); }
+    button.danger:hover:not(:disabled) { background: var(--danger-soft); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 10px 14px; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 1px solid var(--line); padding: 10px 14px; }
     .footer > .row button { flex: 1; }
-    #exitAsk { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; color: #7F1D1D; }
-    #exitAsk .row button { flex: 1 1 auto; font-size: 12px; padding: 6px 8px; }
-    .hidden { display: none !important; }
-    a { color: #1D4ED8; cursor: pointer; }
+    #exitAsk { background: var(--danger-soft); border: 1px solid #e9c3bf; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; color: var(--danger); }
+    #exitAsk .row button { flex: 1 1 auto; font-size: 12.5px; padding: 0 8px; }
+    a { color: var(--accent); cursor: pointer; font-weight: 600; font-size: 12.5px; }
     /* Step 5: Your Lists */
-    .li { border: 1px solid #DBE2EC; border-radius: 10px; padding: 9px 11px; margin: 8px 0; background: #fff; }
-    .li .top { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13.5px; }
+    .li { border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; margin: 8px 0; background: #ffffff; }
+    .li .top { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13.5px; }
     .li .top .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-    .li .top button { font-size: 11px; padding: 1px 5px; border-color: transparent; background: transparent; }
-    .li .top button:hover { background: #F1F5F9; border-color: #CBD5E1; }
-    .li .meta { font-size: 11.5px; color: #64748B; margin: 2px 0 0 22px; }
-    .li .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 5px 0 0 22px; }
-    .li .chip { font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: #E6F4EA; color: #137333; }
-    .li .chip.warn { background: #FEF3D6; color: #8A5A00; }
-    .li .chip.grey { background: #F1F5F9; color: #475569; }
-    .li .btns { display: flex; gap: 5px; flex-wrap: wrap; margin: 7px 0 0 22px; }
-    .li .btns button { font-size: 11.5px; padding: 4px 8px; }
-    .li .btns button.soft { background: #E8F0FE; color: #1D4ED8; border-color: #C6DAFC; }
-    .addlist { width: 100%; border: 1.5px dashed #94A3B8; background: #F8FAFC; color: #1D4ED8; font-weight: 700; padding: 9px; margin-top: 4px; }
-    #newListForm input { width: 100%; box-sizing: border-box; border: 1px solid #CBD5E1; border-radius: 6px; padding: 7px 9px; font: inherit; margin: 6px 0; }
-    /* 🐞 TEMPORARY DEBUG panel */
-    #debug { margin-top: 16px; border: 1px dashed #F59E0B; border-radius: 8px; padding: 8px 10px; background: #FFFBEB; font-size: 11px; }
+    .li .top button { height: 24px; font-size: 11.5px; padding: 0 6px; border-color: transparent; background: transparent; color: var(--accent); }
+    .li .top button.del { color: var(--danger); }
+    .li .top button:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
+    .li .meta { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
+    .li .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 5px 0 0; }
+    .li .chip { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); }
+    .li .chip.warn { background: var(--warn-soft); color: var(--warn); }
+    .li .chip.grey { background: var(--panel); color: var(--muted); }
+    .li .btns { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; }
+    .li .btns button { height: 28px; font-size: 12px; padding: 0 9px; }
+    .li .btns button.soft { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+    .addlist { width: 100%; height: 36px; border: 1.5px dashed var(--faint); background: var(--panel); color: var(--accent); margin-top: 4px; }
+    #newListForm input { margin: 6px 0; }
+    /* Debug panel: only shown when z_InputDataDebug.gs is installed (the replies then carry .debug) */
+    #debug { margin-top: 16px; border: 1px dashed var(--warn); border-radius: var(--radius); padding: 8px 10px; background: var(--warn-soft); font-size: 11.5px; }
     #debug summary { font-weight: 700; cursor: pointer; }
-    #debug pre { white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; background: #fff; border: 1px solid #FDE68A; padding: 6px; margin: 6px 0 0; font-size: 10.5px; }
+    #debug pre { white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; background: #ffffff; border: 1px solid #ecd9a8; padding: 6px; margin: 6px 0 0; font-size: 10.5px; }
   </style>
 </head>
 <body>
-  <h2>📥 Welcome to Input Data Mode</h2>
+  <h2>Input Data Mode</h2>
   <div class="muted">Load each export one at a time. The other tabs are hidden until you finish or exit.</div>
 
   <div id="progress" class="hidden"></div>
@@ -85,25 +89,25 @@
     </div>
 
     <div class="card" id="uploadCard">
-      <b>Option 1 — Upload the file (easiest)</b>
+      <b>Option 1: Upload the file (easiest)</b>
       <div class="muted">Pick the file you downloaded (CSV or Excel). Numbers come in exactly as they are in the file.</div>
       <div class="row">
         <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" class="hidden">
-        <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">📂 Upload file</button>
+        <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">Upload file</button>
       </div>
     </div>
 
     <div id="doneList" class="ok hidden"></div>
 
     <div class="card yellow" id="pasteCard">
-      <b>Option 2 — Copy &amp; paste</b>
+      <b>Option 2: Copy and paste</b>
       <ol>
         <li>Open the file you downloaded.</li>
         <li>Click any cell, then press <kbd>Ctrl</kbd>+<kbd>A</kbd> (Mac: <kbd>⌘</kbd>+<kbd>A</kbd>) to select everything, including the top row.</li>
         <li>Press <kbd>Ctrl</kbd>+<kbd>C</kbd> (Mac: <kbd>⌘</kbd>+<kbd>C</kbd>) to copy.</li>
         <li>Come back to the <b id="tabName"></b> tab, click any cell, and paste <b>values only</b>: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> (Mac: <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>).</li>
       </ol>
-      <div class="muted" style="margin-top:6px">⚠️ If Excel shows numbers like <b>7.19E+09</b> or <b>####</b>, widen the columns first: after <kbd>Ctrl</kbd>+<kbd>A</kbd>, double-click the line between any two column letters. Otherwise the real digits get lost.</div>
+      <div class="muted" style="margin-top:6px">If Excel shows numbers like <b>7.19E+09</b> or <b>####</b>, widen the columns first: after <kbd>Ctrl</kbd>+<kbd>A</kbd>, double-click the line between any two column letters. Otherwise the real digits get lost.</div>
       <div class="row"><a onclick="call('idm_goToTempSheet')">Go to the paste tab</a></div>
     </div>
 
@@ -111,7 +115,7 @@
       <b>Fill in the <span id="siteTabName"></span> tab</b>
       <div class="muted">Your entries are only saved to Raw Data when you click Save.</div>
       <div class="row">
-        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">✅ Save Site / Class</button>
+        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">Save Site / Class</button>
         <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
       </div>
     </div>
@@ -124,9 +128,9 @@
         <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
         <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; paste</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
       </div>
-      <button class="addlist" id="addListBtn" onclick="showNewList()">➕ Add another list</button>
+      <button class="addlist" id="addListBtn" onclick="showNewList()">Add another list</button>
       <div class="muted" style="margin-top:6px">No lists? Click Finish to skip this step.</div>
-      <div class="row"><button class="primary" id="finishListsBtn" style="flex:1" onclick="finishLists()">Finish ✓</button></div>
+      <div class="row"><button class="primary" id="finishListsBtn" style="flex:1" onclick="finishLists()">Finish</button></div>
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
@@ -134,7 +138,7 @@
     <div id="errorBox" class="error hidden">
       <div id="errorText"></div>
       <div class="row">
-        <button id="retryBtn" onclick="retry()">🧹 Clear &amp; try again</button>
+        <button id="retryBtn" onclick="retry()">Clear and try again</button>
         <button id="anywayBtn" class="hidden" onclick="useAnyway()">Use it anyway</button>
       </div>
     </div>
@@ -142,23 +146,23 @@
 
   <!-- FINISHED -->
   <div id="doneView" class="hidden">
-    <h3 id="doneTitle">🎉 All done!</h3>
+    <h3 id="doneTitle">All done</h3>
     <div id="doneNotice" class="ok hidden"></div>
     <div class="card"><div id="summary"></div></div>
     <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span></div>
     <div class="row">
-      <button class="primary" id="buildBtn" onclick="build()">🏗️ Build Sheets Now</button>
+      <button class="primary" id="buildBtn" onclick="build()">Build sheets now</button>
       <button onclick="google.script.host.close()">Close</button>
     </div>
   </div>
 
-  <!-- 🐞 TEMPORARY DEBUG: remove once Input Data Mode works -->
-  <details id="debug" open>
-    <summary>🐞 Debug (temporary)</summary>
+  <!-- Debug panel: hidden unless the server replies carry debug info (z_InputDataDebug.gs) -->
+  <details id="debug" class="hidden" open>
+    <summary>Debug (z_InputDataDebug.gs)</summary>
     <div id="dbgStatus">Not started</div>
     <div class="row">
-      <button onclick="checkNow()">🔍 Check now</button>
-      <button onclick="copyDebug()">📋 Copy debug info</button>
+      <button onclick="checkNow()">Check now</button>
+      <button onclick="copyDebug()">Copy debug info</button>
     </div>
     <pre id="dbgServer">(no server reply yet)</pre>
     <pre id="dbgClient"></pre>
@@ -167,17 +171,17 @@
   <div class="footer" id="footer">
     <!-- Exit asks first (shows just above the buttons) -->
     <div id="exitAsk" class="hidden">
-      <b>💾 Save your progress before exiting?</b>
+      <b>Save your progress before exiting?</b>
       <div class="muted" id="exitAskText"></div>
       <div class="row">
-        <button class="primary" onclick="saveAndExit()">💾 Save &amp; exit</button>
+        <button class="primary" onclick="saveAndExit()">Save and exit</button>
         <button class="danger" onclick="hideExitAsk(); reallyExit()">Exit without saving</button>
         <button onclick="hideExitAsk()">Cancel</button>
       </div>
     </div>
     <div class="row" style="margin:0">
-      <button id="skipBtn" onclick="skip()">⏭️ Skip</button>
-      <button id="exitBtn" class="danger" onclick="exitMode()">🚪 Exit Input Data Mode</button>
+      <button id="skipBtn" onclick="skip()">Skip</button>
+      <button id="exitBtn" class="danger" onclick="exitMode()">Exit Input Data Mode</button>
     </div>
   </div>
 
@@ -192,7 +196,7 @@
 
   function $(id) { return document.getElementById(id); }
 
-  // --- 🐞 TEMPORARY DEBUG ---
+  // --- Debug panel (only with z_InputDataDebug.gs) ---
   var dbg = { polls: 0, fails: 0, inRow: 0, lastSent: 0, lastMs: null, lastAt: null, client: [] };
   function clog(msg) {
     var t = new Date().toLocaleTimeString();
@@ -207,9 +211,11 @@
       ' · Excel reader: ' + (typeof XLSX === 'undefined' ? '<b>NOT loaded</b>' : 'loaded');
   }
   function dbgReply(v, what) {
+    if (!(v && v.debug)) return; // no z_InputDataDebug.gs: no debug panel
+    show('debug', true);
     dbg.lastAt = new Date().toLocaleTimeString();
     dbg.lastMs = dbg.lastSent ? (Date.now() - dbg.lastSent) : null;
-    var lines = (v && v.debug) ? v.debug : ['(reply had no debug info — is the new Input Data.gs pasted in?)'];
+    var lines = v.debug;
     var summary = v ? ('active=' + v.active + ' step=' + v.stepIndex + ' tab=' + v.tabName +
       (v.notice ? ' notice=' + v.notice.type + '/' + (v.notice.code || '') : '')) : '(empty reply)';
     $('dbgServer').textContent = 'SERVER (' + what + ' @ ' + dbg.lastAt + ')\n' + summary + '\n' + lines.join('\n');
@@ -261,7 +267,7 @@
     $('waiting').parentNode.insertBefore($('errorBox'), $('waiting').nextSibling);
     $('howToTitle').textContent = (manual || listsStep) ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
-    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? '⏭️ Skip' : '⏭️ Skip (don\'t save) & finish';
+    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? 'Skip' : 'Skip (don\'t save) and finish';
     show('skipBtn', !listsStep); // step 5 ends with its own Finish button
     show('exitAsk', false);
 
@@ -270,15 +276,15 @@
     var done = v.done || [];
     $('doneList').innerHTML = done.map(function (d) {
       return d.skipped
-        ? '<div class="done-line skip">⏭️ "' + d.name + '" skipped (old data kept)</div>'
-        : '<div class="done-line">✅ "' + d.name + '" Successful (' + d.rows + ' rows)</div>';
+        ? '<div class="done-line skip"><span class="mk skip">–</span>"' + d.name + '" skipped (old data kept)</div>'
+        : '<div class="done-line"><span class="mk yes">✓</span>"' + d.name + '" successful (' + d.rows + ' rows)</div>';
     }).join('');
     show('doneList', done.length > 0);
 
     if (n && n.type === 'error') {
       paused = true;
-      $('errorText').innerHTML = n.message;
-      $('retryBtn').textContent = n.fromUpload ? 'OK' : '🧹 Clear & try again';
+      $('errorText').innerHTML = plainText(n.message);
+      $('retryBtn').textContent = n.fromUpload ? 'OK' : 'Clear and try again';
       show('anywayBtn', !!n.canUseAnyway);
       show('errorBox', true);
       show('waiting', false);
@@ -295,7 +301,7 @@
   }
 
   function renderProgress(steps) {
-    var icons = { done: '✅ ', skipped: '⏭️ ', todo: '' };
+    var icons = { done: '✓ ', skipped: '– ', todo: '' };
     $('progress').innerHTML = steps.map(function (p, i) {
       return (i ? '<span class="parrow">→</span>' : '') +
         '<button class="pstep' + (p.current ? ' current' : '') + (p.status === 'done' ? ' done' : '') +
@@ -316,8 +322,8 @@
     stopPolling();
     show('progress', false);
     show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
-    $('doneTitle').textContent = v.exited ? '🚪 Input Data Mode closed' : '🎉 All done!';
-    if (v.notice && v.notice.message) { $('doneNotice').textContent = v.notice.message; show('doneNotice', true); }
+    $('doneTitle').textContent = v.exited ? 'Input Data Mode closed' : 'All done';
+    if (v.notice && v.notice.message) { $('doneNotice').textContent = plainText(v.notice.message); show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported);
     // Delete the temp tab now that the user has been moved off it (see IDM_PENDING_DELETE_KEY)
     // Tries a few times: the first try may find the user still on the tab (it moves them off, then retries)
@@ -328,15 +334,26 @@
       google.script.run
         .withSuccessHandler(function (r) {
           clog('leftover tab deleted: ' + (r && r.deleted) + (r && r.pending ? ' (still pending)' : ''));
-          if (r && r.debug) $('dbgServer').textContent = 'SERVER (delete tab)\n' + r.debug.join('\n');
+          if (r && r.debug) { show('debug', true); $('dbgServer').textContent = 'SERVER (delete tab)\n' + r.debug.join('\n'); }
           if (r && r.pending && tries < 6) setTimeout(deleteTab, 2000);
         })
         .withFailureHandler(function (e) { clog('delete tab FAILED: ' + (e && e.message ? e.message : e)); if (tries < 6) setTimeout(deleteTab, 2000); })
         .idm_deleteLeftoverTab();
     }
     setTimeout(deleteTab, 1500);
-    $('summary').innerHTML = (v.summary || []).map(function (s) { return '<div>' + s + '</div>'; }).join('');
+    $('summary').innerHTML = (v.summary || []).map(statusLine).join('');
   }
+
+  // The server's lines start with a status emoji (✅ / ⏭️ / —); here they get a plain marker
+  function statusLine(s) {
+    s = String(s);
+    var m = s.match(/^(✅|⏭️|⏭|—)\s*/);
+    if (!m) return '<div>' + s + '</div>';
+    var kind = m[1] === '✅' ? 'yes' : (m[1] === '—' ? 'none' : 'skip');
+    return '<div class="done-line' + (kind === 'yes' ? '' : ' skip') + '"><span class="mk ' + kind + '">' + (kind === 'yes' ? '✓' : '–') + '</span>' + s.slice(m[0].length) + '</div>';
+  }
+  /** A server message without its leading emoji (✅ / ❌ / ⚠️). */
+  function plainText(s) { return String(s == null ? '' : s).replace(/^(✅|❌|⚠️|⚠)\s*/, ''); }
 
   function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
 
@@ -360,7 +377,7 @@
     dbg.fails++; clog('CALL FAILED: ' + (err && err.message ? err.message : err)); dbgStatus();
     setButtons(true);
     paused = true;
-    $('errorText').textContent = '❌ ' + (err && err.message ? err.message : err);
+    $('errorText').textContent = plainText(err && err.message ? err.message : err);
     $('retryBtn').textContent = 'OK';
     show('anywayBtn', false);
     show('errorBox', true);
@@ -392,7 +409,7 @@
         if (v && v.active && v.pending) {
           dbgReply(v, 'poll');
           clog('data found on the paste tab -> moving it');
-          working('✅ Found your data — moving it to Raw Data… (this can take up to a minute, please wait)');
+          working('Found your data. Moving it to Raw Data… (this can take up to a minute, please wait)');
           call('idm_processPaste');
           return;
         }
@@ -449,14 +466,13 @@
   function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function renderLists(lists) {
     show('addListBtn', true); show('newListForm', false); show('finishListsBtn', true);
-    var icons = ['🚌', '🎒', '🏫', '📋', '🗂️'];
     $('listItems').innerHTML = (lists || []).map(function (l, i) {
       var st = l.stats, chips = '';
       if (!l.ready) chips = '<span class="chip warn">setup not finished</span>';
       else if (st) chips = '<span class="chip">' + st.matched + ' matched</span>' + (st.review ? '<span class="chip warn">' + st.review + ' to review</span>' : '') + (st.skipped ? '<span class="chip grey">' + st.skipped + ' skipped</span>' : '');
-      return '<div class="li"><div class="top"><span>' + icons[i % icons.length] + '</span><span class="nm">' + esc(l.name) + '</span>' +
-        '<button title="Rename" onclick="renameList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">✏️</button>' +
-        '<button title="Delete" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">🗑️</button></div>' +
+      return '<div class="li"><div class="top"><span class="nm">' + esc(l.name) + '</span>' +
+        '<button title="Rename this list" onclick="renameList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Rename</button>' +
+        '<button class="del" title="Delete this list and its tab" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Delete</button></div>' +
         '<div class="meta">by ' + (l.by === 'guardian' ? 'guardian' : 'student') + (st ? ' · ' + st.rows + ' rows' : '') + (l.updated ? ' · updated ' + esc(l.updated) : '') + '</div>' +
         (chips ? '<div class="chips">' + chips + '</div>' : '') +
         '<div class="btns"><button class="soft" onclick="listCall(\'od_repasteList\',' + l.tabId + ')">Paste new version</button>' +

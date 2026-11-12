@@ -27,7 +27,7 @@ function ownerHooks_() {
     adjustDirectory: (ss, directory) => injectHistoricalDirectory_(ss, mergeOldPhoneContactsIntoDirectory_(ss, directory)),
     splitFullName: ownerSplitFullName_,
     buildPhoneContactsData: ownerBuildPhoneContactsData_,
-    contactLogSiteColumn: 11, // the owner's Contact Log hides/shows K (shared sheets: H)
+    contactLogSiteColumn: 8,  // H holds the site on the owner's Contact Log too (K is Method 2; owner 2026-11-12)
     logNewStudents: ownerLogNewStudents_, // the "New Students" tab
     montserratSheets: [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"],
 
@@ -1516,9 +1516,10 @@ function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, not
             const others = existingContact.memberships.filter(m => m.contactGroupMembership?.contactGroupResourceName !== directoryResourceName);
             contactData.memberships = contactData.memberships.concat(others);
           }
+          const changes = ownerContactChanges_(existingContact, contactData); // what really differs (for the summary)
           const updated = People.People.updateContact(contactData, existingContact.resourceName, { updatePersonFields: 'names,phoneNumbers,emailAddresses,biographies,memberships,organizations' });
           cache.put(cacheKey, updated.resourceName, 21600);
-          return { resourceName: updated.resourceName, isNew: false, isEdited: true, name: fullName, logStr: "Strict Update" }; 
+          return { resourceName: updated.resourceName, isNew: false, isEdited: changes.length > 0, name: fullName, logStr: changes.join('<br>') }; 
         } else {
           const created = People.People.createContact(contactData);
           cache.put(cacheKey, created.resourceName, 21600);
@@ -1533,13 +1534,35 @@ function ownerUpsertContact_(parentName, studentNames, emailsArr, phonesArr, not
   } catch (err) { return null; }
 }
 
+/**
+ * What an update changes on an existing contact (phones by digits, emails, notes,
+ * organization), as short lines. Empty = same as before: the summary no longer counts
+ * every contact as "edited" (it said "Strict Update" for all of them before 2026-11-12).
+ */
+function ownerContactChanges_(existing, data) {
+  const set = list => list.slice().sort().join(", ");
+  const phones = arr => set((arr || []).map(p => normalizePhoneForMerge_(p.value) || String(p.value).toLowerCase().trim()).filter(Boolean));
+  const emails = arr => set((arr || []).map(e => String(e.value).toLowerCase().trim()).filter(Boolean));
+  const notes = arr => (arr && arr.length ? String(arr[0].value).trim() : "");
+  const org = arr => (arr && arr.length ? String(arr[0].name || "").trim() + "|" + String(arr[0].title || "").trim() : "");
+  const out = [];
+  const oldP = phones(existing.phoneNumbers), newP = phones(data.phoneNumbers);
+  if (oldP !== newP) out.push("Phone: " + (oldP || "Empty") + " ➔ " + (newP || "Empty"));
+  const oldE = emails(existing.emailAddresses), newE = emails(data.emailAddresses);
+  if (oldE !== newE) out.push("Email: " + (oldE || "Empty") + " ➔ " + (newE || "Empty"));
+  if (notes(existing.biographies) !== notes(data.biographies)) out.push("Notes updated");
+  if (org(existing.organizations) !== org(data.organizations)) out.push("Site / class updated");
+  return out;
+}
+
 // ======================================================================
 // OWNER DEV TOOLS (run from the Apps Script editor)
 // ======================================================================
 function TOGGLE_EMAIL_NOTIFICATIONS() {
   const props = PropertiesService.getDocumentProperties();
   const currentState = props.getProperty('EMAIL_NOTIFICATIONS_ENABLED');
-  const newState = (currentState === 'false') ? 'true' : 'false';
+  // Never set = off (ownerEmailSyncSummary_ only sends on 'true'), so the first click turns it on
+  const newState = (currentState === 'true') ? 'false' : 'true';
   props.setProperty('EMAIL_NOTIFICATIONS_ENABLED', newState);
   
   const status = (newState === 'true') ? "ENABLED ✅" : "DISABLED ❌";
@@ -1592,6 +1615,10 @@ function generateFakeLegacyData() {
     "Custom Field 1 - Value", "Notes", "Labels"
   ];
   
+  // A new tab has 26 columns; these rows are 47 wide
+  if (contactsSheet.getMaxColumns() < contactHeaders.length) {
+    contactsSheet.insertColumnsAfter(contactsSheet.getMaxColumns(), contactHeaders.length - contactsSheet.getMaxColumns());
+  }
   contactsSheet.getRange(1, 1, 1, contactHeaders.length).setValues([contactHeaders]);
 
   // HELPER 1: Easily map data into the 47 columns

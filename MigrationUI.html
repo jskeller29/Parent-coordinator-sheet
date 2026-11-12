@@ -38,7 +38,7 @@
       <div class="step pending" id="step-1"><span class="spinner"></span><span class="status-icon">○</span> Connect to the old sheet</div>
       <div class="step pending" id="step-2"><span class="spinner"></span><span class="status-icon">○</span> Bring over your settings</div>
       <div class="step pending" id="step-3"><span class="spinner"></span><span class="status-icon">○</span> Copy ATS Raw Data</div>
-      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy events and student changes</div>
+      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy events, student changes and your lists</div>
       <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> Match up the Contact Log</div>
       <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> Rebuild the directory and other tabs</div>
     </div>
@@ -93,7 +93,7 @@
           google.script.run.withSuccessHandler(() => {
             setStep(3, 'done');
             
-            // Step 4: Simple Sheets (Events, Send Out, Overrides)
+            // Step 4: Simple Sheets (Events, Send Out, Overrides, Your Lists)
             setStep(4, 'running');
             google.script.run.withSuccessHandler(() => {
               setStep(4, 'done');

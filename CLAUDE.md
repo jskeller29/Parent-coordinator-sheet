@@ -75,7 +75,9 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
-  (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). IDM_DEBUG = temporary debug panel.
+  (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). Debug panel: only with
+  z_InputDataDebug.gs (see below; IDM_DEBUG is gone). The temp tab is fully cleared between steps (idm_clearTab_: every
+  dropdown, hidden column Z, frozen row). Sidebar on Styles.html since 2026-11-12 (htmlFromFile_, title without emoji).
   Step 5 "Your Lists" (step key lists, lists: true; part 2 of the same file): no paste / upload /
   polling / Skip; the lists card shows od_listSummaries_ (idm_view_ "lists")
   with Paste new version / Edit setup / ✏️ rename / 🗑️ delete, "➕ Add another list" (od_createList opens
@@ -94,9 +96,21 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   - Paste: od_takePaste_ finds the header row (od_findHeaderRow_; title rows above it are remembered), moves it to
     row 4, data as plain text. A re-paste with the same headers keeps the setup (od_rolesByHeader_) and the picks.
   - Matching (od_matchStudentRow_ / od_matchGuardianRow_): your pick, then OSIS (normalizeOsis_), exact name token
-    set (either name order), phone / email via guardians (Raw Data incl. overrides), then best guesses (short-name
-    prefix of 3+ letters, OD_NICKNAMES_, last initial "Diana P.", a guardian's name -> their children); 2+ candidates =
-    "pick one", none = "not found". Index = Student List OSIS..Class (sidebar: the Backend copy, sibling-group rows
+    set (either name order), phone / email via guardians (Raw Data incl. overrides), then BEST GUESSES WITH A
+    CONFIDENCE (owner's request 2026-11-12; od_rankStudents_ / od_rankPersons_ / od_decideRanked_): every candidate
+    gets 0-100% from od_nameScore_ = 45% first name + 55% last name (od_spellAlike_ = Jaro-Winkler and edit ratio
+    averaged; first names also get the rules: same 100, nickname OD_NICKNAMES_ 95, "Sam"/Samuel 90, initial 72), also
+    tried in the other order ("SIMPSON BART") and as a share of name parts (middle / two last names); "high" (90+)
+    needs first AND last each >= 0.9, else 89 max. The old rules (od_studentGuesses_: part of the name, short name,
+    "Diana P.", first name only, a guardian's name -> their children) keep their reason and give a floor (90 / 88 /
+    78 / 60 / 85). Boosts: parent's name fits +5, same phone / email +6, same class +4 (capped 99). Candidates =
+    people whose LAST name starts with a letter of the row's name (byLastInitial; one-word names: any part). Top two
+    within OD_CONF_TIE_ (4) points = "pick one" (with %); top >= OD_CONF_MIN_ (60) = best guess (+ up to 2 "also
+    close"); else "not found" with the closest 3 >= 50% as suggestions. Levels: high 90+ / medium 75+ / low 60+.
+    Never used without a person: guesses only become matches as Your picks (the build only uses "ok" rows). Sidebar:
+    % chips, "Accept the N high-confidence" + "Accept all N" buttons, the tab's ✔ Matched column shows the %.
+    Tested offline on sample names (typos, swapped order, nicknames, initials, siblings); 500 unmatched rows x 1,500
+    students = ~0.9 s in Node. Index = Student List OSIS..Class (sidebar: the Backend copy, sibling-group rows
     skipped) + Raw Data guardians (od_indexFromSheet_).
   - Sidebar: paste view polls od_wizardCheck every 2 s; 1 Columns (dropdowns 'Column C “OSIS”', "Two columns (first +
     last name)…", OSIS hint "5 of 6 filled cells are OSIS in your Student List"), 2 Variables (keep / name / blank /
@@ -120,7 +134,10 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     load fake data on the copy" builds the copy with this script's cache. od_buildOutputs_ clears ADDL_INFO when there
     are no lists (no-op if never written).
   - Resets: list tabs are deleted by deleteLegacySheets_ (not in KEEP_TABS_); resetDerivedSheets_ clears ADDL_INFO +
-    OWN_LISTS. Migration and Rollover do NOT carry lists over (not built; owner to decide).
+    OWN_LISTS. Migration carries them over (owner 2026-11-12): ma_migrateSimpleSheets (step 4 "Copy events, student
+    changes and your lists") calls od_migrateLists_: each old list tab is copied (copyTo, same name) with its setup and
+    picks under the new tab ID; a same-name list already here is replaced; the old sheet is only read; step 6's build
+    fills the columns. Rollover does not (not built).
   - google.script.run endpoints: od_createList, od_openList, od_repasteList, od_renameList, od_deleteList, od_getWizard,
     od_wizardCheck, od_readPaste, od_matchPreview, od_saveList, od_backToInputMode, od_build (+ idm_finishLists).
     Tested offline (own_test: shared + owner) and by a Chromium click-through of both sidebars wired to the real
@@ -152,6 +169,11 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   around installedOnEdit / installedOnChange): on only while doc cache key CL_DEBUG_ON exists (the sidebar re-puts it
   every 2 s poll, 5-min TTL); runs in CL_DEBUG_LOG (newest 25). Off = one cache read per edit.
 
+Owner testing file: z_InputDataDebug.gs (2026-11-12): the Input Data Mode debug log (idm_debugEnabled_ +
+idm_debugSheets_). With it every Input Data Mode sidebar reply carries its step log and the sidebar shows the Debug
+panel; without it idm_log_ does nothing and the panel stays hidden. Input Data.gs reaches it only through typeof
+checks. Keep it on the owner's sheet while testing; DELETE it from the master template / schools' copies.
+
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
   which returns those hooks on the owner's sheet and null everywhere else. No shared function is redefined, so file
@@ -161,7 +183,7 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   that Combined Contact Tracking also keeps (oldMasterTableOsis), Old Phone Contacts merge,
   last-word name split (splitFullName_), tall Phone Contacts layout, quick update that also rewrites Phone Contacts,
   contacts sync (4 phones / 3 emails per row, group list without pageSize, no 50% delete check, summary email),
-  Contact Log site column K (shared: H), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
+  Contact Log site column (H like the shared sheets since 2026-11-12: K is Method 2), Montserrat list, the New Students tab (ownerLogNewStudents_), 🐞 Debug menu +
   toasts.
 - 🐞 Debug → "🔧 Fix Dropdown Criteria (Student List → Backend)" (ownerMenuFixDropdownCriteria, one-time tool,
   2026-11-11): every tab's data validations (one getDataValidations per tab) listing Student List columns A:G are
@@ -230,7 +252,11 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   week" (default, never saved) = B outside last week's Sunday .. this week's Saturday (same weeks as the A:B color bands).
   Used by every reset, the nightly run (resetContactLogFormatting) and every Settings save: refreshContactLogFilter_
   (Menus.gs) swaps ONLY the P custom-formula rule (rule.copy(), Type colors and other rules kept; added back if missing),
-  writes nothing when it already matches, then re-sets the P filter. The old "Yes - Important" bold rule in resetContactLogFormatting is still there (now unused).
+  writes nothing when it already matches, then re-sets the P filter. The old "Yes - Important" bold rule was removed from resetContactLogFormatting (owner 2026-11-12: that value is
+  now "Followup Needed - ASAP"; the next reset / nightly drops it from the sheet). Z#ContactLog writes / reads the new
+  values too (Followup Needed / No Followup Needed / Resolved; open = the grey-out rule's list, cl_isOpenFollowup_).
+  Migration maps old values: Yes -> Followup Needed, Yes - Important -> Followup Needed - ASAP, No -> No Followup
+  Needed (migrateFollowupValue_, Menus.gs).
 - Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
   Belcher Louise/Gene + override-only Tina, Addams Wednesday/Pugsley), Parent Square, NYCSA, Site/Class in the new
   BH:BI format (one row per site, classes one per line; 5 of 6 sites have 2-3 classes; "Y12"/"Y50" have no teacher),
@@ -270,6 +296,10 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
      are not deployed yet. Contacts Sync, Sheet Lock, the other HTML files, Z#ContactLog / Z#ContactLogSidebar and the
      manifest are unchanged by the coalesce.
   All of these are now required (no longer optional). Needs Styles.html (Getting Started, Contact Log Debug).
+- Fixes + Your Lists confidence + restyle (2026-11-12): re-paste Core, Build, Edits, Menus, Contacts Sync, Sheet Lock,
+  Regenerate, Input Data, Z#ContactLog (scripts) and InputDataSidebar, YourListsSidebar, MigrationUI (HTML); owner sheet
+  also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
+  Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
@@ -358,7 +388,8 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 - Build & Sync sidebar: live build checklist (from getSyncStatus's buildSteps / buildStep, see BUILD_STEPS in Build.gs;
   the current step shows its detail line) + phone-sync progress bar.
 - Data update reminder (showDataReminderDialog_) restyled; Settings has it under Student data. InputDataSidebar
-  and YourListsSidebar (from the trial files) still keep their own style (not Styles.html).
+  and YourListsSidebar use Styles.html too since 2026-11-12 (same class names, colors from the shared tokens, no emoji
+  inside; menu paths like "🚀 App Menu" keep theirs; server status emoji are turned into ✓ / – markers).
 - Create Event: type buttons (PTC, Workshop, Family event, Meeting) only fill the Type box. New/Edit Student: one grouped
   form, entry type as two buttons over a hidden #entryType input. Manage Overrides: cards. Rollover: step markers.
 
@@ -371,7 +402,8 @@ several presses. Don't bring it back without asking.
   rows a build adds are covered when applySheetLocks_ runs at the end of the build. Old SHEET ones are removed as stale.
 - Google "Heads up, are you sure?" warning-only protections (description starts "🔒 Sheet Lock"; scripts are not
   blocked) on: row 1 of Contact Log / Notes / Send Out; Contact Log END bar row (except O, the FILTER? checkbox) and
-  everything below it; row 2 (headers) of every Events table (EVENT_TABLE_HEADERS); PCAR except H2:I2; the whole built
+  everything below it except the lookup box cells typed in (lookupBoxInputCells_: the OSIS box right of the "OSIS"
+  label and the name switch one row up / two columns right; 2026-11-12, rangesAround_); row 2 (headers) of every Events table (EVENT_TABLE_HEADERS); PCAR except H2:I2; the whole built
   tabs (Student List, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report,
   New Students). NOT on: Raw Data, Backend, owner-only tabs, Contact Log entry rows (incl. column A, so deleting one
   row never warns), Notes / Send Out rows 2+, Events row 1 and rows 3+.
@@ -422,6 +454,12 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
 Workflow:
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
   changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
+- OTHER CLAUDE SESSIONS (owner's request 2026-11-12): two sessions pushing to Test-Version at once collide. At the
+  start of every task AND right before every push: (1) list the owner's sessions (claude-code-remote list_sessions,
+  mine: true) and (2) git fetch origin Test-Version and look at commits not in this checkout (their
+  "Claude-Session:" trailer names the session). If another session is running / working, or pushed commits this
+  session has not built on, WARN THE OWNER right away (which session, what it pushed) before going on; rebase or
+  redo this session's change on top of theirs, never overwrite them.
 
 Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
 - Each line is "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻} note [follow-up]" (event: "... - {𝗘𝘃𝗲𝗻𝘁 - [𝗣𝗲𝗿𝘀𝗼𝗻]} |Event|"), no bullet.
@@ -481,9 +519,9 @@ handlers (installedOnEdit, installedOnChange, nightlyMasterSync, checkVersionOnO
 all sheet names (except the owner's Master Table -> Student List rename), Backend cells,
 property/cache keys.
 Owner decisions still open (current behavior kept): add shared sync safety checks (50% delete stop, label pageSize)
-to owner sync?; owner hides Contact Log col K (11) vs shared H (8) when no site (K looks stale); Montserrat on New
-Students (owner build skips it); owner splitFullName_ changes the shared Directory name split - intended?; ghost typist
-TextFinder vs in-memory scan (differ only on stray spaces); carry Your Lists over at Migration / Rollover (now they are not).
+to owner sync?; Montserrat on New Students (owner build skips it); owner splitFullName_ changes the shared Directory
+name split - intended?; ghost typist TextFinder vs in-memory scan (differ only on stray spaces); Your Lists at Rollover.
+Decided 2026-11-12: site column = H on the owner's sheet too; Your Lists carried over at Migration.
 Data update reminder (Menus.gs, replaced the old 30-day ATS-only reminder; same checkRawDataFreshness_ name): centered
 pop-up when Raw Data A1 / AG1 / AP1 (ATS / Parent Square / NYCSA, only sections ever loaded) is older than setting
 "dataReminder" (week default / 2weeks / month / off; in SETTING_KEYS so it is saved to the Backend settings block and
@@ -492,35 +530,38 @@ once an hour); once a day (ATS_REMINDER_LAST_SHOWN); not during Input Data Mode.
 the coalesce; DATA_GUIDE_URL is kept but no longer linked). Skip -> Remind After 2 Weeks / 1 Month (setting + wait in doc
 property DATA_REMINDER_SNOOZE_UNTIL) / Remove Reminders / Just skip for today. Endpoints dataReminderOpenInputMode,
 dataReminderChoose. Saving a different choice in Settings clears the wait.
-Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications.
+Settings saved but never read: autoOverride, ignoreHideCheckboxes, emailNotifications (defaults in getSettings, kept in
+SETTING_KEYS / the Backend settings block; no feature or Settings control uses them).
 Nightly trigger (nightlyMasterSync): 10 PM, NIGHTLY_SYNC_HOUR (Menus.gs), both at Initial Setup and when a Settings
 save re-makes it (owner's pick 2026-11-05; was 11 PM at setup but 2 AM after a Settings save). Existing triggers keep
 their old hour until Settings is saved once or Initial Setup is run again.
-Bugs noticed (not fixed): quick update ignores the Settings notes date range; getExistingMasterTable_ has no header but buildPhoneContactsData_ slice(1)s it
-(first student loses Student List details); EMERGENCY_STOP_SYNC leaves SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS
-needs two clicks first time; repo manifest lacks script.send_mail so the owner email may never send;
-purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header (they found no Status column while
-the header was on row 4; since 2026-11-11 it is on row 1, so they should work now: untested); generateFakeLegacyData (owner) writes 47 columns into a new
-26-column "Old Phone Contacts" tab, so it fails right after a reset.
-More bugs found in the 2026-11-11 review (not fixed; owner to pick):
+ONE nightly job per sheet (2026-11-12, Build.gs "ONE NIGHTLY JOB PER SHEET"): triggers are per user, so a second
+person's Settings save used to add a second nightly (two builds, contacts synced into their account). Doc properties
+NIGHTLY_TRIGGER_UID (+ _SET) / NIGHTLY_LAST_RUN: a firing trigger that isn't the remembered one deletes itself
+(e.triggerUid; it runs as its maker), unless the remembered one hasn't run for 3 days (then it takes over);
+manageNightlyTrigger_ makes none for another person; checkVersionOnOpen (runs as the setup person) remembers their
+trigger on older sheets (claimNightlyTrigger_); the trigger itself checks disableNightlySync when it fires.
+BUILD / SYNC LOCK (2026-11-12, withBuildLock_ in Core.gs): ScriptLock around buildAllDerivedSheets (body now
+buildAllDerivedSheetsRun_), syncToGoogleContacts, Full Sync (build + sync as one job) and the nightly; re-entrant within
+a run; busy = Error.buildBusy "Another \"X\" is running right now" (Build Only / Full Sync show it in the sidebar; a busy
+resume re-schedules itself in 2 min). Contact Log edits / Input Data Mode use the Document lock, so builds never hold
+them up. Full Sync errors end as 'killed' with the error (was stuck on 'building' for 6 h).
+Bugs NOT fixed yet (2026-11-11 review; owner asked for recommendations first):
 - Contacts sync: searchAndUpsertSingleContact (and ownerUpsertContact_) catch EVERY error and return null, so a failed
   row's contact stays in the stale map and is DELETED in the cleanup phase; the "quota -> pause 15 min" branch in
   syncToGoogleContactsRun_ is unreachable (on a quota hit every remaining row fails and is deleted). The 50% check
   only runs when startRow === 1 and not on the owner's sheet.
 - Full Sync / nightly: the sync's 4.5-min budget starts after the build in the same execution, so build + sync can
-  pass the 6-min limit; a killed run saves no SYNC_START_ROW, so the next run starts at row 1 again (the last rows and
-  the cleanup may never run).
+  pass the 6-min limit; a killed run saves no SYNC_START_ROW, so the next run starts at row 1 again.
 - Sync speed / quota: every row not in the 6 h cache (every row at night) pages through ALL the user's contacts.
-- A Settings notes date range + the quick update (no range) makes every row delete / paste / cleared row see > 25
-  students changed -> full Combined + Phone Contacts rebuild each time.
-- startResilientSyncRun_ has no try/catch: a build error leaves SYNC_UI_STATE "building" for 6 h (Full Sync then
-  starts nothing until Cancel -> Start new run). No LockService around builds / syncs (nightly, resume trigger and
-  a manual run can overlap; two syncs can create duplicate contacts).
-- Triggers are per user: anyone saving Settings (manageNightlyTrigger_) or running setup gets their own nightly (and
-  setup: onEdit / onOpen) trigger -> double builds, every edit handled twice, contacts synced to a second account.
-- Z#ContactLog: follow-ups still use "Yes" / "No" (cl_getFollowups /^yes/, cl_saveInteraction, Resolve), but N's
-  options are "Followup Needed" ... -> the Follow-ups view is always empty and New Interaction writes invalid N values.
-- Sheet Lock warns on everything below END, incl. the lookup box cells typed into (check on the sheet).
-- Input Data Mode: after the Site / Class step a paste step keeps its dropdowns past the data rows and hidden column
-  Z (clearDataValidations on getDataRange only). Migration copies old Follow-up values (Yes / No / Yes - Important)
-  as they are. Every edit on a row with no OSIS waits Utilities.sleep(1000). Owner sync counts every update as edited.
+- Owner email: MailApp needs the script.send_mail scope and Session.getActiveUser().getEmail() userinfo.email; the
+  repo manifest has neither. Add them ONLY to the owner's own project manifest (adding them to the shared manifest
+  would make every school re-authorize, and their triggers stop until they do).
+Fixed 2026-11-12: quick notes ignored the Settings date range (notesDateRange_ / inNotesDateRange_, Build.gs, used by
+the build and notesTextForOsis_); getExistingMasterTable_ now has a header row; EMERGENCY_STOP_SYNC clears
+SYNC_EDITED_COUNT; TOGGLE_EMAIL_NOTIFICATIONS turns on with the first click; purgeDischargedStudents and the Hide
+Discharged filter start at studentListHeaderRow_; generateFakeLegacyData adds the 47 columns first; Full Sync stuck
+on "building" + no build / sync lock + per-user nightly triggers (see above); Z#ContactLog follow-up values; Sheet Lock
+leaves the lookup box inputs free; Input Data Mode clears the temp tab fully; Migration maps old Follow-up values; a
+Contact Log edit waits 1 s only when the OSIS cell says "Loading..."; the owner sync counts a contact as edited only
+when its phones / emails / notes / site really changed (ownerContactChanges_).

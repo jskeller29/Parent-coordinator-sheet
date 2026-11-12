@@ -19,6 +19,15 @@
 var CLQ = { A:1, DATE:2, GUARDIAN:3, PERSON:4, OSIS:5, STUDENT:6, COUNT:7,
             SITE:8, CLASS:9, METHOD:10, TYPE:12, NOTES:13, FSTATUS:14, FNOTE:15, HIDE:16, W:16 };
 
+// Follow-up (N) values (2026-11-12; the tool used "Yes" / "No" before the Contact Log
+// got its own options). "Still open" = the same list the Contact Log grey-out rule
+// keeps showing (getContactLogHideFormula_, Regenerate.gs).
+var CLQ_FOLLOWUP_NEEDED = "Followup Needed";
+var CLQ_NO_FOLLOWUP = "No Followup Needed";
+var CLQ_RESOLVED = "Resolved";
+var CLQ_OPEN_FOLLOWUPS = ["followup needed", "followup needed - asap", "need to respond", "waiting for response", "waiting - check up"];
+function cl_isOpenFollowup_(v) { return CLQ_OPEN_FOLLOWUPS.indexOf(String(v || "").trim().toLowerCase()) !== -1; }
+
 // ---------------------------------------------------------------------
 // MENU + LAUNCHERS
 // ---------------------------------------------------------------------
@@ -111,7 +120,7 @@ function cl_getFamilyContext(osis) {
         who: String(r[CLQ.PERSON - 1] || "").trim(),
         note: String(r[CLQ.NOTES - 1] || "").trim(),
         fnote: String(r[CLQ.FNOTE - 1] || "").trim(),
-        followup: /^yes/i.test(String(r[CLQ.FSTATUS - 1] || "").trim()),
+        followup: cl_isOpenFollowup_(r[CLQ.FSTATUS - 1]),
         hidden: cl_truthy_(r[CLQ.HIDE - 1])
       });
     }
@@ -120,7 +129,7 @@ function cl_getFamilyContext(osis) {
   return out;
 }
 
-/** All interactions that still need follow-up (status starts with "Yes"). */
+/** All interactions that still need follow-up (an open Follow-up value, cl_isOpenFollowup_). */
 function cl_getFollowups() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const cl = ss.getSheetByName("Contact Log");
@@ -130,7 +139,7 @@ function cl_getFollowups() {
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     if (String(r[CLQ.OSIS - 1]).trim().toUpperCase() === "END") break;
-    if (!/^yes/i.test(String(r[CLQ.FSTATUS - 1] || "").trim())) continue;
+    if (!cl_isOpenFollowup_(r[CLQ.FSTATUS - 1])) continue;
     list.push({
       row: i + 1,
       date: String(r[CLQ.DATE - 1]).trim(),
@@ -180,7 +189,7 @@ function cl_saveInteraction(e) {
   if (e.method) sheet.getRange(r, CLQ.METHOD).setValue(e.method);
   if (e.type)   sheet.getRange(r, CLQ.TYPE).setValue(e.type);
   sheet.getRange(r, CLQ.NOTES).setValue(String(e.notes).trim());
-  sheet.getRange(r, CLQ.FSTATUS).setValue(e.followup ? "Yes" : "No");
+  sheet.getRange(r, CLQ.FSTATUS).setValue(e.followup ? CLQ_FOLLOWUP_NEEDED : CLQ_NO_FOLLOWUP);
   sheet.getRange(r, CLQ.FNOTE).setValue(e.fnote || "");
 
   if (typeof patchMissingFormulasInRow_ === "function") patchMissingFormulasInRow_(sheet, r);
@@ -202,7 +211,7 @@ function cl_updateFollowup(row, payload) {
   payload = payload || {};
 
   if (payload.fnote !== undefined) sheet.getRange(row, CLQ.FNOTE).setValue(String(payload.fnote));
-  if (payload.resolve === true)   sheet.getRange(row, CLQ.FSTATUS).setValue("No");
+  if (payload.resolve === true)   sheet.getRange(row, CLQ.FSTATUS).setValue(CLQ_RESOLVED);
   if (payload.hide !== undefined) sheet.getRange(row, CLQ.HIDE).setValue(payload.hide === true);
 
   SpreadsheetApp.flush();

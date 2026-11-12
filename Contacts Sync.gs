@@ -26,6 +26,18 @@ function startResilientSyncRun_() {
   reportBuildStep_(0); // sidebar's build checklist starts at step 1
   cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'building', progress: 0, total: 0 }), 21600);
 
+  // Build + sync as one job (one build / sync at a time, Core.gs). Any error ends
+  // the run as 'killed' with the error, so the sidebar says what went wrong and the
+  // next Full Sync starts normally (before, a crash left 'building' for 6 hours).
+  try {
+    withBuildLock_("Full Sync", () => startResilientSyncLocked_(cache));
+  } catch (e) {
+    console.error("Full Sync failed: " + (e.stack || e.message));
+    cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed', error: e.message || String(e) }), 21600);
+  }
+}
+
+function startResilientSyncLocked_(cache) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   buildAllDerivedSheets();
   formatDirectoryAuto_(ss.getSheetByName("Directory"));
@@ -73,7 +85,19 @@ function resetSyncStatus() {
 // summary at the end (see ownerHooks_().contactsSync).
 // ==========================================
 function syncToGoogleContacts() {
-  return runAction_("Google Contacts sync", () => syncToGoogleContactsRun_());
+  return runAction_("Google Contacts sync", () => {
+    try {
+      return withBuildLock_("Phone sync", () => syncToGoogleContactsRun_());
+    } catch (e) {
+      if (!e.buildBusy) throw e;
+      // Something else is building / syncing. A paused sync must not be lost: try again in 2 minutes.
+      if (PropertiesService.getScriptProperties().getProperty('SYNC_START_ROW')) {
+        ScriptApp.getProjectTriggers().forEach(t => { if (t.getHandlerFunction() === "syncToGoogleContacts") ScriptApp.deleteTrigger(t); });
+        ScriptApp.newTrigger("syncToGoogleContacts").timeBased().after(2 * 60 * 1000).create();
+      }
+      console.warn("Phone sync waited: " + e.message);
+    }
+  });
 }
 
 function syncToGoogleContactsRun_() {
@@ -522,6 +546,7 @@ function EMERGENCY_STOP_SYNC(isSilent) {
   const props = PropertiesService.getScriptProperties();
   props.deleteProperty('SYNC_START_ROW');
   props.deleteProperty('SYNC_CREATED_COUNT');
+  props.deleteProperty('SYNC_EDITED_COUNT'); // (was left behind: the next run's "edited" count started too high)
 
   if (isSilent !== true) {
     SpreadsheetApp.getActiveSpreadsheet().toast("Sync has been safely cancelled.", "🛑 Stopped", 5);
