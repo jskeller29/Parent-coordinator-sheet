@@ -1121,6 +1121,8 @@ var WELCOME_PERMISSIONS_ = [
  * Initial Setup runs here. Works on a copy that isn't the open sheet too
  * (owner's "Copy Sheet, Then Reset the Copy").
  */
+var WELCOME_LINKS_OVERRIDE_ = null; // { exampleUrl, guideUrl } for one reset (🐞 Make Release Copies, z_MINE.gs)
+
 function showWelcomeAfterReset_(ss) {
   const old = ss.getSheetByName(WELCOME_TAB_NAME);
   if (old && old.isSheetHidden()) ss.deleteSheet(old); // an older one the reset didn't delete
@@ -1130,6 +1132,11 @@ function showWelcomeAfterReset_(ss) {
     guideUrl = r.guide || GUIDE_FOLDER_URL;
     exampleUrl = (r.links && r.links.exampleUrl) || "";
   } catch (e) { console.warn("Guide link: " + e.message); }
+  // The tab's links are written now and stay in every copy of this file until the next reset:
+  // a release's Blank copy gets the Example copy made in the same run (not in the tracker yet)
+  const o = WELCOME_LINKS_OVERRIDE_ || {};
+  if (o.exampleUrl) exampleUrl = o.exampleUrl;
+  if (o.guideUrl) guideUrl = o.guideUrl;
   if (!ss.getSheetByName(WELCOME_TAB_NAME)) buildWelcomeTab_(ss, { guideUrl: guideUrl, exampleUrl: exampleUrl });
   try {
     showWelcomeTabOnly_(ss);
@@ -3580,8 +3587,8 @@ function copyUrlFor_(file) {
  * Uses columns D:E so it never collides with the build date (A2), the
  * Auto-Migrate toggle (B3), or the saved-settings block (rows 5+, cols A:B).
  */
-function saveTemplateLinksToVersionSheet_(links) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function saveTemplateLinksToVersionSheet_(links, ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet(); // ss: another spreadsheet (🐞 Make Release Copies)
   const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
   sheet.getRange(BACKEND_VERSION.LINKS_ROW, 4, 3, 2).setValues([
@@ -3680,8 +3687,8 @@ function guideFolderFiles_() {
 }
 
 /** Mirrors the guide link into the Backend Version section (D5 label / E5 value). */
-function saveGuideLinkToVersionSheet_(url) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function saveGuideLinkToVersionSheet_(url, ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
   sheet.getRange(BACKEND_VERSION.GUIDE_ROW, 4, 1, 2).setValues([["GUIDE link", url || ""]]);

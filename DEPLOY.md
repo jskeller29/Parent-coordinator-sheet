@@ -79,10 +79,13 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       Tracker's column D = that (BLANK) file's /copy link
 - [ ] Version Tracker headers: D "Blank Copy", E "Example", F "Document" (clear the old values in E first); 🔗 My Links
       shows "Version Tracker, column D/E/F" with each link, and "See an example tracker" appears in 📖 Open User Guide
+- [ ] Make Release Copies: the Blank copy's 👋 Welcome tab has "See an example tracker" opening the Example copy made
+      in the same run (no Initial Setup on the Blank copy, nothing to redo there)
 
 ## 5. Going live (after the copy works)
 1. Merge Test-Version into main.
 2. Update the master template (General manifest, no z_ files).
 3. Add a row to the Version Tracker so schools get the update prompt: A = the version date, D "Blank Copy" = the
    template's /copy link, E "Example" / F "Document" = the example tracker / User Guide when they changed (blank =
-   the newest earlier row's link is kept).
+   the newest earlier row's link is kept). A NEW User Guide: put its F link in BEFORE 🐞 Debug → 📦 Make Release
+   Copies (the Blank copy's Welcome tab gets the guide link then); D and E come from the pop-up, after.

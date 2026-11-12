@@ -282,9 +282,19 @@ function listsSheet() {
   g.Utilities.formatDate = d => (d.getMonth() + 1 + "").padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0") + "/" + String(d.getFullYear()).slice(2);
   g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
   const steps = [];
-  g.resetToDisplayModeSteps_ = c => steps.push(["reset", c.getSheetByName("Backend").getRange("B3").getValue()]);
+  const overrides = [];
+  g.resetToDisplayModeSteps_ = c => { steps.push(["reset", c.getSheetByName("Backend").getRange("B3").getValue()]); overrides.push(g.WELCOME_LINKS_OVERRIDE_); };
   g.ownerRunOnCopy_ = (c, fn) => { steps.push(["fake"]); };
-  const b = g.ownerMakeCopy("blank"), e = g.ownerMakeCopy("example");
+  const EX = "https://docs.google.com/spreadsheets/d/EX/edit?usp=sharing";
+  const b = g.ownerMakeCopy("blank", EX), e = g.ownerMakeCopy("example");
+  // the Blank copy (nobody runs Initial Setup on it) gets the Example made in the same run on its Welcome tab,
+  // and its own saved links: its /copy link + that Example
+  assert.strictEqual(JSON.stringify(overrides), JSON.stringify([{ exampleUrl: EX }]), 'the reset links the new Example copy');
+  assert.strictEqual(g.WELCOME_LINKS_OVERRIDE_, null, 'only for that reset');
+  const be0 = made[0].copy.getSheetByName("Backend");
+  assert.strictEqual(be0.getRange("E3").getValue(), "https://docs.google.com/spreadsheets/d/COPY_0/copy", 'Blank: its own /copy link saved');
+  assert.deepStrictEqual(be0.getRange("D6:E6").getValues()[0].slice(), ["EXAMPLE copy", EX], 'Blank: the Example saved');
+  assert.strictEqual(mine.getSheetByName("Backend").getRange("E6").getValue(), "", 'this sheet is not changed');
   // the release names: never this sheet's name ("Mine")
   assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (11/12/26)"));
   assert.deepStrictEqual(steps, [["reset", "No"], ["fake"]], 'B3 = No before the reset; Example loads fake data');
@@ -308,6 +318,7 @@ function listsSheet() {
   assert(!/ORDER = \[[^\]]*migrate/.test(dialog), 'no Migrate copy in the pop-up');
   assert(/Version date in both/.test(dialog), 'the pop-up says which date goes in the Version Tracker');
   assert(/id="l_blank"/.test(dialog) && /id="l_example"/.test(dialog), 'the pop-up shows the D / E links');
+  assert(/ownerMakeCopy\(k, k === 'blank' \? exampleLink : ''\)/.test(dialog), 'the pop-up passes the Example link to the Blank copy');
   g.getGuideLink_ = () => "https://example.org/guide.pdf";
   g.trackerLinks_ = () => ({ blank: "https://docs.google.com/spreadsheets/d/B/copy", example: "", guide: "", fromTracker: true,
     cols: { blank: 'D "Blank Copy"', example: "", guide: 'F "Document"' } });
@@ -429,6 +440,27 @@ function listsSheet() {
     return Array.from(g2.buildWelcomeTab_(ss2, { guideUrl: "https://g", exampleUrl: exampleUrl })._cells.values()).join("\n");
   };
   assert(/See an example tracker/.test(welcomeText("https://e")), 'Welcome tab: an example row with a link');
+  {
+    // Reset to Display Mode with WELCOME_LINKS_OVERRIDE_ (Make Release Copies): that Example, not the tracker's
+    const ss3 = makeSpreadsheet(TABS);
+    const app3 = fakeSpreadsheetApp(ss3);
+    app3.newRichTextValue = () => { const v = {}; const b = new Proxy({}, { get: (t, k) =>
+      k === 'setText' ? (x => { v.text = x; return b; }) : k === 'setLinkUrl' ? (u => { v.links = (v.links || []).concat(u); return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
+    const seen = [];
+    const ws = ss3.getSheets()[0];
+    const g3 = loadProject({ extra: { SpreadsheetApp: app3 } });
+    g3.isAutoMigrateOn_ = () => false;
+    g3.refreshResolvedLinks_ = () => ({ guide: "https://g", links: { exampleUrl: "https://tracker/old-example" } });
+    g3.buildWelcomeTab_ = (sh, o) => { seen.push(o); return ws; };
+    g3.showWelcomeTabOnly_ = () => {};
+    g3.WELCOME_LINKS_OVERRIDE_ = { exampleUrl: "https://new/example" };
+    g3.showWelcomeAfterReset_(ss3);
+    assert.strictEqual(seen[0].exampleUrl, "https://new/example", 'the override wins');
+    g3.WELCOME_LINKS_OVERRIDE_ = null;
+    seen.length = 0; ss3.getSheetByName = () => null;
+    g3.showWelcomeAfterReset_(ss3);
+    assert.strictEqual(seen[0].exampleUrl, "https://tracker/old-example", 'no override: the tracker\'s');
+  }
   assert(!/See an example tracker/.test(welcomeText("")), 'Welcome tab: no example row without one');
   console.log("Version Tracker links (Blank Copy / Example / Document, folders as backup): ok");
 }

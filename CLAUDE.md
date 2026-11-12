@@ -405,6 +405,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   the old values in E (the old "Blank Link" column, or they would be read as the example), fill D/E/F in the newest
   row; then Reset to Display Mode on the master template (the Welcome tab gets the example row).
 - No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
+- Make Release Copies: the Blank's Welcome tab links the new Example (2026-11-12): re-paste Menus (every sheet) and
+  z_MINE (owner sheet).
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,
 FULL_MENU_UNLOCKED isn't "true", Input Data Mode is off and the Student List is built. Called at the end of
@@ -500,6 +502,13 @@ then the folders as backup, the guide folder's files in rank order with why.
 google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one
 doesn't stop the others. This sheet is never changed. The done message shows the Version Tracker row to add: A = the
 version date, D = the Blank copy's /copy link, E = the Example copy's link (trackerLink).
+Nobody runs Initial Setup on the Blank copy and its Welcome tab's links are written by its reset (then kept in every
+school's copy until it runs setup), so the pop-up makes the Example FIRST and passes its link to ownerMakeCopy("blank",
+exampleUrl): WELCOME_LINKS_OVERRIDE_ (Menus.gs, { exampleUrl, guideUrl }, read by showWelcomeAfterReset_) is set for
+that one reset, and ownerSaveCopyLinks_ writes the copy's own Backend D2:E6 (Blank / upgrade = its own /copy link, that
+Example, the guide now; saveTemplateLinksToVersionSheet_ / saveGuideLinkToVersionSheet_ take an optional ss). The
+guide link on it is the tracker's F at that moment, so a new guide's link goes in F BEFORE making the copies. After
+a school's Initial Setup every link is read live (the Welcome tab is then deleted).
 ONE TEMPLATE FOR EVERYONE (owner 2026-11-12; there is no MIGRATE template any more): the first window after Initial
 Setup (showGuideWelcome_) asks "Is this your first PC Tracker?": "Yes, start fresh" = the old welcome (4 steps, Input
 Data Mode), "No, bring over last year's tracker" = zg_action('importOld') -> openMigrationWizard (title "Bring Over Last

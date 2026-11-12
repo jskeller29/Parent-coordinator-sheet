@@ -170,6 +170,8 @@ function ownerMenuMakeAllCopies() {
     </style>
     <div class="dlg">
       <p>Makes two copies of this sheet in the same Drive folder, one after the other (a few minutes in all). <b>This sheet is not changed.</b></p>
+      <p class="help" style="margin:0">A new User Guide? Put its link in the Version Tracker's F column <b>first</b>: the Blank
+        copy's 👋 Welcome tab gets its links now (it links the Example copy made here), and nobody runs Initial Setup on it.</p>
       ${rows}
       <div id="after" class="notice">
         <p style="margin:0 0 6px"><b>Version date in both: <span id="stamp"></span>.</b> Add a row to the Version Tracker:
@@ -187,6 +189,7 @@ function ownerMenuMakeAllCopies() {
     <script>
       const ORDER = ${JSON.stringify(order)};
       const el = id => document.getElementById(id);
+      let exampleLink = ''; // the Example copy's link, for the Blank copy's Welcome tab
       function start() {
         el('goBtn').disabled = true; el('closeBtn').textContent = 'Close';
         next(0);
@@ -200,6 +203,7 @@ function ownerMenuMakeAllCopies() {
             el('r_' + k).className = 'row done'; el('c_' + k).textContent = '✓';
             if (r.stamp) el('stamp').textContent = r.stamp;
             if (r.trackerLink) el('l_' + k).value = r.trackerLink;
+            if (k === 'example') exampleLink = r.trackerLink || '';
             el('s_' + k).innerHTML = '<a href="' + r.url + '" target="_blank" rel="noopener">Open ' + r.name.replace(/</g, '&lt;') + '</a>';
             next(i + 1);
           })
@@ -208,18 +212,33 @@ function ownerMenuMakeAllCopies() {
             el('s_' + k).textContent = 'Stopped: ' + (e && e.message ? e.message : e) + ' (if a copy was made, you can delete it).';
             next(i + 1); // the others still get made
           })
-          .ownerMakeCopy(k);
+          .ownerMakeCopy(k, k === 'blank' ? exampleLink : '');
       }
     </script>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(560), "📦 Make Release Copies");
 }
 
 /**
- * One copy for the pop-up above: "example" | "blank". Returns { name, url, stamp, trackerLink }:
+ * The Blank copy's own saved links (its Backend D2:E6, the backup when a school's copy can't
+ * read the Version Tracker): Blank / upgrade = this copy's own /copy link, the Example made in
+ * the same run, the User Guide now. (The reset saved them into THIS sheet, the active one.)
+ */
+function ownerSaveCopyLinks_(copy, exampleUrl) {
+  const own = "https://docs.google.com/spreadsheets/d/" + copy.getId() + "/copy";
+  let example = exampleUrl || "", guide = "";
+  try { if (!example) example = getTemplateLinks_().exampleUrl || ""; } catch (e) {}
+  try { guide = getGuideLink_(); } catch (e) {}
+  saveTemplateLinksToVersionSheet_({ blankCopyUrl: own, migrateCopyUrl: own, exampleUrl: example }, copy);
+  if (guide) saveGuideLinkToVersionSheet_(guide, copy);
+}
+
+/**
+ * One copy for the pop-up above: "example" | "blank" (+ the Example copy's link, made first in
+ * the same pop-up, for the Blank copy's Welcome tab). Returns { name, url, stamp, trackerLink }:
  * trackerLink = what goes in the Version Tracker (Blank = its /copy link, column D;
  * Example = its link, column E).
  */
-function ownerMakeCopy(kind) {
+function ownerMakeCopy(kind, exampleUrl) {
   const c = OWNER_COPY_KINDS_[kind];
   if (!c) throw new Error("Unknown copy: " + kind);
   return runAction_("Make copy: " + c.title, () => {
@@ -230,7 +249,12 @@ function ownerMakeCopy(kind) {
       ownerRunOnCopy_(copy, () => loadFakeDataSteps_(copy)); // same as "Copy Sheet, Then Load Fake Data on the Copy"
     } else {
       ownerSetAutoMigrate_(copy, migrate); // before the reset: the Welcome tab reads it
-      resetToDisplayModeSteps_(copy);
+      // Nobody runs Initial Setup on the Blank copy, and its Welcome tab's links are written by
+      // this reset and kept in every school's copy of it: link the Example copy made just before
+      // (its link goes in the Version Tracker only after this pop-up)
+      WELCOME_LINKS_OVERRIDE_ = exampleUrl ? { exampleUrl: exampleUrl } : null;
+      try { resetToDisplayModeSteps_(copy); } finally { WELCOME_LINKS_OVERRIDE_ = null; }
+      ownerSaveCopyLinks_(copy, exampleUrl);
     }
     const stamp = ownerStampVersion_(copy, migrate); // both: today's version date + B3 = No
     SpreadsheetApp.flush();
