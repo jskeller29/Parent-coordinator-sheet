@@ -98,6 +98,13 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   WITHOUT the document lock (the build lock only), then every tab the build made / showed is hidden again (added to
   state.hiddenIds, shown at the end) and the temp tab is active again. Result in state.listsBuild ({ ok, message },
   shown on the lists card); dataChanged = false. A failed build is reported, not retried, until new data comes in.
+  End screen (2026-11-12): "Build sheets now" only when idm_finalBuildNeeded_ (something came in and NOT
+  idm_builtAlready_ = step 5's build ok and no dataChanged / listsChanged since; od_saveList / od_deleteList set
+  state.listsChanged via idm_noteListsChanged_); else "Your sheets are already built with the new data." "Next steps"
+  (openGuideChecklist) while the Getting Started checklist isn't all done (idm_guideNext_; primary button when no
+  build is needed). Closing the mode (idm_cleanup_) shows the tabs it hid EXCEPT the Your Lists tabs (every list in
+  OWN_LISTS), and hides those too (owner's request 2026-11-12; od_openList / od_repasteList show one again).
+  idm_deleteLeftoverTab (the separate call after the end screen) then runs refreshMenusAfterFirstBuild_.
 
 - Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
@@ -351,8 +358,14 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
-- Wrong paste cleared, Your Lists upload, build before step 5 (2026-11-12): re-paste Input Data (script) and
-  InputDataSidebar, YourListsSidebar (HTML).
+- Wrong paste cleared, Your Lists upload, build before step 5, new-user flow (2026-11-12): re-paste Menus, Build,
+  Input Data (scripts) and InputDataSidebar, YourListsSidebar (HTML).
+
+First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,
+FULL_MENU_UNLOCKED isn't "true", Input Data Mode is off and the Student List is built. Called at the end of
+startBuildOnlyProcessRun_ (after phase done_build_only, so buildMenus_ shows no "sync in progress" alert; toast
+"🎉 Sheets built") and by idm_deleteLeftoverTab. Before, only Full Sync and Migration redrew them; Build Sheets Only
+needed a reload. Getting Started texts: step 2 "Build your sheets (Input Data Mode does this for you)".
 
 👋 Welcome tab (Menus.gs, WELCOME TAB section; owner's request 2026-11-12, not yet tried on a sheet):
 - New copies only: while SETUP_COMPLETE is not "true", every open (buildMenus_, simple onOpen, before the welcome
@@ -361,6 +374,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Setup / Allow access (incl. "hasn't verified this app" -> Advanced) / Load your data, or "Bring over your old data"
   on an upgrade copy (isAutoMigrateOn_); User Guide + bug form links (GUIDE_FOLDER_URL, BUG_REPORT_FORM_URL)). An
   existing tab of that name is reused as is. No merged cells (Sheets doesn't grow a merged row for wrapped text).
+- The old blocking pre-setup pop-up ("👋 Welcome to the PC Tracker!" / "🎉 Welcome to the newest version!") is now a
+  30 s toast pointing at 🚀 App Menu → 🚨 Initial Setup (the Welcome tab has the steps; owner's "make the new-user flow
+  simple", 2026-11-12).
 - Initial Setup: leaveWelcomeTab_ shows + activates the Contact Log (else the first default tab) and hides it, then
   the normal visibility. It is DELETED by deleteWelcomeTab_ at the next open (buildMenus_ after setup, not while
   IS_RUNNING_SETUP) or build (start of buildAllDerivedSheets), never in the setup call (deleting the tab the user is

@@ -194,3 +194,67 @@ function listsSheet() {
   assert.strictEqual(ss.getSheetByName("👋 Welcome"), null);
   console.log("Welcome tab: ok");
 }
+
+// ---------------------------------------------------------------- new-user flow pieces
+{
+  // A new copy opens: the Welcome tab only, a toast pointing at Initial Setup, no pop-up
+  const ss = makeSpreadsheet(TABS);
+  const app = fakeSpreadsheetApp(ss);
+  const g = loadProject({ extra: { SpreadsheetApp: app } });
+  g.buildMenus_();
+  assert.deepStrictEqual(ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"], 'new copy: Welcome tab only');
+  assert.strictEqual(app._ui._alerts.length, 0, 'new copy: no pop-up on top of the Welcome tab');
+  assert(ss._toasts.some(t => /Initial Setup/.test(t.msg)), 'new copy: a toast points at Initial Setup');
+  assert(app._ui._menus.some(m => m.items.indexOf("runInitialSetupWrapper") !== -1), 'new copy: the Initial Setup menu');
+  console.log("new copy open: Welcome tab + toast, no pop-up: ok");
+}
+{
+  // End of Input Data Mode: no second build when step 5 already built and nothing changed since
+  const { g } = newSheet();
+  const st = { results: { ats: { rows: 18 } }, listsBuild: { ok: true }, dataChanged: false };
+  assert.strictEqual(g.idm_finalBuildNeeded_(st), false, 'built at step 5: no build button');
+  assert.strictEqual(g.idm_builtAlready_(st), true);
+  assert.strictEqual(g.idm_finalBuildNeeded_(Object.assign({}, st, { listsChanged: true })), true, 'a list saved after: build');
+  assert.strictEqual(g.idm_finalBuildNeeded_(Object.assign({}, st, { dataChanged: true })), true, 'new data after: build');
+  assert.strictEqual(g.idm_finalBuildNeeded_({ results: { ats: { rows: 18 } } }), true, 'no step 5 build (left early): build');
+  assert.strictEqual(g.idm_finalBuildNeeded_({ results: {} }), false, 'nothing came in: no build');
+  // A list saved during the mode is noted
+  g.idm_saveState_({ step: 4, results: {}, listsBuild: { ok: true } });
+  g.idm_noteListsChanged_();
+  assert.strictEqual(g.idm_loadState_().listsChanged, true, 'list saved -> listsChanged');
+  console.log("end screen build button only when needed: ok");
+}
+{
+  // The full menus right after the first build (not during Input Data Mode, not twice)
+  const { g } = newSheet();
+  let opens = 0;
+  g.onOpen = () => { opens++; };
+  g.studentListIsBuilt_ = () => true;
+  assert.strictEqual(g.refreshMenusAfterFirstBuild_(), false, 'before setup: no');
+  g.__props.SETUP_COMPLETE = 'true';
+  g.__props.INPUT_DATA_MODE_STATE = '{}';
+  assert.strictEqual(g.refreshMenusAfterFirstBuild_(), false, 'during Input Data Mode: no');
+  delete g.__props.INPUT_DATA_MODE_STATE;
+  assert.strictEqual(g.refreshMenusAfterFirstBuild_(), true, 'first build: menus redrawn');
+  g.__props.FULL_MENU_UNLOCKED = 'true';
+  assert.strictEqual(g.refreshMenusAfterFirstBuild_(), false, 'already unlocked: no');
+  assert.strictEqual(opens, 1);
+  console.log("full menus after the first build: ok");
+}
+{
+  // Closing Input Data Mode: the other tabs come back, the Your Lists tabs stay hidden
+  const { ss, g, sheet, lists } = listsSheet();
+  const old = ss.insertSheet("📥 PTA"); // a list from before the mode, showing when the mode starts
+  lists().push({ tabId: old.getSheetId(), name: "PTA", setup: g.od_emptySetup_(), updated: "", sheet: old });
+  sheet.hideSheet();                     // "Bus Routes" stands for a list made DURING the mode:
+  const temp = startMode(ss, g, 4);      //   not there when the mode hid the tabs...
+  sheet.showSheet(); sheet.activate();   //   ...then made by od_createList (shown and active)
+  const v = g.idm_finishLists();
+  assert(v.finished, 'mode finished');
+  const vis = ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
+  assert(vis.indexOf("📥 Bus Routes") === -1 && vis.indexOf("📥 PTA") === -1, 'list tabs hidden: ' + vis.join(", "));
+  ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"].forEach(n => assert(vis.indexOf(n) !== -1, n + ' back'));
+  assert.notStrictEqual(ss.getActiveSheet().getSheetId(), sheet.getSheetId(), 'not left on a hidden list tab');
+  assert.notStrictEqual(ss.getActiveSheet().getSheetId(), temp.getSheetId(), 'off the temp tab (deleted next call)');
+  console.log("closing Input Data Mode hides the Your Lists tabs: ok");
+}

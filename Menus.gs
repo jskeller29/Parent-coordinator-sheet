@@ -245,22 +245,13 @@ function buildMenus_() {
     // New copy: the 👋 Welcome tab is the only tab shown until Initial Setup has run
     try { showWelcomeTabOnly_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error("Welcome tab: " + e.message); }
 
+    // A short pointer only: the Welcome tab has the steps (it was a pop-up on top of it; simplified 2026-11-12).
+    // Upgrade-template copies: Initial Setup then opens the Migration Wizard (see runInitialSetupWrapper).
     try {
-      if (isAutoMigrateOn_()) {
-        // Upgrade-template copy: point the user at Initial Setup, which kicks
-        // off the migration flow (see runInitialSetupWrapper).
-        SpreadsheetApp.getUi().alert(
-          "🎉 Welcome to the newest version!",
-          "Click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)' to start the migration process.",
-          SpreadsheetApp.getUi().ButtonSet.OK
-        );
-      } else {
-        SpreadsheetApp.getUi().alert(
-          "👋 Welcome to the PC Tracker!",
-          "To get started, please click '🚀 App Menu' at the top of the screen and select '🚨 Initial Setup (Run Once)'. This will authorize the system and open your clickable User Guide!\n\nIf you prefer to view the guide right now, you can copy and paste this link into a new tab:\n" + GUIDE_FOLDER_URL,
-          SpreadsheetApp.getUi().ButtonSet.OK
-        );
-      }
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        "Click 🚀 App Menu (top of the screen) → 🚨 Initial Setup (Run Once)" +
+          (isAutoMigrateOn_() ? " to bring over your old data." : " to get started."),
+        isAutoMigrateOn_() ? "🎉 Welcome to the newest version" : "👋 Welcome to the PC Tracker", 30);
     } catch(e) { console.error(e); }
 
     return;
@@ -531,7 +522,7 @@ function showGuideWelcome_() {
       <p>This tracker keeps your parent contacts, events and family directory in one place, and fills in your PCAR for you. Getting started takes four steps:</p>
       <ol>
         <li><b>Load your student data</b> (Input Data Mode walks you through it)</li>
-        <li><b>Build your sheets</b></li>
+        <li><b>Build your sheets</b> (Input Data Mode does this for you)</li>
         <li><b>Check your settings</b></li>
         <li><b>Log your first parent contact</b></li>
       </ol>
@@ -655,7 +646,7 @@ function zg_checklist_(ss) {
   const data = zg_dataStatus_(ss);
   const steps = [
     { id: "data", title: "Load your student data", done: data.ats.loaded,
-      text: "Input Data Mode walks you through it: paste or upload your ATS, Parent Square and NYCSA exports, then your sites and classes.",
+      text: "Input Data Mode walks you through it: paste or upload your ATS, Parent Square and NYCSA exports, then your sites and classes, then your own lists.",
       parts: [
         { label: "Student data (ATS)", done: data.ats.loaded, date: data.ats.date },
         { label: "Parent Square", done: data.ps.loaded, date: data.ps.date },
@@ -667,7 +658,7 @@ function zg_checklist_(ss) {
       links: [{ label: "Video: how to download your data", url: GUIDE_LINKS.downloadDataVideo },
               { label: "Guide: how to download your data", url: GUIDE_LINKS.downloadDataDoc }] },
     { id: "build", title: "Build your sheets", done: zg_isBuilt_(ss),
-      text: "Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
+      text: "Input Data Mode builds them for you before Your Lists (step 5). Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
       buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
       links: [{ label: "Guide: what Build Sheets does", url: GUIDE_LINKS.buildDoc }] },
     { id: "settings", title: "Check your settings", done: props.getProperty('ZG_SETTINGS_SEEN') === 'true',
@@ -861,6 +852,21 @@ function runInitialSetupWrapper() {
     // Getting Started: its welcome + the checklist (📖 Open User Guide still opens showWelcomeDialog)
     showGuideWelcome_();
   }
+}
+
+/**
+ * The first build unlocks the full menus (⚙️ Settings, 👤 Student Overrides, 📆 Events):
+ * repaint them right away instead of at the next reload. Called after Build Sheets
+ * Only and when Input Data Mode has ended (in its separate tab-delete call, because
+ * buildMenus_ also deletes the mode's leftover tab). True when the menus were redrawn.
+ */
+function refreshMenusAfterFirstBuild_() {
+  const props = PropertiesService.getDocumentProperties();
+  if (props.getProperty('SETUP_COMPLETE') !== 'true' || props.getProperty('FULL_MENU_UNLOCKED') === 'true') return false;
+  if (props.getProperty('INPUT_DATA_MODE_STATE')) return false; // still in Input Data Mode: at its end
+  if (!studentListIsBuilt_(SpreadsheetApp.getActiveSpreadsheet())) return false;
+  onOpen();
+  return true;
 }
 
 // ==========================================

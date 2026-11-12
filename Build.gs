@@ -414,6 +414,11 @@ function startBuildOnlyProcessRun_() {
     formatDirectoryAuto_(ss.getSheetByName("Directory"));
 
     cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'done_build_only' }), 21600); 
+
+    // First build on a new sheet: the full menus now, not after a reload (Menus.gs)
+    try {
+      if (refreshMenusAfterFirstBuild_()) ss.toast("Your full 🚀 App Menu is ready (⚙️ Settings, 👤 Student Overrides, 📆 Events). Don't see it? Reload the page.", "🎉 Sheets built", 15);
+    } catch (e) { console.warn("Menus not refreshed: " + e.message); }
   } catch(e) { 
     console.error("Build failed: " + (e.stack || e.message));
     cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed', error: e.message || String(e) }), 21600); 

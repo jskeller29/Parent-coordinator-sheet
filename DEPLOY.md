@@ -49,7 +49,10 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 7. Master template only: the Student List header on row 1, frozen, as on your sheet.
 
 ## 4. Quick test on the copy
-- [ ] 📥 Input Data Mode: all 5 steps with a real export (paste and upload), then Build
+- [ ] 📥 Input Data Mode: all 5 steps with a real export (paste and upload). Paste a wrong export once: the tab
+      empties by itself. Step 5 builds the sheets first; the end screen only offers Build if something changed
+- [ ] Your Lists: upload a CSV and an Excel list as well as pasting one; after closing Input Data Mode the 📥 list
+      tabs are hidden
 - [ ] Your Lists: paste a list with a few misspelled names; check the % and the picks
 - [ ] Contact Log: type a parent name, paste a few rows, delete a row; the search bar notes follow
 - [ ] 🧱 Full Sync while you watch (the "more than half" question, if it comes, is asked at the start)

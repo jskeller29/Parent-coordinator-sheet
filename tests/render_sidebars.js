@@ -18,7 +18,7 @@ const runStub = (responses) => `
     return new Proxy({}, { get(_, fn) {
       if (fn === 'withSuccessHandler') return h => make(h, fail);
       if (fn === 'withFailureHandler') return h => make(ok, h);
-      return function () { const r = window.RESP[fn]; setTimeout(() => ok && ok(typeof r === 'function' ? r.apply(null, arguments) : JSON.parse(JSON.stringify(r === undefined ? null : r))), 30); };
+      return function () { const r = window.RESP[fn]; if (r === '__HANG__') return; setTimeout(() => ok && ok(typeof r === 'function' ? r.apply(null, arguments) : JSON.parse(JSON.stringify(r === undefined ? null : r))), 30); };
     } });
   })() } };`;
 const progress = (cur, done) => ['Student Data', 'Parent Square', 'NYCSA', 'Site / Class', 'Your Lists'].map((l, i) => ({ label: l, current: i === cur, status: i < cur ? (done[i] || 'done') : 'todo' }));
@@ -69,6 +69,16 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   await shoot('InputDataSidebar', { idm_getState: lists, idm_check: lists }, 'idm_lists');
   await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '⏭️ Parent Square: skipped (old data kept)', '— NYCSA: not loaded (old data kept)', '✅ Your Lists: 1 list(s) set up'] }, idm_deleteLeftoverTab: { deleted: true } }, 'idm_done');
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, ats, { debug: ['+0ms lock ok', '+12ms temp tab has data: false'] }), idm_check: ats }, 'idm_debug');
+  // 2026-11-12: a wrong paste cleared, step 5 building first / built, the end screen after it, the list upload
+  const cleared = Object.assign({}, ats, { notice: { type: 'error', code: 'wrongType', cleared: true, fromUpload: false,
+    message: 'This looks like <b>Parent Square</b> data, but this step is <b>Student Data (ATS / Insight)</b>. Use the Student Data (ATS / Insight) export instead (or Skip to the Parent Square step).' } });
+  await shoot('InputDataSidebar', { idm_getState: cleared, idm_check: ats }, 'idm_cleared');
+  const buildSteps = [{ label: 'Reading your data' }, { label: 'Student List' }, { label: 'Event Log' }, { label: 'Combined Contact Tracking' }, { label: 'Parents Divided' }, { label: 'Directory' }, { label: 'Phone Contacts' }, { label: 'Finishing up' }];
+  await shoot('InputDataSidebar', { idm_getState: Object.assign({}, lists, { needsBuild: true }), idm_buildForLists: '__HANG__', getSyncStatus: { phase: 'idle', buildSteps: buildSteps, buildStep: 1 } },
+    'idm_lists_building', async p => { await p.waitForTimeout(3000); });
+  await shoot('InputDataSidebar', { idm_getState: Object.assign({}, lists, { listsBuild: { ok: true, message: 'Sheets built, so your lists can find your students.' } }) }, 'idm_lists_built');
+  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: false, builtAlready: true, guideNext: true, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '— Your Lists: skipped'] }, idm_deleteLeftoverTab: { deleted: true } }, 'idm_done_built');
+  await shoot('YourListsSidebar', { od_getWizard: { phase: 'paste', list: { tabId: 1, name: 'Bus Routes', tabName: '📥 Bus Routes', ready: false } }, od_wizardCheck: { pasted: false } }, 'yl_paste');
   await shoot('YourListsSidebar', { od_getWizard: setupView }, 'yl_setup');
   await shoot('YourListsSidebar', { od_getWizard: setupView, od_matchPreview: matchView }, 'yl_match', async p => { await p.click('#nextBtn'); await p.waitForTimeout(200); await p.click('#nextBtn'); await p.waitForTimeout(500); });
   await shoot('YourListsSidebar', { od_getWizard: setupView }, 'yl_vars', async p => { await p.click('#nextBtn'); await p.waitForTimeout(300); });

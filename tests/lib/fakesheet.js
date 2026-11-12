@@ -89,21 +89,34 @@ function makeSpreadsheet(tabNames) {
       if (ss._active === s) throw new Error("fake sheet: deleting the tab the user is on");
       ss._sheets = ss._sheets.filter(x => x !== s);
     },
-    toast: () => {}
+    _toasts: [],
+    toast: (msg, title) => { ss._toasts.push({ msg: String(msg), title: String(title || "") }); }
   };
   (tabNames || []).forEach(n => ss._sheets.push(makeSheet(ss, n)));
   ss._active = ss._sheets[0] || null;
   return ss;
 }
 
-/** SpreadsheetApp for loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } }). */
+/** SpreadsheetApp for loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } }). ui._alerts / ui._menus record calls. */
 function fakeSpreadsheetApp(ss) {
   const builder = () => new Proxy({}, { get(t, k) { return k === 'build' ? () => ({}) : () => builder(); } });
+  const ui = { _alerts: [], _menus: [], ButtonSet: {}, Button: {},
+    alert: (...a) => { ui._alerts.push(a.map(String).join(" | ")); }, showSidebar() {}, showModalDialog() {},
+    createMenu: name => {
+      const m = { name: name, items: [] };
+      ui._menus.push(m);
+      const p = new Proxy(m, { get(t, k) {
+        if (k === 'addItem') return (label, fn) => { m.items.push(fn); return p; };
+        return (k in t) ? t[k] : () => p;
+      } });
+      return p;
+    } };
   return {
+    _ui: ui,
     getActiveSpreadsheet: () => ss, flush() {}, newRichTextValue: builder, newTextStyle: builder,
     BorderStyle: { SOLID: 'SOLID' }, WrapStrategy: { CLIP: 'CLIP', WRAP: 'WRAP', OVERFLOW: 'OVERFLOW' },
     BandingTheme: new Proxy({}, { get: (t, k) => String(k) }),
-    getUi: () => ({ alert() {}, showSidebar() {}, showModalDialog() {}, ButtonSet: {} })
+    getUi: () => ui
   };
 }
 

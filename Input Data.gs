@@ -302,7 +302,7 @@ function idm_saveAndExit() {
     const results = state.results;
     idm_cleanup_(ss, state, idm_anyImported_(results));
     return { active: false, finished: true, exited: true, notice: result ? result.notice : null,
-             anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
+             anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
   });
 }
 
@@ -313,7 +313,7 @@ function idm_exit() {
     if (!state) return idm_view_(ss, null);
     const results = state.results;
     idm_cleanup_(ss, state, false);
-    return { active: false, finished: true, exited: true, anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
+    return { active: false, finished: true, exited: true, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
   });
 }
 
@@ -374,6 +374,32 @@ function idm_hasAtsRows_(raw) {
   return raw.getLastRow() >= 7 && String(raw.getRange(7, 3).getValue()).trim() !== "";
 }
 
+/** Step 5's build ran and nothing changed since: the end screen doesn't ask for another build. */
+function idm_builtAlready_(state) {
+  return !!(state.listsBuild && state.listsBuild.ok && !state.dataChanged && !state.listsChanged);
+}
+
+/** The end screen offers "Build sheets now": something came in, and the sheets don't have it yet. */
+function idm_finalBuildNeeded_(state) {
+  return idm_anyImported_(state.results) && !idm_builtAlready_(state);
+}
+
+/** The end screen's "Next steps" (the ✅ Getting Started checklist) while it still has steps to do. */
+function idm_guideNext_(ss) {
+  try {
+    if (PropertiesService.getDocumentProperties().getProperty('ZG_AUTO_OPEN') === 'off') return false;
+    return !zg_checklist_(ss).allDone;
+  } catch (e) { console.warn("Getting Started check skipped: " + e.message); return false; }
+}
+
+/** A list was saved / deleted (Your Lists sidebar): its columns need a build at the end of the mode. */
+function idm_noteListsChanged_() {
+  const state = idm_loadState_();
+  if (!state) return;
+  state.listsChanged = true;
+  idm_saveState_(state);
+}
+
 function idm_buildForLists() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   // 1. Which tabs show now (short lock; the build itself runs without the document lock)
@@ -418,6 +444,7 @@ function idm_buildForLists() {
       } catch (e) { console.warn("Input Data Mode: could not hide " + s.getName() + ": " + e.message); }
     });
     state.dataChanged = false;
+    if (outcome.ok) state.listsChanged = false;
     state.listsBuild = outcome;
     idm_saveState_(state);
     idm_log_("build before Your Lists: " + (outcome.ok ? "ok" : outcome.message));
@@ -449,6 +476,9 @@ function idm_deleteLeftoverTab() {
   return idm_withLock_(() => {
     const deleted = idm_deleteLeftoverTab_();
     const pending = !!PropertiesService.getDocumentProperties().getProperty(IDM_PENDING_DELETE_KEY);
+    // The mode is over and the user is off the temp tab: the first build's full menus can show now
+    // (not earlier: buildMenus_ also deletes the leftover tab, never in the call that moved the user)
+    if (!pending) { try { refreshMenusAfterFirstBuild_(); } catch (e) { console.warn("Menus not refreshed: " + e.message); } }
     return { deleted: deleted, pending: pending }; // pending -> the sidebar tries again shortly
   });
 }
@@ -801,7 +831,7 @@ function idm_advance_(ss, state, notice) {
   if (state.step >= IDM_STEPS.length) {
     const results = state.results;
     idm_cleanup_(ss, state, true);
-    return { active: false, finished: true, notice: notice, anyImported: idm_anyImported_(results), summary: idm_summary_(results) };
+    return { active: false, finished: true, notice: notice, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), summary: idm_summary_(results) };
   }
   if (oldTemp) {
     // Same tab, cleared and renamed for the next export (never deleted while the user is on it)
@@ -916,9 +946,19 @@ function idm_hideOtherSheets_(ss, state) {
 
 /** Shows the tabs we hid, deletes the temp tab, clears the saved state. */
 function idm_cleanup_(ss, state, goToRawData) {
+  // Your Lists tabs stay hidden once the mode ends (owner's request 2026-11-12): they are opened
+  // from step 5 (od_openList shows the tab again). Hidden after the others are back, so a tab still shows.
+  let listIds = [];
+  try { listIds = od_loadLists_(ss).filter(l => l.sheet).map(l => l.sheet.getSheetId()); }
+  catch (e) { console.warn("Your Lists tabs not hidden: " + e.message); }
   (state.hiddenIds || []).forEach(id => {
+    if (listIds.indexOf(id) !== -1) return;
     const s = idm_sheetById_(ss, id);
     if (s) { try { s.showSheet(); } catch (e) { console.warn(e.message); } }
+  });
+  listIds.forEach(id => {
+    const s = idm_sheetById_(ss, id);
+    if (s && !s.isSheetHidden()) { try { s.hideSheet(); } catch (e) { console.warn("Could not hide " + s.getName() + ": " + e.message); } }
   });
   const raw = idm_rawSheet_(ss);
   const target = (goToRawData && raw && !raw.isSheetHidden()) ? raw : (idm_sheetById_(ss, state.prevActiveId) || raw);
@@ -2403,6 +2443,7 @@ function od_deleteList(tabId) {
       ss.deleteSheet(list.sheet);
     }
     od_saveLists_(ss, lists.filter(l => l !== list));
+    idm_noteListsChanged_();
     return { ok: true };
   });
 }
@@ -2638,6 +2679,7 @@ function od_saveList(p) {
     if (!list.updated) list.updated = od_today_();
     od_writeToolColumns_(list.sheet, list, table, results, idx);
     od_saveLists_(ss, w.lists);
+    idm_noteListsChanged_();
     return { phase: "done", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName() }, stats: setup.stats,
              inputMode: !!idm_loadState_() };
   });

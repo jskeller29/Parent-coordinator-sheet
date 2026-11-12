@@ -152,9 +152,10 @@
     <h3 id="doneTitle">All done</h3>
     <div id="doneNotice" class="ok hidden"></div>
     <div class="card"><div id="summary"></div></div>
-    <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span></div>
+    <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span><span id="builtHint" class="hidden"> Your sheets are already built with the new data.</span></div>
     <div class="row">
       <button class="primary" id="buildBtn" onclick="build()">Build sheets now</button>
+      <button id="nextStepsBtn" class="hidden" onclick="nextSteps()">Next steps</button>
       <button onclick="google.script.host.close()">Close</button>
     </div>
   </div>
@@ -273,9 +274,10 @@
     // The "Reading… / Moving data…" spinner and any error sit right under Option 1
     // (Upload), so they are not pushed out of sight below the long paste steps;
     // on the Site / Class step they sit under that card instead.
+    // (the message first: after a cleared wrong paste the "Waiting…" line shows under it)
     var anchor = manual ? $('siteCard') : $('uploadCard');
-    anchor.parentNode.insertBefore($('waiting'), anchor.nextSibling);
-    $('waiting').parentNode.insertBefore($('errorBox'), $('waiting').nextSibling);
+    anchor.parentNode.insertBefore($('errorBox'), anchor.nextSibling);
+    $('errorBox').parentNode.insertBefore($('waiting'), $('errorBox').nextSibling);
     $('howToTitle').textContent = (manual || listsStep) ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? 'Skip' : 'Skip (don\'t save) and finish';
@@ -344,7 +346,9 @@
     show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
     $('doneTitle').textContent = v.exited ? 'Input Data Mode closed' : 'All done';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = plainText(v.notice.message); show('doneNotice', true); }
-    show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported);
+    show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported); show('builtHint', !v.anyImported && !!v.builtAlready);
+    // The Getting Started checklist (settings, first contact ...): the main button when no build is needed
+    show('nextStepsBtn', !!v.guideNext); $('nextStepsBtn').classList.toggle('primary', !v.anyImported);
     // Delete the temp tab now that the user has been moved off it (see IDM_PENDING_DELETE_KEY)
     // Tries a few times: the first try may find the user still on the tab (it moves them off, then retries)
     var tries = 0;
@@ -484,6 +488,9 @@
   }
   function build() {
     google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
+  }
+  function nextSteps() {
+    google.script.run.withFailureHandler(onFail).openGuideChecklist(); // the checklist in place of this sidebar
   }
 
   // --- step 5: build first (Your Lists needs the Student List) ---
