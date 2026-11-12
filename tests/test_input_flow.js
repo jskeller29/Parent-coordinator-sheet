@@ -327,6 +327,23 @@ function listsSheet() {
   console.log("Debug → Make All 3 Copies + My Links: ok");
 }
 
+{
+  // Backend TEMPLATE LINKS: saving the guide link (D5:E5) clears an old second "GUIDE link" row (D6:E6)
+  const ss = makeSpreadsheet(TABS);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const be = ss.getSheetByName("Backend");
+  g.getOrCreateVersionSheet_ = () => be;
+  be.getRange("D6:E6").setValues([["GUIDE link", "https://old.example.org"]]);
+  be.getRange("A6:B6").setValues([["syncToPhones", "false"]]);
+  g.saveGuideLinkToVersionSheet_("https://example.org/guide");
+  assert.deepStrictEqual(be.getRange("D5:E6").getValues().map(r => r.slice()), [["GUIDE link", "https://example.org/guide"], ["", ""]]);
+  assert.strictEqual(be.getRange("A6").getValue(), "syncToPhones", 'the settings block next to it is untouched');
+  be.getRange("D6:E6").setValues([["Something else", "x"]]);
+  g.saveGuideLinkToVersionSheet_("https://example.org/guide");
+  assert.strictEqual(be.getRange("D6").getValue(), "Something else", 'only a stale "GUIDE link" row is cleared');
+  console.log("Backend: stale second GUIDE link row cleared: ok");
+}
+
 // ---------------------------------------------------------------- new-user flow pieces
 {
   // A new copy opens: the Welcome tab only, a toast pointing at Initial Setup, no pop-up

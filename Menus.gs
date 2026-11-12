@@ -84,6 +84,10 @@ const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
 
 // (The User Guide's own "Make a copy" buttons are in the docs folder of the
 //  repository, not here: ask Claude to change them.)
+//
+// The hidden Backend tab's "TEMPLATE LINKS" cells (D2:E5) are the tracker's OWN saved
+// copy of the links it found in these two folders, used only when a sheet can't read
+// the folders. The tracker rewrites them by itself: don't paste links there.
 
 // ######################################################################
 // ##   END OF YOUR LINKS                                              ##
@@ -3435,6 +3439,9 @@ function saveGuideLinkToVersionSheet_(url) {
   const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
   sheet.getRange(BACKEND_VERSION.GUIDE_ROW, 4, 1, 2).setValues([["GUIDE link", url || ""]]);
+  // A second "GUIDE link" row right under it is left from an older layout and nothing reads it: clear it
+  const below = sheet.getRange(BACKEND_VERSION.GUIDE_ROW + 1, 4, 1, 2);
+  if (String(below.getValues()[0][0]).trim() === "GUIDE link") below.clearContent();
 }
 
 /** Reads the inherited guide link back out of the Backend Version section (E5). */

@@ -435,9 +435,19 @@ needed a reload. Getting Started texts: step 2 "Build your sheets (Input Data Mo
   User Guide, Report a Bug, Updates. showWelcomeDialog's "Next steps" point at Getting Started (was "paste into the
   RAW Data tab"). Getting Started links: zg_links_() fills empty DOCUMENT links with the User Guide (download data:
   DATA_GUIDE_URL); an empty VIDEO link is left out (no more "coming soon").
-- docs (2026-11-12): Part 1 rewritten for this path (md is the source; scratchpad script regenerated Part 1 of
-  guide.html / build_guide.js from it; docx + pdf rebuilt), plus Settings labels, Follow-up values, search bar position,
+- docs (2026-11-12): Part 1 rewritten for this path, plus Settings labels, Follow-up values, search bar position,
   Events type buttons, Your Lists upload + View step, "RAW Data" -> "Raw Data", the external-service row.
+
+USER GUIDE (docs/, owner's request 2026-11-12 "style of the style guide, less AI looking"): docs/USER_GUIDE.md is the
+ONLY source. `node docs/build_guide.js` makes guide.html, PC_Tracker_User_Guide.pdf (Playwright; the jump links are then
+turned from named destinations into plain page links with Python pypdf, so Drive / GitHub previews follow them more
+often) and PC_Tracker_User_Guide.docx (docx package; headings are real Heading 1-3 so a Google Doc gets heading links;
+contents = internal links to bookmarks; footer page numbers, none on the title page). Before, the text lived in three
+hand-kept copies (md, guide.html, build_guide.js). Look = Styles.html "District" (navy, Source Sans 3 / Source Serif 4,
+thin lines, 3px corners; notes = > [!NOTE] / [!IMPORTANT] / [!WARNING] boxes). Writing: plain short sentences, no
+decorative emoji (only menu / tab labels), no em dashes, the sheet's own words; maintainer notes in <!-- comments -->.
+Parts: Before you start (what it does, get your copy = the template folder link), 1 Setting up, 2 Daily use, 3 New
+versions and the end of the year, 4 Privacy, 5 Help. docs/README.md = how to rebuild and put it in Drive.
 
 📌 YOUR LINKS (owner's request 2026-11-12): every link the owner pastes is in ONE box at the very top of Menus.gs, with
 plain-language comments (how to paste, where each shows, empty = no video button / the User Guide opens):
@@ -446,6 +456,10 @@ settingsDoc, contactLogDoc), GUIDE_FOLDER_ID, TEMPLATE_FOLDER_ID, BUG_REPORT_FOR
 from their sections, same names; DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc). setupVideo: Welcome tab "🎬 Watch the
 setup video" (when set) + checklist Help. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
 ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
+Backend D2:E5 "TEMPLATE LINKS" = the tracker's OWN saved copy (D3:E4 BLANK / MIGRATE copy links from the template
+folder scan, D5:E5 the guide link): written after every successful scan, read only when a sheet can't read the folders.
+Never the place to paste links. A second "GUIDE link" row at D6:E6 (an older layout) is read by nothing; saving the
+guide link clears it (saveGuideLinkToVersionSheet_).
 🐞 Debug → 📦 Make All 3 Copies (ownerMenuMakeAllCopies, z_MINE.gs): a pop-up makes "… - (EXAMPLE)" (fake data, as
 "Copy Sheet, Then Load Fake Data"), "… - (BLANK)" (B3 = No + display reset) and "… - (MIGRATE)" (B3 = Yes + display
 reset), ONE google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link;
