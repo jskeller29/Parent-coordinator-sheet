@@ -57,6 +57,8 @@ function idm_log_(msg) {
   IDM_DBG.push("+" + (Date.now() - IDM_DBG.t0) + "ms " + msg);
 }
 var IDM_PLACEHOLDER = 'PASTE HERE';
+// Row 2 of an empty paste tab: the way back when the sidebar was closed (not data)
+var IDM_HINT = 'Closed the side panel? Click 🚀 App Menu → 📥 Input Data Mode to bring it back.';
 // Apps Script breaks ("Sheet 123 not found") for the rest of the session if a
 // call deletes the tab the user is on. So the temp tab is reused (cleared and
 // renamed) between steps, and at the end it is deleted in a SEPARATE call,
@@ -132,54 +134,99 @@ function addInputDataModeMenuItem_(menu) {
   try {
     if (idm_loadState_()) {
       SpreadsheetApp.getActiveSpreadsheet().toast(
-        "Input Data Mode is still on (some tabs may be hidden). Open 🚀 App Menu → 📥 Input Data Mode to finish or exit.",
+        "Input Data Mode is still on, so your other tabs are hidden. Its panel on the right lets you go on, finish or exit (🚀 App Menu → 📥 Input Data Mode opens it again).",
         "📥 Input Data Mode", 15);
     }
   } catch (e) { console.warn("Input Data Mode reminder: " + e.message); }
 }
 
-/** Menu handler: starts the mode (or resumes it) and opens the sidebar. */
+/**
+ * Menu handler (🚀 App Menu → 📥 Input Data Mode, and the open trigger / Your Lists'
+ * "Back"): starts the mode (or resumes it) and opens the sidebar. The sidebar's first
+ * call (idm_open) checks the same thing again.
+ */
 function openInputDataMode() {
   const lock = LockService.getDocumentLock();
   lock.waitLock(20000);
+  let started;
   try {
-    try { idm_deleteLeftoverTab_(); } catch (e) { console.warn("Input Data Mode leftover tab: " + e.message); }
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let state = idm_loadState_();
-    if (!state) {
-      if (!idm_rawSheet_(ss)) {
-        SpreadsheetApp.getUi().alert('📥 Input Data Mode', 'The "Raw Data" tab is missing, so there is nowhere to put the data.', SpreadsheetApp.getUi().ButtonSet.OK);
-        return;
-      }
-      let active = ss.getActiveSheet();
-      // Started from the 👋 Welcome tab (new copy): come back to the Contact Log, not to it
-      if (active && active.getName() === WELCOME_TAB_NAME) active = ss.getSheetByName("Contact Log") || null;
-      state = { step: 0, tempId: null, hiddenIds: [], prevActiveId: active ? active.getSheetId() : null, results: {} };
-      idm_saveState_(state);
-      idm_ensureTempSheet_(ss, state);
-      idm_hideOtherSheets_(ss, state);
-    } else {
-      // Resumed (menu, Getting Started, the open trigger): the same screen as a fresh start. Before
-      // 2026-11-12 it only made sure the temp tab existed, so the user stayed on the tab they were
-      // on with every other tab showing (owner: "it stays on the Contact Log").
-      const temp = idm_ensureTempSheet_(ss, state);
-      const active = ss.getActiveSheet();
-      const listIds = IDM_STEPS[state.step].lists ? idm_listTabIds_(ss) : []; // step 5 opens list tabs: those may stay open
-      if (!active || active.isSheetHidden() || listIds.indexOf(active.getSheetId()) === -1) temp.activate();
-      idm_hideOtherSheets_(ss, state, listIds);
-    }
-    idm_saveState_(state);
-    SpreadsheetApp.flush(); // the tab switch shows before the sidebar opens
+    started = idm_startOrResume_(SpreadsheetApp.getActiveSpreadsheet());
   } finally {
     lock.releaseLock();
   }
+  if (started.error) {
+    SpreadsheetApp.getUi().alert('📥 Input Data Mode', started.error, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  openInputDataModeSidebar_();
+}
+
+/**
+ * Only opens the sidebar; its first call (idm_open) starts or resumes the mode. Used
+ * from pop-ups and other sidebars (welcome window, Getting Started, data reminder):
+ * owner 2026-11-12, twice, "it doesn't go to the Student Data tab": started from the
+ * welcome pop-up, the sidebar opened but the tabs were not switched / hidden. The
+ * sidebar's own calls switch tabs reliably (every step does), so they do it there.
+ */
+function openInputDataModeSidebar_() {
   const html = htmlFromFile_('InputDataSidebar').setTitle('Input Data Mode'); // template: pulls in Styles.html
   SpreadsheetApp.getUi().showSidebar(html.setWidth(340));
+}
+
+/**
+ * Starts the mode (no state yet) or resumes it, so that either way the user is on the
+ * mode's tab and every other tab is hidden (step 5 may keep a list tab open). Run under
+ * the document lock. { state } or { error } (no Raw Data tab).
+ */
+function idm_startOrResume_(ss) {
+  try { idm_deleteLeftoverTab_(); } catch (e) { console.warn("Input Data Mode leftover tab: " + e.message); }
+  let state = idm_loadState_();
+  if (!state) {
+    if (!idm_rawSheet_(ss)) return { error: 'The "Raw Data" tab is missing, so there is nowhere to put the data.' };
+    let active = ss.getActiveSheet();
+    // Started from the 👋 Welcome tab (new copy): come back to the Contact Log, not to it
+    if (active && active.getName() === WELCOME_TAB_NAME) active = ss.getSheetByName("Contact Log") || null;
+    state = { step: 0, tempId: null, hiddenIds: [], prevActiveId: active ? active.getSheetId() : null, results: {} };
+    idm_saveState_(state);
+    idm_ensureTempSheet_(ss, state);
+    idm_hideOtherSheets_(ss, state);
+    idm_log_("started: temp tab #" + state.tempId + ", hid " + state.hiddenIds.length + " tab(s)");
+  } else {
+    // Resumed: the same screen as a fresh start. Before 2026-11-12 it only made sure the
+    // temp tab existed, so the user stayed where they were with every tab showing.
+    idm_focusTempTab_(ss, state, idm_ensureTempSheet_(ss, state));
+    idm_log_("resumed at step " + state.step);
+  }
+  idm_saveState_(state);
+  SpreadsheetApp.flush(); // the tab switch shows before the sidebar draws
+  return { state: state };
+}
+
+/**
+ * The user is on the mode's tab and no other tab shows. Step 5 may keep its list tabs
+ * open (od_openList shows them). Caller saves the state (hiddenIds may grow).
+ */
+function idm_focusTempTab_(ss, state, temp) {
+  const listIds = IDM_STEPS[state.step].lists ? idm_listTabIds_(ss) : [];
+  const active = ss.getActiveSheet();
+  const onList = active && !active.isSheetHidden() && listIds.indexOf(active.getSheetId()) !== -1;
+  if (!onList && (!active || active.getSheetId() !== temp.getSheetId())) temp.activate();
+  idm_hideOtherSheets_(ss, state, listIds, true);
 }
 
 // ---------------------------------------------------------------------
 // SIDEBAR ENDPOINTS
 // ---------------------------------------------------------------------
+
+/** The sidebar's FIRST call: starts or resumes the mode (see openInputDataModeSidebar_), then the view. */
+function idm_open() {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const started = idm_startOrResume_(ss);
+    if (started.error) return idm_view_(ss, null, { type: 'error', message: started.error });
+    return idm_view_(ss, started.state);
+  });
+}
 
 /** Current step + "last updated" dates for the sidebar. */
 function idm_getState() {
@@ -196,6 +243,15 @@ function idm_check() {
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
     const temp = idm_ensureTempSheet_(ss, state);
+    // Paste steps: the user belongs on the paste tab. Anywhere else (a tab shown again by hand
+    // or by something else) = back to it, other tabs hidden again (one call when all is well)
+    if (!IDM_STEPS[state.step].manual && !IDM_STEPS[state.step].lists) {
+      const active = ss.getActiveSheet();
+      if (!active || active.getSheetId() !== temp.getSheetId()) {
+        idm_log_("active tab is " + (active ? active.getName() : "none") + ": back to the paste tab");
+        idm_focusTempTab_(ss, state, temp);
+      }
+    }
     idm_saveState_(state);
     if (IDM_DBG && typeof idm_debugSheets_ === "function") idm_debugSheets_(ss, state, temp); // z_InputDataDebug.gs
     if (IDM_STEPS[state.step].manual || IDM_STEPS[state.step].lists) return idm_view_(ss, state);
@@ -531,8 +587,9 @@ function idm_processTemp_(ss, state, temp, ignoreCutoff) {
   const range = temp.getDataRange();
   const values = range.getValues();
   const displays = range.getDisplayValues();
-  // The "PASTE HERE" label is not data
+  // The "PASTE HERE" label and the hint under it are not data
   if (values.length && String(values[0][0]).trim() === IDM_PLACEHOLDER) { values[0][0] = ""; displays[0][0] = ""; }
+  if (values.length > 1 && String(values[1][0]).trim() === IDM_HINT) { values[1][0] = ""; displays[1][0] = ""; }
   idm_log_("read temp tab: " + values.length + " rows x " + (values[0] ? values[0].length : 0) + " cols");
   return idm_processRows_(ss, state, values, displays, ignoreCutoff, false);
 }
@@ -941,28 +998,36 @@ function idm_resetTempSheet_(sheet) {
   idm_clearTab_(sheet);
   sheet.getRange("A1").setValue(IDM_PLACEHOLDER)
     .setBackground("#FFF2CC").setFontWeight("bold").setFontSize(14)
-    .setNote("Paste anywhere on this tab — it doesn't have to be A1.\n\nClosed the side panel? 🚀 App Menu → 📥 Input Data Mode brings it back.");
+    .setNote("Paste anywhere on this tab — it doesn't have to be A1.");
+  sheet.getRange("A2").setValue(IDM_HINT).setFontColor("#8a94a3").setFontStyle("italic").setWrap(false);
   sheet.setColumnWidth(1, 160);
 }
 
+/** Anything on the tab besides "PASTE HERE" (A1) and the hint (A2). */
 function idm_tempHasData_(sheet) {
-  if (sheet.getLastRow() > 1 || sheet.getLastColumn() > 1) return true;
-  return String(sheet.getRange("A1").getValue()).trim() !== IDM_PLACEHOLDER;
+  const lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (lastRow > 2 || lastCol > 1) return true;
+  if (lastRow === 0) return false; // emptied by hand
+  const a = sheet.getRange(1, 1, 2, 1).getValues();
+  const a1 = String(a[0][0]).trim(), a2 = String(a[1][0]).trim();
+  return (a1 !== "" && a1 !== IDM_PLACEHOLDER) || (a2 !== "" && a2 !== IDM_HINT);
 }
 
 /**
- * Hides every visible tab except the temp tab (and keepIds) and remembers which ones they
- * were (added to the ones already remembered). The 👋 Welcome tab is hidden but not
- * remembered: the end of the mode shows it again only while the sheets aren't built.
+ * Hides every visible tab except the temp tab (and keepIds). At the START of the mode it
+ * remembers which ones they were (the end shows them again); later (resume, a tab shown
+ * again in the middle) it only hides: a tab that wasn't showing when the mode started
+ * stays hidden at the end. The 👋 Welcome tab is never remembered: the end of the mode
+ * shows it again only while the sheets aren't built.
  */
-function idm_hideOtherSheets_(ss, state, keepIds) {
+function idm_hideOtherSheets_(ss, state, keepIds, onlyHide) {
   const hidden = (state.hiddenIds || []).slice();
   keepIds = keepIds || [];
   ss.getSheets().forEach(s => {
     if (s.getSheetId() === state.tempId || s.isSheetHidden() || keepIds.indexOf(s.getSheetId()) !== -1) return;
     try {
       s.hideSheet();
-      if (s.getName() !== WELCOME_TAB_NAME && hidden.indexOf(s.getSheetId()) === -1) hidden.push(s.getSheetId());
+      if (!onlyHide && s.getName() !== WELCOME_TAB_NAME && hidden.indexOf(s.getSheetId()) === -1) hidden.push(s.getSheetId());
     } catch (e) { console.warn("Input Data Mode could not hide " + s.getName() + ": " + e.message); }
   });
   state.hiddenIds = hidden;
@@ -2862,7 +2927,7 @@ function od_migrateLists_(oldSS, newSS) {
 function od_backToInputMode() {
   PropertiesService.getDocumentProperties().deleteProperty(OD_WIZARD_KEY);
   if (idm_loadState_()) {
-    openInputDataMode();
+    openInputDataModeSidebar_(); // its first call (idm_open) puts the user back on the mode's tab
     return { reopened: true };
   }
   return { reopened: false };

@@ -18,6 +18,8 @@ const runStub = (responses) => `
     return new Proxy({}, { get(_, fn) {
       if (fn === 'withSuccessHandler') return h => make(h, fail);
       if (fn === 'withFailureHandler') return h => make(ok, h);
+      // idm_open (the Input Data Mode sidebar's first call) answers like idm_getState unless given
+      if (fn === 'idm_open' && window.RESP.idm_open === undefined) fn = 'idm_getState';
       return function () { const r = window.RESP[fn]; if (r === '__HANG__') return; setTimeout(() => ok && ok(typeof r === 'function' ? r.apply(null, arguments) : JSON.parse(JSON.stringify(r === undefined ? null : r))), 30); };
     } });
   })() } };`;

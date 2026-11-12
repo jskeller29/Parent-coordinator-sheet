@@ -261,9 +261,9 @@ function buildAllDerivedSheetsRun_() {
   // A build finished: an old "last night's rebuild didn't finish" message is out of date now
   try { PropertiesService.getDocumentProperties().deleteProperty(NIGHTLY_FAILED_KEY_); } catch (e) { /* message only */ }
 
-  // A new copy's 👋 Welcome tab ("what to do next" since Initial Setup) goes once the sheets
-  // are built (Menus.gs; at the END, so a build that fails half way leaves the guide there)
-  try { deleteWelcomeTab_(ss, true); } catch (e) { console.warn("Welcome tab: " + e.message); }
+  // A new copy's first build: its everyday tabs come out from behind the 👋 Welcome tab and the
+  // Welcome tab goes (Menus.gs; at the END, so a build that fails half way leaves the guide there)
+  try { welcomeTabAfterBuild_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
@@ -368,6 +368,13 @@ function nightlyMasterSyncRun_() {
 
 function nightlyMasterSyncLocked_() {
   {
+    // A new copy with no student data yet (Student List never built, no ATS rows in Raw Data):
+    // nothing to build, so no "didn't finish" message and no first build overnight (2026-11-12)
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!studentListIsBuilt_(ss) && !idm_canBuild_(ss)) {
+      console.log("Nightly rebuild skipped: no student data loaded yet.");
+      return;
+    }
     buildAllDerivedSheets();
     resetContactLogFormatting();
 

@@ -250,7 +250,9 @@
     if (!v || !v.active) {
       if (v && v.finished) return renderDone(v);
       show('stepView', false); show('footer', false);
-      $('loading').innerHTML = '<div>Input Data Mode is not on. Open 🚀 App Menu → 📥 Input Data Mode to start.</div>';
+      $('loading').innerHTML = '<div>' + (v && v.notice && v.notice.type === 'error'
+        ? esc(plainText(v.notice.message))
+        : 'Input Data Mode is not on. Open 🚀 App Menu → 📥 Input Data Mode to start.') + '</div>';
       show('loading', true);
       return;
     }
@@ -618,7 +620,8 @@
   });
 
   clog('sidebar loaded; Excel reader ' + (typeof XLSX === 'undefined' ? 'NOT loaded' : 'loaded'));
-  call('idm_getState');
+  // First call: starts or resumes the mode (puts you on its tab, hides the others), then shows the step
+  call('idm_open');
 </script>
 </body>
 </html>

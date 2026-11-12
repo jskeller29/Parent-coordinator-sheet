@@ -41,7 +41,9 @@ function startMode(ss, g, stepIndex) {
   g.idm_saveState_(state);
   return g.idm_sheetById_(ss, state.tempId);
 }
-const tabEmpty = t => t.getLastRow() === 1 && t.getLastColumn() === 1 && t.getRange("A1").getValue() === "PASTE HERE";
+// An empty paste tab: "PASTE HERE" in A1 and the way back to the sidebar in A2 (neither is data)
+const tabEmpty = t => t.getLastRow() === 2 && t.getLastColumn() === 1 && t.getRange("A1").getValue() === "PASTE HERE" &&
+  /App Menu → 📥 Input Data Mode/.test(t.getRange("A2").getValue());
 
 // ---------------------------------------------------------------- wrong paste is cleared
 {
@@ -195,19 +197,137 @@ function listsSheet() {
   assert(vis().indexOf("Contact Log") !== -1 && vis().indexOf("PCAR") !== -1, 'exit: they come back');
   console.log("Input Data Mode resumed: ok");
 }
+// ---------------------------------------------------------------- a new user, step by step
 {
-  // Started from the Welcome tab: it is hidden, not remembered, and comes back at the end while not built
-  const { ss, g } = newSheet();
-  g.htmlFromFile_ = () => ({ setTitle() { return this; }, setWidth() { return this; } });
-  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
-  g.welcomeTabAfterSetup_(ss); g.applyDefaultSheetVisibility_(ss, true);
-  g.openInputDataMode();
-  const st = g.idm_loadState_();
-  assert.strictEqual(ss.getSheetByName("👋 Welcome").isSheetHidden(), true, 'Welcome hidden during the mode');
-  assert.strictEqual(st.prevActiveId, ss.getSheetByName("Contact Log").getSheetId(), 'comes back to the Contact Log, not the Welcome tab id');
+  // The whole first-time path on a new copy, as the owner walked it (2026-11-12 screenshots):
+  // open -> Initial Setup -> "Is this your first PC Tracker?" -> start fresh -> Input Data Mode
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const app = fakeSpreadsheetApp(ss);
+  let dialog = "", sidebars = [];
+  app._ui.showModalDialog = (h) => { dialog = h._html; };
+  app._ui.showSidebar = (h) => { sidebars.push(h._name); };
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true }); // no z_ and no Z# files, like the owner's test copy
+  assert.strictEqual(typeof g.buildContactLogMenu_, "undefined", 'loaded without Z#ContactLog');
+  g.isAutoMigrateOn_ = () => false;
+  g.include_ = () => "";
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => ""; g.getGuideLink_ = () => "https://example.org/guide";
+  g.HtmlService = { createHtmlOutput: h => { const o = { _html: h }; o.setWidth = () => o; o.setHeight = () => o; return o; } };
+  g.htmlFromFile_ = name => { const o = { _name: name }; o.setTitle = () => o; o.setWidth = () => o; return o; };
+  const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
+
+  // 1. The copy opens: only the Welcome tab
+  g.onOpen({ source: ss });
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], '1. open: only the Welcome tab');
+
+  // 2. 🚨 Initial Setup: the window opens at once and nothing else happens in that click
+  let setups = 0;
+  const realSteps = g.runInitialSetupSteps_;
+  g.runInitialSetupSteps_ = function () { setups++; return realSteps.apply(this, arguments); };
+  g.runInitialSetupWrapper();
+  assert(/Setting up your tracker/.test(dialog) && /runSetup\(\);/.test(dialog), '2. the setup window, which starts the setup itself');
+  assert.strictEqual(setups, 0, '2. the click itself does no setup work');
+  assert(!/example\.org\/guide/.test(dialog), '2. no link look-ups before the window shows');
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], '2. no tab changes yet');
+
+  // 3. The window's setup call: still ONLY the Welcome tab (no Contact Log / PCAR / Combined), now "You're set up"
+  const setupReply = JSON.parse(JSON.stringify(g.zg_runSetup()));
+  assert.strictEqual(setupReply.migrate, false);
+  assert(setupReply.links && setupReply.links.downloadDataDoc, '3. the window gets its links from the setup call');
+  assert.strictEqual(g.__props.SETUP_COMPLETE, 'true');
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], '3. after setup: still only the Welcome tab');
+  const w = ss.getSheetByName("👋 Welcome");
+  assert.strictEqual(ss.getActiveSheet(), w, '3. on the Welcome tab');
+  assert.strictEqual(w.getRange("C3").getValue(), "You're set up", '3. it says what to do next');
+  assert.deepStrictEqual(sidebars, ["GettingStartedSidebar"], '3. the checklist opens');
+  // A second setup window (clicked twice) does not run it again
+  g.zg_runSetup();
+  assert.strictEqual(setups, 1, '3. setup runs once');
+
+  // 4. "Yes, start fresh" -> "Start Input Data Mode": the pop-up only opens the sidebar...
+  g.zg_action('inputData');
+  assert.deepStrictEqual(sidebars.slice(-1), ["InputDataSidebar"], '4. Input Data Mode sidebar');
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], '4. the pop-up call itself does not touch the tabs');
+  // ...whose first call switches the tabs
+  const v = g.idm_open();
+  assert(v.active && v.stepIndex === 0, '4. step 1');
+  assert.deepStrictEqual(vis(), ["Student Data"], '4. only the Student Data tab');
+  assert.strictEqual(ss.getActiveSheet().getName(), "Student Data", '4. on it');
+  assert.strictEqual(g.idm_loadState_().prevActiveId, ss.getSheetByName("Contact Log").getSheetId(), '4. comes back to the Contact Log later, not the Welcome tab');
+  const temp = ss.getSheetByName("Student Data");
+  assert(tabEmpty(temp), '4. PASTE HERE + the way back if the panel is closed');
+  assert.strictEqual(g.idm_check().pending, false, '4. the hint is not data');
+
+  // 5. Something shows other tabs again and moves the user (that was the screenshot): the next check fixes it
+  w.showSheet(); ss.getSheetByName("Contact Log").showSheet(); w.activate();
+  g.idm_check();
+  assert.deepStrictEqual(vis(), ["Student Data"], '5. the check hides them again');
+  assert.strictEqual(ss.getActiveSheet().getName(), "Student Data", '5. and puts the user back');
+  // The sidebar opened again (closed by accident, Getting Started, Your Lists' Back): same screen
+  ss.getSheetByName("PCAR").showSheet(); ss.getSheetByName("PCAR").activate();
+  g.idm_open();
+  assert.deepStrictEqual(vis(), ["Student Data"], '5. reopened: only its tab');
+
+  // 6. A paste below the label + hint is read; the label / hint are not
+  temp._put(asPasted(csv("1 - Student Data (ATS).csv")), 4, 2);
+  assert.strictEqual(g.idm_check().pending, true, '6. a paste is seen');
+  const imported = g.idm_processPaste();
+  assert.strictEqual(imported.notice.type, 'imported', '6. imported: ' + JSON.stringify(imported.notice));
+
+  // 7. Exit before building: back on the Welcome tab, nothing else shown
+  const tempId = temp.getSheetId();
   g.idm_exit();
-  assert.strictEqual(ss.getActiveSheet().getName(), "👋 Welcome", 'not built: the end lands on "what to do next"');
-  console.log("Input Data Mode from the Welcome tab: ok");
+  const visNow = () => ss.getSheets().filter(s => !s.isSheetHidden() && s.getSheetId() !== tempId).map(s => s.getName()); // the mode's tab goes in the next call
+  assert.deepStrictEqual(visNow(), ["👋 Welcome"], '7. exit, not built: the Welcome tab, and the tabs shown by mistake stay hidden');
+  assert.strictEqual(ss.getActiveSheet().getName(), "👋 Welcome");
+
+  // 8. The first build: the everyday tabs come out, the user moves to the Contact Log, the Welcome tab goes
+  g.studentListIsBuilt_ = () => true;
+  g.welcomeTabAfterBuild_(ss);
+  assert.deepStrictEqual(visNow(), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], '8. the default tabs');
+  assert.strictEqual(ss.getActiveSheet().getName(), "Contact Log", '8. on the Contact Log');
+  g.onOpen({ source: ss });
+  assert.strictEqual(ss.getSheetByName("👋 Welcome"), null, '8. the next open deletes the Welcome tab');
+  console.log("a new user, step by step: ok");
+}
+{
+  // Step 5 builds inside Input Data Mode: the everyday tabs wait for the end of the mode
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const app = fakeSpreadsheetApp(ss);
+  const g = loadProject({ extra: { SpreadsheetApp: app } });
+  g.isAutoMigrateOn_ = () => false;
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  g.onOpen({ source: ss });
+  g.runInitialSetup_();
+  g.idm_open();
+  const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
+  g.studentListIsBuilt_ = () => true;
+  g.welcomeTabAfterBuild_(ss); // the build at step 5 ends
+  assert.deepStrictEqual(vis(), ["Student Data"], 'during the mode: still only its tab');
+  assert.strictEqual(ss.getSheetByName("👋 Welcome"), null, 'the (hidden) Welcome tab is deleted');
+  g.idm_exit();
+  assert.deepStrictEqual(vis().filter(n => n !== "Student Data"), ["Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'end of the mode: the everyday tabs');
+  assert.strictEqual(ss.getActiveSheet().getName(), "Contact Log", 'on the Contact Log');
+  console.log("first build inside Input Data Mode: ok");
+}
+{
+  // The 10 PM rebuild on a new copy with nothing loaded yet: skipped quietly, the Welcome tab stays
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+  g.isAutoMigrateOn_ = () => false;
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  g.onOpen({ source: ss });
+  g.runInitialSetup_();
+  let builds = 0; g.buildAllDerivedSheets = () => { builds++; };
+  g.nightlyMasterSyncRun_();
+  assert.strictEqual(builds, 0, 'no build without student data');
+  assert.strictEqual(g.__props.NIGHTLY_FAILED_MSG, undefined, 'no "didn\'t finish" message');
+  // A build that ends with no students (nothing loaded) leaves the guide alone
+  assert.strictEqual(g.welcomeTabAfterBuild_(ss), false);
+  assert.deepStrictEqual(ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"], 'still only the Welcome tab');
+  console.log("nightly on a new copy: skipped: ok");
 }
 {
   // "Finish setup": the checklist stops opening by itself, a pop-up says where it is
@@ -235,11 +355,11 @@ function listsSheet() {
   assert.strictEqual(ss.getSheets()[0].getName(), "👋 Welcome", 'first tab');
   g.showWelcomeTabOnly_(ss);
   assert.strictEqual(ss.getSheets().filter(s => s.getName() === "👋 Welcome").length, 1, 'made once');
-  // Initial Setup: the user stays on it, now "what to do next"; the default tabs come back beside it
+  // Initial Setup: the user stays on it, now "what to do next"; the other tabs wait for the first build
   g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
-  g.welcomeTabAfterSetup_(ss); g.applyDefaultSheetVisibility_(ss, true);
+  g.welcomeTabAfterSetup_(ss);
   const w = ss.getSheetByName("👋 Welcome");
-  assert.deepStrictEqual(vis(), ["👋 Welcome", "Contact Log", "Combined Contact Tracking", "PCAR", "Directory"], 'after setup: Welcome + default tabs');
+  assert.deepStrictEqual(vis(), ["👋 Welcome"], 'after setup: only the Welcome tab');
   assert.strictEqual(ss.getActiveSheet(), w, 'after setup: still on the Welcome tab');
   assert.strictEqual(w.getRange("C3").getValue(), "You're set up", 'rewritten in place as "what to do next"');
   assert(/Input Data Mode/.test(Array.from(w._cells.values()).join("\n")), 'next step named');
@@ -250,7 +370,7 @@ function listsSheet() {
   g.welcomeTabAfterSetup_(ss, true);
   assert.strictEqual(ss.getActiveSheet(), w, 'an open brings the user back to it');
   assert(ss._toasts.some(t => /Input Data Mode/.test(t.msg)), 'with a toast naming the next step');
-  ss.getSheetByName("Contact Log").activate();
+  ss.getSheetByName("Contact Log").showSheet(); ss.getSheetByName("Contact Log").activate();
   assert.strictEqual(g.deleteWelcomeTab_(ss, true), true, 'deleted at the end of a build');
   assert.strictEqual(ss.getSheetByName("👋 Welcome"), null);
   console.log("Welcome tab: ok");

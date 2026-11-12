@@ -407,31 +407,46 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
 - Make Release Copies: the Blank's Welcome tab links the new Example (2026-11-12): re-paste Menus (every sheet) and
   z_MINE (owner sheet).
-- New-user flow fixes (2026-11-12, latest): re-paste Core, Build, Menus, Input Data (scripts) and GettingStartedSidebar
-  (HTML) on every sheet.
+- New-user flow fixes (2026-11-12, latest): re-paste Core, Build, Menus, Input Data (scripts) and GettingStartedSidebar,
+  InputDataSidebar (HTML) on every sheet.
 
-NEW-USER FLOW (owner's bug list 2026-11-12, "act as a new user who is not tech savvy"):
-- Initial Setup answers at once: runInitialSetupWrapper only runs requireAllScopes and opens showGuideWelcome_({ setup:
-  true }) = a "Setting up your tracker" spinner window, which calls zg_runSetup -> runInitialSetup_ (the old body: triggers
-  quiet, settings, visibility, locks, menus; returns isAutoMigrateOn_). Then the window shows "Is this your first PC
-  Tracker?" (or the server opens the Migration Wizard in its place; a failure shows "Try again"). zg_runSetup opens the
-  checklist. "Not now" = zg_notNow (toast naming the next step).
-- 👋 Welcome tab after setup: the user STAYS on it (applyDefaultSheetVisibility_(ss, keepWelcome) shows the 4 default
-  tabs beside it); welcomeTabAfterSetup_ rewrites it in place (writeWelcomeTab_ into, welcomeDoneRows_; C3 =
-  WELCOME_DONE_TITLE_ "You're set up") as "what to do next" (Input Data Mode / Import Old Data / "Closed a window by
-  accident?"). Every REAL open (onOpen(e) -> buildMenus_(realOpen); a menu redraw by code never moves the user) while
-  the Student List isn't built and Input Data Mode is off shows + opens it with a toast. deleteWelcomeTab_(ss, force):
-  without force kept while not built; the END of every build (buildAllDerivedSheetsRun_) forces it (moved from the
-  start, so a failed build keeps the guide). WELCOME_TAB_KEEP (Reset to Display Mode) still keeps the setup version.
-- Input Data Mode: openInputDataMode on RESUME now activates its tab and hides the other tabs again (was: only made sure
-  the tab existed, so the user stayed on the Contact Log with every tab showing); idm_hideOtherSheets_ adds to the
-  remembered ids, never remembers the Welcome tab (hidden only), keeps list tabs on step 5. Started from the Welcome tab:
-  prevActiveId = Contact Log. idm_cleanup_: not built yet -> lands on the Welcome tab. guideOnOpen_ (installable open)
-  re-opens the Input Data Mode sidebar when the mode was left on. Clone detector clears INPUT_DATA_MODE_STATE,
-  INPUT_DATA_MODE_DELETE_TAB, ZG_AUTO_OPEN.
-- Getting Started: the "Open this by itself" checkbox is now a "Finish setup" button (owner's request; zg_finishSetup:
-  ZG_AUTO_OPEN = off + alert "you can always open it: 🚀 App Menu → ✅ Getting Started", sidebar closes; confirm when
-  steps are left; hidden once all 4 are done). zg_setAutoOpen kept for sidebars still open.
+NEW-USER FLOW (owner's bug lists 2026-11-12, "act as a new user who is not tech savvy"; walked step by step in
+tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# files like the owner's test copy):
+- 1. New copy opens: only the 👋 Welcome tab (setup version: permissions, steps), toast -> Initial Setup.
+- 2. 🚨 Initial Setup answers at once: runInitialSetupWrapper only runs requireAllScopes and opens
+  showGuideWelcome_({ setup: true }) = "Setting up your tracker" spinner window (no link look-ups before it shows:
+  zg_runSetup returns { migrate, links } and the window's fillLinks adds them). The window calls zg_runSetup ->
+  runInitialSetup_: under the DOCUMENT lock (60 s wait), skipped when SETUP_FINISHED (doc property) = this sheet's ID,
+  so a second window / double click never runs it twice (two runs could re-show tabs after Input Data Mode hid them);
+  body = runInitialSetupSteps_. A failure shows "Try again".
+- 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined
+  showing during setup looked wrong): newCopy (= Student List not built) -> showWelcomeTabOnly_ +
+  updateVisualSettings_(settings, columnsOnly = true); a built sheet -> default tabs + settings as before. Last step:
+  welcomeTabAfterSetup_ rewrites the tab in place as "You're set up" (writeWelcomeTab_ into, welcomeDoneRows_; C3 =
+  WELCOME_DONE_TITLE_). The window asks "Is this your first PC Tracker?"; zg_runSetup opened the checklist.
+- 4. "Start Input Data Mode" (and Getting Started's button, the data reminder, Your Lists' Back): only OPEN the
+  sidebar (openInputDataModeSidebar_); the sidebar's first call idm_open does the tab work (idm_startOrResume_).
+  Owner saw it twice: started from the pop-up, the sidebar opened but the tabs were not switched / hidden; tab work
+  from the sidebar's own calls is known to work. The menu item (openInputDataMode, also guideOnOpen_) does it in the
+  menu run AND the sidebar checks again. Resume = same screen (idm_focusTempTab_: on the mode's tab, others hidden
+  WITHOUT remembering them: only tabs showing at the START come back at the end; step 5 keeps list tabs). Every
+  paste-step poll (idm_check): active tab not the paste tab -> idm_focusTempTab_ (one getActiveSheet call otherwise).
+  Paste tab: A1 "PASTE HERE" + A2 IDM_HINT (grey: "Closed the side panel? 🚀 App Menu → 📥 Input Data Mode ...");
+  neither is data (idm_tempHasData_, idm_processTemp_ strip both). Started from the Welcome tab: it is hidden, never
+  remembered, prevActiveId = Contact Log; ending before a build (idm_cleanup_) lands on the Welcome tab.
+- 5. Every REAL open (onOpen(e) -> buildMenus_(realOpen); code redrawing menus never moves the user) while not built
+  and Input Data Mode off: welcomeTabAfterSetup_(ss, true) shows + opens the Welcome tab with a toast. Input Data
+  Mode left on: guideOnOpen_ re-opens its sidebar (and the open toast says the panel is on the right).
+- 6. The FIRST build (end of buildAllDerivedSheetsRun_, welcomeTabAfterBuild_; only with setup done, no
+  WELCOME_TAB_KEEP and the Student List really built): the starting tabs (startingTabs_ = TAB_VISIBILITY + settings)
+  come out (inside Input Data Mode: added to its hiddenIds, shown when it ends), then deleteWelcomeTab_(ss, true)
+  (user on it: showStartingTabs_ + leaveWelcomeTab_, deleted next time). A failed / empty build keeps the guide.
+  The 10 PM rebuild skips a sheet with no Student List and no ATS rows (nightlyMasterSyncLocked_; no "didn't finish").
+- Getting Started: Welcome tab in ZG_TABS ("This tab"); "Hidden tabs" list only after the first build; the "Open this
+  by itself" checkbox is now "Finish setup" (zg_finishSetup: ZG_AUTO_OPEN = off + alert "you can always open it:
+  🚀 App Menu → ✅ Getting Started", sidebar closes; confirm when steps are left; hidden once all 4 are done).
+  zg_setAutoOpen kept for sidebars still open. "Not now" = zg_notNow (toast naming the next step).
+- Clone detector also clears INPUT_DATA_MODE_STATE, INPUT_DATA_MODE_DELETE_TAB, ZG_AUTO_OPEN.
 - Notes line with no method and no person: "𝘿𝙖𝙩𝙚 - note", never "{}" (noteLineHeader_, Core.gs). Run a build once.
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,

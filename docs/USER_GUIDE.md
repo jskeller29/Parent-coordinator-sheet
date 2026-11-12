@@ -116,8 +116,10 @@ A "Setting up your tracker" window opens right away. Keep it open: setup takes a
 20 seconds. Setup then:
 
 - turns on the automatic parts (Contact Log updates, the 10 PM rebuild, the update check),
-- shows your everyday tabs next to the Welcome tab: Contact Log, Combined Contact
-  Tracking, PCAR and Directory (you can turn on others in Settings → Tabs & columns),
+- keeps you on the Welcome tab, which now shows what to do next. Your everyday tabs
+  (Contact Log, Combined Contact Tracking, PCAR and Directory) stay hidden until your
+  sheets are built, because they are empty until then. You can turn on others later in
+  Settings → Tabs & columns,
 - asks "Is this your first PC Tracker?": "Yes, start fresh" shows the first steps, and
   "No, bring over last year's tracker" opens the Migration Wizard (Part 3),
 - opens the Getting Started checklist.
@@ -139,15 +141,16 @@ It opens each time you open the sheet until all four are done, or until you clic
 Finish setup at the bottom of it. You can always reopen it from 🚀 App Menu → ✅ Getting
 Started. If you close Input Data Mode half way, it opens again by itself the next time
 you open the sheet, or from 🚀 App Menu → 📥 Input Data Mode.
-Below the steps, "This tab" explains the tab you are on, and "Hidden tabs" lists the
-tabs you can turn on.
+Below the steps, "This tab" explains the tab you are on, and after your first build
+"Hidden tabs" lists the tabs you can turn on.
 
 ### Step 5: Load your data
 
 Open 🚀 App Menu → 📥 Input Data Mode, or click Open Input Data Mode in the checklist.
 It takes you through each export in turn, then two optional steps: Site / Class (the
 teacher and site for each class) and Your Lists. Your other tabs are hidden while you
-work.
+work. If you close its panel by accident, the yellow tab still says how to bring it back:
+🚀 App Menu → 📥 Input Data Mode. It picks up where you left off.
 
 For each export, either click Upload file and pick the file you downloaded, or open the
 file, select everything (Ctrl+A, Mac ⌘+A), copy it, and paste it anywhere on the
