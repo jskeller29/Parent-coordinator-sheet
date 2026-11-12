@@ -32,6 +32,8 @@
     .mk.yes { color: var(--ok); } .mk.skip, .mk.none { color: var(--faint); }
     .done-line { font-weight: 600; margin: 2px 0; }
     .done-line.skip { color: var(--muted); font-weight: 400; }
+    .warnline { background: var(--warn-soft); color: var(--warn); border: 1px solid #ecd9a8; border-radius: var(--radius); padding: 6px 8px; margin: 6px 0; font-size: 12.5px; }
+    .error .cleared { margin-top: 8px; font-weight: 600; }
     button { font: 600 13px var(--font); height: 32px; border-radius: var(--radius); padding: 0 12px; cursor: pointer; border: 1px solid var(--line); background: #ffffff; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
     button:hover:not(:disabled) { background: var(--panel); }
     button.primary { background: var(--accent); border-color: var(--accent); color: #ffffff; }
@@ -122,11 +124,12 @@
 
     <div class="card" id="listsCard">
       <b>Your lists</b>
+      <div id="listsBuildNote" class="hidden"></div>
       <div id="listItems"></div>
       <div id="newListForm" class="hidden">
         <b>New list</b>
         <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
-        <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; paste</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
+        <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; add the list</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
       </div>
       <button class="addlist" id="addListBtn" onclick="showNewList()">Add another list</button>
       <div class="muted" style="margin-top:6px">No lists? Click Finish to skip this step.</div>
@@ -193,6 +196,9 @@
   var pendingUpload = null;
   var currentManual = false; // on the Site / Class step (no polling)  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
   var currentLists = false;  // on step 5, Your Lists (no polling)
+  var stickyError = null;    // a wrong paste was cleared off the tab: its message stays while polling goes on (step index)
+  var listsBuildStarted = false; // step 5's build-first ran on this visit (never started twice in a row)
+  var buildPollTimer = null; // build progress while step 5 builds first
 
   function $(id) { return document.getElementById(id); }
 
@@ -233,6 +239,7 @@
 
   function render(v) {
     busy = false;
+    stopBuildPoll();
     dbgReply(v, 'reply');
     show('loading', false);
     if (!v || !v.active) {
@@ -259,6 +266,10 @@
     show('uploadCard', !manual && !listsStep); show('pasteCard', !manual && !listsStep); show('siteCard', manual);
     show('listsCard', listsStep);
     if (listsStep) renderLists(v.lists);
+    if (!listsStep) listsBuildStarted = false;
+    var lb = listsStep ? v.listsBuild : null;
+    $('listsBuildNote').className = lb ? (lb.ok ? 'done-line' : 'warnline') : 'hidden';
+    $('listsBuildNote').innerHTML = lb ? (lb.ok ? '<span class="mk yes">✓</span>' : '') + esc(plainText(lb.message)) : '';
     // The "Reading… / Moving data…" spinner and any error sit right under Option 1
     // (Upload), so they are not pushed out of sight below the long paste steps;
     // on the Site / Class step they sit under that card instead.
@@ -282,14 +293,21 @@
     show('doneList', done.length > 0);
 
     if (n && n.type === 'error') {
-      paused = true;
-      $('errorText').innerHTML = plainText(n.message);
-      $('retryBtn').textContent = n.fromUpload ? 'OK' : 'Clear and try again';
+      // A wrong paste is already cleared off the tab (n.cleared): keep checking for the next paste,
+      // the message stays until then. "Use it anyway" sends back the rows the server kept (heldRows).
+      paused = !n.cleared;
+      stickyError = n.cleared ? v.stepIndex : null;
+      if (n.heldRows) pendingUpload = { kind: 'rows', data: n.heldRows };
+      $('errorText').innerHTML = plainText(n.message) +
+        (n.cleared ? '<div class="cleared">The tab was cleared, so you can paste the right data straight away.</div>' : '');
+      $('retryBtn').textContent = (n.fromUpload || n.cleared) ? 'OK' : 'Clear and try again';
       show('anywayBtn', !!n.canUseAnyway);
       show('errorBox', true);
-      show('waiting', false);
+      show('waiting', !!n.cleared);
+      if (n.cleared) $('waitingText').textContent = 'Waiting for your paste or upload…';
     } else {
       paused = false;
+      stickyError = null;
       pendingUpload = null;
       show('errorBox', false);
       $('waitingText').textContent = 'Waiting for your paste or upload…';
@@ -298,6 +316,8 @@
     setButtons(true);
     if (manual || listsStep) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks a button
     else schedule();
+    // Step 5 matches lists to the Student List: a new sheet / new data is built first (idm_buildForLists)
+    if (listsStep && v.needsBuild && !listsBuildStarted) { listsBuildStarted = true; buildForLists(); }
   }
 
   function renderProgress(steps) {
@@ -413,6 +433,10 @@
           call('idm_processPaste');
           return;
         }
+        // Still waiting after a cleared wrong paste: leave its message up (nothing else changed)
+        if (stickyError !== null && v && v.active && v.stepIndex === stickyError && !v.notice) {
+          busy = false; dbgReply(v, 'poll'); schedule(); return;
+        }
         render(v);
       })
       .withFailureHandler(function (e) {
@@ -443,7 +467,7 @@
   function hideExitAsk() { show('exitAsk', false); }
   function retry() {
     if ($('retryBtn').textContent === 'OK') {
-      pendingUpload = null; show('errorBox', false);
+      pendingUpload = null; stickyError = null; show('errorBox', false);
       if (currentManual) return;  // Site / Class: just fix the tab and click Save again
       paused = false; show('waiting', true); schedule(); return;
     }
@@ -460,6 +484,26 @@
   }
   function build() {
     google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
+  }
+
+  // --- step 5: build first (Your Lists needs the Student List) ---
+  var BUILD_TEXT = 'Building your sheets first, so your lists can find your students. This can take a minute or two…';
+  function buildForLists() {
+    working(BUILD_TEXT);
+    pollBuild();
+    call('idm_buildForLists');
+  }
+  function stopBuildPoll() { if (buildPollTimer) { clearTimeout(buildPollTimer); buildPollTimer = null; } }
+  function pollBuild() {
+    stopBuildPoll();
+    buildPollTimer = setTimeout(function () {
+      google.script.run.withSuccessHandler(function (st) {
+        if (!buildPollTimer) return; // the build finished meanwhile
+        var steps = (st && st.buildSteps) || [], i = st ? st.buildStep : 0;
+        if (busy && steps[i]) $('waitingText').textContent = BUILD_TEXT + ' (step ' + (i + 1) + ' of ' + steps.length + ': ' + steps[i].label + ')';
+        if (busy) pollBuild();
+      }).withFailureHandler(function () { if (busy) pollBuild(); }).getSyncStatus();
+    }, 2500);
   }
 
   // --- step 5: Your Lists (Input Data.gs, part 2) ---

@@ -84,6 +84,20 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   YourListsSidebar IN PLACE of this sidebar; od_backToInputMode reopens it) and Finish (idm_finishLists:
   results.lists = { saved, rows: ready lists, lists: true } or skipped, so the end screen offers Build). Site / Class
   is no longer the last step: its button is "✅ Save Site / Class".
+  Wrong paste (owner's request 2026-11-12): any data problem on a PASTE (no header row, wrong export, no rows, numbers
+  cut off; not "Raw Data tab missing") clears the temp tab right away (idm_processRows_ fail -> idm_resetTempSheet_,
+  notice.cleared); the sidebar keeps the message up while it goes on polling for the next paste (stickyError) and
+  its button reads OK. Cut-off numbers: the read cells come back in notice.heldRows (Dates as their shown text) and
+  "Use it anyway" sends them to idm_submitRows(rows, true), the upload path. Uploads are never "cleared" (nothing on
+  the tab).
+  Build before step 5 (owner's request 2026-11-12): Your Lists matches rows to the Student List, so idm_view_ says
+  needsBuild on step 5 when data was moved to Raw Data in this run (state.dataChanged, set by every section write and
+  the Site / Class save) or the Student List was never built (studentListIsBuilt_) and no build was tried yet. The
+  sidebar then calls idm_buildForLists by itself (spinner shows the build's step from getSyncStatus): no Student Data
+  in Raw Data (C7 empty) -> no build, a note says to load it first; else buildAllDerivedSheets + formatDirectoryAuto_
+  WITHOUT the document lock (the build lock only), then every tab the build made / showed is hidden again (added to
+  state.hiddenIds, shown at the end) and the temp tab is active again. Result in state.listsBuild ({ ok, message },
+  shown on the lists card); dataChanged = false. A failed build is reported, not retried, until new data comes in.
 
 - Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
@@ -95,6 +109,11 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   guardian key / "skip"), headers, title, stats.
   - Paste: od_takePaste_ finds the header row (od_findHeaderRow_; title rows above it are remembered), moves it to
     row 4, data as plain text. A re-paste with the same headers keeps the setup (od_rolesByHeader_) and the picks.
+    Upload (owner's request 2026-11-12): "Option 1: Upload the file" in the paste view (SheetJS 0.18.5 from cdnjs,
+    first sheet, raw values, Dates -> M/D/YYYY, like InputDataSidebar). od_uploadCsv(text) (Utilities.parseCsv via
+    idm_parseCsv_) / od_uploadRows(rows): written as plain text from row 4 of the reset list tab, then od_readTab_
+    (shared with od_readPaste) reads it exactly like a paste. A list with a header but no rows is cleared
+    (od_resetListTab_, cleared: true): before, the header stayed and the 2 s poll re-read it in a loop.
   - Matching (od_matchStudentRow_ / od_matchGuardianRow_): your pick, then OSIS (normalizeOsis_), exact name token
     set (either name order), phone / email via guardians (Raw Data incl. overrides), then BEST GUESSES WITH A
     CONFIDENCE (owner's request 2026-11-12; od_rankStudents_ / od_rankPersons_ / od_decideRanked_): every candidate
@@ -141,7 +160,8 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     picks under the new tab ID; a same-name list already here is replaced; the old sheet is only read; step 6's build
     fills the columns. Rollover puts each list tab in the archive PDF (next year's sheet gets them through Migration).
   - google.script.run endpoints: od_createList, od_openList, od_repasteList, od_renameList, od_deleteList, od_getWizard,
-    od_wizardCheck, od_readPaste, od_matchPreview, od_saveList, od_backToInputMode, od_build (+ idm_finishLists).
+    od_wizardCheck, od_readPaste, od_uploadCsv, od_uploadRows, od_matchPreview, od_saveList, od_backToInputMode,
+    od_build (+ idm_finishLists, idm_buildForLists).
     Tested offline (own_test: shared + owner) and by a Chromium click-through of both sidebars wired to the real
     server code on the mock sheet (not yet tried on a real sheet).
 
@@ -331,6 +351,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
+- Wrong paste cleared, Your Lists upload, build before step 5 (2026-11-12): re-paste Input Data (script) and
+  InputDataSidebar, YourListsSidebar (HTML).
 
 👋 Welcome tab (Menus.gs, WELCOME TAB section; owner's request 2026-11-12, not yet tried on a sheet):
 - New copies only: while SETUP_COMPLETE is not "true", every open (buildMenus_, simple onOpen, before the welcome

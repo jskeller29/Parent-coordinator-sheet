@@ -5,6 +5,8 @@
   <meta charset="utf-8">
   <!-- Your Lists: set up one list (Input Data.gs, part 2). Opened from step 5 of Input Data Mode. -->
   <?!= include_('Styles') ?>
+  <!-- Excel reader for the upload (same file and version as InputDataSidebar) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     /* Your Lists sidebar: the shared "District" look (Styles.html); restyled 2026-11-12 */
     body { padding: 14px 14px 100px; font-size: 13.5px; }
@@ -94,15 +96,24 @@
 
   <!-- WAITING FOR THE PASTE -->
   <div id="pasteView" class="hidden">
+    <div class="card">
+      <b>Option 1: Upload the file</b>
+      <div class="muted">Pick your list's file (CSV or Excel; the first sheet is used). It goes on the tab <b id="uploadTab"></b> just like a paste.</div>
+      <div class="row">
+        <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" class="hidden">
+        <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">Upload file</button>
+      </div>
+    </div>
     <div class="card yellow">
+      <b>Option 2: Copy and paste</b>
       <ol>
         <li>The tab <b id="pasteTab"></b> is ready (it's the one showing).</li>
         <li>Open your list, press <kbd>Ctrl</kbd>+<kbd>A</kbd> (Mac: <kbd>⌘</kbd>+<kbd>A</kbd>) and copy it, headers too.</li>
         <li>Click the <b>yellow box (A4)</b> on that tab and paste values only: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>.</li>
       </ol>
-      <div class="muted" style="margin-top:6px">Title rows above the headers are fine; the tool finds the header row itself.</div>
     </div>
-    <div class="status"><div class="spinner"></div><div>Waiting for your paste…</div></div>
+    <div class="muted">Title rows above the headers are fine; the tool finds the header row itself.</div>
+    <div class="status"><div class="spinner"></div><div>Waiting for your paste or upload…</div></div>
   </div>
 
   <!-- SETUP -->
@@ -172,7 +183,7 @@
   function colName(c) { var col = (view.columns || [])[c - 1]; return col ? 'Column ' + col.letter + ' “' + col.header + '”' : ''; }
 
   function loading(text) { busy = true; $('loadingText').textContent = text; show('loading', true); show('errorBox', false); setButtons(false); }
-  function setButtons(on) { ['backBtn', 'nextBtn'].forEach(function (id) { $(id).disabled = !on; }); }
+  function setButtons(on) { ['backBtn', 'nextBtn', 'uploadBtn'].forEach(function (id) { $(id).disabled = !on; }); }
   function fail(e) {
     busy = false; show('loading', false); setButtons(true);
     $('errorBox').innerHTML = esc(plainText(e && e.message ? e.message : e)); show('errorBox', true);
@@ -191,6 +202,7 @@
     view = v;
     $('title').textContent = v.list.name;
     $('pasteTab').textContent = '“' + v.list.tabName + '”';
+    $('uploadTab').textContent = '“' + v.list.tabName + '”';
     show('pasteView', true); show('setupView', false); show('doneView', false); show('leaveRow', true);
     show('backBtn', false); show('nextBtn', false);
     stopPoll(); pollTimer = setTimeout(poll, 2000);
@@ -199,11 +211,56 @@
   function poll() {
     pollTimer = null;
     google.script.run.withSuccessHandler(function (r) {
+      if (busy) return; // an upload is being read: it carries on from there
       if (r && r.error) { fail(r.error); return; }
       if (r && r.pasted) { loading('Found your list. Reading it…'); run('od_readPaste', undefined, route); return; }
       pollTimer = setTimeout(poll, 2000);
     }).withFailureHandler(function () { pollTimer = setTimeout(poll, 4000); }).od_wizardCheck();
   }
+
+  // ---------- upload (CSV parsed on the server, Excel read here; then the same as a paste) ----------
+  function resumePoll() { if (!$('pasteView').classList.contains('hidden') && !pollTimer) pollTimer = setTimeout(poll, 2000); }
+  function upload(fn, data) {
+    loading('Reading your list…');
+    google.script.run.withSuccessHandler(function (v) {
+      busy = false; show('loading', false); setButtons(true);
+      if (v && v.error) { $('errorBox').innerHTML = esc(plainText(v.error)); show('errorBox', true); }
+      if (v && v.phase) route(v); else resumePoll();
+    }).withFailureHandler(function (e) { fail(e); resumePoll(); })[fn](data);
+  }
+  function uploadFailed(msg) { fail(msg); resumePoll(); }
+  $('fileInput').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    this.value = '';
+    if (!file || busy) return;
+    var name = file.name.toLowerCase();
+    var reader = new FileReader();
+    stopPoll();
+    loading('Reading ' + file.name + '…');
+    reader.onerror = function () { uploadFailed('Could not read that file.'); };
+    if (/\.(csv|txt)$/.test(name)) {
+      reader.onload = function () { upload('od_uploadCsv', reader.result); };
+      reader.readAsText(file);
+    } else if (/\.(xlsx|xls)$/.test(name)) {
+      if (typeof XLSX === 'undefined') { uploadFailed('The Excel reader did not load. Save the file as CSV and upload that, or copy and paste.'); return; }
+      reader.onload = function () {
+        try {
+          var wb = XLSX.read(new Uint8Array(reader.result), { type: 'array', cellDates: true });
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }).map(function (r) {
+            return r.map(function (c) {
+              if (c instanceof Date) return (c.getMonth() + 1) + '/' + c.getDate() + '/' + c.getFullYear();
+              return c;
+            });
+          });
+          upload('od_uploadRows', rows);
+        } catch (e) { uploadFailed('Could not read that Excel file: ' + e.message); }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      uploadFailed('Please pick a .csv, .xlsx or .xls file.');
+    }
+  });
 
   function route(v) {
     if (!v) return;

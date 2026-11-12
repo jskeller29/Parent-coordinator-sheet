@@ -114,7 +114,7 @@ var IDM_STEPS = [
     key: 'lists', tab: 'Your Lists', short: 'Your Lists', zone: 'Your Lists', required: false, lists: true,
     howTo: [
       "Any other list you get: bus routes, trip forms, after school, PTA…",
-      "Each list gets its own tab. Paste the whole sheet there; the tool works out who each row is.",
+      "Each list gets its own tab. Upload the file (CSV or Excel) or paste the whole sheet there; the tool works out who each row is.",
       "What you keep shows on the phone contacts (Additional Information) and as a column in the Student List or Parents Divided after the next build."
     ]
   }
@@ -353,6 +353,78 @@ function idm_finishLists() {
   });
 }
 
+// ---------------------------------------------------------------------
+// BUILD BEFORE STEP 5 (owner's request 2026-11-12)
+// Your Lists matches each row to the Student List (+ Raw Data guardians), so on
+// a new sheet (Student List never built) or after data was moved to Raw Data in
+// this run, step 5 builds the sheets first. The sidebar calls idm_buildForLists
+// when the view says needsBuild. It builds like 🏗️ Build Sheets Only, but inside
+// this sidebar: the user stays on the temp tab, and any tab the build made or
+// showed is hidden again (and shown at the end with the others). Tried once per
+// change: a failed build is reported on the lists card, not retried in a loop.
+// ---------------------------------------------------------------------
+
+function idm_listsNeedBuild_(ss, state) {
+  if (state.dataChanged) return true;
+  return !state.listsBuild && !studentListIsBuilt_(ss);
+}
+
+/** Raw Data has students in the ATS section (Student ID, column C, from row 7). */
+function idm_hasAtsRows_(raw) {
+  return raw.getLastRow() >= 7 && String(raw.getRange(7, 3).getValue()).trim() !== "";
+}
+
+function idm_buildForLists() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // 1. Which tabs show now (short lock; the build itself runs without the document lock)
+  const before = idm_withLock_(() => {
+    const state = idm_loadState_();
+    if (!state || !IDM_STEPS[state.step].lists) return { view: idm_view_(ss, state) };
+    reportBuildStep_(0); // the sidebar shows the build's steps (getSyncStatus)
+    return { visible: ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getSheetId()) };
+  });
+  if (!before.visible) return before.view || before; // not on step 5 any more, or an error view
+
+  // 2. The build (holds the build lock; another build / sync running = a message, not a wait)
+  let outcome;
+  const raw = idm_rawSheet_(ss);
+  if (!raw || !idm_hasAtsRows_(raw)) {
+    outcome = { ok: false, message: "Load your Student Data first (step 1): your lists are matched to those students." };
+  } else {
+    try {
+      buildAllDerivedSheets();
+      try { formatDirectoryAuto_(ss.getSheetByName("Directory")); } catch (e) { console.warn("Directory format skipped: " + e.message); }
+      outcome = { ok: true, message: "Sheets built, so your lists can find your students." };
+    } catch (e) {
+      console.error("Input Data Mode build before Your Lists: " + (e && e.stack ? e.stack : e));
+      outcome = { ok: false, message: "The sheets couldn't be built (" + (e && e.message ? e.message : e) + "). " +
+        "Your lists can only find students who are already on the Student List." };
+    }
+  }
+
+  // 3. Back to how Input Data Mode had the tabs (short lock)
+  return idm_withLock_(() => {
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const temp = idm_sheetById_(ss, state.tempId);
+    state.hiddenIds = state.hiddenIds || [];
+    if (temp) { if (temp.isSheetHidden()) temp.showSheet(); temp.activate(); }
+    ss.getSheets().forEach(s => {
+      const id = s.getSheetId();
+      if (s.isSheetHidden() || before.visible.indexOf(id) !== -1 || (temp && id === temp.getSheetId())) return;
+      try {
+        s.hideSheet();
+        if (state.hiddenIds.indexOf(id) === -1) state.hiddenIds.push(id); // shown again at the end
+      } catch (e) { console.warn("Input Data Mode: could not hide " + s.getName() + ": " + e.message); }
+    });
+    state.dataChanged = false;
+    state.listsBuild = outcome;
+    idm_saveState_(state);
+    idm_log_("build before Your Lists: " + (outcome.ok ? "ok" : outcome.message));
+    return idm_view_(ss, state);
+  });
+}
+
 /** Brings the user back to the paste tab. */
 function idm_goToTempSheet() {
   return idm_withLock_(() => {
@@ -427,7 +499,19 @@ function idm_processTemp_(ss, state, temp, ignoreCutoff) {
 function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload) {
   const step = IDM_STEPS[state.step];
   if (step.manual || step.lists) return idm_view_(ss, state, { type: 'error', code: 'manual', message: "This step is filled in on the tab — no file needed.", fromUpload: true });
-  const fail = (code, message, extra) => idm_view_(ss, state, Object.assign({ type: 'error', code: code, message: message, fromUpload: fromUpload }, extra || {}));
+  // Wrong data pasted on the tab is cleared off it right away (owner's request 2026-11-12), so the
+  // right export can be pasted straight in; notice.cleared tells the sidebar. A missing Raw Data tab
+  // is not the paste's fault, so that paste stays.
+  const fail = (code, message, extra) => {
+    const notice = Object.assign({ type: 'error', code: code, message: message, fromUpload: fromUpload }, extra || {});
+    const temp = (!fromUpload && code !== 'noRaw') ? idm_sheetById_(ss, state.tempId) : null;
+    if (temp) {
+      idm_resetTempSheet_(temp);
+      notice.cleared = true;
+      idm_log_("wrong data (" + code + "): paste tab cleared");
+    }
+    return idm_view_(ss, state, notice);
+  };
 
   idm_log_("step " + state.step + " (" + step.key + "), " + values.length + " rows in, fromUpload=" + fromUpload + ", ignoreCutoff=" + ignoreCutoff);
   const found = idm_findHeader_(values);
@@ -439,7 +523,7 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   }
   if (found.step.key !== step.key) {
     return fail('wrongType', "This looks like <b>" + found.step.zone + "</b> data, but this step is <b>" + step.zone + "</b>. " +
-      "Clear it and paste the " + step.zone + " export (or Skip to the " + found.step.zone + " step).");
+      "Use the " + step.zone + " export instead (or Skip to the " + found.step.zone + " step).");
   }
 
   const mapped = idm_mapRows_(step, values, displays, found.row);
@@ -457,7 +541,8 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
       return fail('cutoff', "Some numbers look cut off by Excel, so the real digits are missing:<br>" + list +
         "<br><br>In Excel, press Ctrl+A (Mac: ⌘+A), then double-click the line between any two column letters to widen every column. " +
         "Then copy and paste again" + (fromUpload ? ", or upload the original downloaded file (not one re-saved from Excel)." : "."),
-        { canUseAnyway: true });
+        // A paste is cleared off the tab, so "Use it anyway" sends these rows back (idm_submitRows)
+        { canUseAnyway: true, heldRows: fromUpload ? null : idm_heldRows_(values, displays) });
     }
   }
 
@@ -468,7 +553,13 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   idm_log_("Raw Data written");
 
   state.results[step.key] = { rows: mapped.rows.length };
+  state.dataChanged = true; // step 5 builds first (idm_buildForLists)
   return idm_advance_(ss, state, { type: 'imported', message: "✅ " + step.zone + ": " + mapped.rows.length + " row(s) moved to Raw Data." });
+}
+
+/** A paste's cells for the sidebar to keep (Dates as the text shown: google.script.run can't send a Date). */
+function idm_heldRows_(values, displays) {
+  return values.map((r, i) => r.map((c, j) => (c instanceof Date) ? String((displays[i] || [])[j] || "") : c));
 }
 
 /** Header row = the row (in the first 20) that matches the most column names of one export. */
@@ -693,6 +784,7 @@ function idm_saveSiteClass_(ss, state) {
     const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yy");
     PropertiesService.getDocumentProperties().setProperty(IDM_SITECLASS_UPDATED_KEY, today);
     state.results[step.key] = { rows: classCount, saved: true };
+    state.dataChanged = true; // step 5 builds first (idm_buildForLists)
     return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + classCount + " class(es) saved to Raw Data." });
   }
 }
@@ -854,8 +946,10 @@ function idm_view_(ss, state, notice) {
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists },
-    // Step 5: your lists
+    // Step 5: your lists (+ whether the sidebar must build first, and how that build went)
     lists: step.lists ? od_listSummaries_(ss) : undefined,
+    needsBuild: step.lists ? idm_listsNeedBuild_(ss, state) : false,
+    listsBuild: step.lists ? (state.listsBuild || null) : null,
     tabName: temp ? temp.getName() : step.tab,
     lastUpdated: raw ? idm_lastUpdated_(raw, step) : null,
     // Finished / skipped steps (other than this one), for the "✅ "Student Data" Successful" lines under Option 1
@@ -1126,7 +1220,7 @@ function od_resetListTab_(sheet, name) {
   try { sheet.setFrozenRows(0); } catch (e) { /* none */ }
   sheet.getDataRange().clearDataValidations();
   sheet.clear();
-  od_writeBands_(sheet, name, "", "Paste your whole list (headers too) in the yellow box (A4) as values: Ctrl+Shift+V. The sidebar sets it up.", []);
+  od_writeBands_(sheet, name, "", "Paste your whole list (headers too) in the yellow box (A4) as values: Ctrl+Shift+V, or upload the file in the sidebar. The sidebar sets it up.", []);
   sheet.getRange(OD_HEADER_ROW, 1).setValue(OD_PLACEHOLDER).setBackground(OD_COLORS.paste).setFontWeight("bold")
     .setNote("Paste your whole list here (headers too). Title rows above the headers are fine.");
   sheet.setColumnWidth(1, 160);
@@ -2357,13 +2451,62 @@ function od_readPaste() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const w = od_wizardList_(ss);
     if (!w.list || !w.list.sheet) return { error: "This list's tab is gone.", gone: true };
-    const taken = od_takePaste_(w.list.sheet, w.list.name);
-    if (!taken) return od_pasteView_(w.list);
-    if (!taken.rows.length) return Object.assign(od_pasteView_(w.list), { error: "I found the header row, but no rows under it. Paste the whole list, headers and rows." });
-    w.list.updated = od_today_();
-    w.list.setup.title = taken.title;
-    od_saveLists_(ss, w.lists);
-    return od_setupView_(ss, w.list, { headers: taken.headers, rows: taken.rows }, taken);
+    return od_readTab_(ss, w, false);
+  });
+}
+
+/**
+ * The list's tab -> its column setup (shared by a paste and an upload). A list
+ * with no rows under the header is wrong data: the tab is emptied again (owner's
+ * request 2026-11-12), so the right list can go straight in.
+ */
+function od_readTab_(ss, w, fromUpload) {
+  const taken = od_takePaste_(w.list.sheet, w.list.name);
+  if (!taken) return od_pasteView_(w.list);
+  if (!taken.rows.length) {
+    od_resetListTab_(w.list.sheet, w.list.name);
+    return Object.assign(od_pasteView_(w.list), { cleared: true, error: "I found the header row, but no rows under it. " +
+      (fromUpload ? "Upload the whole list, headers and rows." : "Paste the whole list, headers and rows.") + " The tab was cleared, so you can try again." });
+  }
+  w.list.updated = od_today_();
+  w.list.setup.title = taken.title;
+  od_saveLists_(ss, w.lists);
+  return od_setupView_(ss, w.list, { headers: taken.headers, rows: taken.rows }, taken);
+}
+
+/** Uploaded CSV / TXT list (raw text, parsed here like Input Data Mode's uploads). */
+function od_uploadCsv(text) {
+  let rows;
+  try {
+    rows = idm_parseCsv_(text);
+  } catch (e) {
+    return { error: "That file couldn't be read as a CSV file (" + e.message + ")." };
+  }
+  return od_uploadRows(rows);
+}
+
+/**
+ * Uploaded list (CSV parsed above, or Excel read in the sidebar): written on the
+ * list's tab as plain text where a paste goes (row 4), then read exactly like a paste.
+ */
+function od_uploadRows(rows) {
+  return od_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const w = od_wizardList_(ss);
+    if (!w.list || !w.list.sheet) return { error: "This list's tab is gone.", gone: true };
+    const cells = (rows || []).map(r => (r || []).map(c => (c === null || c === undefined) ? "" : String(c)));
+    const width = cells.reduce((m, r) => Math.max(m, r.length), 0);
+    if (!width || !cells.some(r => r.some(c => c.trim() !== ""))) {
+      return Object.assign(od_pasteView_(w.list), { error: "That file is empty." });
+    }
+    const table = cells.map(r => r.concat(new Array(width - r.length).fill("")));
+    const sheet = w.list.sheet;
+    od_resetListTab_(sheet, w.list.name);
+    const needRows = OD_HEADER_ROW + table.length, needCols = width + 3;
+    if (sheet.getMaxRows() < needRows) sheet.insertRowsAfter(sheet.getMaxRows(), needRows - sheet.getMaxRows());
+    if (sheet.getMaxColumns() < needCols) sheet.insertColumnsAfter(sheet.getMaxColumns(), needCols - sheet.getMaxColumns());
+    sheet.getRange(OD_HEADER_ROW, 1, table.length, width).setNumberFormat("@").setValues(table);
+    return od_readTab_(ss, w, true);
   });
 }
 

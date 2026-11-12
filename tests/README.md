@@ -16,6 +16,7 @@ npm test         # runs everything below
 | `test_fixes.js` | Notes date range in the quick update, Sheet Lock ranges around the lookup box, Follow-up values (Migration + Contact Log tool), one nightly job per sheet, the "last night's rebuild didn't finish" message, the build lock, the quick-rebuild header row, ghost typists ignoring stray spaces. |
 | `test_sync.js` | The phone sync against a fake Google Contacts: normal sync, a failed save (nothing removed), Google's limit (15-minute pause, then resume), "more than half" (blocked when no one is there, removed after Yes), a long build before the sync, the owner's tall rows. |
 | `test_testdata.js` | The files in `test-data/` go through Input Data Mode (header found, right export, the broken file refused) and Your Lists (expected matched / best guesses / not found per list). |
+| `test_input_flow.js` | On a fake spreadsheet (`lib/fakesheet.js`): a wrong Input Data Mode paste is cleared off the tab ("Use it anyway" still works), a Your Lists upload (CSV / Excel rows) and a list with no rows, the build before step 5 (new sheet / new data; the tabs it shows are hidden again), the 👋 Welcome tab on a new copy. |
 | `render_sidebars.js` | Optional: screenshots of the Input Data Mode and Your Lists sidebars with sample data (needs Playwright + Chromium). Output in `tests/out/`. |
 
 `lib/load.js` loads the project's `.gs` files into one Node context with small fake Apps
@@ -28,5 +29,6 @@ const g = loadProject();              // a school's sheet; { owner: true } also 
 console.log(g.typistKey_("  Ann  Smith "));
 ```
 
-These tests cover plain logic only. Anything that reads or writes a sheet, opens a dialog or
-calls Google still has to be tried on a copy of the real sheet.
+These tests cover plain logic (and, in `test_input_flow.js`, a fake spreadsheet that only
+holds values). Formatting, dialogs, sidebars and anything that calls Google still have to be
+tried on a copy of the real sheet.
