@@ -117,3 +117,23 @@ gc.ownerNewCopyCheck_(fakeUi("NO"));                        // shown once per co
 assert.strictEqual(alerts.length, 3);
 assert(/z_MINE/.test(gc.newCopyChecklistText_()) && /App Scripts \(General\)/.test(gc.newCopyChecklistText_()));
 console.log("new copy checklist pop-up: ok");
+
+// Before Initial Setup an edit is undone with "🔒 Action Blocked", but not while any owner
+// test file (z_...) is in the project (owner's request 2026-11-12)
+{
+  const editBeforeSetup = opts => {
+    const alerts = [], cell = { v: "typed", setValue(v) { this.v = v; }, clearContent() { this.v = ""; } };
+    const g = loadProject(Object.assign({ extra: { SpreadsheetApp: { getUi: () => ({ alert: t => alerts.push(t), ButtonSet: {} }) } } }, opts));
+    g.onEdit({ range: cell, oldValue: undefined });
+    return { blocked: alerts.indexOf("🔒 Action Blocked") !== -1, value: cell.v, present: g.ownerTestFilesPresent_() };
+  };
+  const school = editBeforeSetup({});
+  assert(school.blocked && school.value === "" && !school.present, "a school's copy (no z_ files): blocked, the edit undone");
+  const owner = editBeforeSetup({ owner: true });
+  assert(!owner.blocked && owner.value === "typed" && owner.present, "z_MINE / z_NewCopy: no block");
+  const debug = editBeforeSetup({ debugFiles: true });
+  assert(!debug.blocked && debug.value === "typed", "only a z_ debug file left: no block");
+  const done = loadProject({ props: { SETUP_COMPLETE: "true" } });
+  assert.strictEqual(done.onEdit({ range: {} }), undefined, "after setup: never blocked");
+  console.log("Action Blocked only without z_ files: ok");
+}

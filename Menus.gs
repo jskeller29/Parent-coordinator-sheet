@@ -1313,13 +1313,25 @@ function buildWelcomeTab_(ss, opts) {
 
 // ==========================================
 // 4. SHEET LOCK & CUSTOM WARNING
+// Before Initial Setup, an edit is undone with "🔒 Action Blocked". Not while any
+// owner test file (z_...) is in the project (owner's request 2026-11-12): the owner's
+// sheet and test copies can be typed in before setup; a school's copy (no z_ files)
+// is still blocked.
 // ==========================================
+function ownerTestFilesPresent_() {
+  return typeof ownerHooks_ === "function"                  // z_MINE
+      || typeof addContactLogDebugMenuItem_ === "function"  // z_ContactLogDebug
+      || typeof idm_debugEnabled_ === "function"            // z_InputDataDebug
+      || typeof ownerNewCopyCheck_ === "function";          // z_NewCopy
+}
+
 function onEdit(e) {
   const props = PropertiesService.getDocumentProperties();
   
   if (props.getProperty('SETUP_COMPLETE') === 'true') {
     return; // Normal edits completely bypass the setup lock block below
   }
+  if (ownerTestFilesPresent_()) return; // owner's sheet / test copies: no block
 
   if (e && e.range) {
     if (e.oldValue !== undefined) e.range.setValue(e.oldValue); 

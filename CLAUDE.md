@@ -227,6 +227,11 @@ copies; shared code reaches them only through typeof checks): z_ContactLogDebug.
 idm_debugSheets_). With it every Input Data Mode sidebar reply carries its step log and the sidebar shows the Debug
 panel; without it idm_log_ does nothing and the panel stays hidden. Input Data.gs reaches it only through typeof
 checks. Keep it on the owner's sheet while testing; DELETE it from the master template / schools' copies.
+Before Initial Setup the simple onEdit (Menus.gs) undoes every edit with "🔒 Action Blocked", EXCEPT while any z_ file
+is in the project (ownerTestFilesPresent_: typeof ownerHooks_ / addContactLogDebugMenuItem_ / idm_debugEnabled_ /
+ownerNewCopyCheck_; owner's request 2026-11-12): the owner's sheet and test copies can be typed in before setup; a
+school's copy (no z_ files) is still blocked. tests/lib/load.js: the default load = no z_ files at all (owner: true adds
+z_MINE + z_NewCopy, debugFiles: true the two debug files).
 
 z_NewCopy.gs (owner only, 2026-11-12): the copy part of DEPLOY.md as a pop-up on the first open of a NEW COPY of the
 owner's sheet, and as 🐞 Debug → 📋 New Copy Checklist (HTML dialog, ticks in doc property OWNER_NEW_COPY_TICKS;
@@ -399,6 +404,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   owner sheet also z_MINE. In the Version Tracker: name the headers D "Blank Copy", E "Example", F "Document", clear
   the old values in E (the old "Blank Link" column, or they would be read as the example), fill D/E/F in the newest
   row; then Reset to Display Mode on the master template (the Welcome tab gets the example row).
+- No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,
 FULL_MENU_UNLOCKED isn't "true", Input Data Mode is off and the Student List is built. Called at the end of

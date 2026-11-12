@@ -2,7 +2,8 @@
 // scope too), with small fake Apps Script services. For testing plain logic offline:
 // nothing here talks to Google.
 //   loadProject({ owner, extra, props })
-//     owner: true = also load z_MINE.gs (the owner's sheet); default = a school's sheet
+//     owner: true = also load z_MINE.gs + z_NewCopy.gs (the owner's sheet); default = a school's sheet (no z_ files)
+//     debugFiles: true = also load the owner's z_ContactLogDebug.gs / z_InputDataDebug.gs
 //     extra: globals to add / replace (e.g. a fake ScriptApp or People)
 //     props: starting document properties
 // The returned context has every global function and var (ctx.od_index_(...)),
@@ -44,7 +45,7 @@ function loadProject(opts) {
   vm.createContext(ctx);
   fs.readdirSync(ROOT)
     .filter(f => f.endsWith('.gs'))
-    .filter(f => opts.owner || f !== 'z_MINE.gs')
+    .filter(f => opts.owner || !/^z_(MINE|NewCopy)\.gs$/.test(f))
     .filter(f => opts.debugFiles || !/^z_(ContactLogDebug|InputDataDebug)\.gs$/.test(f))
     .forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f }));
   // Top-level const / let (not properties of ctx, unlike var and function): ctx.__get("NAME")
