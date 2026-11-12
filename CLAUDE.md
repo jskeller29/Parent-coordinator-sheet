@@ -105,8 +105,10 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     "Diana P.", first name only, a guardian's name -> their children) keep their reason and give a floor (90 / 88 /
     78 / 60 / 85). Boosts: parent's name fits +5, same phone / email +6, same class +4 (capped 99). Candidates =
     people whose LAST name starts with a letter of the row's name (byLastInitial; one-word names: any part). Top two
-    within OD_CONF_TIE_ (4) points = "pick one" (with %); top >= OD_CONF_MIN_ (60) = best guess (+ up to 2 "also
-    close"); else "not found" with the closest 3 >= 50% as suggestions. Levels: high 90+ / medium 75+ / low 60+.
+    within OD_CONF_TIE_ (4) points = "pick one" (with %), but only from medium (75) up: a LOW tie (siblings sharing a
+    last name with someone not on the list) = "not found" + suggestions; top >= OD_CONF_MIN_ (60) = best guess (+ up
+    to 2 "also close"); else "not found" with the closest 3 >= 50% as suggestions. Column guess: a list with parent
+    first + last columns and a first-name-only child column is a GUARDIAN list (od_guessRoles_, stats.multi). Levels: high 90+ / medium 75+ / low 60+.
     Never used without a person: guesses only become matches as Your picks (the build only uses "ok" rows). Sidebar:
     % chips, "Accept the N high-confidence" + "Accept all N" buttons, the tab's ✔ Matched column shows the %.
     Tested offline on sample names (typos, swapped order, nicknames, initials, siblings); 500 unmatched rows x 1,500
@@ -486,6 +488,12 @@ Workflow:
   (test_matching, test_fixes, test_sync with a fake People API); render_sidebars.js = optional Playwright screenshots.
   lib/load.js loads the .gs files into one Node context with fake Apps Script services. Run them before every push
   and add a test for logic you change; they don't cover sheet reads / writes / dialogs (try those on a copy).
+- TEST DATA (test-data/, 2026-11-12): fake exports for every Input Data Mode step (ATS incl. a "next month" file with
+  2 new / 1 left and a broken one with cut-off numbers, Parent Square, NYCSA, Site and Class) and 4 Your Lists files
+  (bus routes = student list with title rows / typos / initials / wrong OSIS, PTA = guardian list, field trip =
+  first + last columns, after school = "LAST, FIRST" + nicknames), each .csv + .xlsx, plus "PC Tracker test data.zip".
+  Same 18 students as Regenerate's fake data (make_test_data.py reads them from Regenerate.gs; needs openpyxl).
+  README.md there says what each file should show; tests/test_testdata.js checks those counts.
 - DEPLOY.md (repo root): the owner's one-page checklist (files to delete, the files each copy should have, manifests,
   after-deploy steps, a quick test, going live). Keep it in step when files are added / renamed.
 - Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets

@@ -1685,6 +1685,10 @@ function od_decideRanked_(ranked, keyOf, label, word, note) {
   const scores = {};
   good.slice(0, 5).forEach(r => { scores[keyOf(r.item)] = od_pct_(r.score); });
   const close = good.filter(r => od_pct_(top.score) - od_pct_(r.score) < OD_CONF_TIE_);
+  // "Pick one" only when they are at least medium: two LOW ties are usually siblings who only share
+  // the last name with someone who isn't on the list ("Tina Belcher" vs Louise / Gene): not found,
+  // with them as the closest suggestions (test data 2026-11-12)
+  if (close.length > 1 && od_pct_(top.score) < OD_CONF_MEDIUM_) return null;
   if (close.length > 1) {
     return od_pick_(close.slice(0, 5).map(r => keyOf(r.item)), close.length + " " + word + " are about as close to “" + label + "”" + note, scores);
   }
@@ -2065,7 +2069,7 @@ function od_columnStats_(headers, rows, idx) {
   return headers.map((h, i) => {
     const vals = rows.map(r => toText_(r[i])).filter(Boolean);
     const n = vals.length || 1;
-    let osisLike = 0, osisKnown = 0, phoneLike = 0, emailLike = 0, studentKnown = 0, guardianKnown = 0, classKnown = 0, comma = 0;
+    let osisLike = 0, osisKnown = 0, phoneLike = 0, emailLike = 0, studentKnown = 0, guardianKnown = 0, classKnown = 0, comma = 0, multi = 0;
     vals.forEach(v => {
       const digits = v.replace(/\D/g, "");
       if (/^[\d\s-]+$/.test(v) && digits.length >= 6 && digits.length <= 9) { osisLike++; if (idx.byOsis.has(normalizeOsis_(v))) osisKnown++; }
@@ -2073,6 +2077,7 @@ function od_columnStats_(headers, rows, idx) {
       if (v.indexOf("@") !== -1) emailLike++;
       if (v.indexOf(",") !== -1) comma++;
       const parts = od_nameParts_(v);
+      if (parts && parts.tokens.length >= 2) multi++; // a full name, not just a first name
       if (parts && /[a-z]/i.test(v) && v.indexOf("@") === -1) {
         const key = od_tokenKey_(parts.tokens);
         if (idx.byNameKey.has(key) || (parts.last && (idx.byLast.get(parts.last) || []).some(st => od_firstLike_(parts.first, st.first)))) studentKnown++;
@@ -2082,7 +2087,7 @@ function od_columnStats_(headers, rows, idx) {
     });
     return { col: i + 1, header: h, n: vals.length, osisLike: osisLike / n, osisKnown: osisKnown, osisKnownShare: osisKnown / n,
              phone: phoneLike / n, email: emailLike / n, student: studentKnown / n, guardian: guardianKnown / n, cls: classKnown / n, comma: comma / n,
-             samples: vals.slice(0, 3) };
+             multi: multi / n, samples: vals.slice(0, 3) };
   });
 }
 
@@ -2135,7 +2140,14 @@ function od_guessRoles_(headers, rows, idx) {
   const cls = pick(s => s.cls >= 0.3 && /class|homeroom|official|section|room/.test(H(s)), s => s.cls);
   if (cls) roles["class"] = cls.col;
 
-  const by = (roles.osis || roles.student) ? "student" : (roles.guardian || roles.phone || roles.email) ? "guardian" : "student";
+  let by = (roles.osis || roles.student) ? "student" : (roles.guardian || roles.phone || roles.email) ? "guardian" : "student";
+  // A guardian list that also names the child by first name only ("Parent First | Parent Last | Child"):
+  // the parent is who the row is (test data 2026-11-12: the PTA list was guessed as a student list)
+  if (by === "student" && !roles.osis && roles.guardian && roles.student && roles.student.col) {
+    const childCol = stats[roles.student.col - 1];
+    const guardianFull = roles.guardian.first || (stats[roles.guardian.col - 1] || {}).multi >= 0.5;
+    if (childCol && childCol.multi < 0.5 && guardianFull) by = "guardian";
+  }
   return { roles: roles, by: by, stats: stats };
 }
 

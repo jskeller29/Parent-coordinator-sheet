@@ -1,7 +1,7 @@
 // Runs every offline test (node tests/run_all.js, or `npm test` in tests/).
 const { spawnSync } = require('child_process');
 const path = require('path');
-const tests = ['check.js', 'test_matching.js', 'test_fixes.js', 'test_sync.js'];
+const tests = ['check.js', 'test_matching.js', 'test_fixes.js', 'test_sync.js', 'test_testdata.js'];
 let failed = 0;
 for (const t of tests) {
   const r = spawnSync(process.execPath, [path.join(__dirname, t)], { encoding: 'utf8' });
