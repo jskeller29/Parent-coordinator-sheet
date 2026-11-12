@@ -173,10 +173,18 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
 
 Owner testing files (2026-11-12; keep them on the owner's sheet, DELETE them from the master template / schools'
 copies; shared code reaches them only through typeof checks): z_ContactLogDebug.gs + z_ContactLogDebugSidebar.html
-(above) and z_InputDataDebug.gs: the Input Data Mode debug log (idm_debugEnabled_ +
+(above), z_NewCopy.gs (see below) and z_InputDataDebug.gs: the Input Data Mode debug log (idm_debugEnabled_ +
 idm_debugSheets_). With it every Input Data Mode sidebar reply carries its step log and the sidebar shows the Debug
 panel; without it idm_log_ does nothing and the panel stays hidden. Input Data.gs reaches it only through typeof
 checks. Keep it on the owner's sheet while testing; DELETE it from the master template / schools' copies.
+
+z_NewCopy.gs (owner only, 2026-11-12): the copy part of DEPLOY.md as a pop-up on the first open of a NEW COPY of the
+owner's sheet, and as 🐞 Debug → 📋 New Copy Checklist (HTML dialog, ticks in doc property OWNER_NEW_COPY_TICKS;
+endpoints ownerNewCopySetTick / ownerNewCopyClearTicks). Called only from z_MINE.gs ownerAddMenus_ (2 typeof-guarded
+lines, after addToUi). Doc properties don't travel with a copy, so ownerNewCopyCheck_ asks once "Is this your MAIN
+sheet?" (Yes -> OWNER_HOME_SHEET_ID; No -> checklist, OWNER_COPY_CHECKLIST_SHOWN = that copy's ID); the constant
+OWNER_HOME_SHEET_ID_ skips the question on the main sheet. Plain ui.alert because a new copy only has the simple
+onOpen (no HtmlService there). Keep NEW_COPY_STEPS_ in step with DEPLOY.md.
 
 Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Never copy it into other schools' sheets. It defines ownerHooks_(); shared code calls getOwnerHooks_() (Core.gs),
@@ -307,7 +315,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
      Z#GuideSidebar, Z#ContactLogDebug, Z#ContactLogDebugSidebar.
   2. ADD the script file "Input Data" and the HTML files InputDataSidebar, YourListsSidebar, GettingStartedSidebar
      (HTML file names must match exactly, without ".html"). Owner's sheet only: z_ContactLogDebug (script) +
-     z_ContactLogDebugSidebar (HTML) and z_InputDataDebug (script); never on the master template / schools.
+     z_ContactLogDebugSidebar (HTML), z_InputDataDebug and z_NewCopy (scripts); never on the master template / schools.
   3. RE-PASTE Core, Build, Edits, Menus (owner sheet: also z_MINE); Regenerate too if the two 2026-11-11 steps above
      are not deployed yet. Contacts Sync, Sheet Lock, the other HTML files, Z#ContactLog / Z#ContactLogSidebar and the
      manifest are unchanged by the coalesce.

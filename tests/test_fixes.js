@@ -98,3 +98,22 @@ fakeRows.forEach(r => written.push(r[9]));
 const bad = written.filter(v => !isOption(v));
 assert.deepStrictEqual(bad, [], "Follow-up values that are not dropdown options: " + JSON.stringify(bad));
 console.log("follow-up values are real options: ok (" + written.length + " checked)");
+
+// z_NewCopy.gs: the pop-up on a new copy of the owner's sheet
+const gc = loadProject({ owner: true, extra: { SpreadsheetApp: { getActiveSpreadsheet: () => ({ getId: () => gc.__sheetId }) } } });
+const alerts = [];
+const fakeUi = answer => ({ ButtonSet: { YES_NO: "YN", OK: "OK" }, Button: { YES: "YES", NO: "NO" },
+  alert: (title, text, buttons) => { alerts.push(title); return buttons === "YN" ? answer : "OK"; } });
+gc.__sheetId = "MAIN";
+gc.ownerNewCopyCheck_(fakeUi("YES"));                       // first open of the main sheet: asked, answered Yes
+assert.deepStrictEqual(alerts, ["📋 New copy?"]);
+gc.ownerNewCopyCheck_(fakeUi("YES"));                       // never asked again there
+assert.strictEqual(alerts.length, 1);
+gc.__props.OWNER_HOME_SHEET_ID = undefined; delete gc.__props.OWNER_HOME_SHEET_ID; // a copy: Google didn't copy the settings
+gc.__sheetId = "COPY1";
+gc.ownerNewCopyCheck_(fakeUi("NO"));                        // asked, answered No -> the checklist
+assert.deepStrictEqual(alerts.slice(1), ["📋 New copy?", "📋 New copy: what to change"]);
+gc.ownerNewCopyCheck_(fakeUi("NO"));                        // shown once per copy
+assert.strictEqual(alerts.length, 3);
+assert(/z_MINE/.test(gc.newCopyChecklistText_()) && /App Scripts \(General\)/.test(gc.newCopyChecklistText_()));
+console.log("new copy checklist pop-up: ok");

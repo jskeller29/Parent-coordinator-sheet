@@ -22,7 +22,7 @@ A file from an older version left in the project = the project won't load
 | | Your own sheet | Master template + schools |
 |---|---|---|
 | **Scripts** | Core, Build, Edits, Menus, Input Data, Contacts Sync, Sheet Lock, Regenerate, Z#ContactLog | same |
-| **Your scripts** | z_MINE, z_ContactLogDebug, z_InputDataDebug | **none** (never copy these) |
+| **Your scripts** | z_MINE, z_ContactLogDebug, z_InputDataDebug, z_NewCopy | **none** (never copy these) |
 | **Pages** | Styles, SettingsDialog, ProgressSidebar, NewStudentDialog, ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog, InputDataSidebar, YourListsSidebar, GettingStartedSidebar, Z#ContactLogSidebar | same |
 | **Your pages** | z_ContactLogDebugSidebar | **none** |
 | **Manifest** (`appsscript.json`) | contents of `App Scripts (Mine).Json` | contents of `App Scripts (General).Json` |
@@ -32,6 +32,10 @@ To see `appsscript.json`: Project Settings (gear) → tick
 
 Paste each file's full contents from Test-Version (replace everything in it), and create
 the ones that don't exist yet with the same name (script: + → Script; page: + → HTML).
+
+**Making a new copy of your sheet** (for a school, the master template or a test): open the
+copy and a pop-up lists what to change in it (z_NewCopy.gs, your sheet only). The same list
+with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 
 ## 3. After pasting
 1. Save, then reload the spreadsheet.

@@ -61,7 +61,7 @@ const OWNER_DEBUG_PROP_ = "OWNER_DEBUG_TOASTS";
 let ownerDebugDepth_ = 0; // only the outermost action reports
 
 function ownerAddMenus_(ui) {
-  ui.createMenu("🐞 Debug")
+  const menu = ui.createMenu("🐞 Debug")
     .addItem("🧪 Reset + Load Fake Data", "ownerMenuResetAndLoadFakeData")
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
@@ -69,8 +69,12 @@ function ownerAddMenus_(ui) {
     .addSeparator()
     .addItem("🔧 Fix Dropdown Criteria (Student List → Backend)", "ownerMenuFixDropdownCriteria")
     .addSeparator()
-    .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug")
-    .addToUi();
+    .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug");
+  // z_NewCopy.gs (owner only): what to change in a new copy of this sheet
+  if (typeof ownerMenuNewCopyChecklist === "function") menu.addSeparator().addItem("📋 New Copy Checklist", "ownerMenuNewCopyChecklist");
+  menu.addToUi();
+  // ... and the pop-up on a new copy's first open (after every menu is in place)
+  if (typeof ownerNewCopyCheck_ === "function") ownerNewCopyCheck_(ui);
 }
 
 function ownerMenuResetAndLoadFakeData() {
