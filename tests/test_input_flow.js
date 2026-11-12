@@ -309,6 +309,22 @@ function listsSheet() {
   g.ownerMenuMyLinks();
   Object.keys(g.__get("GUIDE_LINKS")).forEach(k => assert(dialog.indexOf(k) !== -1, 'My Links lists ' + k));
   assert(/YOUR LINKS/.test(dialog) && /guide\.pdf/.test(dialog), 'My Links: where to change them + the newest guide file');
+  // The guide folder: a date in the NAME ranks first, else the last change; My Links rescans and lists them
+  const gfile = (name, changed) => ({ getName: () => name, getUrl: () => "https://drive.example/" + encodeURIComponent(name),
+    getLastUpdated: () => changed, getId: () => name });
+  const gfiles = [gfile("PC_Tracker_User_Guide.pdf", new Date(2026, 10, 12, 14, 0)),     // uploaded today, no date in the name
+                  gfile("PC Tracker User Guide 11/20/26", new Date(2026, 10, 1)),        // a LATER date in its name
+                  gfile("Old guide.pdf", new Date(2026, 8, 1))];
+  g.DriveApp = { getFolderById: () => ({ getFiles: () => { let i = 0; return { hasNext: () => i < gfiles.length, next: () => gfiles[i++] }; } }) };
+  const ranked = g.guideFolderFiles_();
+  assert.strictEqual(ranked[0].name, "PC Tracker User Guide 11/20/26", 'a date in the name beats a newer upload');
+  assert.strictEqual(ranked[1].name, "PC_Tracker_User_Guide.pdf");
+  assert.strictEqual(g.scanGuideFolder_(), ranked[0].url);
+  let rescanned = false;
+  g.refreshResolvedLinks_ = () => { rescanned = true; return {}; };
+  g.ownerMenuMyLinks();
+  assert(rescanned, 'My Links looks again instead of using the 6-hour copy');
+  assert(/PC Tracker User Guide 11\/20\/26/.test(dialog) && /date in the name/.test(dialog), 'My Links lists the guide folder in its order');
   // The YOUR LINKS box is the first thing in Menus.gs
   const src = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
   assert(src.indexOf('YOUR LINKS') < src.indexOf('function '), 'links box at the top of Menus.gs');

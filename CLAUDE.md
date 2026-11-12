@@ -464,6 +464,11 @@ Backend D2:E5 "TEMPLATE LINKS" = the tracker's OWN saved copy (D3:E4 BLANK / upg
 folder scan, D5:E5 the guide link): written after every successful scan, read only when a sheet can't read the folders.
 Never the place to paste links. A second "GUIDE link" row at D6:E6 (an older layout) is read by nothing; saving the
 guide link clears it (saveGuideLinkToVersionSheet_).
+Guide link = the newest file DIRECTLY in the guide folder (guideFolderFiles_ / scanGuideFolder_: a MM/DD/YY date in the
+NAME counts first, else the last change; ties: the one Drive lists last), remembered 6 h (script cache GUIDE_LINK_V1;
+the nightly refreshResolvedLinks_ clears it). 🔗 My Links and Reset to Display Mode's Welcome tab rescan first
+(refreshResolvedLinks_), and My Links lists the folder's files in that order with why (owner 2026-11-12: "newest file"
+had opened an old guide right after an upload, from the 6-hour copy).
 🐞 Debug → 📦 Make Release Copies (ownerMenuMakeAllCopies, z_MINE.gs; was "Make All 3 Copies"): a pop-up makes
 "… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data") and "… - (BLANK)" (B3 = No + display reset), ONE
 google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one

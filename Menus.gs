@@ -556,7 +556,7 @@ function linkList_() {
     { kind: "doc", name: "settingsDoc", what: "What each setting does", where: "Getting Started (step 3)", url: L.settingsDoc },
     { kind: "doc", name: "contactLogDoc", what: "How to log a parent contact", where: "Getting Started (step 4)", url: L.contactLogDoc },
     { kind: "folder", name: "GUIDE_FOLDER_ID", what: "User Guide folder (newest file = the guide" + (guide && guide !== GUIDE_FOLDER_URL ? ")" : "; no file found)"),
-      where: "📖 Open User Guide, Welcome tab, Getting Started", url: GUIDE_FOLDER_URL, now: guide },
+      where: "📖 Open User Guide, Welcome tab, Getting Started", url: GUIDE_FOLDER_URL, now: guide, files: guideFolderFiles_().slice(0, 5) },
     { kind: "folder", name: "TEMPLATE_FOLDER_ID", what: "Template folder ((BLANK) / (MIGRATE) files)", where: "End of Year Rollover, 📖 Open User Guide", url: TEMPLATE_FOLDER_URL },
     { kind: "form", name: "BUG_REPORT_FORM_URL", what: "Bug report form", where: "🐞 Report a Bug, Welcome tab, Getting Started", url: BUG_REPORT_FORM_URL },
     { kind: "sheet", name: "VERSION_TRACKER_ID", what: "Version Tracker", where: "🔔 Check for Updates", url: "https://docs.google.com/spreadsheets/d/" + VERSION_TRACKER_ID }
@@ -1089,7 +1089,7 @@ function showWelcomeAfterReset_(ss) {
   const old = ss.getSheetByName(WELCOME_TAB_NAME);
   if (old && old.isSheetHidden()) ss.deleteSheet(old); // an older one the reset didn't delete
   let guideUrl = GUIDE_FOLDER_URL;
-  try { guideUrl = getGuideLink_() || GUIDE_FOLDER_URL; } catch (e) { console.warn("Guide link: " + e.message); }
+  try { guideUrl = refreshResolvedLinks_().guide || GUIDE_FOLDER_URL; } catch (e) { console.warn("Guide link: " + e.message); }
   if (!ss.getSheetByName(WELCOME_TAB_NAME)) buildWelcomeTab_(ss, { guideUrl: guideUrl });
   try {
     showWelcomeTabOnly_(ss);
@@ -3498,19 +3498,29 @@ function getGuideLink_() {
  * "" on any failure (no access / offline / empty folder).
  */
 function scanGuideFolder_() {
+  const files = guideFolderFiles_();
+  return files.length ? files[0].url : "";
+}
+
+/**
+ * The files directly in the guide folder, newest first, as the tracker ranks them:
+ * a date in the NAME (MM/DD/YY, e.g. "User Guide 11/12/26") counts first, else the
+ * file's last change (fileSortKey_). On a tie the file Drive lists last wins, as before.
+ * [{ name, url, ms, byName }]; [] when the folder can't be read.
+ */
+function guideFolderFiles_() {
   try {
-    const folder = DriveApp.getFolderById(GUIDE_FOLDER_ID);
-    const files = folder.getFiles();
-    let newest = null, newestKey = -1;
-    while (files.hasNext()) {
+    const files = DriveApp.getFolderById(GUIDE_FOLDER_ID).getFiles();
+    const out = [];
+    for (let i = 0; files.hasNext(); i++) {
       const f = files.next();
-      const key = fileSortKey_(f.getName(), f);
-      if (key >= newestKey) { newest = f; newestKey = key; }
+      const name = f.getName();
+      out.push({ name: name, url: f.getUrl(), ms: fileSortKey_(name, f), byName: /\d{1,2}\/\d{1,2}\/\d{2,4}/.test(name), i: i });
     }
-    return newest ? newest.getUrl() : "";
+    return out.sort((a, b) => (b.ms - a.ms) || (b.i - a.i));
   } catch (e) {
     console.error("scanGuideFolder_ failed (folder access?): " + e.message);
-    return "";
+    return [];
   }
 }
 

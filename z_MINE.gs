@@ -234,12 +234,19 @@ function ownerMakeCopy(kind) {
 function ownerMenuMyLinks() {
   const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const icon = { video: "🎬", doc: "📄", folder: "🗂️", form: "🐞", sheet: "🔔" };
+  // Look again now: the guide / template links are otherwise remembered for up to 6 hours,
+  // so right after a new upload "newest file" could still be the old one
+  try { refreshResolvedLinks_(); } catch (e) { console.warn("Links not refreshed: " + e.message); }
+  const tz = Session.getScriptTimeZone();
+  const filesList = files => !files || !files.length ? "" :
+    `<ol class="files">${files.map((f, i) => `<li${i ? "" : ' class="top"'}><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>` +
+      ` <span>${f.byName ? "date in the name" : "changed " + Utilities.formatDate(new Date(f.ms), tz, "MMM d, h:mm a")}</span></li>`).join("")}</ol>`;
   const rows = linkList_().map(l => {
     const value = l.url
       ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">Open</a>` +
         (l.now && l.now !== l.url ? ` · <a href="${esc(l.now)}" target="_blank" rel="noopener">newest file</a>` : "")
       : `<span class="no">${l.kind === "video" ? "Not set: no button" : "Not set: the User Guide opens"}</span>`;
-    return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div></td>
+    return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div>${filesList(l.files)}</td>
       <td class="w">${esc(l.where)}</td><td class="v">${value}</td></tr>`;
   }).join("");
   const html = include_('Styles') + `
@@ -251,11 +258,18 @@ function ownerMenuMyLinks() {
       .w { color: var(--muted); font-size: 12.5px; }
       .v { white-space: nowrap; }
       .no { color: var(--warn); font-size: 12.5px; }
+      .files { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+      .files li.top a { font-weight: 600; }
+      .files span { color: var(--faint); }
+      .why { font-size: 12.5px; color: var(--muted); }
     </style>
     <div class="dlg">
       <p><b>To add or change a link:</b> Extensions → Apps Script → <b>Menus</b> → the <b>📌 YOUR LINKS</b> box at the very top.
         Paste the link between the quote marks "" next to the name in grey, save, then paste Menus into the master template
         and run Reset to Display Mode there (the Welcome tab is only made again by a reset).</p>
+      <p class="why">The User Guide is the file at the top of the guide folder's list below. A date in a file's name
+        (like 11/12/26) counts before when it was changed, so a file named with a later date stays on top. Files in a
+        subfolder don't count. Other sheets take up to 6 hours to see a new guide (or until their next nightly run).</p>
       <table>${rows}</table>
     </div>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(720).setHeight(600), "🔗 My Links");
