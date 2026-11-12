@@ -502,3 +502,25 @@ needs two clicks first time; repo manifest lacks script.send_mail so the owner e
 purgeDischargedStudents and the Hide Discharged filter take ROW 1 as the header (they found no Status column while
 the header was on row 4; since 2026-11-11 it is on row 1, so they should work now: untested); generateFakeLegacyData (owner) writes 47 columns into a new
 26-column "Old Phone Contacts" tab, so it fails right after a reset.
+More bugs found in the 2026-11-11 review (not fixed; owner to pick):
+- Contacts sync: searchAndUpsertSingleContact (and ownerUpsertContact_) catch EVERY error and return null, so a failed
+  row's contact stays in the stale map and is DELETED in the cleanup phase; the "quota -> pause 15 min" branch in
+  syncToGoogleContactsRun_ is unreachable (on a quota hit every remaining row fails and is deleted). The 50% check
+  only runs when startRow === 1 and not on the owner's sheet.
+- Full Sync / nightly: the sync's 4.5-min budget starts after the build in the same execution, so build + sync can
+  pass the 6-min limit; a killed run saves no SYNC_START_ROW, so the next run starts at row 1 again (the last rows and
+  the cleanup may never run).
+- Sync speed / quota: every row not in the 6 h cache (every row at night) pages through ALL the user's contacts.
+- A Settings notes date range + the quick update (no range) makes every row delete / paste / cleared row see > 25
+  students changed -> full Combined + Phone Contacts rebuild each time.
+- startResilientSyncRun_ has no try/catch: a build error leaves SYNC_UI_STATE "building" for 6 h (Full Sync then
+  starts nothing until Cancel -> Start new run). No LockService around builds / syncs (nightly, resume trigger and
+  a manual run can overlap; two syncs can create duplicate contacts).
+- Triggers are per user: anyone saving Settings (manageNightlyTrigger_) or running setup gets their own nightly (and
+  setup: onEdit / onOpen) trigger -> double builds, every edit handled twice, contacts synced to a second account.
+- Z#ContactLog: follow-ups still use "Yes" / "No" (cl_getFollowups /^yes/, cl_saveInteraction, Resolve), but N's
+  options are "Followup Needed" ... -> the Follow-ups view is always empty and New Interaction writes invalid N values.
+- Sheet Lock warns on everything below END, incl. the lookup box cells typed into (check on the sheet).
+- Input Data Mode: after the Site / Class step a paste step keeps its dropdowns past the data rows and hidden column
+  Z (clearDataValidations on getDataRange only). Migration copies old Follow-up values (Yes / No / Yes - Important)
+  as they are. Every edit on a row with no OSIS waits Utilities.sleep(1000). Owner sync counts every update as edited.
