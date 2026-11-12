@@ -164,16 +164,22 @@ function ownerMenuMakeAllCopies() {
       .row.fail .st { color: var(--danger); }
       .foot { display: flex; justify-content: flex-end; gap: 8px; }
       #after { display: none; }
+      .lk { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+      .lk span { font-weight: 700; width: 12px; }
+      .lk input { flex: 1; font-size: 12px; }
     </style>
     <div class="dlg">
       <p>Makes two copies of this sheet in the same Drive folder, one after the other (a few minutes in all). <b>This sheet is not changed.</b></p>
       ${rows}
       <div id="after" class="notice">
-        <p style="margin:0 0 6px"><b>Version date in both: <span id="stamp"></span>.</b> Put that date in the Version Tracker
-        (column A) when you add the release, or new copies will think they are out of date.</p>
-        <b>Before you share them:</b> in each copy, delete the z_ files in Extensions → Apps Script and use the General manifest.
-        Move Blank into the template folder, and any old (MIGRATE) file out of it ("(BLANK)" in the name is how the
-        "make a copy" links find them).
+        <p style="margin:0 0 6px"><b>Version date in both: <span id="stamp"></span>.</b> Add a row to the Version Tracker:
+        A = that date (or new copies will think they are out of date), D "Blank Copy" and E "Example" = these links
+        (F "Document" = the User Guide, when it changed):</p>
+        <div class="lk"><span>D</span><input readonly id="l_blank" onclick="this.select()" placeholder="(no copy made)"></div>
+        <div class="lk"><span>E</span><input readonly id="l_example" onclick="this.select()" placeholder="(no copy made)"></div>
+        <p style="margin:6px 0 0"><b>Before you share them:</b> in each copy, delete the z_ files in Extensions → Apps Script
+        and use the General manifest. Share both "Anyone with the link can view". Move Blank into the template folder too
+        (the backup when the tracker can't be read; "(BLANK)" in the name is how it is found).</p>
       </div>
       <div class="foot"><button type="button" class="btn sec" id="closeBtn" onclick="google.script.host.close()">Cancel</button>
         <button type="button" class="btn pri" id="goBtn" onclick="start()">Make the 2 copies</button></div>
@@ -193,6 +199,7 @@ function ownerMenuMakeAllCopies() {
           .withSuccessHandler(r => {
             el('r_' + k).className = 'row done'; el('c_' + k).textContent = '✓';
             if (r.stamp) el('stamp').textContent = r.stamp;
+            if (r.trackerLink) el('l_' + k).value = r.trackerLink;
             el('s_' + k).innerHTML = '<a href="' + r.url + '" target="_blank" rel="noopener">Open ' + r.name.replace(/</g, '&lt;') + '</a>';
             next(i + 1);
           })
@@ -207,7 +214,11 @@ function ownerMenuMakeAllCopies() {
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(560), "📦 Make Release Copies");
 }
 
-/** One copy for the pop-up above: "example" | "blank". Returns { name, url, stamp }. */
+/**
+ * One copy for the pop-up above: "example" | "blank". Returns { name, url, stamp, trackerLink }:
+ * trackerLink = what goes in the Version Tracker (Blank = its /copy link, column D;
+ * Example = its link, column E).
+ */
 function ownerMakeCopy(kind) {
   const c = OWNER_COPY_KINDS_[kind];
   if (!c) throw new Error("Unknown copy: " + kind);
@@ -223,7 +234,9 @@ function ownerMakeCopy(kind) {
     }
     const stamp = ownerStampVersion_(copy, migrate); // both: today's version date + B3 = No
     SpreadsheetApp.flush();
-    return { name: copy.getName(), url: copy.getUrl(), stamp: stamp };
+    const base = "https://docs.google.com/spreadsheets/d/" + copy.getId();
+    return { name: copy.getName(), url: copy.getUrl(), stamp: stamp,
+             trackerLink: kind === "blank" ? base + "/copy" : base + "/edit?usp=sharing" };
   });
 }
 
@@ -233,7 +246,7 @@ function ownerMakeCopy(kind) {
 // ----------------------------------------------------------------------
 function ownerMenuMyLinks() {
   const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const icon = { video: "🎬", doc: "📄", folder: "🗂️", form: "🐞", sheet: "🔔" };
+  const icon = { video: "🎬", doc: "📄", folder: "🗂️", form: "🐞", sheet: "🔔", tracker: "📊" };
   // Look again now: the guide / template links are otherwise remembered for up to 6 hours,
   // so right after a new upload "newest file" could still be the old one
   try { refreshResolvedLinks_(); } catch (e) { console.warn("Links not refreshed: " + e.message); }
@@ -245,7 +258,7 @@ function ownerMenuMyLinks() {
     const value = l.url
       ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">Open</a>` +
         (l.now && l.now !== l.url ? ` · <a href="${esc(l.now)}" target="_blank" rel="noopener">newest file</a>` : "")
-      : `<span class="no">${l.kind === "video" ? "Not set: no button" : "Not set: the User Guide opens"}</span>`;
+      : `<span class="no">${esc(l.empty || (l.kind === "video" ? "Not set: no button" : "Not set: the User Guide opens"))}</span>`;
     return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div>${filesList(l.files)}</td>
       <td class="w">${esc(l.where)}</td><td class="v">${value}</td></tr>`;
   }).join("");
@@ -264,12 +277,14 @@ function ownerMenuMyLinks() {
       .why { font-size: 12.5px; color: var(--muted); }
     </style>
     <div class="dlg">
-      <p><b>To add or change a link:</b> Extensions → Apps Script → <b>Menus</b> → the <b>📌 YOUR LINKS</b> box at the very top.
+      <p><b>📊 Blank Copy, Example, User Guide:</b> in the <b>Version Tracker</b> (columns D, E, F; the newest dated row with
+        a link counts). No code change; other sheets see a new link within 6 hours (or at their next nightly run).
+        Not filled in = the folder's newest file (the backup, listed below).</p>
+      <p><b>Every other link:</b> Extensions → Apps Script → <b>Menus</b> → the <b>📌 YOUR LINKS</b> box at the very top.
         Paste the link between the quote marks "" next to the name in grey, save, then paste Menus into the master template
         and run Reset to Display Mode there (the Welcome tab is only made again by a reset).</p>
-      <p class="why">The User Guide is the file at the top of the guide folder's list below. A date in a file's name
-        (like 11/12/26) counts before when it was changed, so a file named with a later date stays on top. Files in a
-        subfolder don't count. Other sheets take up to 6 hours to see a new guide (or until their next nightly run).</p>
+      <p class="why">In the guide folder, a date in a file's name (like 11/12/26) counts before when it was changed, so a
+        file named with a later date stays on top. Files in a subfolder don't count.</p>
       <table>${rows}</table>
     </div>`;
   SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(720).setHeight(600), "🔗 My Links");

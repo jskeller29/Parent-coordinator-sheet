@@ -29,6 +29,18 @@
 //                   A document button opens the User Guide instead.
 // To see every link at once (set or not, and where it shows):
 //   🐞 Debug → 🔗 My Links
+//
+// THREE LINKS ARE NOT IN THIS FILE: they go in the VERSION TRACKER (spreadsheet below),
+// one row per release, so changing them needs no code and reaches every sheet:
+//   column D "Blank Copy"  the blank template's /copy link (Make a new copy, Rollover,
+//                          "Get the latest version" in 🔔 Check for Updates)
+//   column E "Example"     a filled-in example tracker (made-up students): a "See an
+//                          example tracker" button on the Welcome tab, the welcome
+//                          pop-up, 📖 Open User Guide and Getting Started (empty = no button)
+//   column F "Document"    the User Guide
+// The newest dated row with a link in that column counts (leave it blank in a release
+// that keeps the same link). Columns are found by their header name. Not filled in /
+// the tracker can't be read = the folders below are used instead (the backup).
 // ----------------------------------------------------------------------
 
 // 🎬 VIDEOS ------------------------------------------------------------
@@ -67,27 +79,30 @@ const GUIDE_LINKS = {
 //    A Drive folder ID is the long part of the folder's link after /folders/
 //    (https://drive.google.com/drive/folders/THIS_PART).
 
-// 📖 The User Guide FOLDER. The NEWEST file in it is the User Guide link
-//    everywhere (📖 Open User Guide, the Welcome tab, Getting Started).
-//    To publish a new guide, put the new file in this folder; no code change.
+// 📖 The User Guide FOLDER (the BACKUP): when the Version Tracker has no
+//    "Document" link, the NEWEST file in it is the User Guide link everywhere
+//    (📖 Open User Guide, the Welcome tab, Getting Started).
 const GUIDE_FOLDER_ID = "1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
 
-// 📋 The template FOLDER: the files with "(BLANK)" and "(MIGRATE)" in their names
-//    become the "make a copy" links (End of Year Rollover, 📖 Open User Guide).
+// 📋 The template FOLDER (the BACKUP): when the Version Tracker has no "Blank
+//    Copy" link, the newest file with "(BLANK)" in its name is the "make a copy"
+//    link (End of Year Rollover, 📖 Open User Guide).
 const TEMPLATE_FOLDER_ID = "1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
 
 // 🐞 The bug report form (🐞 Report a Bug, the Welcome tab, Getting Started Help).
 var BUG_REPORT_FORM_URL = "https://forms.gle/5dXR2me3jt37aGhQ9";
 
-// 🔔 The Version Tracker spreadsheet ID (🔔 Check for Updates reads its first tab).
+// 🔔 The Version Tracker spreadsheet ID. 🔔 Check for Updates and the three links
+//    above (Blank Copy / Example / Document) read its FIRST tab.
 const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
 
 // (The User Guide's own "Make a copy" buttons are in the docs folder of the
 //  repository, not here: ask Claude to change them.)
 //
-// The hidden Backend tab's "TEMPLATE LINKS" cells (D2:E5) are the tracker's OWN saved
-// copy of the links it found in these two folders, used only when a sheet can't read
-// the folders. The tracker rewrites them by itself: don't paste links there.
+// The hidden Backend tab's "LINKS" cells (D2:E6) are the tracker's OWN saved copy of
+// the links it found (Version Tracker, else the folders), used only when a sheet can't
+// read either. The tracker rewrites them by itself: don't paste links there (deleting
+// them is harmless).
 
 // ######################################################################
 // ##   END OF YOUR LINKS                                              ##
@@ -497,6 +512,7 @@ function showWelcomeDialog() {
       <p><b>Next steps:</b> open <b>🚀 App Menu → ✅ Getting Started</b>. Its checklist walks you through loading your student data (📥 Input Data Mode), building your sheets, your settings and your first parent contact.</p>
       <p>Moving from last year's tracker? Use <b>🚀 App Menu → 🔄 Import Old Data</b>.</p>
       <div class="foot">
+        ${links.exampleUrl ? `<a class="btn sec" href="${links.exampleUrl}" target="_blank" rel="noopener">See an example tracker</a>` : ``}
         <a class="btn pri" href="${guideUrl}" target="_blank" rel="noopener">Read the User Guide</a>
       </div>
       <div class="sub">
@@ -547,7 +563,19 @@ function linkList_() {
   const L = GUIDE_LINKS;
   let guide = "";
   try { guide = getGuideLink_(); } catch (e) { guide = ""; }
+  const t = trackerLinks_();
+  const col = (key, name) => t.fromTracker
+    ? (t.cols && t.cols[key] ? "Version Tracker, column " + t.cols[key] : 'Version Tracker: no column named "' + name + '"')
+    : "Version Tracker (couldn't read it" + (t.error ? ": " + t.error : "") + ")";
+  const trackerRow = (key, name, what, where, empty) =>
+    ({ kind: "tracker", name: col(key, name), what: what, where: where, url: t[key] || "", empty: empty });
   return [
+    trackerRow("blank", "Blank Copy", "Blank copy (the /copy link people make their tracker from)",
+      "📖 Open User Guide (Make a new copy), 🔔 Check for Updates, End of Year Rollover", "Not set: the template folder's newest (BLANK) file"),
+    trackerRow("example", "Example", "Example tracker (made-up students)",
+      "📖 Open User Guide, Welcome pop-up, 👋 Welcome tab, Getting Started (Help)", "Not set: no button"),
+    trackerRow("guide", "Document", "User Guide",
+      "📖 Open User Guide, 👋 Welcome tab, Getting Started", "Not set: the guide folder's newest file"),
     { kind: "video", name: "setupVideo", what: "Setting up a new copy", where: "👋 Welcome tab, Getting Started (Help)", url: L.setupVideo },
     { kind: "video", name: "downloadDataVideo", what: "How to download your data", where: "Welcome pop-up, Getting Started (step 1, Help)", url: L.downloadDataVideo },
     { kind: "doc", name: "downloadDataDoc", what: "How to download / update your data", where: "Welcome pop-up, Getting Started (step 1)", url: L.downloadDataDoc },
@@ -555,11 +583,12 @@ function linkList_() {
     { kind: "doc", name: "buildDoc", what: "What Build Sheets does", where: "Getting Started (step 2)", url: L.buildDoc },
     { kind: "doc", name: "settingsDoc", what: "What each setting does", where: "Getting Started (step 3)", url: L.settingsDoc },
     { kind: "doc", name: "contactLogDoc", what: "How to log a parent contact", where: "Getting Started (step 4)", url: L.contactLogDoc },
-    { kind: "folder", name: "GUIDE_FOLDER_ID", what: "User Guide folder (newest file = the guide" + (guide && guide !== GUIDE_FOLDER_URL ? ")" : "; no file found)"),
-      where: "📖 Open User Guide, Welcome tab, Getting Started", url: GUIDE_FOLDER_URL, now: guide, files: guideFolderFiles_().slice(0, 5) },
-    { kind: "folder", name: "TEMPLATE_FOLDER_ID", what: "Template folder ((BLANK) / (MIGRATE) files)", where: "End of Year Rollover, 📖 Open User Guide", url: TEMPLATE_FOLDER_URL },
+    { kind: "folder", name: "GUIDE_FOLDER_ID", what: "User Guide folder (backup: its newest file, when the Version Tracker has no Document link)",
+      where: "Same places as the User Guide", url: GUIDE_FOLDER_URL, now: t.guide ? "" : guide, files: guideFolderFiles_().slice(0, 5) },
+    { kind: "folder", name: "TEMPLATE_FOLDER_ID", what: "Template folder (backup: its newest (BLANK) file, when the Version Tracker has no Blank Copy link)",
+      where: "Same places as the blank copy", url: TEMPLATE_FOLDER_URL },
     { kind: "form", name: "BUG_REPORT_FORM_URL", what: "Bug report form", where: "🐞 Report a Bug, Welcome tab, Getting Started", url: BUG_REPORT_FORM_URL },
-    { kind: "sheet", name: "VERSION_TRACKER_ID", what: "Version Tracker", where: "🔔 Check for Updates", url: "https://docs.google.com/spreadsheets/d/" + VERSION_TRACKER_ID }
+    { kind: "sheet", name: "VERSION_TRACKER_ID", what: "Version Tracker (versions + the Blank Copy / Example / Document links)", where: "🔔 Check for Updates, the 3 links above", url: "https://docs.google.com/spreadsheets/d/" + VERSION_TRACKER_ID }
   ];
 }
 
@@ -574,6 +603,7 @@ function zg_links_() {
     buildDoc: GUIDE_LINKS.buildDoc || guide,
     settingsDoc: GUIDE_LINKS.settingsDoc || guide,
     contactLogDoc: GUIDE_LINKS.contactLogDoc || guide,
+    example: zg_safeExampleLink_(),
     bugReport: BUG_REPORT_FORM_URL
   };
 }
@@ -684,6 +714,7 @@ function showGuideWelcome_() {
           ${link(links.downloadDataVideo, "Watch the video")}
           ${link(links.downloadDataDoc, "How to download your data")}
           ${link(links.guideDoc, "Read the User Guide")}
+          ${link(links.example, "See an example tracker")}
         </div>
       </div>
     </div>
@@ -882,6 +913,11 @@ function zg_hiddenTabs_(ss) {
 
 function zg_safeGuideLink_() {
   try { return getGuideLink_(); } catch (e) { return ""; }
+}
+
+/** The example tracker (Version Tracker → Example), "" when there is none: no button then. */
+function zg_safeExampleLink_() {
+  try { return getTemplateLinks_().exampleUrl || ""; } catch (e) { return ""; }
 }
 
 // ==========================================
@@ -1088,9 +1124,13 @@ var WELCOME_PERMISSIONS_ = [
 function showWelcomeAfterReset_(ss) {
   const old = ss.getSheetByName(WELCOME_TAB_NAME);
   if (old && old.isSheetHidden()) ss.deleteSheet(old); // an older one the reset didn't delete
-  let guideUrl = GUIDE_FOLDER_URL;
-  try { guideUrl = refreshResolvedLinks_().guide || GUIDE_FOLDER_URL; } catch (e) { console.warn("Guide link: " + e.message); }
-  if (!ss.getSheetByName(WELCOME_TAB_NAME)) buildWelcomeTab_(ss, { guideUrl: guideUrl });
+  let guideUrl = GUIDE_FOLDER_URL, exampleUrl = "";
+  try {
+    const r = refreshResolvedLinks_();
+    guideUrl = r.guide || GUIDE_FOLDER_URL;
+    exampleUrl = (r.links && r.links.exampleUrl) || "";
+  } catch (e) { console.warn("Guide link: " + e.message); }
+  if (!ss.getSheetByName(WELCOME_TAB_NAME)) buildWelcomeTab_(ss, { guideUrl: guideUrl, exampleUrl: exampleUrl });
   try {
     showWelcomeTabOnly_(ss);
   } catch (e) {
@@ -1156,8 +1196,9 @@ function deleteWelcomeTab_(ss) {
 
 /**
  * Makes the Welcome tab (first tab, 4 columns, no gridlines) in the "District" colors.
- * opts.guideUrl: the User Guide link (Reset to Display Mode resolves the newest file;
- * the simple onOpen can't read Drive, so it uses the guide folder).
+ * opts.guideUrl: the User Guide link (Reset to Display Mode resolves it: Version Tracker,
+ * else the guide folder's newest file; the simple onOpen can't read Drive, so it uses the
+ * guide folder). opts.exampleUrl: the example tracker (no link = no row).
  */
 function buildWelcomeTab_(ss, opts) {
   opts = opts || {};
@@ -1216,6 +1257,7 @@ function buildWelcomeTab_(ss, opts) {
   rows.push({ c: "Need help?", style: "help" });
   if (GUIDE_LINKS.setupVideo) rows.push({ c: "🎬 Watch the setup video", link: GUIDE_LINKS.setupVideo });
   rows.push({ c: "📖 Open the User Guide", link: opts.guideUrl || GUIDE_FOLDER_URL });
+  if (opts.exampleUrl) rows.push({ c: "👀 See an example tracker (made-up students)", link: opts.exampleUrl });
   rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
   rows.push({ h: 12 });
   rows.push({ c: "This tab is only here until Initial Setup has run. It is then deleted for you.", style: "hint" });
@@ -2963,6 +3005,86 @@ function checkForUpdates_(isManual) {
   return true;
 }
 
+// ----------------------------------------------------------------------
+// THE VERSION TRACKER'S COLUMNS (owner 2026-11-12). First tab, header on row 1, one row
+// per release: Version (date) | Size | Notes | Blank Copy | Example | Document. Columns are
+// found by their header names, so moving or adding one in the Table breaks nothing; a
+// header that isn't found falls back to that layout (A..F), but only onto an empty or
+// "Column N" header (so the old "Blank Link" column is never read as the Example).
+// Blank Copy = the template's /copy link ("Get the latest version", Rollover, "Make a new
+// copy"); Example = a filled-in example tracker; Document = the User Guide. For each link
+// the NEWEST dated row where it is filled in counts (trackerLinksFromRows_), so a release
+// that keeps the same guide leaves Document blank. The template / guide folders are the
+// backup (getTemplateLinks_ / getGuideLink_), then the Backend's saved copy.
+// ----------------------------------------------------------------------
+function trackerColumns_(header) {
+  const h = (header || []).map(v => String(v).trim().toLowerCase());
+  const generic = i => i < h.length ? (h[i] === "" || /^column \d+$/.test(h[i])) : true;
+  const find = (test, fallback, exclude) => {
+    const i = h.findIndex((x, k) => test(x) && (exclude || []).indexOf(k) === -1);
+    return i >= 0 ? i : (generic(fallback) ? fallback : -1);
+  };
+  const example = find(x => /example/.test(x), 4);
+  const guide = find(x => /document|guide/.test(x), 5);
+  const blank = find(x => /blank|template|copy/.test(x) || x === "link", 3, [example, guide]);
+  return { date: find(x => /version|date/.test(x), 0), size: find(x => /size/.test(x), 1),
+           notes: find(x => /note/.test(x), 2), blank: blank, example: example, guide: guide };
+}
+
+/** Reads the Version Tracker once: { rows: [{ dateMs, rawDate, size, notes, link, example, guide }], cols }. Throws if it can't. */
+function readVersionTracker_() {
+  const tab = SpreadsheetApp.openById(VERSION_TRACKER_ID).getSheets()[0]; // Changelog must stay the FIRST tab
+  const lastRow = tab.getLastRow();
+  if (lastRow < 1) return { rows: [], cols: trackerColumns_([]) };
+  // getValues (not display) so date-formatted cells come back as real Dates.
+  const all = tab.getRange(1, 1, lastRow, Math.max(6, tab.getLastColumn())).getValues();
+  const cols = trackerColumns_(all[0]);
+  const cell = (r, c) => c >= 0 && c < r.length ? String(r[c] == null ? "" : r[c]).trim() : "";
+  return {
+    cols: cols,
+    header: all[0].map(v => String(v).trim()),
+    rows: all.slice(1).map(r => ({ dateMs: toDateMs_(r[cols.date]), rawDate: r[cols.date], size: cell(r, cols.size), notes: cell(r, cols.notes),
+                                   link: cell(r, cols.blank), example: cell(r, cols.example), guide: cell(r, cols.guide) }))
+  };
+}
+
+/** The newest dated row's link in each link column (rows in any order). */
+function trackerLinksFromRows_(rows) {
+  const isUrl = v => /^https?:\/\//i.test(v);
+  const dated = rows.filter(r => !isNaN(r.dateMs)).sort((a, b) => b.dateMs - a.dateMs);
+  const newest = key => { const r = dated.find(x => isUrl(x[key])); return r ? r[key] : ""; };
+  return { blank: newest("link"), example: newest("example"), guide: newest("guide"), fromTracker: true };
+}
+
+/** trackerLinksFromRows_ + where each link column is ({ blank: 'D "Blank Copy"', ... }, "" = not found), for 🔗 My Links. */
+function trackerLinksFrom_(tracker) {
+  const links = trackerLinksFromRows_(tracker.rows);
+  const where = i => i < 0 ? "" : String.fromCharCode(65 + i) + ((tracker.header || [])[i] ? ' "' + tracker.header[i] + '"' : "");
+  links.cols = { blank: where(tracker.cols.blank), example: where(tracker.cols.example), guide: where(tracker.cols.guide) };
+  return links;
+}
+
+/**
+ * The three links from the Version Tracker, remembered 6 h (script cache). fresh = read it now.
+ * Never throws: { blank: "", example: "", guide: "", fromTracker: false } when it can't be read
+ * (no access, offline, or the simple onOpen, which may not open another spreadsheet).
+ */
+var TRACKER_LINKS_KEY_ = 'TRACKER_LINKS_V1';
+function trackerLinks_(fresh) {
+  const cache = CacheService.getScriptCache();
+  if (!fresh) {
+    try { const c = cache.get(TRACKER_LINKS_KEY_); if (c) return JSON.parse(c); } catch (e) { console.error(e); }
+  }
+  try {
+    const links = trackerLinksFrom_(readVersionTracker_());
+    try { cache.put(TRACKER_LINKS_KEY_, JSON.stringify(links), TEMPLATE_LINKS_CACHE_SECONDS); } catch (e) {}
+    return links;
+  } catch (e) {
+    console.warn("Version Tracker links not read: " + e.message);
+    return { blank: "", example: "", guide: "", fromTracker: false, error: e.message };
+  }
+}
+
 /**
  * Reads the tracker and builds everything the dialog needs.
  * Returns null only if the tracker can't be reached at all.
@@ -2976,11 +3098,10 @@ function computeUpdatePayload_(showAll) {
 
   let rows;
   try {
-    const trackerSS = SpreadsheetApp.openById(VERSION_TRACKER_ID);
-    const tab = trackerSS.getSheets()[0]; // Changelog must stay the FIRST tab
-    const lastRow = tab.getLastRow();
-    // getValues (not display) so date-formatted cells come back as real Dates.
-    rows = (lastRow < 2) ? [] : tab.getRange(2, 1, lastRow - 1, 4).getValues();
+    const tracker = readVersionTracker_();
+    rows = tracker.rows;
+    // The same read gives the links: remember them (trackerLinks_)
+    try { CacheService.getScriptCache().put(TRACKER_LINKS_KEY_, JSON.stringify(trackerLinksFrom_(tracker)), TEMPLATE_LINKS_CACHE_SECONDS); } catch (e) {}
   } catch (e) {
     console.error("Could not read Version Tracker: " + e.message);
     return null;
@@ -2993,15 +3114,15 @@ function computeUpdatePayload_(showAll) {
   // a deleted/rearranged tracker row never breaks the walk.
   const missed = [];
   for (let i = 0; i < rows.length; i++) {
-    const ms = toDateMs_(rows[i][0]);
+    const ms = rows[i].dateMs;
     if (isNaN(ms)) continue;        // Skip blank / junk / header-ish rows
     if (ms <= baselineMs) continue; // Already have it / already dismissed it
     missed.push({
       dateMs: ms,
-      dateStr: formatTrackerDate_(rows[i][0]),
-      size:  String(rows[i][1] || "").trim(),
-      notes: String(rows[i][2] || "").trim(),
-      link:  String(rows[i][3] || "").trim()
+      dateStr: formatTrackerDate_(rows[i].rawDate),
+      size:  rows[i].size,
+      notes: rows[i].notes,
+      link:  rows[i].link   // the Blank Copy column: "Get the latest version"
     });
   }
   missed.sort((a, b) => b.dateMs - a.dateMs); // Newest first
@@ -3240,30 +3361,34 @@ function resetVersionCheckState() {
 
 // ======================================================================
 // SECTION: TEMPLATE & GUIDE LINKS (was LinkResolver.gs)
-// One source of truth for the shareable template links, so you
-// never hand-paste a file ID again.
+// One source of truth for the shareable links, so you never hand-paste a file ID.
 //
-// HOW IT WORKS
-//   Drop your template files into the Drive folder below and label them:
-//     • a file whose NAME contains "(BLANK)"   -> the fresh new-user template
-//     • a file whose NAME contains "(MIGRATE)" -> the upgrade template that
-//       auto-opens the Migration Wizard
-//   The resolver finds each file by that label and builds a "Make a copy"
-//   link from its live file ID. Next release, just swap the files in the
-//   folder (keeping the labels) — no code edits anywhere.
+// WHERE EACH LINK COMES FROM (first one found wins; owner 2026-11-12)
+//   Blank copy  1. Version Tracker column "Blank Copy" (D)   2. the template folder's
+//               newest file with "(BLANK)" in its name ("(MIGRATE)" only when there is
+//               no BLANK one)   3. the Backend's saved copy (E3)   4. the folder itself
+//   Example     1. Version Tracker column "Example" (E)      2. the Backend's saved copy
+//               (E6)   (no folder backup: no link = no "See an example tracker" button)
+//   User Guide  1. Version Tracker column "Document" (F)     2. the guide folder's newest
+//               file   3. the Backend's saved copy (E5)   4. the folder itself
+//   (Version Tracker: trackerLinks_, the newest dated row with a link in that column.)
+//
+// WHEN THEY ARE LOOKED UP
+//   Only when something needs one (📖 Open User Guide, Getting Started, the welcome
+//   pop-up, Rollover), then remembered 6 hours (script cache). Looked up fresh by the
+//   nightly run, 🔔 Check for Updates (it reads the tracker anyway), 🔗 My Links and
+//   Reset to Display Mode. Never in the simple onOpen (it can't read other files).
 //
 // RESILIENCE (why copies still work)
-//   getTemplateLinks_() tries a live Drive scan first. On success it mirrors
-//   the result into the Backend Version section (cols D:E), which travels with
-//   every copy of the sheet — so a plain copy that can't reach the folder
-//   still inherits the last-known links, exactly like saved settings do.
+//   Whatever is found is mirrored into the Backend Version section (D2:E6), which
+//   travels with every copy of the sheet, so a copy that can't reach the tracker or
+//   the folders still inherits the last-known links, exactly like saved settings do.
 //
 // SHARING REQUIREMENT
-//   For the live scan to work in OTHER coordinators' copies, the folder and
-//   the (BLANK)/(MIGRATE) files must be shared "Anyone with the link -> Viewer".
-//   (The copy links themselves already need that sharing to be usable.)
-//   If you keep the folder private, run refreshTemplateLinks() on your master
-//   template before sharing it and copies will inherit the links.
+//   Other coordinators' copies need view access: share the Version Tracker, the
+//   folders and the files "Anyone with the link -> Viewer". If you keep them private,
+//   run refreshTemplateLinks() on your master template before sharing it and copies
+//   will inherit the links.
 // ======================================================================
 
 // The Drive folders that hold the labeled template files (TEMPLATE_FOLDER_ID) and
@@ -3281,7 +3406,7 @@ const GUIDE_FOLDER_URL = "https://drive.google.com/drive/folders/" + GUIDE_FOLDE
 
 /**
  * Public entry point for the dialogs (called via google.script.run).
- * Returns { blankCopyUrl, migrateCopyUrl, blankName, migrateName, folderUrl }.
+ * Returns { blankCopyUrl, migrateCopyUrl, exampleUrl, blankName, migrateName, folderUrl }.
  * Never throws — always returns usable (folder-fallback) URLs.
  */
 function getTemplateLinks() {
@@ -3289,13 +3414,14 @@ function getTemplateLinks() {
 }
 
 /**
- * Force a fresh scan of BOTH folders (bypassing the cache) and re-store the
- * results. No UI — safe to call from time-based triggers (the nightly sync).
+ * Force a fresh look (Version Tracker, then both folders; bypassing the cache) and
+ * re-store the results. No UI — safe to call from time-based triggers (the nightly sync).
  */
 function refreshResolvedLinks_() {
   const cache = CacheService.getScriptCache();
   try { cache.remove('TEMPLATE_LINKS_V1'); } catch (e) {}
   try { cache.remove('GUIDE_LINK_V1'); } catch (e) {}
+  try { cache.remove(TRACKER_LINKS_KEY_); } catch (e) {}
   const links = getTemplateLinks_();
   const guide = getGuideLink_();
   return { links: links, guide: guide };
@@ -3312,6 +3438,7 @@ function refreshTemplateLinks() {
   const msg =
     "BLANK  (" + (links.blankName || "not found") + "):\n" + (links.blankCopyUrl || "(unresolved)") +
     "\n\nMIGRATE (" + (links.migrateName || "not found") + "):\n" + (links.migrateCopyUrl || "(unresolved)") +
+    "\n\nEXAMPLE:\n" + (links.exampleUrl || "(none)") +
     "\n\nGUIDE:\n" + (r.guide || "(unresolved)");
   console.log("Resolved links:\n" + msg); // Always in the execution log for testing.
   try {
@@ -3327,9 +3454,9 @@ function refreshTemplateLinks() {
 // ==========================================
 
 /**
- * Cached, resilient resolver. Tries a live scan; on success caches it (script
- * cache + Version tab). On failure, falls back to the Version-tab copy that
- * traveled with this spreadsheet, then to the folder URL.
+ * Cached, resilient resolver. Version Tracker first, then a live folder scan; on
+ * success caches it (script cache + Backend D2:E6). On failure, falls back to the
+ * Backend copy that traveled with this spreadsheet, then to the folder URL.
  */
 function getTemplateLinks_() {
   const cache = CacheService.getScriptCache();
@@ -3338,20 +3465,29 @@ function getTemplateLinks_() {
     if (cached) return JSON.parse(cached);
   } catch (e) { console.error(e); }
 
-  let links = scanTemplateFolder_();
+  // 1. The Version Tracker's Blank Copy / Example columns (owner 2026-11-12); 2. the template
+  // folder's newest (BLANK) file (backup); 3. the copy saved in the Backend; 4. the folder itself.
+  const tracker = trackerLinks_();
+  let links = tracker.blank
+    ? { blankCopyUrl: tracker.blank, migrateCopyUrl: tracker.blank, blankName: "Version Tracker", migrateName: "Version Tracker" }
+    : scanTemplateFolder_();
+  links.exampleUrl = tracker.example || "";
 
+  const inherited = loadTemplateLinksFromVersionSheet_();
   if (links.blankCopyUrl || links.migrateCopyUrl) {
-    // Live scan worked — persist so plain copies inherit it.
+    // The tracker read fine but has no Example = no button (don't bring back an old saved one)
+    if (!links.exampleUrl && inherited && !tracker.fromTracker) links.exampleUrl = inherited.exampleUrl || "";
+    // Found it — persist so plain copies inherit it.
     try { saveTemplateLinksToVersionSheet_(links); } catch (e) { console.error(e); }
-  } else {
-    // Live scan failed (no access / offline) — use the inherited copy if any.
-    const inherited = loadTemplateLinksFromVersionSheet_();
-    if (inherited) links = inherited;
+  } else if (inherited) {
+    // Tracker and folder unreachable (no access / offline) — use the inherited copy.
+    links = inherited;
   }
 
-  // Guarantee non-empty, non-dead URLs.
+  // Guarantee non-empty, non-dead URLs (the example has no folder fallback: no link = no button).
   if (!links.blankCopyUrl)   links.blankCopyUrl   = TEMPLATE_FOLDER_URL;
   if (!links.migrateCopyUrl) links.migrateCopyUrl = TEMPLATE_FOLDER_URL;
+  links.exampleUrl = links.exampleUrl || "";
   links.folderUrl = TEMPLATE_FOLDER_URL;
 
   try { cache.put('TEMPLATE_LINKS_V1', JSON.stringify(links), TEMPLATE_LINKS_CACHE_SECONDS); } catch (e) {}
@@ -3437,10 +3573,13 @@ function saveTemplateLinksToVersionSheet_(links) {
   const sheet = getOrCreateVersionSheet_(ss);
   if (!sheet) return;
   sheet.getRange(BACKEND_VERSION.LINKS_ROW, 4, 3, 2).setValues([
-    ["TEMPLATE LINKS (auto-managed — do not edit)", ""],
+    ["LINKS (automatic: from the Version Tracker, else the folders; don't edit)", ""],
     ["BLANK copy",   links.blankCopyUrl   || ""],
     ["UPGRADE copy (same file as BLANK)", links.migrateCopyUrl || ""]
   ]);
+  const ex = sheet.getRange(BACKEND_VERSION.EXAMPLE_ROW, 4, 1, 2);
+  if (links.exampleUrl) ex.setValues([["EXAMPLE copy", links.exampleUrl]]);
+  else if (String(ex.getValues()[0][0]).trim() === "EXAMPLE copy") ex.clearContent();
 }
 
 /**
@@ -3454,8 +3593,10 @@ function loadTemplateLinksFromVersionSheet_() {
     const vals = sheet.getRange(BACKEND_VERSION.LINKS_ROW + 1, 5, 2, 1).getValues(); // E3:E4
     const blank = String(vals[0][0] || "").trim();
     const migrate = String(vals[1][0] || "").trim();
-    if (!blank && !migrate) return null;
-    return { blankCopyUrl: blank, migrateCopyUrl: migrate, blankName: "", migrateName: "" };
+    const ex = sheet.getRange(BACKEND_VERSION.EXAMPLE_ROW, 4, 1, 2).getValues()[0]; // D6:E6
+    const example = String(ex[0]).trim() === "EXAMPLE copy" ? String(ex[1] || "").trim() : "";
+    if (!blank && !migrate && !example) return null;
+    return { blankCopyUrl: blank, migrateCopyUrl: migrate, exampleUrl: example, blankName: "", migrateName: "" };
   } catch (e) {
     console.error(e);
     return null;
@@ -3481,7 +3622,9 @@ function getGuideLink_() {
     if (cached) return cached;
   } catch (e) { console.error(e); }
 
-  let url = scanGuideFolder_();
+  // 1. The Version Tracker's Document column (owner 2026-11-12); 2. the guide folder's newest
+  // file (backup); 3. the copy saved in the Backend; 4. the folder itself.
+  let url = trackerLinks_().guide || scanGuideFolder_();
   if (url) {
     try { saveGuideLinkToVersionSheet_(url); } catch (e) { console.error(e); }
   } else {

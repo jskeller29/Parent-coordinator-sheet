@@ -36,8 +36,12 @@ paragraphs, `- ` and `1. ` lists (a continued line is indented), tables, and the
 
 ## Putting it in Google Drive
 
-The tracker's 📖 Open User Guide link is the newest file in the guide folder
-(`GUIDE_FOLDER_ID` in the 📌 YOUR LINKS box at the top of `Menus.gs`).
+The tracker's 📖 Open User Guide link is the **Version Tracker's "Document" column (F)**:
+the newest dated row with a link there. Paste the new guide's link in the row of the release
+that brings it (leave it blank in a release that keeps the same guide). When the tracker has
+no Document link (or a sheet can't read it), the newest file in the guide folder is used
+(`GUIDE_FOLDER_ID` in the 📌 YOUR LINKS box at the top of `Menus.gs`), so keep the newest
+guide there too.
 
 - **Google Doc (recommended):** upload the .docx to the guide folder, right-click it → Open
   with → Google Docs, then delete the .docx so the Google Doc is the only file there. Share it
@@ -48,5 +52,5 @@ The tracker's 📖 Open User Guide link is the newest file in the guide folder
   link from the sheet always opens it at page 1. Drive's and GitHub's previews may ignore the
   jump links; downloading it or opening it in a PDF reader works.
 
-Keep old versions in a subfolder (for example "Old guides"): the tracker only looks at files
+Keep old versions in a subfolder (for example "Old guides"): the backup only looks at files
 directly in the guide folder.

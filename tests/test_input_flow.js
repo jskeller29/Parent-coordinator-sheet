@@ -294,7 +294,9 @@ function listsSheet() {
   made.forEach(x => assert(x.copy.getSheetByName("Backend").getRange("A2").getValue() instanceof Date, 'version date in ' + x.label));
   assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');
   assert.strictEqual(e.stamp, "11/12/26", 'the pop-up shows the version date');
-  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (11/12/26)", url: "https://example.org/0", stamp: "11/12/26" }));
+  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (11/12/26)", url: "https://example.org/0", stamp: "11/12/26",
+    trackerLink: "https://docs.google.com/spreadsheets/d/COPY_0/copy" }), 'Blank: its /copy link goes in the tracker (D)');
+  assert.strictEqual(e.trackerLink, "https://docs.google.com/spreadsheets/d/COPY_1/edit?usp=sharing", 'Example: its link goes in the tracker (E)');
   assert(e.url);
   assert.throws(() => g.ownerMakeCopy("other"), /Unknown copy/);
   let dialog = "";
@@ -305,8 +307,14 @@ function listsSheet() {
   assert(/ownerMakeCopy/.test(dialog) && /Parent Coordinator Sheet - \(BLANK\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the release copies pop-up');
   assert(!/ORDER = \[[^\]]*migrate/.test(dialog), 'no Migrate copy in the pop-up');
   assert(/Version date in both/.test(dialog), 'the pop-up says which date goes in the Version Tracker');
+  assert(/id="l_blank"/.test(dialog) && /id="l_example"/.test(dialog), 'the pop-up shows the D / E links');
   g.getGuideLink_ = () => "https://example.org/guide.pdf";
+  g.trackerLinks_ = () => ({ blank: "https://docs.google.com/spreadsheets/d/B/copy", example: "", guide: "", fromTracker: true,
+    cols: { blank: 'D "Blank Copy"', example: "", guide: 'F "Document"' } });
   g.ownerMenuMyLinks();
+  assert(/column D &quot;Blank Copy&quot;/.test(dialog) && /d\/B\/copy/.test(dialog), 'My Links: the tracker\'s Blank Copy column and link');
+  assert(/no column named &quot;Example&quot;/.test(dialog), 'My Links: says when the Example column is missing');
+  assert(/the guide folder&#39;s newest file|the guide folder's newest file/.test(dialog), 'My Links: an empty Document link says the folder is used');
   Object.keys(g.__get("GUIDE_LINKS")).forEach(k => assert(dialog.indexOf(k) !== -1, 'My Links lists ' + k));
   assert(/YOUR LINKS/.test(dialog) && /guide\.pdf/.test(dialog), 'My Links: where to change them + the newest guide file');
   // The guide folder: a date in the NAME ranks first, else the last change; My Links rescans and lists them
@@ -346,6 +354,83 @@ function listsSheet() {
   g.saveGuideLinkToVersionSheet_("https://example.org/guide");
   assert.strictEqual(be.getRange("D6").getValue(), "Something else", 'only a stale "GUIDE link" row is cleared');
   console.log("Backend: stale second GUIDE link row cleared: ok");
+}
+
+{
+  // The Version Tracker's link columns (owner 2026-11-12): D Blank Copy, E Example, F Document, found by
+  // header name; the newest dated row WITH a link counts; the folders are the backup
+  const g0 = loadProject({});
+  const C = h => JSON.stringify(g0.trackerColumns_(h));
+  assert.strictEqual(C(["Version", "Size", "Notes", "Blank Copy", "Example", "Document"]),
+    JSON.stringify({ date: 0, size: 1, notes: 2, blank: 3, example: 4, guide: 5 }));
+  // today's tracker: "Link" is the blank copy; the old "Blank Link" (E) is NOT read as the example
+  assert.strictEqual(C(["Version", "Size", "Notes", "Link", "Blank Link", "Column 1"]),
+    JSON.stringify({ date: 0, size: 1, notes: 2, blank: 3, example: -1, guide: 5 }));
+  // moved columns are found by name
+  assert.strictEqual(C(["Version", "Document", "Size", "Notes", "Example", "Blank Copy"]),
+    JSON.stringify({ date: 0, size: 2, notes: 3, blank: 5, example: 4, guide: 1 }));
+  const row = (d, blank, example, guide) => ({ dateMs: d ? new Date(d).getTime() : NaN, link: blank, example: example, guide: guide });
+  const L = g0.trackerLinksFromRows_([
+    row("2026-09-01", "https://b/old/copy", "https://e/old", "https://g/old"),
+    row("2026-11-12", "https://b/new/copy", "", "not a link"),
+    row("", "https://b/undated/copy", "https://e/undated", "https://g/undated"),
+    row("2026-10-01", "", "https://e/oct", "")]);
+  assert.strictEqual(JSON.stringify(L), JSON.stringify({ blank: "https://b/new/copy", example: "https://e/oct", guide: "https://g/old", fromTracker: true }),
+    'each column: the newest dated row that has a link');
+
+  // getTemplateLinks_ / getGuideLink_: tracker first, then the folders, then the Backend's saved copy
+  const ss = makeSpreadsheet(TABS);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const be = ss.getSheetByName("Backend");
+  g.getOrCreateVersionSheet_ = () => be;
+  let scans = 0;
+  g.scanTemplateFolder_ = () => { scans++; return { blankCopyUrl: "https://folder/blank", migrateCopyUrl: "https://folder/blank" }; };
+  g.scanGuideFolder_ = () => "https://folder/guide";
+  const fresh = () => { const c = g.CacheService.getScriptCache(); ["TEMPLATE_LINKS_V1", "GUIDE_LINK_V1", "TRACKER_LINKS_V1"].forEach(k => c.remove(k)); };
+  g.trackerLinks_ = () => ({ blank: "https://tracker/copy", example: "https://tracker/example", guide: "https://tracker/guide", fromTracker: true });
+  fresh();
+  let t = g.getTemplateLinks_();
+  assert.strictEqual(t.blankCopyUrl, "https://tracker/copy"); assert.strictEqual(t.migrateCopyUrl, "https://tracker/copy");
+  assert.strictEqual(t.exampleUrl, "https://tracker/example"); assert.strictEqual(scans, 0, 'no folder scan when the tracker has the link');
+  assert.strictEqual(g.getGuideLink_(), "https://tracker/guide");
+  assert.strictEqual(be.getRange("E3").getValue(), "https://tracker/copy", 'saved in the Backend for copies');
+  assert.deepStrictEqual(be.getRange("D6:E6").getValues()[0].slice(), ["EXAMPLE copy", "https://tracker/example"]);
+  assert.strictEqual(be.getRange("E5").getValue(), "https://tracker/guide");
+  // the tracker has no links (or no Example): the folders; the Example button goes, the saved one is cleared
+  g.trackerLinks_ = () => ({ blank: "", example: "", guide: "", fromTracker: true });
+  fresh();
+  t = g.getTemplateLinks_();
+  assert.strictEqual(t.blankCopyUrl, "https://folder/blank"); assert.strictEqual(t.exampleUrl, "", 'no Example in the tracker = no button');
+  assert.strictEqual(be.getRange("D6").getValue(), "", 'the saved Example is cleared');
+  assert.strictEqual(g.getGuideLink_(), "https://folder/guide");
+  // nothing can be read (a copy without access): the Backend's saved copy
+  be.getRange("D6:E6").setValues([["EXAMPLE copy", "https://saved/example"]]);
+  g.trackerLinks_ = () => ({ blank: "", example: "", guide: "", fromTracker: false });
+  g.scanTemplateFolder_ = () => ({ blankCopyUrl: "", migrateCopyUrl: "" });
+  g.scanGuideFolder_ = () => "";
+  fresh();
+  t = g.getTemplateLinks_();
+  assert.strictEqual(t.blankCopyUrl, "https://folder/blank", 'saved blank link');
+  assert.strictEqual(t.exampleUrl, "https://saved/example", 'saved example link');
+  assert.strictEqual(g.getGuideLink_(), "https://folder/guide", 'saved guide link');
+  // the help links show the Example button only when there is one
+  g.getTemplateLinks_ = () => ({ exampleUrl: "https://tracker/example" });
+  assert.strictEqual(g.zg_links_().example, "https://tracker/example");
+  g.getTemplateLinks_ = () => ({ exampleUrl: "" });
+  assert.strictEqual(g.zg_links_().example, "");
+  // the Welcome tab: an Example row only with a link
+  const welcomeText = exampleUrl => {
+    const ss2 = makeSpreadsheet(TABS);
+    const app2 = fakeSpreadsheetApp(ss2);
+    app2.newRichTextValue = () => { const v = {}; const b = new Proxy({}, { get: (t, k) =>
+      k === 'setText' ? (x => { v.text = x; return b; }) : k === 'build' ? (() => v) : (() => b) }); return b; };
+    const g2 = loadProject({ extra: { SpreadsheetApp: app2 } });
+    g2.isAutoMigrateOn_ = () => false;
+    return Array.from(g2.buildWelcomeTab_(ss2, { guideUrl: "https://g", exampleUrl: exampleUrl })._cells.values()).join("\n");
+  };
+  assert(/See an example tracker/.test(welcomeText("https://e")), 'Welcome tab: an example row with a link');
+  assert(!/See an example tracker/.test(welcomeText("")), 'Welcome tab: no example row without one');
+  console.log("Version Tracker links (Blank Copy / Example / Document, folders as backup): ok");
 }
 
 {

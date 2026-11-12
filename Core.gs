@@ -219,6 +219,7 @@ var BACKEND_VERSION = {
   MIGRATE_TOGGLE: "B3",      // was B2
   LINKS_ROW: 2,              // D2:E4 template links (was D1:E3)
   GUIDE_ROW: 5,              // D5:E5 guide link (was D4:E4)
+  EXAMPLE_ROW: 6,            // D6:E6 example tracker link (2026-11-12; from the Version Tracker's Example column)
   SETTINGS_HEADER_ROW: 5,    // A5 (was A4)
   SETTINGS_FIRST_ROW: 6      // A6:B (was A5:B)
 };

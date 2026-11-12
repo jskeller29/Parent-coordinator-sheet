@@ -75,8 +75,12 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       the four steps; Bring over last year's tracker = the wizard, which lists your old trackers (pick one, Bring it over)
 - [ ] Template folder: only the newest "(BLANK)" file in it (move old "(MIGRATE)" files to a subfolder); the Version
       Tracker's column D = that (BLANK) file's /copy link
+- [ ] Version Tracker headers: D "Blank Copy", E "Example", F "Document" (clear the old values in E first); 🔗 My Links
+      shows "Version Tracker, column D/E/F" with each link, and "See an example tracker" appears in 📖 Open User Guide
 
 ## 5. Going live (after the copy works)
 1. Merge Test-Version into main.
 2. Update the master template (General manifest, no z_ files).
-3. Add a row to the Version Tracker so schools get the update prompt.
+3. Add a row to the Version Tracker so schools get the update prompt: A = the version date, D "Blank Copy" = the
+   template's /copy link, E "Example" / F "Document" = the example tracker / User Guide when they changed (blank =
+   the newest earlier row's link is kept).

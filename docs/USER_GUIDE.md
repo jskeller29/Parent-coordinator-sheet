@@ -39,6 +39,10 @@ The copy is private and lives in your own Google Drive.
 The same template is for everyone. If you used the tracker last year, you bring your old
 data over during setup.
 
+Want to see one filled in first? "See an example tracker" (on the 👋 Welcome tab, and in
+🚀 App Menu → 📖 Open User Guide) opens a tracker with made-up students. Look around in it,
+but keep your real work in your own copy.
+
 ## Part 1: Setting up
 
 ### Quick start

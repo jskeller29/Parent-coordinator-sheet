@@ -395,6 +395,10 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Input Data (scripts) and InputDataSidebar, YourListsSidebar (HTML).
 - Your Lists View step + "Save, exit and build" (2026-11-12): re-paste Input Data (script) and InputDataSidebar,
   YourListsSidebar (HTML).
+- Version Tracker links (2026-11-12): re-paste Core, Menus (script) and GettingStartedSidebar (HTML) on every sheet;
+  owner sheet also z_MINE. In the Version Tracker: name the headers D "Blank Copy", E "Example", F "Document", clear
+  the old values in E (the old "Blank Link" column, or they would be read as the example), fill D/E/F in the newest
+  row; then Reset to Display Mode on the master template (the Welcome tab gets the example row).
 
 First build -> full menus (2026-11-12): refreshMenusAfterFirstBuild_ (Menus.gs) runs onOpen() when setup is done,
 FULL_MENU_UNLOCKED isn't "true", Input Data Mode is off and the Student List is built. Called at the end of
@@ -460,19 +464,36 @@ settingsDoc, contactLogDoc), GUIDE_FOLDER_ID, TEMPLATE_FOLDER_ID, BUG_REPORT_FOR
 from their sections, same names; DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc). setupVideo: Welcome tab "🎬 Watch the
 setup video" (when set) + checklist Help. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
 ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
-Backend D2:E5 "TEMPLATE LINKS" = the tracker's OWN saved copy (D3:E4 BLANK / upgrade copy links, the same file now, from the template
-folder scan, D5:E5 the guide link): written after every successful scan, read only when a sheet can't read the folders.
-Never the place to paste links. A second "GUIDE link" row at D6:E6 (an older layout) is read by nothing; saving the
-guide link clears it (saveGuideLinkToVersionSheet_).
-Guide link = the newest file DIRECTLY in the guide folder (guideFolderFiles_ / scanGuideFolder_: a MM/DD/YY date in the
+VERSION TRACKER LINKS (owner 2026-11-12, "folder = backup"): the Version Tracker's first tab holds the 3 shared links,
+one row per release: D "Blank Copy" (the template's /copy link), E "Example" (a filled-in example tracker), F "Document"
+(the User Guide). trackerColumns_ finds them by header name (blank|template|copy or "Link" / example / document|guide;
+a header not found falls back to D/E/F only when that header is empty or "Column N", so the old E "Blank Link" is never
+the example); trackerLinksFromRows_ = per column the newest dated row with an http link; trackerLinks_ (script cache
+TRACKER_LINKS_V1, 6 h; never throws, fromTracker false when unreadable; cols = where each column is, for My Links).
+computeUpdatePayload_ reads the tracker once (readVersionTracker_) and refreshes that cache too.
+Order: blank copy = tracker D, else scanTemplateFolder_'s (BLANK) file, else Backend E3, else the folder; example =
+tracker E, else Backend E6 only when the tracker couldn't be read (read fine + no E = no button; the saved E6 is
+cleared); guide = tracker F, else the guide folder's newest file, else Backend E5, else the folder. getTemplateLinks_
+returns exampleUrl; the "See an example tracker" button shows only with a link: Welcome tab (buildWelcomeTab_
+opts.exampleUrl from showWelcomeAfterReset_), the welcome pop-up's fresh view, 📖 Open User Guide (showWelcomeDialog),
+Getting Started Help (zg_links_().example / zg_safeExampleLink_). Looked up only when something needs a link, then
+remembered 6 h; fresh at the nightly run, 🔔 Check for Updates, 🔗 My Links and Reset to Display Mode; never in the
+simple onOpen.
+Backend D2:E6 "LINKS (automatic ...)" = the tracker's OWN saved copy (D3:E4 BLANK / upgrade copy links, the same file,
+D5:E5 the guide link, D6:E6 "EXAMPLE copy"): written after every successful look-up, read only when a sheet can read
+neither the Version Tracker nor the folders. Never the place to paste links; deleting them is harmless. An old second
+"GUIDE link" row at D6:E6 is cleared when the guide link is saved (saveGuideLinkToVersionSheet_), then D6 holds the
+example.
+Guide folder backup = the newest file DIRECTLY in it (guideFolderFiles_ / scanGuideFolder_: a MM/DD/YY date in the
 NAME counts first, else the last change; ties: the one Drive lists last), remembered 6 h (script cache GUIDE_LINK_V1;
-the nightly refreshResolvedLinks_ clears it). 🔗 My Links and Reset to Display Mode's Welcome tab rescan first
-(refreshResolvedLinks_), and My Links lists the folder's files in that order with why (owner 2026-11-12: "newest file"
-had opened an old guide right after an upload, from the 6-hour copy).
+the nightly refreshResolvedLinks_ clears it). 🔗 My Links and Reset to Display Mode's Welcome tab look again first
+(refreshResolvedLinks_). My Links shows the tracker's D / E / F first (which column, or 'no column named "Example"'),
+then the folders as backup, the guide folder's files in rank order with why.
 🐞 Debug → 📦 Make Release Copies (ownerMenuMakeAllCopies, z_MINE.gs; was "Make All 3 Copies"): a pop-up makes
 "… - (EXAMPLE)" (fake data, as "Copy Sheet, Then Load Fake Data") and "… - (BLANK)" (B3 = No + display reset), ONE
 google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link; a failed one
-doesn't stop the others. This sheet is never changed.
+doesn't stop the others. This sheet is never changed. The done message shows the Version Tracker row to add: A = the
+version date, D = the Blank copy's /copy link, E = the Example copy's link (trackerLink).
 ONE TEMPLATE FOR EVERYONE (owner 2026-11-12; there is no MIGRATE template any more): the first window after Initial
 Setup (showGuideWelcome_) asks "Is this your first PC Tracker?": "Yes, start fresh" = the old welcome (4 steps, Input
 Data Mode), "No, bring over last year's tracker" = zg_action('importOld') -> openMigrationWizard (title "Bring Over Last
@@ -489,8 +510,9 @@ two test-copy items keep "<this sheet's name> - Display Mode / Fake Data (date)"
 stamp (ownerStampVersion_: Backend A2 = today via stampVersionDate_, B3 = No); the Example copy had
 kept this sheet's old date (fake data has no reset). The pop-up / done message shows that date: it is the date for the
 Version Tracker's column A (a later tracker date makes brand-new copies say "New Version Available").
-Version Tracker (VERSION_TRACKER_ID, first tab): every version of the checker reads only A:D (A date, B Size "Major..." =
-major, C Notes, D Link = "Get the latest version", the newest dated row with a link). Its E "Blank Link" / F are never read.
+Version Tracker (VERSION_TRACKER_ID, first tab): A date, B Size "Major..." = major, C Notes, D Blank Copy = "Get the
+latest version" (the newest dated row's link), E Example, F Document (see VERSION TRACKER LINKS). Older checkers read
+only A:D by position, so D must stay the blank copy's link.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first
