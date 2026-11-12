@@ -67,8 +67,10 @@ function ownerAddMenus_(ui) {
     .addItem("🧹 Reset to Display Mode", "ownerMenuResetToDisplayMode")
     .addItem("📄 Copy Sheet, Then Reset the Copy", "ownerMenuCopyAndResetToDisplayMode")
     .addItem("🔄 Copy Sheet and Set to Migrate", "ownerMenuCopyAndSetToMigrate")
+    .addItem("📦 Make All 3 Copies (Example, Blank, Migrate)", "ownerMenuMakeAllCopies")
     .addItem("🧪 Copy Sheet, Then Load Fake Data on the Copy", "ownerMenuCopyForFakeData")
     .addSeparator()
+    .addItem("🔗 My Links (videos, documents, folders)", "ownerMenuMyLinks")
     .addItem("🔧 Fix Dropdown Criteria (Student List → Backend)", "ownerMenuFixDropdownCriteria")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug");
@@ -167,6 +169,138 @@ function ownerMenuCopyAndSetToMigrate() {
       "Extensions &gt; Apps Script, use the General manifest, and move it into the template folder. Its name has " +
       "\"(MIGRATE)\", which is how 🔄 End of Year Rollover and the welcome links find the upgrade template.");
   });
+}
+
+// ----------------------------------------------------------------------
+// 📦 MAKE ALL 3 COPIES (owner's request 2026-11-12): Example (fake data), Blank
+// (new-user template) and Migrate (upgrade template), each a copy of THIS sheet in
+// its Drive folder. A pop-up makes them one at a time, each in its own script run
+// (Apps Script stops a run after 6 minutes, and the fake-data build is the slow one),
+// and shows each copy's link as it is done. This sheet is never changed.
+// ----------------------------------------------------------------------
+var OWNER_COPY_KINDS_ = {
+  example: { label: "(EXAMPLE)", title: "Example", what: "fake students, contacts and events, built like a school's sheet" },
+  blank:   { label: "(BLANK)",   title: "Blank",   what: "empty, opens on the 👋 Welcome tab (new coordinators)" },
+  migrate: { label: "(MIGRATE)", title: "Migrate", what: "empty, Auto-Migrate on: Initial Setup opens the Migration Wizard (upgrades)" }
+};
+
+function ownerMenuMakeAllCopies() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const order = ["example", "blank", "migrate"];
+  const rows = order.map(k => {
+    const c = OWNER_COPY_KINDS_[k];
+    return `<div class="row" id="r_${k}"><div class="ck" id="c_${k}"></div><div class="txt"><b>${c.title}</b>
+      <span class="nm">${esc(ss.getName())} - ${c.label}</span><span class="what">${esc(c.what)}</span>
+      <span class="st" id="s_${k}">Waiting</span></div></div>`;
+  }).join("");
+  const html = include_('Styles') + `
+    <style>
+      .dlg { padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+      .row { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+      .ck { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; margin-top: 2px; display: grid; place-items: center; color: #fff; font: 700 11px/1 var(--font); }
+      .row.now .ck { border: 2px solid var(--accent-soft); border-top-color: var(--accent); animation: spin 1s linear infinite; }
+      .row.done .ck { background: var(--accent); border-color: var(--accent); }
+      .row.fail .ck { background: var(--danger); border-color: var(--danger); }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .txt { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+      .nm, .what { font-size: 12.5px; color: var(--muted); }
+      .st { font-size: 12.5px; margin-top: 3px; }
+      .row.fail .st { color: var(--danger); }
+      .foot { display: flex; justify-content: flex-end; gap: 8px; }
+      #after { display: none; }
+    </style>
+    <div class="dlg">
+      <p>Makes three copies of this sheet in the same Drive folder, one after the other (a few minutes in all). <b>This sheet is not changed.</b></p>
+      ${rows}
+      <div id="after" class="notice">
+        <b>Before you share them:</b> in each copy, delete the z_ files in Extensions → Apps Script and use the General manifest.
+        Move Blank and Migrate into the template folder ("(BLANK)" and "(MIGRATE)" in the names are how the
+        "make a copy" links find them).
+      </div>
+      <div class="foot"><button type="button" class="btn sec" id="closeBtn" onclick="google.script.host.close()">Cancel</button>
+        <button type="button" class="btn pri" id="goBtn" onclick="start()">Make the 3 copies</button></div>
+    </div>
+    <script>
+      const ORDER = ${JSON.stringify(order)};
+      const el = id => document.getElementById(id);
+      function start() {
+        el('goBtn').disabled = true; el('closeBtn').textContent = 'Close';
+        next(0);
+      }
+      function next(i) {
+        if (i >= ORDER.length) { el('after').style.display = 'block'; el('goBtn').style.display = 'none'; return; }
+        const k = ORDER[i];
+        el('r_' + k).className = 'row now'; el('s_' + k).textContent = 'Making the copy…';
+        google.script.run
+          .withSuccessHandler(r => {
+            el('r_' + k).className = 'row done'; el('c_' + k).textContent = '✓';
+            el('s_' + k).innerHTML = '<a href="' + r.url + '" target="_blank" rel="noopener">Open ' + r.name.replace(/</g, '&lt;') + '</a>';
+            next(i + 1);
+          })
+          .withFailureHandler(e => {
+            el('r_' + k).className = 'row fail'; el('c_' + k).textContent = '✕';
+            el('s_' + k).textContent = 'Stopped: ' + (e && e.message ? e.message : e) + ' (if a copy was made, you can delete it).';
+            next(i + 1); // the others still get made
+          })
+          .ownerMakeCopy(k);
+      }
+    </script>`;
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(560), "📦 Make All 3 Copies");
+}
+
+/** One copy for the pop-up above: "example" | "blank" | "migrate". Returns { name, url }. */
+function ownerMakeCopy(kind) {
+  const c = OWNER_COPY_KINDS_[kind];
+  if (!c) throw new Error("Unknown copy: " + kind);
+  return runAction_("Make copy: " + c.title, () => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const copy = ownerCopyThisSheet_(ss, c.label);
+    if (kind === "example") {
+      ownerRunOnCopy_(copy, () => loadFakeDataSteps_(copy)); // same as "Copy Sheet, Then Load Fake Data on the Copy"
+    } else {
+      const migrate = kind === "migrate";
+      ownerSetAutoMigrate_(copy, migrate); // before the reset: the Welcome tab reads it
+      resetToDisplayModeSteps_(copy);
+      ownerSetAutoMigrate_(copy, migrate);
+    }
+    SpreadsheetApp.flush();
+    return { name: copy.getName(), url: copy.getUrl() };
+  });
+}
+
+// ----------------------------------------------------------------------
+// 🔗 MY LINKS: every link from the 📌 YOUR LINKS box (top of Menus.gs), whether
+// it is set, and where it shows. Changing one = editing that box.
+// ----------------------------------------------------------------------
+function ownerMenuMyLinks() {
+  const esc = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const icon = { video: "🎬", doc: "📄", folder: "🗂️", form: "🐞", sheet: "🔔" };
+  const rows = linkList_().map(l => {
+    const value = l.url
+      ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">Open</a>` +
+        (l.now && l.now !== l.url ? ` · <a href="${esc(l.now)}" target="_blank" rel="noopener">newest file</a>` : "")
+      : `<span class="no">${l.kind === "video" ? "Not set: no button" : "Not set: the User Guide opens"}</span>`;
+    return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div></td>
+      <td class="w">${esc(l.where)}</td><td class="v">${value}</td></tr>`;
+  }).join("");
+  const html = include_('Styles') + `
+    <style>
+      .dlg { padding: 6px 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      td { border-top: 1px solid var(--line); padding: 7px 6px; vertical-align: top; }
+      .k { font-size: 11.5px; color: var(--faint); font-family: monospace; }
+      .w { color: var(--muted); font-size: 12.5px; }
+      .v { white-space: nowrap; }
+      .no { color: var(--warn); font-size: 12.5px; }
+    </style>
+    <div class="dlg">
+      <p><b>To add or change a link:</b> Extensions → Apps Script → <b>Menus</b> → the <b>📌 YOUR LINKS</b> box at the very top.
+        Paste the link between the quote marks "" next to the name in grey, save, then paste Menus into the master template
+        and run Reset to Display Mode there (the Welcome tab is only made again by a reset).</p>
+      <table>${rows}</table>
+    </div>`;
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(720).setHeight(600), "🔗 My Links");
 }
 
 /** Backend B3 (Auto-Migrate toggle) of ss: "Yes" = upgrade template, "No" = new-user template. */

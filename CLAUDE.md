@@ -382,6 +382,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
 - 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
 - 🐞 Debug → 🔄 Copy Sheet and Set to Migrate (2026-11-12): re-paste Menus and z_MINE (owner sheet), z_NewCopy.
+- 📌 YOUR LINKS box + 🔗 My Links + 📦 Make All 3 Copies (2026-11-12): re-paste Menus, GettingStartedSidebar (every
+  sheet) and z_MINE (owner sheet).
 - Welcome tab after a reset + permissions (2026-11-12, later): re-paste Menus, Regenerate (script) and
   GettingStartedSidebar (HTML); then run Reset to Display Mode on the master template; upload the new
   docs/PC_Tracker_User_Guide.pdf to the guide folder.
@@ -436,6 +438,18 @@ needed a reload. Getting Started texts: step 2 "Build your sheets (Input Data Mo
 - docs (2026-11-12): Part 1 rewritten for this path (md is the source; scratchpad script regenerated Part 1 of
   guide.html / build_guide.js from it; docx + pdf rebuilt), plus Settings labels, Follow-up values, search bar position,
   Events type buttons, Your Lists upload + View step, "RAW Data" -> "Raw Data", the external-service row.
+
+📌 YOUR LINKS (owner's request 2026-11-12): every link the owner pastes is in ONE box at the very top of Menus.gs, with
+plain-language comments (how to paste, where each shows, empty = no video button / the User Guide opens):
+GUIDE_LINKS (setupVideo, downloadDataVideo, downloadDataDoc = the old DATA_GUIDE_URL doc, guideDoc, buildDoc,
+settingsDoc, contactLogDoc), GUIDE_FOLDER_ID, TEMPLATE_FOLDER_ID, BUG_REPORT_FORM_URL, VERSION_TRACKER_ID (moved there
+from their sections, same names; DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc). setupVideo: Welcome tab "🎬 Watch the
+setup video" (when set) + checklist Help. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
+ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
+🐞 Debug → 📦 Make All 3 Copies (ownerMenuMakeAllCopies, z_MINE.gs): a pop-up makes "… - (EXAMPLE)" (fake data, as
+"Copy Sheet, Then Load Fake Data"), "… - (BLANK)" (B3 = No + display reset) and "… - (MIGRATE)" (B3 = Yes + display
+reset), ONE google.script.run call each (ownerMakeCopy(kind); each run has its own 6-minute limit), showing each link;
+a failed one doesn't stop the others. This sheet is never changed.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first

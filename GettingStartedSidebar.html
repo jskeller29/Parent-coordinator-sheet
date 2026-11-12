@@ -168,6 +168,7 @@
       const help = el('helpLinks');
       help.innerHTML = '';
       if (state.links.guideDoc !== state.userGuideUrl) addLink(help, 'Getting started guide', state.links.guideDoc);
+      addLink(help, 'Video: setting up your tracker', state.links.setupVideo);
       addLink(help, 'Video: how to download your data', state.links.downloadDataVideo);
       addLink(help, 'User Guide', state.userGuideUrl);
       addLink(help, 'Report a bug or ask a question', state.links.bugReport);

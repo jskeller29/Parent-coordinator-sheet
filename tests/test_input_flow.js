@@ -287,6 +287,45 @@ function listsSheet() {
   assert(/set to Migrate/.test(shown[0]), 'done message: ' + shown[0]);
   console.log("Debug → Copy Sheet and Set to Migrate: ok");
 }
+{
+  // 🐞 Debug → 📦 Make All 3 Copies: Blank (B3 = No) and Migrate (B3 = Yes) are reset copies,
+  // Example is the fake-data copy; 🔗 My Links lists every link from the YOUR LINKS box
+  const mine = makeSpreadsheet(TABS);
+  mine.getName = () => "Mine";
+  const app = fakeSpreadsheetApp(mine);
+  const g = loadProject({ owner: true, extra: { SpreadsheetApp: app } });
+  const made = [];
+  g.ownerCopyThisSheet_ = (ss, label) => {
+    const n = made.length, c = makeSpreadsheet(TABS); c.getId = () => "COPY_" + n; c.getUrl = () => "https://example.org/" + n;
+    c.getName = () => "Mine - " + label; made.push({ label: label, copy: c }); return c;
+  };
+  g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
+  const steps = [];
+  g.resetToDisplayModeSteps_ = c => steps.push(["reset", c.getSheetByName("Backend").getRange("B3").getValue()]);
+  g.ownerRunOnCopy_ = (c, fn) => { steps.push(["fake"]); };
+  const b = g.ownerMakeCopy("blank"), m = g.ownerMakeCopy("migrate"), e = g.ownerMakeCopy("example");
+  assert.deepStrictEqual(made.map(x => x.label), ["(BLANK)", "(MIGRATE)", "(EXAMPLE)"]);
+  assert.deepStrictEqual(steps, [["reset", "No"], ["reset", "Yes"], ["fake"]], 'B3 set before each reset; Example loads fake data');
+  assert.strictEqual(made[0].copy.getSheetByName("Backend").getRange("B3").getValue(), "No");
+  assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "Yes");
+  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Mine - (BLANK)", url: "https://example.org/0" }));
+  assert(m.url && e.url);
+  assert.throws(() => g.ownerMakeCopy("other"), /Unknown copy/);
+  let dialog = "";
+  app._ui.showModalDialog = (h, title) => { dialog = title + "\n" + h._html; };
+  g.include_ = () => "";
+  g.HtmlService = { createHtmlOutput: h => { const o = { _html: h }; o.setWidth = () => o; o.setHeight = () => o; return o; } };
+  g.ownerMenuMakeAllCopies();
+  assert(/ownerMakeCopy/.test(dialog) && /\(BLANK\)/.test(dialog) && /\(MIGRATE\)/.test(dialog) && /\(EXAMPLE\)/.test(dialog), 'the 3-copies pop-up');
+  g.getGuideLink_ = () => "https://example.org/guide.pdf";
+  g.ownerMenuMyLinks();
+  Object.keys(g.__get("GUIDE_LINKS")).forEach(k => assert(dialog.indexOf(k) !== -1, 'My Links lists ' + k));
+  assert(/YOUR LINKS/.test(dialog) && /guide\.pdf/.test(dialog), 'My Links: where to change them + the newest guide file');
+  // The YOUR LINKS box is the first thing in Menus.gs
+  const src = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
+  assert(src.indexOf('YOUR LINKS') < src.indexOf('function '), 'links box at the top of Menus.gs');
+  console.log("Debug → Make All 3 Copies + My Links: ok");
+}
 
 // ---------------------------------------------------------------- new-user flow pieces
 {

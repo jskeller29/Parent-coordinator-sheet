@@ -6,6 +6,89 @@
 // reminder, and the template / User Guide links.
 // ======================================================================
 
+// ######################################################################
+// ######################################################################
+// ##                                                                  ##
+// ##   📌  YOUR LINKS  -  paste document and video links HERE         ##
+// ##                                                                  ##
+// ######################################################################
+// ######################################################################
+//
+// HOW TO ADD OR CHANGE A LINK
+//   1. Open the video or document and copy its link
+//      (YouTube: Share → Copy.  Google Doc / Drive file: Share → Copy link).
+//      Set it to "Anyone with the link can view", or other schools can't open it.
+//   2. Paste it between the two quote marks "" on the right line below.
+//      Keep the quote marks and the comma at the end of the line.
+//   3. Save (Ctrl+S, Mac ⌘+S).
+//   4. Paste this Menus file into the master template too (and any sheet that
+//      should get the new link), then run 🐞 Debug → Reset to Display Mode on the
+//      master template: the 👋 Welcome tab is only made again by a reset.
+//
+// LEFT EMPTY ("")?  A video button is simply not shown.
+//                   A document button opens the User Guide instead.
+// To see every link at once (set or not, and where it shows):
+//   🐞 Debug → 🔗 My Links
+// ----------------------------------------------------------------------
+
+// 🎬 VIDEOS ------------------------------------------------------------
+// 📄 DOCUMENTS (empty = the User Guide opens instead) ------------------
+const GUIDE_LINKS = {
+  // 🎬 Setting up a new copy: the Welcome tab, the permissions, Initial Setup.
+  //    Shows on: the 👋 Welcome tab ("Watch the setup video") and the
+  //    Getting Started checklist (Help at the bottom).
+  setupVideo: "",
+
+  // 🎬 How to download your data from ATS, Parent Square and NYCSA.
+  //    Shows on: the welcome pop-up after Initial Setup ("Watch the video") and
+  //    the Getting Started checklist (step 1 and Help).
+  downloadDataVideo: "",
+
+  // 📄 How to download / update your data, step by step (a Google Doc).
+  //    Shows on: the welcome pop-up ("How to download your data") and
+  //    Getting Started step 1.
+  downloadDataDoc: "https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing",
+
+  // 📄 A short getting-started guide, if you write one apart from the User Guide.
+  //    Shows on: the welcome pop-up ("Read the User Guide") and Getting Started Help.
+  guideDoc: "",
+
+  // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
+  buildDoc: "",
+
+  // 📄 What each setting does.           Shows on: Getting Started step 3.
+  settingsDoc: "",
+
+  // 📄 How to log a parent contact.       Shows on: Getting Started step 4.
+  contactLogDoc: ""
+};
+
+// 🗂️ FOLDERS, FORM AND TRACKER (already set; change only if you move them) ----
+//    A Drive folder ID is the long part of the folder's link after /folders/
+//    (https://drive.google.com/drive/folders/THIS_PART).
+
+// 📖 The User Guide FOLDER. The NEWEST file in it is the User Guide link
+//    everywhere (📖 Open User Guide, the Welcome tab, Getting Started).
+//    To publish a new guide, put the new file in this folder; no code change.
+const GUIDE_FOLDER_ID = "1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
+
+// 📋 The template FOLDER: the files with "(BLANK)" and "(MIGRATE)" in their names
+//    become the "make a copy" links (End of Year Rollover, 📖 Open User Guide).
+const TEMPLATE_FOLDER_ID = "1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
+
+// 🐞 The bug report form (🐞 Report a Bug, the Welcome tab, Getting Started Help).
+var BUG_REPORT_FORM_URL = "https://forms.gle/5dXR2me3jt37aGhQ9";
+
+// 🔔 The Version Tracker spreadsheet ID (🔔 Check for Updates reads its first tab).
+const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
+
+// (The User Guide's own "Make a copy" buttons are in the docs folder of the
+//  repository, not here: ask Claude to change them.)
+
+// ######################################################################
+// ##   END OF YOUR LINKS                                              ##
+// ######################################################################
+
 // When runInitialSetupWrapper() calls onOpen() to refresh the menu, we don't
 // want onOpen's own "auto-open Migration Wizard" block to fire too — the
 // wrapper opens it authoritatively right after. This global (shared across all
@@ -449,28 +532,42 @@ function showWelcomeDialog() {
 // starts fresh): ZG_AUTO_OPEN ("off"), ZG_SETTINGS_SEEN ("true").
 // ======================================================================
 
-// ----------------------------------------------------------------------
-// LINKS — paste the links here when they're ready.
+// LINKS: GUIDE_LINKS is in the 📌 YOUR LINKS box at the top of this file.
 // An empty DOCUMENT link uses the User Guide instead (the newest file in the guide
-// folder, getGuideLink_; "how to download your data" uses DATA_GUIDE_URL), so every
-// document button works today. An empty VIDEO link is simply not shown.
-// ----------------------------------------------------------------------
-const GUIDE_LINKS = {
-  guideDoc: "",          // DOCUMENT: the getting-started guide (what each tab does, first steps)
-  downloadDataVideo: "", // VIDEO: how to download your data (ATS, Parent Square, NYCSA)
-  downloadDataDoc: "",   // DOCUMENT: how to download your data, step by step
-  buildDoc: "",          // DOCUMENT: what Build Sheets does
-  settingsDoc: "",       // DOCUMENT: what each setting does
-  contactLogDoc: ""      // DOCUMENT: how to log a parent contact
-};
+// folder, getGuideLink_), so every document button works. An empty VIDEO link is not shown.
+
+/**
+ * Every link in the 📌 YOUR LINKS box, what it is, where it shows and its value now
+ * ("" = not set). For 🐞 Debug → 🔗 My Links (z_MINE.gs).
+ */
+function linkList_() {
+  const L = GUIDE_LINKS;
+  let guide = "";
+  try { guide = getGuideLink_(); } catch (e) { guide = ""; }
+  return [
+    { kind: "video", name: "setupVideo", what: "Setting up a new copy", where: "👋 Welcome tab, Getting Started (Help)", url: L.setupVideo },
+    { kind: "video", name: "downloadDataVideo", what: "How to download your data", where: "Welcome pop-up, Getting Started (step 1, Help)", url: L.downloadDataVideo },
+    { kind: "doc", name: "downloadDataDoc", what: "How to download / update your data", where: "Welcome pop-up, Getting Started (step 1)", url: L.downloadDataDoc },
+    { kind: "doc", name: "guideDoc", what: "Getting-started guide", where: "Welcome pop-up, Getting Started (Help)", url: L.guideDoc },
+    { kind: "doc", name: "buildDoc", what: "What Build Sheets does", where: "Getting Started (step 2)", url: L.buildDoc },
+    { kind: "doc", name: "settingsDoc", what: "What each setting does", where: "Getting Started (step 3)", url: L.settingsDoc },
+    { kind: "doc", name: "contactLogDoc", what: "How to log a parent contact", where: "Getting Started (step 4)", url: L.contactLogDoc },
+    { kind: "folder", name: "GUIDE_FOLDER_ID", what: "User Guide folder (newest file = the guide" + (guide && guide !== GUIDE_FOLDER_URL ? ")" : "; no file found)"),
+      where: "📖 Open User Guide, Welcome tab, Getting Started", url: GUIDE_FOLDER_URL, now: guide },
+    { kind: "folder", name: "TEMPLATE_FOLDER_ID", what: "Template folder ((BLANK) / (MIGRATE) files)", where: "End of Year Rollover, 📖 Open User Guide", url: TEMPLATE_FOLDER_URL },
+    { kind: "form", name: "BUG_REPORT_FORM_URL", what: "Bug report form", where: "🐞 Report a Bug, Welcome tab, Getting Started", url: BUG_REPORT_FORM_URL },
+    { kind: "sheet", name: "VERSION_TRACKER_ID", what: "Version Tracker", where: "🔔 Check for Updates", url: "https://docs.google.com/spreadsheets/d/" + VERSION_TRACKER_ID }
+  ];
+}
 
 /** GUIDE_LINKS with the fallbacks filled in (videos stay empty when not set). */
 function zg_links_() {
   const guide = zg_safeGuideLink_();
   return {
+    setupVideo: GUIDE_LINKS.setupVideo,
     downloadDataVideo: GUIDE_LINKS.downloadDataVideo,
     guideDoc: GUIDE_LINKS.guideDoc || guide,
-    downloadDataDoc: GUIDE_LINKS.downloadDataDoc || DATA_GUIDE_URL || guide,
+    downloadDataDoc: GUIDE_LINKS.downloadDataDoc || guide,
     buildDoc: GUIDE_LINKS.buildDoc || guide,
     settingsDoc: GUIDE_LINKS.settingsDoc || guide,
     contactLogDoc: GUIDE_LINKS.contactLogDoc || guide,
@@ -745,8 +842,7 @@ function zg_safeGuideLink_() {
 // auto-opens the bug-report form (with a clickable button as a fallback
 // for browsers that block the automatic pop-up).
 // ==========================================
-// Bug report form (🐞 Report a Bug, and the link on the 👋 Welcome tab)
-var BUG_REPORT_FORM_URL = "https://forms.gle/5dXR2me3jt37aGhQ9";
+// Bug report form: BUG_REPORT_FORM_URL, in the 📌 YOUR LINKS box at the top of this file
 
 function reportABug() {
   const formUrl = BUG_REPORT_FORM_URL;
@@ -1069,6 +1165,7 @@ function buildWelcomeTab_(ss, opts) {
   rows.push({ h: 26 });
   rows.push({ h: 16, style: "divider" });
   rows.push({ c: "Need help?", style: "help" });
+  if (GUIDE_LINKS.setupVideo) rows.push({ c: "🎬 Watch the setup video", link: GUIDE_LINKS.setupVideo });
   rows.push({ c: "📖 Open the User Guide", link: opts.guideUrl || GUIDE_FOLDER_URL });
   rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
   rows.push({ h: 12 });
@@ -2528,8 +2625,8 @@ function ma_finish() {
 //      (Only the newest filled-in Link matters — older links are ignored.)
 // ======================================================================
 
-// The master tracker spreadsheet (shared: Anyone with the link -> Viewer)
-const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
+// The master tracker spreadsheet (shared: Anyone with the link -> Viewer):
+// VERSION_TRACKER_ID, in the 📌 YOUR LINKS box at the top of this file
 
 // How often (in hours) the sheet actually reaches out to the tracker on open
 const VERSION_CHECK_HOURS = 6;
@@ -2587,9 +2684,9 @@ function manualCheckForUpdates() {
 // "Skip" then offers Remind After 2 Weeks / 1 Month / Remove Reminders, which
 // change the setting (also in ⚙️ Settings) and wait that long before asking again.
 // ==========================================
-// "How to update your data" guide. Not linked anywhere now (the reminder always
-// offers Input Data Mode); kept for GUIDE_LINKS.downloadDataDoc (Getting Started).
-const DATA_GUIDE_URL = "https://docs.google.com/document/d/1iKzHa5Mh-K90qNLLcNtPllKPdqDzMH_4_Zjtrw-Nj6w/edit?usp=sharing";
+// "How to update your data" guide (Getting Started): GUIDE_LINKS.downloadDataDoc, top of this file.
+// The old name still works for anything that used it.
+const DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc;
 
 const DATA_REMINDER_DAYS = { week: 7, '2weeks': 14, month: 30 }; // 'off' = never
 const DATA_REMINDER_SNOOZE_KEY = 'DATA_REMINDER_SNOOZE_UNTIL';     // ms; doc property only (not copied)
@@ -3088,13 +3185,9 @@ function resetVersionCheckState() {
 //   template before sharing it and copies will inherit the links.
 // ======================================================================
 
-// The Drive folder that holds the labeled template files.
-const TEMPLATE_FOLDER_ID = "1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
-
-// The Drive folder that holds the User Guide. Whatever the NEWEST file in here
-// is (a PDF or a Google Doc) becomes the "Open User Guide" link — just replace
-// the file to publish a new guide; no code edits.
-const GUIDE_FOLDER_ID = "1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
+// The Drive folders that hold the labeled template files (TEMPLATE_FOLDER_ID) and
+// the User Guide (GUIDE_FOLDER_ID: its NEWEST file, a PDF or a Google Doc, is the
+// "Open User Guide" link): both in the 📌 YOUR LINKS box at the top of this file.
 
 // How long a successful folder scan is cached (script cache) before re-scanning.
 const TEMPLATE_LINKS_CACHE_SECONDS = 6 * 60 * 60; // 6 hours

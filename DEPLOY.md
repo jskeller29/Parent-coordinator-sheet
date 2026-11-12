@@ -66,6 +66,8 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       back, and the Welcome tab is gone after a reload (or the first build)
 - [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained
       first), also after reopening it. Then Google's permission page on a copy: Select all → Continue
+- [ ] Your sheet: 🐞 Debug → 📦 Make All 3 Copies: three copies (EXAMPLE / BLANK / MIGRATE) with a link each; 🔗 My Links
+      lists every link from the 📌 YOUR LINKS box at the top of Menus
 - [ ] Your sheet: 🐞 Debug → 🔄 Copy Sheet and Set to Migrate: the copy "… - (MIGRATE) (date)" opens on the 👋 Welcome
       tab with "Bring over your old data"; its Initial Setup opens the Migration Wizard; your sheet is unchanged
 
