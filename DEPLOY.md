@@ -56,6 +56,8 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 - [ ] On a fresh template copy, before its first build: 🚀 App Menu → 🔄 Import Old Data from last year's tracker
       (Follow-ups translated, lists copied; the menu item is gone once a sheet is built)
 - [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
+- [ ] A fresh copy of the master template: only the 👋 Welcome tab shows; after 🚨 Initial Setup your tabs are
+      back, and the Welcome tab is gone after a reload (or the first build)
 
 ## 5. Going live (after the copy works)
 1. Merge Test-Version into main.

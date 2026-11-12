@@ -45,12 +45,16 @@ var DEFAULT_VISIBLE_SHEETS = TAB_VISIBILITY
   .filter(function(t) { return t.def; })
   .reduce(function(all, t) { return all.concat(t.sheets); }, []);
 
-/** Shows only the default-visible tabs and hides every other sheet. */
+/**
+ * Shows only the default-visible tabs and hides every other sheet. Shown tabs
+ * first: on a new copy the 👋 Welcome tab is the only visible one, and Sheets
+ * refuses to hide the last visible tab.
+ */
 function applyDefaultSheetVisibility_(ss) {
-  ss.getSheets().forEach(function(sheet) {
-    if (DEFAULT_VISIBLE_SHEETS.indexOf(sheet.getName()) !== -1) sheet.showSheet();
-    else sheet.hideSheet();
-  });
+  const sheets = ss.getSheets();
+  const isDefault = function(sheet) { return DEFAULT_VISIBLE_SHEETS.indexOf(sheet.getName()) !== -1; };
+  sheets.forEach(function(sheet) { if (isDefault(sheet)) sheet.showSheet(); });
+  sheets.forEach(function(sheet) { if (!isDefault(sheet)) sheet.hideSheet(); });
 }
 
 /**
@@ -237,7 +241,10 @@ function buildMenus_() {
     if (ownerBeforeSetup) {
       try { ownerBeforeSetup.addMenus(ui); } catch (e) { console.error(e); }
     }
-    
+
+    // New copy: the 👋 Welcome tab is the only tab shown until Initial Setup has run
+    try { showWelcomeTabOnly_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error("Welcome tab: " + e.message); }
+
     try {
       if (isAutoMigrateOn_()) {
         // Upgrade-template copy: point the user at Initial Setup, which kicks
@@ -263,6 +270,12 @@ function buildMenus_() {
   // WHAT SHOWS AFTER SETUP IS COMPLETE:
   // ==============================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // The 👋 Welcome tab Initial Setup hid is deleted now (not in the setup call itself: see WELCOME TAB)
+  if (!IS_RUNNING_SETUP) {
+    try { deleteWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
+  }
+
   // Check if the sheets have ACTUALLY been built (a student under the Student List header)
   const isBuilt = studentListIsBuilt_(ss);
 
@@ -722,8 +735,11 @@ function zg_safeGuideLink_() {
 // auto-opens the bug-report form (with a clickable button as a fallback
 // for browsers that block the automatic pop-up).
 // ==========================================
+// Bug report form (🐞 Report a Bug, and the link on the 👋 Welcome tab)
+var BUG_REPORT_FORM_URL = "https://forms.gle/5dXR2me3jt37aGhQ9";
+
 function reportABug() {
-  const formUrl = "https://forms.gle/5dXR2me3jt37aGhQ9";
+  const formUrl = BUG_REPORT_FORM_URL;
   const htmlContent = include_('Styles') + `
     <style>
       .note-dlg { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 14px; }
@@ -815,6 +831,8 @@ function runInitialSetupWrapper() {
   // HIDE UNNECESSARY SHEETS — start from the default-visible set...
   // =======================================================
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // New copy: move to the Contact Log and hide the 👋 Welcome tab (deleted at the next open / build)
+  try { leaveWelcomeTab_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
   applyDefaultSheetVisibility_(ss);
 
   // ...then reveal the optional tabs/columns the inherited settings ask for.
@@ -843,6 +861,148 @@ function runInitialSetupWrapper() {
     // Getting Started: its welcome + the checklist (📖 Open User Guide still opens showWelcomeDialog)
     showGuideWelcome_();
   }
+}
+
+// ==========================================
+// 1.6. 👋 WELCOME TAB (new copies, before Initial Setup)
+// Owner's request 2026-11-12. Until Initial Setup has run, every open shows this
+// tab and hides all the others (buildMenus_; the simple onOpen may change its own
+// sheet). The code makes it when it is missing, so the template doesn't need one.
+// Initial Setup moves the user to the Contact Log and hides it; it is deleted at
+// the next open or build, never in the setup call itself: deleting the tab the user
+// is on breaks the rest of the session ("Sheet <id> not found", see Z#InputDataMode.gs).
+// ==========================================
+var WELCOME_TAB_NAME = "👋 Welcome";
+
+/** Before setup: makes the Welcome tab if needed, shows it and hides every other tab. */
+function showWelcomeTabOnly_(ss) {
+  const tab = ss.getSheetByName(WELCOME_TAB_NAME) || buildWelcomeTab_(ss);
+  if (tab.isSheetHidden()) tab.showSheet();
+  tab.activate();
+  ss.getSheets().forEach(function(sheet) {
+    if (sheet.getSheetId() !== tab.getSheetId() && !sheet.isSheetHidden()) sheet.hideSheet();
+  });
+}
+
+/** Initial Setup: moves the user to the Contact Log (else the first default tab) and hides the Welcome tab. */
+function leaveWelcomeTab_(ss) {
+  const tab = ss.getSheetByName(WELCOME_TAB_NAME);
+  if (!tab || tab.isSheetHidden()) return;
+  let landing = null;
+  for (let i = 0; i < DEFAULT_VISIBLE_SHEETS.length && !landing; i++) landing = ss.getSheetByName(DEFAULT_VISIBLE_SHEETS[i]);
+  if (!landing) landing = ss.getSheets().filter(function(s) { return s.getSheetId() !== tab.getSheetId(); })[0];
+  if (!landing) return; // the only tab: keep it
+  landing.showSheet();
+  landing.activate();
+  tab.hideSheet();
+}
+
+/**
+ * After setup (next open / build): deletes the Welcome tab. If the user is on it
+ * (setup stopped half way), the default tabs come back and it is only hidden now,
+ * then deleted the next time.
+ */
+function deleteWelcomeTab_(ss) {
+  const tab = ss.getSheetByName(WELCOME_TAB_NAME);
+  if (!tab) return false;
+  if (!tab.isSheetHidden() && ss.getActiveSheet().getSheetId() === tab.getSheetId()) {
+    leaveWelcomeTab_(ss);
+    applyDefaultSheetVisibility_(ss);
+    return false;
+  }
+  ss.deleteSheet(tab);
+  return true;
+}
+
+/** Makes the Welcome tab (first tab, 4 columns, no gridlines) in the "District" colors. */
+function buildWelcomeTab_(ss) {
+  const NAVY = "#183e69", INK = "#1b2430", MUTED = "#566173", FAINT = "#8a94a3", LINE = "#d3d9e1";
+  const upgrade = isAutoMigrateOn_(); // upgrade-template copy: setup opens the Migration Wizard
+
+  const steps = [
+    ["Open 🚀 App Menu",
+     "It's in the menu bar at the top of the screen, after Help. Don't see it? Wait a few seconds, or reload the page."],
+    ["Click 🚨 Initial Setup (Run Once)",
+     "It turns on the sheet's automatic updates and brings back your tabs."],
+    ["Allow access",
+     "Google asks you to allow the script: choose your Google account and click Allow. If Google says it hasn't " +
+     "verified this app, click Advanced, then the \"Go to …\" link. If setup doesn't start after you allow it, " +
+     "click 🚨 Initial Setup (Run Once) again."],
+    upgrade
+      ? ["Bring over your old data",
+         "When setup is done, this tab is removed, your tabs come back and the Migration Wizard opens to bring your data over from your old sheet."]
+      : ["Load your data",
+         "When setup is done, this tab is removed and your tabs come back. A welcome window then shows you how to load your student data and build your sheets."]
+  ];
+
+  // One entry per row: h = fixed height (spacers; other rows grow to fit), band =
+  // navy background, b = step number (column B), c = text (column C), style = how
+  // it looks, link = c is a link. No merged cells: Sheets doesn't grow a merged row.
+  const rows = [
+    { h: 20 },
+    { h: 16, band: true },
+    { h: 44, band: true, c: "Welcome to the PC Tracker", style: "title" },
+    { band: true, c: "Your parent contacts, events and family directory in one place, with your PCAR filled in for you.", style: "subtitle" },
+    { h: 18, band: true },
+    { h: 26 },
+    { c: "SET UP YOUR COPY", style: "label" },
+    { h: 10 }
+  ];
+  steps.forEach(function(step, i) {
+    if (i) rows.push({ h: 18 });
+    rows.push({ b: i + 1, c: step[0], style: "step" });
+    rows.push({ c: step[1], style: "body" });
+  });
+  rows.push({ h: 26 });
+  rows.push({ h: 16, style: "divider" });
+  rows.push({ c: "Need help?", style: "help" });
+  rows.push({ c: "📖 Open the User Guide", link: GUIDE_FOLDER_URL });
+  rows.push({ c: "🐞 Report a problem", link: BUG_REPORT_FORM_URL });
+  rows.push({ h: 12 });
+  rows.push({ c: "This tab is only here until Initial Setup has run. It is then deleted for you.", style: "hint" });
+  rows.push({ h: 24 });
+
+  const sh = ss.insertSheet(WELCOME_TAB_NAME, 0);
+  const n = rows.length;
+  if (sh.getMaxColumns() > 4) sh.deleteColumns(5, sh.getMaxColumns() - 4);
+  if (sh.getMaxRows() > n) sh.deleteRows(n + 1, sh.getMaxRows() - n);
+  sh.setHiddenGridlines(true);
+  sh.setTabColor(NAVY);
+  [32, 56, 600, 32].forEach(function(w, i) { sh.setColumnWidth(i + 1, w); });
+
+  sh.getRange(1, 1, n, 4)
+    .setFontFamily("Montserrat").setFontSize(11).setFontColor(INK)
+    .setVerticalAlignment("top").setWrap(true);
+  sh.getRange(1, 2, n, 2).setValues(rows.map(function(r) {
+    return [r.b || "", r.link ? "" : (r.c || "")];
+  }));
+
+  const byStyle = {};
+  const add = function(style, a1) { (byStyle[style] = byStyle[style] || []).push(a1); };
+  rows.forEach(function(r, i) {
+    const row = i + 1;
+    if (r.h) sh.setRowHeight(row, r.h);
+    if (r.band) add("band", "A" + row + ":D" + row);
+    if (r.style === "step") add("number", "B" + row);
+    if (r.style === "divider") add("divider", "B" + row + ":C" + row);
+    else if (r.style) add(r.style, "C" + row);
+    if (r.link) {
+      sh.getRange(row, 3).setRichTextValue(SpreadsheetApp.newRichTextValue().setText(r.c).setLinkUrl(r.link)
+        .setTextStyle(SpreadsheetApp.newTextStyle().setForegroundColor(NAVY).setUnderline(true).build()).build());
+    }
+  });
+  const look = function(style, apply) { if (byStyle[style]) apply(sh.getRangeList(byStyle[style])); };
+  look("band", function(l) { l.setBackground(NAVY); });
+  look("title", function(l) { l.setFontSize(20).setFontWeight("bold").setFontColor("#ffffff").setVerticalAlignment("middle"); });
+  look("subtitle", function(l) { l.setFontColor("#d5deea"); });
+  look("label", function(l) { l.setFontSize(10).setFontWeight("bold").setFontColor(NAVY); });
+  look("number", function(l) { l.setFontSize(16).setFontWeight("bold").setFontColor(NAVY).setHorizontalAlignment("center"); });
+  look("step", function(l) { l.setFontSize(13).setFontWeight("bold"); });
+  look("body", function(l) { l.setFontColor(MUTED); });
+  look("divider", function(l) { l.setBorder(true, null, null, null, null, null, LINE, SpreadsheetApp.BorderStyle.SOLID); });
+  look("help", function(l) { l.setFontSize(12).setFontWeight("bold"); });
+  look("hint", function(l) { l.setFontSize(10).setFontColor(FAINT); });
+  return sh;
 }
 
 // ==========================================

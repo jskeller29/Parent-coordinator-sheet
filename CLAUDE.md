@@ -21,8 +21,8 @@ Files (shared = every school's sheet):
 - Edits.gs: installedOnEdit, ghost typists (Contact Log / Notes / Events), Raw Data paste clean-up, quick updates
   (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables. (The temporary
   🐞 Contact Log Debug sidebar is the owner's test file z_ContactLogDebug.gs, see below.)
-- Menus.gs: onOpen menus, setup, Getting Started (welcome + checklist, see below), Settings, Student Overrides +
-  report, Rollover, Migration, Version Check, data update reminder, links.
+- Menus.gs: onOpen menus, setup, 👋 Welcome tab (new copies, see below), Getting Started (welcome + checklist, see
+  below), Settings, Student Overrides + report, Rollover, Migration, Version Check, data update reminder, links.
 - Input Data.gs: Input Data Mode (part 1) + Your Lists (part 2), see below.
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
@@ -330,6 +330,24 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Regenerate, Input Data, Z#ContactLog (scripts) and InputDataSidebar, YourListsSidebar, MigrationUI (HTML); owner sheet
   also z_MINE and ADD z_InputDataDebug (owner testing only; never on the master template / schools). Owner sheet: if
   Contact Log column K (Method 2) is hidden from the old site rule, unhide it once by hand.
+- 👋 Welcome tab (2026-11-12): re-paste Menus and Build. Nothing to add to the template (the tab is made on the copy).
+
+👋 Welcome tab (Menus.gs, WELCOME TAB section; owner's request 2026-11-12, not yet tried on a sheet):
+- New copies only: while SETUP_COMPLETE is not "true", every open (buildMenus_, simple onOpen, before the welcome
+  alert) shows the "👋 Welcome" tab and hides every other tab (showWelcomeTabOnly_). The code makes it when missing
+  (buildWelcomeTab_: first tab, 27 rows x 4 columns, no gridlines, navy band, 4 numbered steps: App Menu / Initial
+  Setup / Allow access (incl. "hasn't verified this app" -> Advanced) / Load your data, or "Bring over your old data"
+  on an upgrade copy (isAutoMigrateOn_); User Guide + bug form links (GUIDE_FOLDER_URL, BUG_REPORT_FORM_URL)). An
+  existing tab of that name is reused as is. No merged cells (Sheets doesn't grow a merged row for wrapped text).
+- Initial Setup: leaveWelcomeTab_ shows + activates the Contact Log (else the first default tab) and hides it, then
+  the normal visibility. It is DELETED by deleteWelcomeTab_ at the next open (buildMenus_ after setup, not while
+  IS_RUNNING_SETUP) or build (start of buildAllDerivedSheets), never in the setup call (deleting the tab the user is
+  on breaks the session, see Input Data Mode). If the user is on it then (setup stopped half way), it is hidden, the
+  default tabs come back, and the next open / build deletes it.
+- applyDefaultSheetVisibility_ now shows the default tabs first, then hides the rest (same end result; Sheets refuses
+  to hide the last visible tab, which the Welcome tab is on a new copy).
+- Not in KEEP_TABS_ (a reset deletes it; the next pre-setup open makes it again). The tabs are hidden only when the
+  copy is first opened (a second or two after it loads), since the template's own tabs are what the copy starts with.
 
 Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request):
 - Every lookup goes through getStudentListSheet_ (Core.gs), which renames an old copy's "Master Table" tab the first

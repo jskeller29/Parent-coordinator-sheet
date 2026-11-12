@@ -49,6 +49,8 @@ function buildAllDerivedSheets() {
 function buildAllDerivedSheetsRun_() {
   reportBuildStep_(0); // Reading your data
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // A new copy's 👋 Welcome tab (hidden by Initial Setup) goes now (Menus.gs)
+  try { deleteWelcomeTab_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
   const rawSheet = ss.getSheetByName("Raw Data");
   if (!rawSheet) throw new Error('Sheet "Raw Data" not found.');
   const rawData = rawSheet.getDataRange().getValues();
