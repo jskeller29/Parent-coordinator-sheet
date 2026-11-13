@@ -1134,12 +1134,11 @@ function runInitialSetup_() {
 
 function runInitialSetupSteps_(ss, props) {
   setupAllInstallableTriggers(true);
-  
-  props.setProperty('SETUP_COMPLETE', 'true');
-  
-  // Save this exact sheet's ID so the Clone Detector knows this is the original!
-  props.setProperty('ORIGINAL_SHEET_ID', SpreadsheetApp.getActiveSpreadsheet().getId());
-  
+
+  // ORIGINAL_SHEET_ID: this exact sheet's ID, so the Clone Detector knows this is the original!
+  // (both in one call: every property call takes time, owner 2026-11-13 "setup is slow")
+  props.setProperties({ SETUP_COMPLETE: 'true', ORIGINAL_SHEET_ID: SpreadsheetApp.getActiveSpreadsheet().getId() });
+
 // =======================================================
   // SETTINGS: inherit the template's saved settings, fall back to defaults.
   // A fresh copy carries its settings in the Backend Version section (cell values
@@ -1164,9 +1163,10 @@ function runInitialSetupSteps_(ss, props) {
   const finalSettings = Object.assign({}, defaultSettings, savedSettings || {});
 
   // Write variables straight into memory to eliminate any TypeError possibilities.
-  for (const [key, value] of Object.entries(finalSettings)) {
-    props.setProperty(key, String(value));
-  }
+  // One call for all of them (was one per setting; owner 2026-11-13: setup speed).
+  const settingsToSave = {};
+  for (const [key, value] of Object.entries(finalSettings)) settingsToSave[key] = String(value);
+  props.setProperties(settingsToSave);
 
   // =======================================================
   // WHICH TABS SHOW
@@ -1185,8 +1185,14 @@ function runInitialSetupSteps_(ss, props) {
     try { updateVisualSettings_(getSettings()); } catch (e) { console.error(e); }
   }
 
-  // Baby-proof the tabs (headers, Contact Log END bar, PCAR, built tabs) — Sheet Lock.gs
-  try { applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
+  // Baby-proof the tabs (headers, Contact Log END bar, PCAR, built tabs) — Sheet Lock.gs.
+  // Not on a new copy (owner 2026-11-13, setup speed): checking its ~20 warnings one call at a
+  // time was the slowest part of setup, the first build applies them all anyway (end of
+  // buildAllDerivedSheetsRun_; Input Data Mode's and Migration's builds too), and until then
+  // only the Welcome tab shows. A sheet that is already built still gets them here.
+  if (!newCopy) {
+    try { applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
+  }
 
   // Instant UI swap without refresh! Suppress onOpen's own auto-migrate open
   // for this synchronous call so the wizard isn't opened twice — the
@@ -1727,7 +1733,10 @@ function loadSettingsFromVersionSheet_() {
 }
 
 function getSettings() {
-  const props = PropertiesService.getDocumentProperties();
+  // Every document property in ONE call, then read from that (was one call per setting, ~26;
+  // owner 2026-11-13: setup speed). Same values: a missing key reads as null, as before.
+  const allProps = PropertiesService.getDocumentProperties().getProperties();
+  const props = { getProperty: k => (Object.prototype.hasOwnProperty.call(allProps, k) ? allProps[k] : null) };
   const settings = {
     syncToPhones: props.getProperty('syncToPhones') === 'true',
     

@@ -24,6 +24,7 @@ function propStore(start) {
   const m = Object.assign({}, start || {});
   return {
     getProperty: k => (k in m ? m[k] : null), setProperty: (k, v) => { m[k] = String(v); }, deleteProperty: k => { delete m[k]; },
+    setProperties: (obj, deleteAllOthers) => { if (deleteAllOthers) Object.keys(m).forEach(k => delete m[k]); Object.keys(obj).forEach(k => { m[k] = String(obj[k]); }); },
     getProperties: () => Object.assign({}, m), _m: m
   };
 }

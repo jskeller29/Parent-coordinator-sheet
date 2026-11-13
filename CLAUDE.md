@@ -456,6 +456,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   (HTML) on every sheet.
 - Guide link headings (2026-11-13): re-paste Menus (every sheet) and z_MINE (owner sheet); add the 4 headings to the
   Google Doc and paste each heading's link into 📌 YOUR LINKS (docs/README.md "The headings the tracker links to").
+- Faster Initial Setup (2026-11-13): re-paste Menus on every sheet (master template too: new copies get it from there).
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
@@ -517,6 +518,13 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   runInitialSetup_: under the DOCUMENT lock (60 s wait), skipped when SETUP_FINISHED (doc property) = this sheet's ID,
   so a second window / double click never runs it twice (two runs could re-show tabs after Input Data Mode hid them);
   body = runInitialSetupSteps_. A failure shows "Try again".
+  SETUP SPEED (owner 2026-11-13, "reduce the time setup takes"; counted offline: ~237 Google calls -> ~72): a new copy
+  (Student List not built) skips applySheetLocks_ at setup (~130 of those calls: ~20 protections read one call at a
+  time; the first build applies them, only the Welcome tab shows until then); the settings go in with ONE
+  props.setProperties (was one setProperty each; SETUP_COMPLETE + ORIGINAL_SHEET_ID one more); getSettings reads
+  every property with ONE getProperties (was ~26 getProperty calls; every caller, same values). Left as is: the 4
+  triggers (an edit trigger must exist even if the window is closed), the links / "You're set up" tab rewrite /
+  checklist (proposed: a second call after the question shows; not done). Tested in test_input_flow.js.
 - 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined
   showing during setup looked wrong): newCopy (= Student List not built) -> showWelcomeTabOnly_ +
   updateVisualSettings_(settings, columnsOnly = true); a built sheet -> default tabs + settings as before. Last step:
@@ -866,7 +874,8 @@ several presses. Don't bring it back without asking.
   New Students). NOT on: Raw Data, Backend, owner-only tabs, Contact Log entry rows (incl. column A, so deleting one
   row never warns), Notes / Send Out rows 2+, Events row 1 and rows 3+.
 - applySheetLocks_ adds/refreshes them (only our tagged ones; unchanged ones kept, stale ones removed; never takes over
-  someone else's sheet protection) at the end of every build, at Initial Setup, after buildEventTable / an event delete
+  someone else's sheet protection) at the end of every build, at Initial Setup of a sheet that is already built (a new
+  copy gets them at its first build: owner 2026-11-13, setup speed), after buildEventTable / an event delete
   (Events only) and buildOverrideReport. It also deletes the old version's doc properties (SHEET_LOCK_SNAP_*, SHEET_LOCK_CL_END).
 
 Contact Log search bar (rows below END; its cells are formulas typed in the sheet, not in the repo):

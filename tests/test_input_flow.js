@@ -936,3 +936,60 @@ function listsSheet() {
   assert(v.finished && v.exited && v.canBuild === true, 'the exit result says a build can run');
   console.log("Save, exit and build availability: ok");
 }
+
+// ---------------------------------------------------------------- faster Initial Setup (owner 2026-11-13)
+// A new copy skips Sheet Lock at setup (its first build applies every warning; until then only the
+// Welcome tab shows); a sheet that is already built still gets it. The settings go in with ONE
+// property write, and getSettings reads every property in one call; the values are as before.
+{
+  const setup = (built) => {
+    const ss = makeSpreadsheet(TABS);
+    ss.getSheetByName("Backend").hideSheet();
+    const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+    g.isAutoMigrateOn_ = () => false;
+    g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+    g.onOpen({ source: ss });
+    if (built) g.studentListIsBuilt_ = () => true;
+    let locks = 0;
+    g.applySheetLocks_ = () => { locks++; };
+    const dp = g.PropertiesService.getDocumentProperties();
+    const one = dp.setProperty, many = dp.setProperties;
+    const singles = [], batches = [];
+    dp.setProperty = (k, v) => { singles.push(k); return one(k, v); };
+    dp.setProperties = (o, d) => { batches.push(Object.keys(o)); return many(o, d); };
+    g.runInitialSetup_();
+    return { g, locks, singles, batches };
+  };
+
+  const fresh = setup(false);
+  assert.strictEqual(fresh.locks, 0, 'new copy: no Sheet Lock at setup (the first build does it)');
+  assert.strictEqual(setup(true).locks, 1, 'a built sheet: Sheet Lock at setup as before');
+
+  const p = fresh.g.__props;
+  assert.strictEqual(p.SETUP_COMPLETE, 'true');
+  assert.strictEqual(p.ORIGINAL_SHEET_ID, 'FAKE_SS');
+  const expected = { syncToPhones: 'false', phoneContacts: 'false', parentsDivided: 'false', notesTab: 'false', sendOut: 'false',
+    siteClass: 'false', typeCol: 'false', autoNotes: 'true', disableHiddenNotes: 'false', dataReminder: 'week' };
+  Object.keys(expected).forEach(k => assert.strictEqual(p[k], expected[k], 'setting ' + k));
+  const settingKeys = Object.keys(expected);
+  assert(fresh.batches.some(b => settingKeys.every(k => b.indexOf(k) !== -1)), 'the settings go in with one write');
+  assert.deepStrictEqual(fresh.singles.filter(k => settingKeys.indexOf(k) !== -1 || k === 'SETUP_COMPLETE'), [], 'not one by one');
+
+  // getSettings: one read, same answers (missing = default, saved values win)
+  const g = fresh.g, dp = g.PropertiesService.getDocumentProperties();
+  dp.setProperty('typeCol', 'true'); dp.setProperty('showRawData', 'true'); dp.deleteProperty('autoNotes');
+  let reads = 0, readAll = 0;
+  const get = dp.getProperty, getAll = dp.getProperties;
+  dp.getProperty = k => { reads++; return get(k); };
+  dp.getProperties = () => { readAll++; return getAll(); };
+  const s = g.getSettings();
+  assert.strictEqual(readAll, 1, 'getSettings: every property in one call');
+  assert(reads <= 1, 'getSettings: no one-by-one reads (only the data reminder helper)');
+  assert.strictEqual(s.typeCol, true, 'a saved value');
+  assert.strictEqual(s.autoNotes, true, 'a missing value = its default');
+  assert.strictEqual(s.syncToPhones, false);
+  assert.strictEqual(s.showRawData, true, 'a tab shown in Settings');
+  assert.strictEqual(s.showContactLog, true, 'a tab never saved = its default');
+  assert.strictEqual(s.dataReminder, 'week');
+  console.log("faster Initial Setup (no Sheet Lock on a new copy, one settings write / read): ok");
+}
