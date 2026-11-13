@@ -454,8 +454,12 @@ screen then always shows "One last step: turn off the old tracker's nightly rebu
 Settings steps for new and old Settings labels), no more auto-close. (2) nightlyTriggerShouldRun_ starts with
 retireIfReplaced_ (Build.gs, REPLACED BY A NEWER TRACKER): a marked tracker deletes the firing nightly trigger and
 saves disableNightlySync = true / syncToPhones = false (other people's triggers then skip / delete themselves). The
-mark names the file's ID, so a Drive copy of a marked tracker is not affected. Only trackers with this code read it:
-last year's (older) trackers need the manual Settings step. Tested in test_features.js.
+mark names the file's ID, so a Drive copy of a marked tracker is not affected. (3) checkVersionOnOpen starts with
+retiredTrackerOnOpen_ (Build.gs): opening a marked tracker removes the opener's nightly triggers, saves nightly +
+phone sync off, toasts the new tracker's link and skips the update pop-up / reminders / checklist. Same for a
+year-to-year move and a version update (both use the wizard). Only trackers with this code read the mark: trackers
+on older code need the manual Settings step (their code reads settings only from document properties, and the
+saved-settings block only at a fresh copy's setup, so the new tracker can't switch them off). Tested in test_features.js.
 - New-user flow fixes + bug pass (2026-11-12): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
   GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
   (HTML) on every sheet.

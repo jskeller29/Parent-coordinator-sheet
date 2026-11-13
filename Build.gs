@@ -389,6 +389,23 @@ function retireIfReplaced_(props, uid) {
 }
 
 /**
+ * checkVersionOnOpen (Menus.gs; runs as the person who made that on-open trigger): on a replaced
+ * tracker, removes that person's nightly triggers, saves nightly + phone sync off and toasts the
+ * new tracker's link. Other people's triggers stop when they fire (retireIfReplaced_). Never throws.
+ */
+function retiredTrackerOnOpen_() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const newUrl = replacedByUrl_(ss);
+    if (!newUrl) return false;
+    retireIfReplaced_(PropertiesService.getDocumentProperties(), "");
+    ss.toast("This tracker was brought into a newer one, so its nightly rebuild and phone sync are off. " +
+      "Use the new tracker: " + newUrl, "📦 Old tracker", 20);
+    return true;
+  } catch (err) { console.warn("Retired tracker check failed: " + err.message); return false; }
+}
+
+/**
  * Remembers the current user's nightly trigger as the sheet's one when none is
  * remembered yet (checkVersionOnOpen runs as the person who ran Initial Setup).
  */

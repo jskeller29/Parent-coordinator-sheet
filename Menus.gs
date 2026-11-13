@@ -3206,6 +3206,10 @@ const VERSION_CHECK_HOURS = 6;
  * limited-auth mode and is not allowed to open other spreadsheets.
  */
 function checkVersionOnOpen() {
+  // Brought into a newer tracker (Migration, ma_markOldTracker): turn this one's nightly rebuild and
+  // phone sync off now, without waiting for the trigger to fire, and say where the new one is.
+  // No update pop-up / data reminder / checklist here: this tracker is retired (owner 2026-11-13)
+  if (retiredTrackerOnOpen_()) return;
   // Sheets set up before the change trigger existed get it now (only after setup)
   if (PropertiesService.getDocumentProperties().getProperty('SETUP_COMPLETE') === 'true') {
     ensureChangeTrigger_(null, true);

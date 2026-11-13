@@ -57,6 +57,17 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   assert.strictEqual(o.__props.disableNightlySync, 'true');
   assert.strictEqual(o.__props.syncToPhones, 'false');
 
+  // Opening it turns the opener's nightly trigger off right away and says where the new one is
+  const deleted2 = [];
+  const trigs2 = [trig("T3", "nightlyMasterSync"), trig("T4", "installedOnEdit")];
+  const o2 = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(old),
+    ScriptApp: { getProjectTriggers: () => trigs2, deleteTrigger: t => deleted2.push(t.getUniqueId()) } }, noTrialFiles: true });
+  old._toasts.length = 0;
+  o2.checkVersionOnOpen();
+  assert.deepStrictEqual(deleted2, ["T3"], 'opening the old tracker removes its nightly trigger');
+  assert.strictEqual(o2.__props.disableNightlySync, 'true');
+  assert(/newer one/.test(old._toasts[0].msg) && /FAKE_SS/.test(old._toasts[0].msg), 'the toast names the new tracker');
+
   // A Drive copy of the marked tracker (other ID) keeps its nightly
   const copy = makeSpreadsheet(["Contact Log"]); copy.getId = () => "COPY"; copy._meta = old._meta.slice();
   const c = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(copy) }, noTrialFiles: true });
