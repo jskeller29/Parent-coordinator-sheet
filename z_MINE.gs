@@ -301,7 +301,8 @@ function ownerMenuMyLinks() {
       ? `<a href="${esc(l.url)}" target="_blank" rel="noopener">Open</a>` +
         (l.now && l.now !== l.url ? ` · <a href="${esc(l.now)}" target="_blank" rel="noopener">newest file</a>` : "")
       : `<span class="no">${esc(l.empty || (l.kind === "video" ? "Not set: no button" : "Not set: the User Guide opens"))}</span>`;
-    return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div>${filesList(l.files)}</td>
+    return `<tr><td>${icon[l.kind] || ""} <b>${esc(l.what)}</b><div class="k">${esc(l.name)}</div>` +
+      (l.heading ? `<div class="hd">User Guide heading: “${esc(l.heading)}”</div>` : "") + `${filesList(l.files)}</td>
       <td class="w">${esc(l.where)}</td><td class="v">${value}</td></tr>`;
   }).join("");
   const html = include_('Styles') + `
@@ -310,6 +311,7 @@ function ownerMenuMyLinks() {
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
       td { border-top: 1px solid var(--line); padding: 7px 6px; vertical-align: top; }
       .k { font-size: 11.5px; color: var(--faint); font-family: monospace; }
+      .hd { font-size: 12px; color: var(--muted); margin-top: 2px; }
       .w { color: var(--muted); font-size: 12.5px; }
       .v { white-space: nowrap; }
       .no { color: var(--warn); font-size: 12.5px; }

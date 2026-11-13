@@ -45,15 +45,46 @@ guide there too.
 
 - **Google Doc (recommended):** upload the .docx to the guide folder, right-click it → Open
   with → Google Docs, then delete the .docx so the Google Doc is the only file there. Share it
-  "Anyone with the link → Viewer". Each heading has its own link (click it in the outline on
-  the left, then copy the address), for `guideDoc`, `buildDoc`, `settingsDoc` and
-  `contactLogDoc` in YOUR LINKS.
+  "Anyone with the link → Viewer". Each heading has its own link: see **The headings the
+  tracker links to** below.
 - **PDF:** upload the PDF instead. Its contents and section buttons jump inside the PDF, but a
   link from the sheet always opens it at page 1. Drive's and GitHub's previews may ignore the
   jump links; downloading it or opening it in a PDF reader works.
 
 Keep old versions in a subfolder (for example "Old guides"): the backup only looks at files
 directly in the guide folder.
+
+## The headings the tracker links to
+
+Four buttons in the tracker open the guide at one heading. Each heading has the same words
+as its button, and the code keeps the list in `GUIDE_LINK_HEADINGS_` (Menus.gs, just under
+the 📌 YOUR LINKS box). A test fails if `USER_GUIDE.md` loses one of these headings, so
+rename a heading in both places.
+
+| Heading in the guide | Where it is | Link in 📌 YOUR LINKS | The button that opens it |
+|---|---|---|---|
+| How to download your data | Part 1, Step 5: Load your data | `downloadDataDoc` | Welcome pop-up "How to download your data"; Getting Started step 1 "Guide: how to download your data" |
+| What Build Sheets does | Part 2, Build and Full Sync | `buildDoc` | Getting Started step 2 "Guide: what Build Sheets does" |
+| What each setting does | Part 2, Settings | `settingsDoc` | Getting Started step 3 "Guide: what each setting does" |
+| How to log a parent contact | Part 2, The Contact Log | `contactLogDoc` | Getting Started step 4 "Guide: how to log a parent contact" |
+
+`guideDoc` (Getting Started Help, "Getting started guide") opens the whole guide, so it has
+no heading. The two videos (`setupVideo`, `downloadDataVideo`) are YouTube links.
+
+To put these headings into the Google Doc that is already in Drive (it is edited in place):
+
+1. In the Doc, type each heading at the place in the table: rename "Where to get each
+   export" to "How to download your data", and add the other three as new lines (Build and
+   Full Sync also gets "What Full Sync does" above its second paragraph).
+2. Make each one a Heading 3: click in the line, then pick Heading 3 in the style box
+   (where it says Normal text).
+3. Get its link: click the heading in the outline on the left; the address in the browser
+   now ends in `#heading=h.` and a code. Copy the whole address. (A bookmark works too:
+   Insert → Bookmark, then click the bookmark → Copy link.)
+4. Paste it into that link's line in 📌 YOUR LINKS (Extensions → Apps Script → Menus),
+   save, then paste Menus into the master template and every sheet.
+
+🔗 My Links (🐞 Debug) shows each link with the heading it should open.
 
 ## Updating the guide that is already in Drive
 

@@ -59,19 +59,24 @@ const GUIDE_LINKS = {
   // 📄 How to download / update your data, step by step (a Google Doc).
   //    Shows on: the welcome pop-up ("How to download your data") and
   //    Getting Started step 1.
+  //    Link to the User Guide heading "How to download your data" (Part 1, Step 5).
   downloadDataDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.sfmhczeptaso",
 
   // 📄 A short getting-started guide, if you write one apart from the User Guide.
   //    Shows on: the welcome pop-up ("Read the User Guide") and Getting Started Help.
+  //    No heading: the whole User Guide (or your own short guide).
   guideDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit?usp=sharing",
 
   // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
+  //    Link to the User Guide heading "What Build Sheets does" (Part 2, Build and Full Sync).
   buildDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.el6l1nctxr0r",
 
   // 📄 What each setting does.           Shows on: Getting Started step 3.
+  //    Link to the User Guide heading "What each setting does" (Part 2, Settings).
   settingsDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.q35hspwrw2p9",
 
   // 📄 How to log a parent contact.       Shows on: Getting Started step 4.
+  //    Link to the User Guide heading "How to log a parent contact" (Part 2, The Contact Log).
   contactLogDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.2a6rj2ilhin4"
 };
 
@@ -107,6 +112,16 @@ const VERSION_TRACKER_ID = "1nnJXnYEGyISvQtvsp2M4D1EQT2cHhNWkBXMG1Ubbljc";
 // ######################################################################
 // ##   END OF YOUR LINKS                                              ##
 // ######################################################################
+
+// The User Guide heading each document link above opens (owner's request 2026-11-13): the
+// same words as the button that opens it. docs/USER_GUIDE.md has these exact headings
+// (tests/test_features.js checks it) and 🔗 My Links shows them. Rename a heading in both.
+var GUIDE_LINK_HEADINGS_ = {
+  downloadDataDoc: "How to download your data",
+  buildDoc: "What Build Sheets does",
+  settingsDoc: "What each setting does",
+  contactLogDoc: "How to log a parent contact"
+};
 
 // When runInitialSetupWrapper() calls onOpen() to refresh the menu, we don't
 // want onOpen's own "auto-open Migration Wizard" block to fire too — the
@@ -586,11 +601,11 @@ function linkList_() {
       "📖 Open User Guide, 👋 Welcome tab, Getting Started", "Not set: the guide folder's newest file"),
     { kind: "video", name: "setupVideo", what: "Setting up a new copy", where: "👋 Welcome tab, Getting Started (Help)", url: L.setupVideo },
     { kind: "video", name: "downloadDataVideo", what: "How to download your data", where: "Welcome pop-up, Getting Started (step 1, Help)", url: L.downloadDataVideo },
-    { kind: "doc", name: "downloadDataDoc", what: "How to download / update your data", where: "Welcome pop-up, Getting Started (step 1)", url: L.downloadDataDoc },
+    { kind: "doc", name: "downloadDataDoc", what: "How to download / update your data", where: "Welcome pop-up, Getting Started (step 1)", url: L.downloadDataDoc, heading: GUIDE_LINK_HEADINGS_.downloadDataDoc },
     { kind: "doc", name: "guideDoc", what: "Getting-started guide", where: "Welcome pop-up, Getting Started (Help)", url: L.guideDoc },
-    { kind: "doc", name: "buildDoc", what: "What Build Sheets does", where: "Getting Started (step 2)", url: L.buildDoc },
-    { kind: "doc", name: "settingsDoc", what: "What each setting does", where: "Getting Started (step 3)", url: L.settingsDoc },
-    { kind: "doc", name: "contactLogDoc", what: "How to log a parent contact", where: "Getting Started (step 4)", url: L.contactLogDoc },
+    { kind: "doc", name: "buildDoc", what: "What Build Sheets does", where: "Getting Started (step 2)", url: L.buildDoc, heading: GUIDE_LINK_HEADINGS_.buildDoc },
+    { kind: "doc", name: "settingsDoc", what: "What each setting does", where: "Getting Started (step 3)", url: L.settingsDoc, heading: GUIDE_LINK_HEADINGS_.settingsDoc },
+    { kind: "doc", name: "contactLogDoc", what: "How to log a parent contact", where: "Getting Started (step 4)", url: L.contactLogDoc, heading: GUIDE_LINK_HEADINGS_.contactLogDoc },
     { kind: "folder", name: "GUIDE_FOLDER_ID", what: "User Guide folder (backup: its newest file, when the Version Tracker has no Document link)",
       where: "Same places as the User Guide", url: GUIDE_FOLDER_URL, now: t.guide ? "" : guide, files: guideFolderFiles_().slice(0, 5) },
     { kind: "folder", name: "TEMPLATE_FOLDER_ID", what: "Template folder (backup: its newest (BLANK) file, when the Version Tracker has no Blank Copy link)",

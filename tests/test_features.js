@@ -209,6 +209,22 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   console.log("Migration: newer tracker refused, settings, notes, types, Send Out, history: ok");
 }
 
+// ---------------------------------------------------------------- User Guide headings the document links open
+{
+  const g = loadProject({ noTrialFiles: true });
+  const md = fs.readFileSync(path.join(ROOT, 'docs', 'USER_GUIDE.md'), 'utf8');
+  const headings = md.split(/\r?\n/).filter(l => /^#{2,4} /.test(l)).map(l => l.replace(/^#+ /, '').trim());
+  const H = g.__get('GUIDE_LINK_HEADINGS_'), L = g.__get('GUIDE_LINKS');
+  const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8').toLowerCase();
+  Object.keys(H).forEach(k => {
+    assert(k in L, k + ' is a link in GUIDE_LINKS');
+    assert.strictEqual(headings.filter(h => h === H[k]).length, 1, 'the guide has exactly one heading "' + H[k] + '"');
+    assert(menus.includes('guide: ' + H[k].toLowerCase()), 'the Getting Started button says "' + H[k] + '"');
+  });
+  ['downloadDataDoc', 'buildDoc', 'settingsDoc', 'contactLogDoc'].forEach(k => assert(H[k], k + ' has a heading'));
+  console.log("User Guide: a heading for every document link: ok");
+}
+
 // ---------------------------------------------------------------- Migration: renamed Contact Log headers
 {
   const g = loadProject({ noTrialFiles: true });

@@ -64,7 +64,7 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   then one temp tab at a time ("Student Data", "Parent Square Data", "NYCSA Data"); paste anywhere or upload the
   CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Which file to pick (owner 2026-11-13): IDM_STEPS' last
   howTo line + fileHint (shown on the upload card): Student Data starts with general_, Parent Square = parents.csv,
-  NYCSA starts with Students_With_NonNycsa_Accts_Rpt_ (also in docs/USER_GUIDE.md "Where to get each export"). Sidebar polls every 2s, finds the header row, refuses the
+  NYCSA starts with Students_With_NonNycsa_Accts_Rpt_ (also in docs/USER_GUIDE.md "How to download your data", was "Where to get each export"). Sidebar polls every 2s, finds the header row, refuses the
   wrong export and numbers Excel cut off (E+ / #### / ID-phone columns ending in 000; "Use it anyway" allowed),
   then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
   updateRawDataTimestamp_). Skip keeps old data. Step 4 "Site / Class" (manual, Save button): Class | Teacher Name |
@@ -454,6 +454,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   R2, hides R:AA); then on the master template and the owner's sheet set column D's dropdown BY HAND (DEPLOY.md step 9).
 - Migration + update run-through (2026-11-13): re-paste Build, Menus (scripts) and MigrationUI, VersionDialog
   (HTML) on every sheet.
+- Guide link headings (2026-11-13): re-paste Menus (every sheet) and z_MINE (owner sheet); add the 4 headings to the
+  Google Doc and paste each heading's link into 📌 YOUR LINKS (docs/README.md "The headings the tracker links to").
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
@@ -634,7 +636,14 @@ plain-language comments (how to paste, where each shows, empty = no video button
 GUIDE_LINKS (setupVideo, downloadDataVideo, downloadDataDoc = the old DATA_GUIDE_URL doc, guideDoc, buildDoc,
 settingsDoc, contactLogDoc), GUIDE_FOLDER_ID, TEMPLATE_FOLDER_ID, BUG_REPORT_FORM_URL, VERSION_TRACKER_ID (moved there
 from their sections, same names; DATA_GUIDE_URL = GUIDE_LINKS.downloadDataDoc). setupVideo: Welcome tab "🎬 Watch the
-setup video" (when set) + checklist Help. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
+setup video" (when set) + checklist Help. GUIDE LINK HEADINGS (owner 2026-11-13): GUIDE_LINK_HEADINGS_ (Menus.gs, under the
+box) = the User Guide heading each document link opens, the same words as its button: downloadDataDoc "How to
+download your data" (Part 1 Step 5, was "Where to get each export"), buildDoc "What Build Sheets does" + "What Full
+Sync does" (Part 2, Build and Full Sync), settingsDoc "What each setting does" (Part 2, Settings), contactLogDoc "How to
+log a parent contact" (Part 2, The Contact Log); all #### = Heading 3 in the Doc (outline + heading link). guideDoc =
+the whole guide. Each comment in the box names its heading; 🔗 My Links shows it (linkList_ heading); test_features.js
+fails if USER_GUIDE.md loses one or a Getting Started button stops saying it; docs/README.md has the table + the
+steps to add them to the Google Doc in place and copy each heading link into the box. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
 ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
 VERSION TRACKER LINKS (owner 2026-11-12, "folder = backup"): the Version Tracker's first tab holds the 3 shared links,
 one row per release: D "Blank Copy" (the template's /copy link), E "Example" (a filled-in example tracker), F "Document"

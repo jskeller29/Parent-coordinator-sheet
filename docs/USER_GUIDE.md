@@ -163,7 +163,7 @@ Before the Your Lists step, Input Data Mode builds your sheets. Finish or exit e
 at any step. Save, exit and build my sheets saves what is on the tab, brings your tabs
 back and builds.
 
-#### Where to get each export
+#### How to download your data
 
 Student Data (required), from ATS / Insight:
 
@@ -291,6 +291,8 @@ Turn tabs on or off in ⚙️ Settings → Tabs & columns. Hidden tabs keep upda
 
 Log every call, email, meeting and walk-in here, one row each.
 
+#### How to log a parent contact
+
 | Column | What to enter |
 |---|---|
 | Date | Fills in today if left blank. Type a date to log an earlier contact. |
@@ -334,6 +336,8 @@ the PCAR.
 
 Open 🚀 App Menu → ⚙️ Settings. Choose a section on the left, then click Save & apply.
 
+#### What each setting does
+
 | Section | Setting | What it does |
 |---|---|---|
 | Contacts & sync | Sync contacts to my phone every night | Puts the school directory in your Google Contacts during the nightly run. |
@@ -354,8 +358,12 @@ Import Old Data brings them into next year's copy.
 
 ### Build and Full Sync
 
+#### What Build Sheets does
+
 🏗️ Build Sheets Only works inside the spreadsheet: it rebuilds the Student List,
 Directory, Combined Contact Tracking and the other tabs from your data.
+
+#### What Full Sync does
 
 🧱 Full Sync does a build and then updates your Google Contacts. It keeps a "School
 Directory" label in your contacts matching the Phone Contacts tab: it adds new parents,
