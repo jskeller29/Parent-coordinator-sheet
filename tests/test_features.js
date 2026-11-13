@@ -83,3 +83,31 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   assert(/withFailureHandler[\s\S]{0,300}buildEventTable/.test(ev), 'New Event: a failure is shown');
   console.log("dialogs: no save before load, OSIS check, failures shown: ok");
 }
+
+// ---------------------------------------------------------------- Fake data: Site / Class in the Contact Log
+// (owner 2026-11-13: the Example's Contact Log had no Site / Class; the typist that fills H:I never runs on
+// rows the script writes, so the fake-data load fills them from the Directory after its build)
+{
+  const ss = makeSpreadsheet(["Contact Log", "Directory", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+  const cl = ss.getSheetByName("Contact Log"), dir = ss.getSheetByName("Directory");
+  dir._put([["Last Name", "First Name", "OSIS", "Site", "Class/ Teacher", "Parent Contact"],
+    ["Simpson", "Bart", "123456789", "15", "Y41: Tessa", "Homer"],
+    ["Belcher", "Gene", "967891234", "51", "Y27: Rosa", "Bob"]], 1, 1);
+  cl._put([["", "Date", "Parent", "Person Spoke With", "OSIS", "Student", "#", "Site", "Class"],
+    ["", "11/12/26", "", "Homer Simpson", "123456789", "Bart Simpson"],
+    ["", "11/12/26", "", "Bob Belcher", "967891234", "Gene Belcher"],
+    ["", "", "", "", "", ""],
+    ["", "11/12/26", "", "Someone", "555555555", "Not in the Directory", "", "kept", "as is"]], 1, 1);
+  cl._set(6, 5, "END");
+  g.fillContactLogSiteClass_(ss);
+  assert.deepStrictEqual(cl.getRange(2, 8, 4, 2).getValues(),
+    [["15", "Y41: Tessa"], ["51", "Y27: Rosa"], ["", ""], ["kept", "as is"]], 'each row gets its student\'s Site / Class');
+  assert.strictEqual(cl.getRange(6, 8).getValue(), "", 'the END row is not touched');
+  const regen = fs.readFileSync(path.join(ROOT, 'Regenerate.gs'), 'utf8');
+  const start = regen.indexOf('function loadFakeDataSteps_');
+  const body = regen.slice(start, regen.indexOf('\nfunction ', start + 10));
+  assert(body.indexOf('buildAllDerivedSheets();') !== -1 && body.indexOf('buildAllDerivedSheets();') < body.indexOf('fillContactLogSiteClass_(ss)'),
+    'the fake-data load fills them after its build (the Directory exists then)');
+  console.log("Fake data: Contact Log Site / Class from the Directory: ok");
+}

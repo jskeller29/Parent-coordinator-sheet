@@ -338,7 +338,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
 - Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
   Belcher Louise/Gene + override-only Tina, Addams Wednesday/Pugsley), Parent Square, NYCSA, Site/Class in the new
   BH:BI format (one row per site, classes one per line; 5 of 6 sites have 2-3 classes; "Y12"/"Y50" have no teacher),
-  26 Contact Log rows (30-row log; each row carries its Type / Follow-up / Follow-up note), 3 events (Fall PTC,
+  26 Contact Log rows (30-row log; each row carries its Type / Follow-up / Follow-up note; Site / Class H:I filled
+  from the Directory right after the build, fillContactLogSiteClass_, owner 2026-11-13: the typist that fills them
+  never runs on script writes, so the Example had them empty), 3 events (Fall PTC,
   Graduation Workshop, Spring Festival; Backend Event Log rows now in the real column order), 5 Notes rows, 3
   New/Edit Student overrides (New Student Tina Belcher, Peter Parker + guardian, Diana Prince hidden from report),
   then the Students Override Report. PCAR gets no fake data (built from other tabs); Send Out: see below.

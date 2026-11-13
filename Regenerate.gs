@@ -162,6 +162,10 @@ function loadFakeDataSteps_(ss) {
     buildAllDerivedSheets();
   }
 
+  // Site / Class (H:I) of the fake Contact Log rows, now that the build made the Directory (owner
+  // 2026-11-13: the Example showed them empty; the typist that fills them never runs on script writes)
+  fillContactLogSiteClass_(ss);
+
   // Students Override Report (from the fake overrides above), then back to the Contact Log
   if (typeof buildOverrideReport === "function") buildOverrideReport();
   const contactLogTab = ss.getSheetByName("Contact Log");
@@ -501,6 +505,34 @@ function loadFakeClassSiteData_(ss) {
 /* =========================
 CONTACT LOG (16 Column Version)
 ========================= */
+
+/**
+ * Site / Class (H:I) for every Contact Log row with an OSIS, from the Directory, the way the
+ * typist fills them when a row is typed or pasted (buildDirectorySiteClassLookup_, Edits.gs).
+ * For the fake data: its rows are written by the script, so no typist ran (owner 2026-11-13).
+ * Run after a build (it needs the Directory). A student with no site / class keeps what the row
+ * has; nothing is written when H:I are already right.
+ */
+function fillContactLogSiteClass_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  const endRow = sheet && findEndRowInColumnE_(sheet);
+  if (!endRow || endRow <= 2) return;
+  const n = endRow - 2;
+  const siteClass = buildDirectorySiteClassLookup_(ss);
+  const osis = sheet.getRange(2, CL_COL_OSIS, n, 1).getValues();
+  const siteClassRange = sheet.getRange(2, 8, n, 2); // H Site, I Class
+  const now = siteClassRange.getValues();
+  let changed = false;
+  const out = osis.map((r, i) => {
+    const o = String(r[0]).trim();
+    if (!o) return now[i];
+    const sc = siteClass(o);
+    if (!sc.site && !sc.cls) return now[i];
+    if (String(now[i][0]) !== sc.site || String(now[i][1]) !== sc.cls) changed = true;
+    return [sc.site, sc.cls];
+  });
+  if (changed) siteClassRange.setValues(out);
+}
 
 function loadFakeContactLog_(ss) {
   const sheet = ss.getSheetByName("Contact Log");
