@@ -379,7 +379,15 @@ It goes through six steps:
 5. Match up the Contact Log, column by column.
 6. Rebuild the directory and the other tabs.
 
-Your old sheet is only read, never changed. Keep it until you have checked the new one.
+Your old sheet's tabs are only read, never changed. Keep it until you have checked the new one.
+
+> [!IMPORTANT]
+> Your old tracker still rebuilds every night, and with phone sync on it keeps sending
+> last year's families to your Google Contacts. When the wizard is done it shows a button
+> to open the old tracker. There, open 🚀 App Menu → ⚙️ Settings, set Rebuild sheets to
+> "Only when I click Build", untick "Sync contacts to my phone every night" and save.
+> On an older tracker, turn on "Disable Nightly Sync Entirely" instead. Newer trackers
+> turn their nightly rebuild off by themselves once they have been brought over.
 
 ### Updates
 

@@ -3061,6 +3061,29 @@ function ma_migrateContactLog(url) {
 }
 
 /**
+ * After step 6: marks the OLD tracker as replaced by this one (invisible developer metadata,
+ * see REPLACED BY A NEWER TRACKER in Build.gs), so its nightly rebuild / phone sync turns
+ * itself off the next time it fires, if the old tracker runs code that reads the mark.
+ * Never throws. Returns { url, name, marked } for the wizard's done screen, which always
+ * also says how to turn it off by hand (older trackers ignore the mark; no edit access = no mark).
+ */
+function ma_markOldTracker(url) {
+  let oldSS;
+  try { oldSS = SpreadsheetApp.openByUrl(url); } catch (e) { return { url: url, name: "", marked: false }; }
+  const res = { url: url, name: "", marked: false };
+  try { res.name = oldSS.getName(); res.url = oldSS.getUrl(); } catch (e) { /* the link as given */ }
+  try {
+    const here = SpreadsheetApp.getActiveSpreadsheet();
+    if (replacedByUrl_(oldSS)) { res.marked = true; return res; }
+    oldSS.addDeveloperMetadata(REPLACED_BY_MARK_, JSON.stringify({ old: oldSS.getId(), newUrl: here.getUrl() }));
+    res.marked = true;
+  } catch (e) {
+    console.warn("Old tracker not marked (no edit access?): " + e.message);
+  }
+  return res;
+}
+
+/**
  * STEP 6: Final Rebuild
  */
 function ma_finish() {

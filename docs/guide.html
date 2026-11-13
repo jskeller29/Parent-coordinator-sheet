@@ -104,11 +104,11 @@
 <p>Before the Your Lists step, Input Data Mode builds your sheets. Finish or exit ends it at any step. Save, exit and build my sheets saves what is on the tab, brings your tabs back and builds.</p>
 <h4 id="where-to-get-each-export">Where to get each export</h4>
 <p>Student Data (required), from ATS / Insight:</p>
-<ol><li>Sign in to TeachHub and open Insight.</li><li>Go to Tools → Downloader.</li><li>Under &quot;Data Available for Download&quot;, select only Guardian Contact Information, then download.</li></ol>
+<ol><li>Sign in to TeachHub and open Insight.</li><li>Go to Tools → Downloader.</li><li>Under &quot;Data Available for Download&quot;, select only Guardian Contact Information, then download.</li><li>In your Downloads, look for the file whose name starts with general_.</li></ol>
 <p>Parent Square (optional):</p>
-<ol><li>Sign in to ParentSquare and open Admin.</li><li>Under Data Assistant, select Parents.</li><li>Click Export CSV.</li></ol>
+<ol><li>Sign in to ParentSquare and open Admin.</li><li>Under Data Assistant, select Parents.</li><li>Click Export CSV.</li><li>In your Downloads, look for the file named parents.csv.</li></ol>
 <p>NYCSA (optional):</p>
-<ol><li>Sign in to TeachHub and open Family Access Management.</li><li>Export the &quot;Students with Non-NYCSA Account&quot; report.</li></ol>
+<ol><li>Sign in to TeachHub and open Family Access Management.</li><li>Export the &quot;Students with Non-NYCSA Account&quot; report.</li><li>In your Downloads, look for the file whose name starts with Students_With_NonNycsa_Accts_Rpt_.</li></ol>
 <h4 id="pasting-into-raw-data-yourself">Pasting into Raw Data yourself</h4>
 <p>You can also paste an export straight into the Raw Data tab (turn it on in Settings → Tabs &amp; columns): Student Data into cell A5, Parent Square into AG6, NYCSA into AP2.</p>
 <div class="note important"><div class="lab">Important</div><p>Paste values only, with Ctrl+Shift+V or Edit → Paste special → Values only. A normal paste can bring in formatting or formulas that break the build. Input Data Mode does this for you.</p></div>
@@ -151,7 +151,8 @@
 <h3 id="bring-over-last-years-data">Bring over last year's data</h3>
 <p>Choose &quot;No, bring over last year's tracker&quot; in the window after Initial Setup, or open 🚀 App Menu → 🔄 Import Old Data at any time. The wizard lists the trackers it finds in your Google Drive: click yours, or paste its link if it isn't listed, then click Bring it over. It goes through six steps:</p>
 <ol><li>Connect to the old sheet.</li><li>Bring over your settings.</li><li>Copy the ATS Raw Data.</li><li>Copy events, student changes and your lists.</li><li>Match up the Contact Log, column by column.</li><li>Rebuild the directory and the other tabs.</li></ol>
-<p>Your old sheet is only read, never changed. Keep it until you have checked the new one.</p>
+<p>Your old sheet's tabs are only read, never changed. Keep it until you have checked the new one.</p>
+<div class="note important"><div class="lab">Important</div><p>Your old tracker still rebuilds every night, and with phone sync on it keeps sending last year's families to your Google Contacts. When the wizard is done it shows a button to open the old tracker. There, open 🚀 App Menu → ⚙️ Settings, set Rebuild sheets to &quot;Only when I click Build&quot;, untick &quot;Sync contacts to my phone every night&quot; and save. On an older tracker, turn on &quot;Disable Nightly Sync Entirely&quot; instead. Newer trackers turn their nightly rebuild off by themselves once they have been brought over.</p></div>
 <h3 id="updates">Updates</h3>
 <p>When you open the sheet, the tracker checks at most every few hours whether a newer version is out, and shows what changed. You can also check with 🚀 App Menu → 🔔 Check for Updates. In that window you can dismiss the update for now, dismiss it until a newer one comes out, ask to hear about major updates only, or stop the automatic check.</p>
 <p>An update doesn't change your current sheet. To move to a new version, click Get the latest version, make a copy, run Initial Setup, and choose &quot;No, bring over last year's tracker&quot;. Your data, lists and settings come with it.</p>

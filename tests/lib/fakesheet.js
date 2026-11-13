@@ -110,6 +110,7 @@ function makeSpreadsheet(tabNames) {
   const ss = {
     _sheets: [], _active: null, _log: [],
     getId: () => "FAKE_SS",
+    getUrl: () => "https://docs.google.com/spreadsheets/d/" + ss.getId() + "/edit",
     getSheets: () => ss._sheets.slice(),
     getSheetByName: n => ss._sheets.find(s => s.getName() === n) || null,
     getActiveSheet: () => ss._active,

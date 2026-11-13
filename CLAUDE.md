@@ -436,6 +436,18 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - No "Action Blocked" while a z_ file is there (2026-11-12): re-paste Menus (every sheet).
 - Make Release Copies: the Blank's Welcome tab links the new Example (2026-11-12): re-paste Menus (every sheet) and
   z_MINE (owner sheet).
+- Old tracker's nightly off after Migration (2026-11-13): re-paste Build, Menus (script) and MigrationUI (HTML) on
+  every sheet.
+
+OLD TRACKER'S NIGHTLY AFTER MIGRATION (owner's request 2026-11-13): a new tracker can't delete another project's
+triggers, so: (1) after step 6 the wizard calls ma_markOldTracker(url) (Menus.gs): invisible developer metadata
+PC_TRACKER_REPLACED_BY = { old: old file ID, newUrl } on the OLD file (needs edit access; never throws); its done
+screen then always shows "One last step: turn off the old tracker's nightly rebuild" (Open "<old name>" button +
+Settings steps for new and old Settings labels), no more auto-close. (2) nightlyTriggerShouldRun_ starts with
+retireIfReplaced_ (Build.gs, REPLACED BY A NEWER TRACKER): a marked tracker deletes the firing nightly trigger and
+saves disableNightlySync = true / syncToPhones = false (other people's triggers then skip / delete themselves). The
+mark names the file's ID, so a Drive copy of a marked tracker is not affected. Only trackers with this code read it:
+last year's (older) trackers need the manual Settings step. Tested in test_features.js.
 - New-user flow fixes + bug pass (2026-11-12): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
   GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
   (HTML) on every sheet.

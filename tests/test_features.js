@@ -32,6 +32,40 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   console.log("Migration: which sheet + a bigger Raw Data: ok");
 }
 
+// ---------------------------------------------------------------- Migration: the old tracker's nightly
+{
+  const here = makeSpreadsheet(["Contact Log", "Backend"]);
+  const old = makeSpreadsheet(["Contact Log"]); old.getId = () => "OLD"; old.getName = () => "PC Tracker 2025";
+  const app = fakeSpreadsheetApp(here);
+  app.openByUrl = url => url === "old" ? old : (() => { throw new Error("no access"); })();
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true });
+  const r = g.ma_markOldTracker("old");
+  assert(r.marked && r.name === "PC Tracker 2025" && /OLD/.test(r.url), 'the old tracker is marked and named');
+  g.ma_markOldTracker("old");
+  assert.strictEqual(old._meta.length, 1, 'marked once only');
+  assert.strictEqual(g.ma_markOldTracker("nope").marked, false, 'no access: not marked, no error');
+
+  // The OLD tracker's own nightly trigger (newer code) sees the mark and turns itself off
+  const deleted = [];
+  const trig = (uid, fn) => ({ getUniqueId: () => uid, getHandlerFunction: () => fn });
+  const triggers = [trig("T1", "nightlyMasterSync"), trig("T2", "installedOnEdit")];
+  const o = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(old),
+    ScriptApp: { getProjectTriggers: () => triggers, deleteTrigger: t => deleted.push(t.getUniqueId()) } }, noTrialFiles: true });
+  o.__props.syncToPhones = 'true';
+  assert.strictEqual(o.nightlyTriggerShouldRun_({ triggerUid: "T1" }), false, 'the replaced tracker does not rebuild');
+  assert.deepStrictEqual(deleted, ["T1"], 'only its nightly trigger is deleted');
+  assert.strictEqual(o.__props.disableNightlySync, 'true');
+  assert.strictEqual(o.__props.syncToPhones, 'false');
+
+  // A Drive copy of the marked tracker (other ID) keeps its nightly
+  const copy = makeSpreadsheet(["Contact Log"]); copy.getId = () => "COPY"; copy._meta = old._meta.slice();
+  const c = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(copy) }, noTrialFiles: true });
+  assert.strictEqual(c.nightlyTriggerShouldRun_({ triggerUid: "X" }), true, 'a copy of it still runs');
+  // The new tracker itself is not affected
+  assert.strictEqual(g.nightlyTriggerShouldRun_({ triggerUid: "N" }), true, 'the new tracker runs');
+  console.log("Migration: the old tracker's nightly turns off: ok");
+}
+
 // ---------------------------------------------------------------- Migration: event tables
 {
   const ss = makeSpreadsheet(["Events", "Backend"]);

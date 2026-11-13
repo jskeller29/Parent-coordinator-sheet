@@ -319,6 +319,7 @@ function nightlyTriggerShouldRun_(e) {
   try {
     const props = PropertiesService.getDocumentProperties();
     const uid = e && e.triggerUid ? String(e.triggerUid) : "";
+    if (retireIfReplaced_(props, uid)) return false;
     const owned = props.getProperty(NIGHTLY_UID_KEY_);
     if (uid && !owned) rememberNightlyTrigger_(props, uid); // first one to fire keeps the job
     else if (uid && owned !== uid) {
@@ -341,6 +342,49 @@ function nightlyTriggerShouldRun_(e) {
       return false;
     }
   } catch (err) { console.warn("Nightly trigger check failed (running anyway): " + err.message); }
+  return true;
+}
+
+// ----------------------------------------------------------------------
+// REPLACED BY A NEWER TRACKER (owner's request 2026-11-13)
+// Bringing this tracker into a new one (Migration, Menus.gs ma_markOldTracker) puts an
+// invisible developer-metadata mark on THIS file: { old: this file's ID, new: the new
+// tracker's link }. The new tracker can't delete this one's triggers (they belong to this
+// script project and their maker), so the nightly trigger checks the mark when it fires:
+// it deletes itself, and "never at night" + phone sync off are saved so every other
+// person's nightly trigger here skips too (and deletes itself when it fires).
+// The mark names this file's ID, so a Drive copy of this tracker (which carries the mark)
+// is not affected. Only trackers with this code read it: older ones are turned off by
+// hand (the wizard's done screen says how).
+// ----------------------------------------------------------------------
+var REPLACED_BY_MARK_ = "PC_TRACKER_REPLACED_BY";
+
+/** The newer tracker's link when this file was brought into one, else "". */
+function replacedByUrl_(ss) {
+  try {
+    const id = ss.getId();
+    const marks = ss.createDeveloperMetadataFinder().withKey(REPLACED_BY_MARK_).find();
+    for (let i = 0; i < marks.length; i++) {
+      const v = JSON.parse(marks[i].getValue() || "{}");
+      if (v && v.old === id) return String(v.newUrl || "(new tracker)");
+    }
+  } catch (err) { /* no mark */ }
+  return "";
+}
+
+/** True (and the nightly run stops for good here) when this tracker was replaced by a newer one. */
+function retireIfReplaced_(props, uid) {
+  let newUrl = "";
+  try { newUrl = replacedByUrl_(SpreadsheetApp.getActiveSpreadsheet()); } catch (err) { /* no sheet: no mark */ }
+  if (!newUrl) return false;
+  props.setProperty('disableNightlySync', 'true');
+  props.setProperty('syncToPhones', 'false');
+  try {
+    ScriptApp.getProjectTriggers().forEach(t => {
+      if (t.getHandlerFunction() === "nightlyMasterSync" && (!uid || t.getUniqueId() === uid)) ScriptApp.deleteTrigger(t);
+    });
+  } catch (err) { console.warn("Nightly trigger not removed: " + err.message); }
+  console.log("Nightly sync: this tracker was brought into a newer one (" + newUrl + "): nightly rebuild turned off.");
   return true;
 }
 
