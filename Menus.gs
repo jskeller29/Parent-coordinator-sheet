@@ -2926,9 +2926,13 @@ function ma_migrateContactLog(url) {
     return s === "" || s.startsWith("#") || s === "FALSE" || s === "-";
   };
 
-  const oldRecords = oldData.slice(1, oldEndIdx).filter(row => {
+  // Old sheet row numbers kept with each record, so the cells' notes can come too
+  const oldRowNums = [];
+  const oldRecords = oldData.slice(1, oldEndIdx).filter((row, i) => {
     // Check the first 10 core columns; if ANY of them contain real data, keep the row
-    return row.slice(0, 10).some(val => !isGhostValue(val));
+    const keep = row.slice(0, 10).some(val => !isGhostValue(val));
+    if (keep) oldRowNums.push(i + 2);
+    return keep;
   });
   
   if (oldRecords.length === 0) return; // Nothing to migrate
@@ -2947,15 +2951,8 @@ function ma_migrateContactLog(url) {
     }
   }
   
-  // 3. Build Smart Mapping Dictionary
-  const headerMap = {}; 
-  oldHeaders.forEach((oldH, oldIdx) => {
-    if (!oldH) return;
-    const newIdx = newHeaders.indexOf(oldH);
-    if (newIdx !== -1) {
-      headerMap[oldIdx] = newIdx;
-    }
-  });
+  // 3. Build Smart Mapping Dictionary (same header; then renamed headers, migrationHeaderMap_)
+  const headerMap = migrationHeaderMap_(oldHeaders, newHeaders);
   
   // 4. Construct Perfectly Mapped Array
   const mappedRecords = [];
@@ -3006,6 +3003,7 @@ function ma_migrateContactLog(url) {
   // Paste the migrated data starting exactly at row 2
   if (mappedRecords.length > 0) {
     newLog.getRange(2, 1, mappedRecords.length, newHeaders.length).setValues(mappedRecords);
+    copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, newHeaders.length);
   }
   
   // 💡 CRITICAL FORMATTING OVERRIDE:
@@ -3058,6 +3056,72 @@ function ma_migrateContactLog(url) {
   }
   
   SpreadsheetApp.getUi().alert(`Success! Migrated ${oldRecords.length} records into your Typed Table and applied your active Master Filter.`);
+}
+
+// Contact Log headers that were renamed between versions (owner 2026-11-13: last year's "Notes" /
+// comments did not come over because the column is now "Event Description"). Compared without
+// case, spaces or punctuation ("Follow-up Notes" = "followupnotes"). Each group = one column.
+var MIGRATION_HEADER_ALIASES_ = [
+  ["eventdescription", "notes", "note", "comments", "comment", "description", "eventnotes", "contactnotes", "details", "summary"],
+  ["additionalnotes", "followupnotes", "followupnote", "additionalcomments", "additionalnote", "followupcomments", "followupdetails", "nextsteps"],
+  ["followup", "followupneeded", "followupstatus", "needsfollowup"],
+  ["method1", "method", "contactmethod"],
+  ["method2", "secondmethod"],
+  ["personspokewith", "spokewith", "personspokento", "spoketo", "contactperson"],
+  ["guardian", "guardianname", "parent", "parentname", "parentguardian", "guardianparent"],
+  ["student", "studentname"],
+  ["osis", "osisnumber", "studentid", "osisid"],
+  ["date", "contactdate", "dateofcontact"],
+  ["type", "topic", "contacttype"]
+];
+
+function migrationHeaderKey_(h) {
+  const t = String(h || "").trim().toLowerCase();
+  const k = t.replace(/[^a-z0-9]/g, "");
+  return k || t; // "#" stays "#"
+}
+
+/**
+ * { oldColIndex: newColIndex }. The same header first (as before), then a renamed one
+ * (MIGRATION_HEADER_ALIASES_) for a new column nothing went into yet. Each column used once.
+ */
+function migrationHeaderMap_(oldHeaders, newHeaders) {
+  const map = {}, usedNew = {};
+  oldHeaders.forEach((oldH, oldIdx) => {
+    if (!oldH) return;
+    const newIdx = newHeaders.indexOf(oldH);
+    if (newIdx !== -1 && !usedNew[newIdx]) { map[oldIdx] = newIdx; usedNew[newIdx] = true; }
+  });
+  const group = key => MIGRATION_HEADER_ALIASES_.findIndex(g => g.indexOf(key) !== -1);
+  newHeaders.forEach((newH, newIdx) => {
+    if (!newH || usedNew[newIdx]) return;
+    const nk = migrationHeaderKey_(newH), ng = group(nk);
+    for (let oldIdx = 0; oldIdx < oldHeaders.length; oldIdx++) {
+      if (!oldHeaders[oldIdx] || map[oldIdx] !== undefined) continue;
+      const ok = migrationHeaderKey_(oldHeaders[oldIdx]);
+      if (ok === nk || (ng !== -1 && group(ok) === ng)) { map[oldIdx] = newIdx; usedNew[newIdx] = true; break; }
+    }
+  });
+  return map;
+}
+
+/** The old Contact Log cells' notes (hover notes) go with their values. Never throws. */
+function copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, width) {
+  try {
+    if (!oldRowNums.length) return;
+    const first = oldRowNums[0], last = oldRowNums[oldRowNums.length - 1];
+    const oldNotes = oldLog.getRange(first, 1, last - first + 1, oldLog.getLastColumn()).getNotes();
+    let any = false;
+    const notes = oldRowNums.map(r => {
+      const row = new Array(width).fill("");
+      Object.keys(headerMap).forEach(oldIdx => {
+        const n = (oldNotes[r - first] || [])[oldIdx];
+        if (n) { row[headerMap[oldIdx]] = n; any = true; }
+      });
+      return row;
+    });
+    if (any) newLog.getRange(2, 1, notes.length, width).setNotes(notes);
+  } catch (e) { console.warn("Contact Log cell notes not copied: " + e.message); }
 }
 
 /**

@@ -66,6 +66,26 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   console.log("Migration: the old tracker's nightly turns off: ok");
 }
 
+// ---------------------------------------------------------------- Migration: renamed Contact Log headers
+{
+  const g = loadProject({ noTrialFiles: true });
+  const low = a => a.map(h => h.toLowerCase());
+  const oldH = low(["Week", "Date", "Guardian", "Person Spoke With", "OSIS", "Student", "#", "Method 1", "Method 2", "Notes", "Followup", "Followup Notes", "Hide"]);
+  const newH = low(["Week", "Date", "Guardian", "Person Spoke With", "OSIS", "Student", "#", "Site", "Class", "Method 1", "Method 2", "Type", "Event Description", "Follow-up", "Additional Notes", "Hide"]);
+  const m = g.migrationHeaderMap_(oldH, newH);
+  assert.strictEqual(m[9], 12, 'old "Notes" -> Event Description');
+  assert.strictEqual(m[11], 14, 'old "Followup Notes" -> Additional Notes');
+  assert.strictEqual(m[10], 13, 'old "Followup" -> Follow-up');
+  assert.strictEqual(m[6], 6, '# still matches itself');
+  assert.strictEqual(m[1], 1, 'same headers as before');
+  const m2 = g.migrationHeaderMap_(low(["Date", "Comments"]), newH);
+  assert.strictEqual(m2[1], 12, '"Comments" -> Event Description');
+  const m3 = g.migrationHeaderMap_(low(["Event Description", "Notes"]), newH);
+  assert.strictEqual(m3[0], 12, 'an exact match wins');
+  assert.strictEqual(m3[1], undefined, 'and the column is used once');
+  console.log("Migration: renamed Contact Log headers: ok");
+}
+
 // ---------------------------------------------------------------- Migration: event tables
 {
   const ss = makeSpreadsheet(["Events", "Backend"]);

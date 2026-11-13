@@ -438,6 +438,14 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   z_MINE (owner sheet).
 - Old tracker's nightly off after Migration (2026-11-13): re-paste Build, Menus (script) and MigrationUI (HTML) on
   every sheet.
+- Migration: renamed Contact Log headers + cell notes (2026-11-13): re-paste Menus on every sheet.
+
+MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
+maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
+(case / spaces / punctuation ignored) for a new column still empty: old "Notes" / "Comments" -> Event Description,
+"Followup Notes" -> Additional Notes, "Followup" -> Follow-up, "Method" -> Method 1, etc.; each column used once.
+The cells' hover notes come too (copyContactLogCellNotes_, never throws). Google's threaded comments can't be copied
+by Apps Script.
 
 OLD TRACKER'S NIGHTLY AFTER MIGRATION (owner's request 2026-11-13): a new tracker can't delete another project's
 triggers, so: (1) after step 6 the wizard calls ma_markOldTracker(url) (Menus.gs): invisible developer metadata
