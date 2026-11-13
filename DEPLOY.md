@@ -53,9 +53,9 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    📦 Make Release Copies then gives the Example and Blank copies the same look.
 9. Master template and your sheet: the **Person Spoke With** dropdown, once, by hand (a script can't
    change a Table's dropdown column). Contact Log → Person Spoke With column → Data validation →
-   **Dropdown (from a range)** `='Contact Log'!$R2:$W2` (no `$` before the 2), Advanced options →
+   **Dropdown (from a range)** `='Contact Log'!$R2:$AA2` (a 2 on BOTH ends, no `$` before them), Advanced options →
    **Show a warning** (other people can still be typed). The build in step 3 already wrote the formula
-   in Contact Log **R2** and hid columns R:W; leave R1 empty and Q blank. Schools' sheets: the same rule
+   in Contact Log **R2** and hid columns R:AA; leave R1 empty and Q blank. Schools' sheets: the same rule
    by hand after their next build, or they get it with next year's copy of the template.
 
 ## 4. Quick test on the copy

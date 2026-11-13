@@ -658,9 +658,9 @@ function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
  * END by itself (rows added / deleted / pasted need nothing from the script).
  * - R2 has a formula (this one, or one changed by hand) -> kept. If it shows #REF! (its list is
  *   blocked, e.g. a whole row was copied and pasted, which pastes the names as plain text), the rest
- *   of R2:W(END-1) is cleared so it can list again: those cells only ever hold the formula's list.
- * - no formula -> written, only when R2:W(END-1) is empty (never over a school's own data there);
- *   then R:W are hidden.
+ *   of R2:AA(END-1) is cleared so it can list again: those cells only ever hold the formula's list.
+ * - no formula -> written, only when R2:AA(END-1) is empty (never over a school's own data there);
+ *   then R:AA are hidden.
  * Returns "kept" / "unblocked" / "added" / "skipped: <why>". Called at the end of every build.
  */
 function ensureSpokeWithChoices_(ss) {
@@ -684,15 +684,15 @@ function ensureSpokeWithChoices_(ss) {
     return "unblocked";
   }
 
-  const have = Math.min(maxCols, lastCol) - col + 1; // the part of R:W the tab already has
+  const have = Math.min(maxCols, lastCol) - col + 1; // the part of R:AA the tab already has
   if (have > 0 && sheet.getRange(2, col, rows, have).getValues().some(r => r.some(v => v !== "" && v !== null))) {
-    console.warn("Person Spoke With choices not added: Contact Log R2:W" + (endRow - 1) + " already holds data");
-    return "skipped: R:W hold data";
+    console.warn("Person Spoke With choices not added: Contact Log R2:AA" + (endRow - 1) + " already holds data");
+    return "skipped: R:AA hold data";
   }
   growCols();
   sheet.getRange(2, col).setFormula(SPOKE_WITH_CHOICES_FORMULA)
     .setNote("Person Spoke With choices: one guardian per cell for column D's dropdown " +
-             "('Contact Log'!$R2:$W2). Hidden on purpose; every build puts this formula back if it goes missing.");
+             "('Contact Log'!$R2:$AA2). Hidden on purpose; every build puts this formula back if it goes missing.");
   sheet.hideColumns(col, width);
   return "added";
 }

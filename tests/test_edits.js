@@ -64,10 +64,10 @@ function sheetWithSiblings() {
   console.log("Notes: no delete without a yes: ok");
 }
 
-// ---------------------------------------------------------------- Contact Log: Person Spoke With choices (R:W)
+// ---------------------------------------------------------------- Contact Log: Person Spoke With choices (R:AA)
 // ensureSpokeWithChoices_ (Edits.gs, end of every build): the formula in R2 lists each row's guardians
-// for column D's dropdown ('Contact Log'!$R2:$W2). Put back when missing, freed when blocked (#REF!),
-// never written over a school's own data in R:W, a formula changed by hand is kept, R1 stays empty.
+// for column D's dropdown ('Contact Log'!$R2:$AA2). Put back when missing, freed when blocked (#REF!),
+// never written over a school's own data in R:AA, a formula changed by hand is kept, R1 stays empty.
 {
   const fs = require('fs'), path = require('path');
   const { ROOT } = require('./lib/load');
@@ -90,18 +90,18 @@ function sheetWithSiblings() {
     const { g } = fresh();
     const F = g.__get("SPOKE_WITH_CHOICES_FORMULA");
     assert.strictEqual(g.__get("CL_COL_SPOKE_CHOICES"), 18, 'starts in R');
-    assert.strictEqual(g.__get("CL_COL_SPOKE_CHOICES") + g.__get("CL_SPOKE_CHOICES_WIDTH") - 1, 23, 'ends in W');
+    assert.strictEqual(g.__get("CL_COL_SPOKE_CHOICES") + g.__get("CL_SPOKE_CHOICES_WIDTH") - 1, 27, 'ends in AA');
     assert(F.indexOf('SPLIT(INDEX(C:C, 2):INDEX(C:C, MATCH(TRUE, TRIM(E:E)="END", 0) - 1), " and ", FALSE)') !== -1,
       'splits C on " and ", from row 2 to the row above END');
   }
 
-  // first build: written in R2 + R:W hidden; R1 left empty; the next build leaves it alone
+  // first build: written in R2 + R:AA hidden; R1 left empty; the next build leaves it alone
   {
     const { ss, g, log, calls } = fresh();
     const F = g.__get("SPOKE_WITH_CHOICES_FORMULA");
     assert.strictEqual(g.ensureSpokeWithChoices_(ss), "added");
     assert.strictEqual(log.getRange(2, 18).getFormula(), F, 'formula in R2');
-    assert.deepStrictEqual(calls("hideColumns").map(x => x.args), [[18, 6]], 'R:W hidden');
+    assert.deepStrictEqual(calls("hideColumns").map(x => x.args), [[18, 10]], 'R:AA hidden');
     assert.strictEqual(log.getRange(1, 18).getFormula() + log.getRange(1, 18).getValue(), "", 'R1 stays empty');
     assert.strictEqual(g.ensureSpokeWithChoices_(ss), "kept");
     assert.strictEqual(calls("setFormula").length, 1, 'not written twice');
@@ -137,11 +137,11 @@ function sheetWithSiblings() {
     assert.strictEqual(calls("hideColumns").length, 0, 'columns not touched');
   }
 
-  // a school's own data in R:W: no formula over it, nothing hidden
+  // a school's own data in R:AA: no formula over it, nothing hidden
   {
     const { ss, g, log, calls } = fresh();
     log._set(3, 20, "my own note");
-    assert.strictEqual(g.ensureSpokeWithChoices_(ss), "skipped: R:W hold data");
+    assert.strictEqual(g.ensureSpokeWithChoices_(ss), "skipped: R:AA hold data");
     assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'no formula');
     assert.strictEqual(log.getRange(3, 20).getValue(), "my own note", 'their data stays');
     assert.strictEqual(calls("hideColumns").length, 0, 'their columns are not hidden');
@@ -151,10 +151,10 @@ function sheetWithSiblings() {
   {
     const { ss, g, log } = fresh(16);
     assert.strictEqual(g.ensureSpokeWithChoices_(ss), "added");
-    assert(log.getMaxColumns() >= 23, 'columns added up to W first');
+    assert(log.getMaxColumns() >= 27, 'columns added up to AA first');
     const t = fresh(20);
     t.log._set(2, 18, "typed here");
-    assert.strictEqual(t.g.ensureSpokeWithChoices_(t.ss), "skipped: R:W hold data", 'the part of R:W it has is checked too');
+    assert.strictEqual(t.g.ensureSpokeWithChoices_(t.ss), "skipped: R:AA hold data", 'the part of R:AA it has is checked too');
     const n = fresh();
     n.log._set(5, 5, "");
     assert.strictEqual(n.g.ensureSpokeWithChoices_(n.ss), "skipped: no log rows above END");

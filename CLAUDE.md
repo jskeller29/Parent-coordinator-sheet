@@ -338,21 +338,22 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   Migration maps old values: Yes -> Followup Needed, Yes - Important -> Followup Needed - ASAP, No -> No Followup
   Needed (migrateFollowupValue_, Menus.gs).
 - Person Spoke With choices (owner's request 2026-11-13; not yet tried on a real sheet): column D's dropdown lists only
-  that row's student's guardians. Hidden helper columns R:W of the Contact Log: the formula in R2
+  that row's student's guardians. Hidden helper columns R:AA of the Contact Log: the formula in R2
   (SPOKE_WITH_CHOICES_FORMULA, Core.gs, next to CL_COL_SPOKE_CHOICES / CL_SPOKE_CHOICES_WIDTH) splits each row's
   Guardian cell C on " and " (the build's join, buildMasterTableData_: Raw Data, New/Edit Student up to 5, sibling
   groups copy the first child's) into one name per cell, rows 2 .. the row above END (END found like
   findEndRowInColumnE_: trimmed, any case). D's rule is set BY HAND in the Table (D is a typed Dropdown column, Apps
-  Script can't set it): Dropdown (from a range) 'Contact Log'!$R2:$W2 (relative row), Advanced → Show a warning (other
+  Script can't set it): Dropdown (from a range) 'Contact Log'!$R2:$AA2 (relative row; the owner widened it from W; the row number on BOTH
+  ends matters: $R2:$AA runs to the bottom of the sheet, so a row would list every guardian below it too), Advanced → Show a warning (other
   people can be typed; the Z#ContactLog sidebar's free-text "Person spoke with" too). R1 stays EMPTY: Migration
   (ma_migrateContactLog) matches columns by their row-1 header (empty = skipped; a copy of a real header would map R
   onto C, a label would carry last year's names over as plain text), and the owner says Sheets takes no formula in
   row 1 there. Q stays blank (the Table must not grow into R). ensureSpokeWithChoices_ (Edits.gs, end of every build,
   try/catch): R2 has a formula -> kept (one changed by hand too) unless it shows #REF! (a pasted whole row put plain
-  names in R:W) -> S2:W2 + R3:W(END-1) cleared ("unblocked"); no formula -> written + R:W hidden + a cell note, only
-  when R2:W(END-1) is empty (a school's own data there = "skipped", warned). Needed because Migration clears rows 2+
+  names in R:AA) -> S2:AA2 + R3:AA(END-1) cleared ("unblocked"); no formula -> written + R:AA hidden + a cell note, only
+  when R2:AA(END-1) is empty (a school's own data there = "skipped", warned). Needed because Migration clears rows 2+
   in every column (ma_finish's build puts it back) and deleting row 2 deletes it. Code must never write into Contact
-  Log R:W rows 2+ or put anything in R1. Owner's sheet: Old Master Table-only students keep their old guardian text
+  Log R:AA rows 2+ or put anything in R1. Owner's sheet: Old Master Table-only students keep their old guardian text
   (whatever separator it had). Rows logged before a guardian was added keep the old list (C is filled once).
   Contact Log getDataRange reads now reach W (more columns read, no extra call; positional readers unaffected).
 - Fake data (Reset + Load Fake Data, Regenerate.gs; owner's request 2026-11-04): 18 ATS students (incl. siblings
@@ -443,7 +444,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   sheet; owner sheet also z_MINE and the manifest from App Scripts (Mine).Json (adds the Sheets service; same
   scopes, no re-approval). Then on the owner's sheet 🐞 Debug → 🎨 Apply Sheet Style once, then Make Release Copies.
 - Person Spoke With choices (2026-11-13): re-paste Core, Build, Edits on every sheet; Build once (writes Contact Log
-  R2, hides R:W); then on the master template and the owner's sheet set column D's dropdown BY HAND (DEPLOY.md step 9).
+  R2, hides R:AA); then on the master template and the owner's sheet set column D's dropdown BY HAND (DEPLOY.md step 9).
 
 NEW-USER FLOW (owner's bug lists 2026-11-12, "act as a new user who is not tech savvy"; walked step by step in
 tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# files like the owner's test copy):
