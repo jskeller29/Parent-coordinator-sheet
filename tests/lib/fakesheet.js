@@ -111,6 +111,7 @@ function makeSpreadsheet(tabNames) {
     _sheets: [], _active: null, _log: [],
     getId: () => "FAKE_SS",
     getUrl: () => "https://docs.google.com/spreadsheets/d/" + ss.getId() + "/edit",
+    getName: () => "Fake tracker",
     getSheets: () => ss._sheets.slice(),
     getSheetByName: n => ss._sheets.find(s => s.getName() === n) || null,
     getActiveSheet: () => ss._active,

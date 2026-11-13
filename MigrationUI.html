@@ -18,6 +18,11 @@
     .running .status-icon { display: none; }
     .done .status-icon { background: var(--accent); border-color: var(--accent); color: #ffffff; }
     .done .spinner { display: none; }
+    .failed { color: var(--danger); font-weight: 600; }
+    .failed .status-icon { border-color: var(--danger); color: var(--danger); }
+    .failed .spinner { display: none; }
+    .step .count { color: var(--muted); font-weight: 400; }
+    #warnBox ul { margin: 6px 0 0; padding-left: 18px; }
     /* Done screen: turn off the old tracker's nightly rebuild (ma_markOldTracker) */
     .oldbox { border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
     .oldbox h2 { font-size: 15px; margin: 0; }
@@ -40,7 +45,7 @@
 
   <div class="wiz">
     <h1>Bring over last year's tracker</h1>
-    <p>Pick your old tracker, or paste its link. Its Raw Data, Contact Log, events, student changes, lists and settings are copied into this one. The old tracker's tabs aren't changed.</p>
+    <p>Pick your old tracker, or paste its link. Its Raw Data, Contact Log, notes, events, send-outs, student changes and history, lists and settings are copied into this one. This also works for a new version in the middle of the year. The old tracker's tabs aren't changed.</p>
 
     <div class="found" id="found">
       <div class="lab">Trackers in your Google Drive</div>
@@ -59,21 +64,24 @@
       <div class="step pending" id="step-1"><span class="spinner"></span><span class="status-icon">○</span> Connect to the old sheet</div>
       <div class="step pending" id="step-2"><span class="spinner"></span><span class="status-icon">○</span> Bring over your settings</div>
       <div class="step pending" id="step-3"><span class="spinner"></span><span class="status-icon">○</span> Copy ATS Raw Data</div>
-      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy events, student changes and your lists</div>
-      <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> Match up the Contact Log</div>
-      <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> Rebuild the directory and other tabs</div>
+      <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy notes, events, send-outs, student changes and your lists</div>
+      <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> Match up the Contact Log <span class="count" id="count-5"></span></div>
+      <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> Bring over the Student List history and rebuild the other tabs</div>
     </div>
 
+    <div class="notice warn" id="warnBox" style="display:none"><b>Some things didn't come over:</b><ul id="warnList"></ul></div>
+
     <div class="oldbox" id="oldNightly" style="display:none">
-      <h2>Done. One last step: turn off the old tracker's nightly rebuild</h2>
-      <p>Your old tracker still rebuilds every night, and if phone sync was on there, it keeps sending last year's families to your Google Contacts. Turn it off there:</p>
+      <h2>Done. One last step: stop the old tracker's nightly rebuild</h2>
+      <p>Your old tracker still rebuilds every night, and if phone sync is on there, it keeps sending its families to your Google Contacts.</p>
+      <p id="oldMarked" style="display:none">If the old tracker is a newer version, it now pauses by itself. When you open it, it asks "Keep this tracker paused?": click <b>Yes</b>.</p>
+      <p>An older tracker doesn't ask. Turn it off in its Settings:</p>
       <ol>
         <li>Open the old tracker (button below).</li>
         <li>Go to 🚀 App Menu → ⚙️ Settings.</li>
-        <li>Newer trackers: under Live updates, set "Rebuild sheets" to "Only when I click Build", and under Contacts &amp; sync untick "Sync contacts to my phone every night". Older trackers: turn on "Disable Nightly Sync Entirely" and turn off "Sync Contacts to Phones (Nightly)".</li>
+        <li>Older trackers: turn on "Disable Nightly Sync Entirely" and turn off "Sync Contacts to Phones (Nightly)". Newer trackers: under Live updates, set "Rebuild sheets" to "Only when I click Build", and under Contacts &amp; sync untick "Sync contacts to my phone every night".</li>
         <li>Save.</li>
       </ol>
-      <p class="hint" id="oldMarked" style="display:none">The old tracker was also marked as replaced. If it is a newer version, it turns its nightly rebuild off by itself, but checking Settings makes sure.</p>
       <div class="acts">
         <a class="btn pri" id="oldLink" target="_blank" rel="noopener" href="#">Open the old tracker</a>
         <button class="btn sec" type="button" onclick="google.script.host.close()">Close</button>
@@ -115,9 +123,7 @@
     function setStep(stepNum, status) {
       const el = document.getElementById(`step-${stepNum}`);
       el.className = `step ${status}`;
-      if (status === 'done') {
-        el.querySelector('.status-icon').innerHTML = '✓';
-      }
+      el.querySelector('.status-icon').innerHTML = status === 'done' ? '✓' : status === 'failed' ? '✕' : '○';
     }
 
     // Done screen: how to stop the OLD tracker rebuilding (and syncing phones) every night
@@ -127,7 +133,7 @@
       link.href = (res && res.url) || url;
       link.textContent = 'Open ' + ((res && res.name) ? '"' + res.name + '"' : 'the old tracker');
       document.getElementById('oldMarked').style.display = res && res.marked ? 'block' : 'none';
-      box.style.display = 'block';
+      box.style.display = 'flex';
       btn.style.display = 'none';
       ['found', 'sheetUrl', 'pasteLabel'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
       box.scrollIntoView({ block: 'nearest' });
@@ -138,6 +144,44 @@
       errorMsg.style.display = 'block';
       btn.disabled = false;
       btn.textContent = "Try Again";
+      document.querySelectorAll('.pick').forEach(p => p.disabled = false);
+    }
+
+    // The six steps (each its own server call, each with its own time limit). Try Again with the
+    // same tracker goes on from the step that failed; another tracker starts over (2026-11-13).
+    const STEP_CALLS = ['ma_verify', 'ma_migrateSettings', 'ma_migrateRawData', 'ma_migrateSimpleSheets', 'ma_migrateContactLog', 'ma_finish'];
+    let doneUpTo = 0, doneUrl = "", warnings = [];
+
+    function runStep(n) {
+      if (n > STEP_CALLS.length) return finished();
+      setStep(n, 'running');
+      google.script.run
+        .withSuccessHandler(res => {
+          if (n === 1 && (!res || !res.success)) { setStep(1, 'failed'); return showError(res ? res.error : "Could not open the old tracker."); }
+          if (res && res.warnings) warnings = warnings.concat(res.warnings);
+          if (n === 5 && res && typeof res.records === 'number') {
+            document.getElementById('count-5').textContent = '(' + res.records.toLocaleString() + ' rows)';
+          }
+          setStep(n, 'done');
+          doneUpTo = n; doneUrl = url;
+          runStep(n + 1);
+        })
+        .withFailureHandler(e => { setStep(n, 'failed'); showError(e && e.message ? e.message : String(e)); })
+        [STEP_CALLS[n - 1]](url);
+    }
+
+    function finished() {
+      btn.textContent = "Done: your old tracker is in";
+      if (warnings.length) {
+        const list = document.getElementById('warnList');
+        list.innerHTML = '';
+        warnings.forEach(w => { const li = document.createElement('li'); li.textContent = w; list.appendChild(li); });
+        document.getElementById('warnBox').style.display = 'block';
+      }
+      // Last step: the old tracker's nightly rebuild (and phone sync) keeps running until it is turned off
+      google.script.run.withSuccessHandler(showOldNightly)
+        .withFailureHandler(() => showOldNightly({ url: url, name: '', marked: false }))
+        .ma_markOldTracker(url);
     }
 
     function startMigration() {
@@ -153,52 +197,13 @@
       document.querySelectorAll('.pick').forEach(p => p.disabled = true);
       document.getElementById('checklist').style.display = 'block';
 
-      // Step 1: Verify Connection
-      setStep(1, 'running');
-      google.script.run.withSuccessHandler(res => {
-        if (!res.success) return showError(res.error);
-        setStep(1, 'done');
-        
-        // Step 2: Settings Inference
-        setStep(2, 'running');
-        google.script.run.withSuccessHandler(() => {
-          setStep(2, 'done');
-          
-          // Step 3: Raw Data
-          setStep(3, 'running');
-          google.script.run.withSuccessHandler(() => {
-            setStep(3, 'done');
-            
-            // Step 4: Simple Sheets (Events, Send Out, Overrides, Your Lists)
-            setStep(4, 'running');
-            google.script.run.withSuccessHandler(() => {
-              setStep(4, 'done');
-              
-              // Step 5: Smart Mapper (Contact Log)
-              setStep(5, 'running');
-              google.script.run.withSuccessHandler(() => {
-                setStep(5, 'done');
-                
-                // Step 6: Final Rebuild
-                setStep(6, 'running');
-                google.script.run.withSuccessHandler(() => {
-                  setStep(6, 'done');
-                  btn.textContent = "Done: your old tracker is in";
-                  // Last step: the old tracker's nightly rebuild (and phone sync) keeps running until it is turned off
-                  google.script.run.withSuccessHandler(showOldNightly)
-                    .withFailureHandler(() => showOldNightly({ url: url, name: '', marked: false }))
-                    .ma_markOldTracker(url);
-                }).withFailureHandler(e => showError(e.message)).ma_finish();
-                
-              }).withFailureHandler(e => showError(e.message)).ma_migrateContactLog(url);
-              
-            }).withFailureHandler(e => showError(e.message)).ma_migrateSimpleSheets(url);
-            
-          }).withFailureHandler(e => showError(e.message)).ma_migrateRawData(url);
-
-        }).withFailureHandler(e => showError(e.message)).ma_migrateSettings(url);
-        
-      }).withFailureHandler(e => showError(e.message)).ma_verify(url);
+      const from = (url === doneUrl && doneUpTo >= 1 && doneUpTo < STEP_CALLS.length) ? doneUpTo + 1 : 1;
+      if (from === 1) {
+        warnings = []; doneUpTo = 0;
+        for (let i = 1; i <= STEP_CALLS.length; i++) setStep(i, 'pending');
+        document.getElementById('count-5').textContent = '';
+      }
+      runStep(from);
     }
   </script>
 </body>

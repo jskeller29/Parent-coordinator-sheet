@@ -367,27 +367,32 @@ picks up where it stopped. With the phone sync on, the nightly run does the same
 
 ### Bring over last year's data
 
-Choose "No, bring over last year's tracker" in the window after Initial Setup, or open
-🚀 App Menu → 🔄 Import Old Data at any time. The wizard lists the trackers it finds in your
-Google Drive: click yours, or paste its link if it isn't listed, then click Bring it over.
-It goes through six steps:
+Use this at the start of a new school year, and also to move to a new version in the
+middle of the year. Choose "No, bring over last year's tracker" in the window after Initial
+Setup, or open 🚀 App Menu → 🔄 Import Old Data before your first build. The wizard lists
+the trackers it finds in your Google Drive: click yours, or paste its link if it isn't
+listed, then click Bring it over. It goes through six steps:
 
-1. Connect to the old sheet.
-2. Bring over your settings.
+1. Connect to the old sheet. A newer tracker can't be brought into an older one.
+2. Bring over your settings, as they were saved in the old tracker.
 3. Copy the ATS Raw Data.
-4. Copy events, student changes and your lists.
-5. Match up the Contact Log, column by column.
-6. Rebuild the directory and the other tabs.
+4. Copy the Notes tab, events, Send Out, New / Edit Student changes, the Type list and your lists.
+5. Match up the Contact Log, column by column (renamed columns like "Notes" find their new place).
+6. Bring over the Student List history (students who left keep their notes) and rebuild the other tabs.
+
+If a step fails, click Try Again: it goes on from that step. Anything that couldn't come
+over is listed when the wizard is done.
 
 Your old sheet's tabs are only read, never changed. Keep it until you have checked the new one.
 
 > [!IMPORTANT]
 > Your old tracker still rebuilds every night, and with phone sync on it keeps sending
-> last year's families to your Google Contacts. When the wizard is done it shows a button
-> to open the old tracker. There, open 🚀 App Menu → ⚙️ Settings, set Rebuild sheets to
-> "Only when I click Build", untick "Sync contacts to my phone every night" and save.
-> On an older tracker, turn on "Disable Nightly Sync Entirely" instead. Newer trackers
-> turn their nightly rebuild off by themselves once they have been brought over.
+> its families to your Google Contacts. When the wizard is done, a tracker of this version
+> or newer pauses its nightly rebuild and phone sync by itself. The next time you open it,
+> it asks "Keep this tracker paused?": click Yes. (Click No if you still use it.)
+> An older tracker doesn't do this. The wizard shows a button to open it. There, open
+> 🚀 App Menu → ⚙️ Settings, turn on "Disable Nightly Sync Entirely", turn off phone sync
+> and save.
 
 ### Updates
 
@@ -396,9 +401,13 @@ version is out, and shows what changed. You can also check with 🚀 App Menu �
 for Updates. In that window you can dismiss the update for now, dismiss it until a
 newer one comes out, ask to hear about major updates only, or stop the automatic check.
 
-An update doesn't change your current sheet. To move to a new version, click Get the
-latest version, make a copy, run Initial Setup, and choose "No, bring over last year's
-tracker". Your data, lists and settings come with it.
+An update doesn't change your current sheet. To move to a new version:
+
+1. Click Get the latest version and make the copy.
+2. In the new copy, run 🚀 App Menu → 🚨 Initial Setup.
+3. Choose "No, bring over last year's tracker", pick your current tracker and click Bring it over.
+4. Your data, notes, lists and settings come with it. Your old tracker then pauses its
+   nightly rebuild (see the box above).
 
 ### End of Year Rollover
 

@@ -67,7 +67,7 @@ html.forEach(h => {
     const last = calls[calls.length - 1];
     if (last && !fnNames.has(last)) missing.add(h + ': ' + last);
   });
-  for (const m of t.matchAll(/['"]((?:idm|od|zg|cld|cl)_[A-Za-z]+)['"]/g)) if (!fnNames.has(m[1])) missing.add(h + ' (by name): ' + m[1]);
+  for (const m of t.matchAll(/['"]((?:idm|od|zg|cld|cl|ma)_[A-Za-z]+)['"]/g)) if (!fnNames.has(m[1])) missing.add(h + ' (by name): ' + m[1]);
 });
 report('google.script.run calls with no function', [...missing]);
 const menuMissing = [];

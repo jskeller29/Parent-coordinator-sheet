@@ -2783,30 +2783,86 @@ function ma_verify(url) {
   if (!oldSS.getSheetByName("Contact Log")) {
     return { success: false, error: "\"" + oldSS.getName() + "\" doesn't look like a PC Tracker (it has no Contact Log tab). Pick your old tracker instead." };
   }
+  // Never backwards (2026-11-13): copying a NEWER tracker into this one would overwrite this one's
+  // data with it and mark the newer one as replaced. Unknown dates (very old trackers) are allowed.
+  const oldMs = trackerBuildDateMs_(oldSS), hereMs = trackerBuildDateMs_(SpreadsheetApp.getActiveSpreadsheet());
+  if (!isNaN(oldMs) && !isNaN(hereMs) && oldMs > hereMs) {
+    return { success: false, error: "\"" + oldSS.getName() + "\" is a newer version (" + formatMsDate_(oldMs) +
+      ") than this tracker (" + formatMsDate_(hereMs) + "). Data only goes from the older tracker into the newer one: " +
+      "open the newer tracker and bring the older one in there." };
+  }
   return { success: true, name: oldSS.getName() };
 }
 
 /**
- * STEP 2: Recover Custom Settings (Smart Inference)
- * Because background properties are locked, we infer settings based on old sheet visibility!
+ * STEP 2: Settings. The old tracker's own saved settings (its Backend block A6:B, written on
+ * every ⚙️ Settings save; an old "Version" tab: A5:B), as Initial Setup loads a template's.
+ * Not the notes date range (notesStartDate / notesEndDate: last year's range would hide this
+ * year's notes). A tracker without the block: the old guess from which tabs it shows (2026-11-13:
+ * that guess was the only source, and turned phone sync on whenever Phone Contacts showed).
+ * Returns { saved: number of settings copied (0 = guessed) }.
  */
+var MIGRATION_SKIP_SETTINGS_ = ['notesStartDate', 'notesEndDate'];
+
 function ma_migrateSettings(url) {
   const oldSS = SpreadsheetApp.openByUrl(url);
   const props = PropertiesService.getDocumentProperties();
-  
-  const pPhone = oldSS.getSheetByName("Phone Contacts");
-  const pDiv = oldSS.getSheetByName("Parents Divided");
-  
-  if (pPhone) {
+
+  const saved = readSavedSettingsFrom_(oldSS);
+  let copied = 0;
+  if (saved) {
+    Object.keys(saved).forEach(k => {
+      if (MIGRATION_SKIP_SETTINGS_.indexOf(k) !== -1) return;
+      props.setProperty(k, saved[k]);
+      copied++;
+    });
+  } else {
+    // Smart inference (trackers without a saved-settings block): from the old tabs' visibility
+    const pPhone = oldSS.getSheetByName("Phone Contacts");
+    const pDiv = oldSS.getSheetByName("Parents Divided");
+    if (pPhone) {
       const isPhoneEnabled = !pPhone.isSheetHidden();
       props.setProperty('phoneContacts', isPhoneEnabled.toString());
       props.setProperty('syncToPhones', isPhoneEnabled.toString()); // Tie sync setting to sheet visibility
+    }
+    if (pDiv) props.setProperty('parentsDivided', (!pDiv.isSheetHidden()).toString());
   }
-  if (pDiv) props.setProperty('parentsDivided', (!pDiv.isSheetHidden()).toString());
-  
+
+  // As a ⚙️ Settings save does: this tracker's saved block, the Contact Log filter window and
+  // the nightly trigger (made at Initial Setup; "never at night" removes it)
+  try { saveSettingsToVersionSheet_(); } catch (e) { console.warn("Settings not saved to the Backend: " + e.message); }
+  try { refreshContactLogFilter_(); } catch (e) { console.warn("Contact Log filter not refreshed: " + e.message); }
+  try { manageNightlyTrigger_(props.getProperty('disableNightlySync') === 'true'); } catch (e) { console.warn("Nightly trigger: " + e.message); }
+
   // Trigger a visual update on the new sheet so tabs hide/show correctly. A new copy (not built
   // yet) only gets its columns now: its tabs come out with step 6's build (welcomeTabAfterBuild_)
   updateVisualSettings_(getSettings(), !studentListIsBuilt_(SpreadsheetApp.getActiveSpreadsheet()));
+  return { saved: copied };
+}
+
+/**
+ * Another tracker's saved settings block as { key: "value" } (SETTING_KEYS only, blanks left
+ * out), or null when it has none. Only reads: never getBackendSheet_ on it (that would
+ * reorganize an old tracker's tabs).
+ */
+function readSavedSettingsFrom_(otherSs) {
+  try {
+    const backend = otherSs.getSheetByName(BACKEND_SHEET_NAME);
+    const sheet = backend || otherSs.getSheetByName("Version");
+    if (!sheet) return null;
+    const firstRow = backend ? BACKEND_VERSION.SETTINGS_FIRST_ROW : BACKEND_VERSION.SETTINGS_FIRST_ROW - 1;
+    const lastRow = sheet.getLastRow();
+    if (lastRow < firstRow) return null;
+    const out = {};
+    sheet.getRange(firstRow, 1, lastRow - firstRow + 1, 2).getValues().forEach(r => {
+      const key = String(r[0]).trim(), val = String(r[1] == null ? "" : r[1]).trim();
+      if (key && val !== "" && SETTING_KEYS.indexOf(key) !== -1) out[key] = val;
+    });
+    return Object.keys(out).length ? out : null;
+  } catch (e) {
+    console.warn("Old tracker's settings not read: " + e.message);
+    return null;
+  }
 }
 
 /**
@@ -2833,54 +2889,137 @@ function ma_migrateRawData(url) {
 }
 
 /**
- * STEP 4: Migrate Standard "Simple" Sheets
- * (New/Edit Student, Send Out, Events)
+ * STEP 4: New/Edit Student, Events, Send Out, the Notes tab, the Type List and Your Lists.
+ * Each part on its own (2026-11-13): before, one refused Send Out cell stopped the whole step,
+ * and Events / Your Lists after it never came over. A part that fails is reported back
+ * ({ warnings: [...] }, shown on the wizard's done screen); the others still come over.
  */
 function ma_migrateSimpleSheets(url) {
   const oldSS = SpreadsheetApp.openByUrl(url);
   const newSS = SpreadsheetApp.getActiveSpreadsheet();
+  const warnings = [];
+  const part = (what, fn) => {
+    try { fn(); } catch (e) {
+      console.warn("Migration: " + what + " not copied: " + e.message);
+      warnings.push(what + " didn't come over (" + e.message + ").");
+    }
+  };
 
   // New/Edit Student lives in the Backend tab now; the old copy may still have
   // it as its own tab, and the reader handles both.
-  const overrides = readBackendBlockFromOtherSpreadsheet_(oldSS, "OVERRIDES");
-  if (overrides.length > 1) backendWriteBlock_(newSS, "OVERRIDES", overrides);
-  
-  const sheetsToCopy = ["Send Out", "Events"];
-  
-  sheetsToCopy.forEach(sheetName => {
-    const oldSheet = oldSS.getSheetByName(sheetName);
-    const newSheet = newSS.getSheetByName(sheetName);
-    
-    if (oldSheet && newSheet) {
-      const data = oldSheet.getDataRange().getValues();
-      if (data.length > 1) { 
-        const maxRows = newSheet.getMaxRows();
-        if (sheetName === "Events") {
-          // Events is a plain tab of 7-column tables: start from a clean grid (no leftover merges,
-          // dropdowns or colors in other places), the tables get their look back below
-          newSheet.getRange(1, 1, maxRows, newSheet.getMaxColumns()).breakApart().clearDataValidations().clearFormat().clearContent();
-        } else if (maxRows > 1) {
-          newSheet.getRange(2, 1, maxRows - 1, newSheet.getMaxColumns()).clearContent();
-        }
-        
-        if (newSheet.getMaxRows() < data.length) newSheet.insertRowsAfter(newSheet.getMaxRows(), data.length - newSheet.getMaxRows());
-        if (newSheet.getMaxColumns() < data[0].length) newSheet.insertColumnsAfter(newSheet.getMaxColumns(), data[0].length - newSheet.getMaxColumns());
-        
-        newSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
-        // Values only came over: each event table gets its title / delete box / headers / dropdowns back
-        if (sheetName === "Events") {
-          try { restyleEventTables_(newSS, newSheet); } catch (e) { console.warn("Migration: event tables not restyled: " + e.message); }
-        }
-      }
-    }
+  part("New / Edit Student changes", () => {
+    const overrides = readBackendBlockFromOtherSpreadsheet_(oldSS, "OVERRIDES");
+    if (overrides.length > 1) backendWriteBlock_(newSS, "OVERRIDES", overrides);
   });
+
+  part("Events", () => {
+    const oldSheet = oldSS.getSheetByName("Events"), newSheet = newSS.getSheetByName("Events");
+    if (!oldSheet || !newSheet) return;
+    const data = oldSheet.getDataRange().getValues();
+    if (data.length <= 1) return;
+    // Events is a plain tab of 7-column tables: start from a clean grid (no leftover merges,
+    // dropdowns or colors in other places), the tables get their look back below
+    newSheet.getRange(1, 1, newSheet.getMaxRows(), newSheet.getMaxColumns()).breakApart().clearDataValidations().clearFormat().clearContent();
+    if (newSheet.getMaxRows() < data.length) newSheet.insertRowsAfter(newSheet.getMaxRows(), data.length - newSheet.getMaxRows());
+    if (newSheet.getMaxColumns() < data[0].length) newSheet.insertColumnsAfter(newSheet.getMaxColumns(), data[0].length - newSheet.getMaxColumns());
+    newSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    // Values only came over: each event table gets its title / delete box / headers / dropdowns back
+    try { restyleEventTables_(newSS, newSheet); } catch (e) { console.warn("Migration: event tables not restyled: " + e.message); }
+  });
+
+  part("Send Out", () => {
+    const skipped = migrateSendOut_(oldSS, newSS);
+    if (skipped.length) warnings.push("Send Out: the column" + (skipped.length > 1 ? "s " : " ") + skipped.join(", ") +
+      " didn't come over (the new Send Out table refused the old values; file chips can't be copied).");
+  });
+
+  part("Notes tab", () => migrateNotesTab_(oldSS, newSS));
+  part("Type List", () => migrateTypeList_(oldSS, newSS));
 
   // Your Lists (owner's pick 2026-11-12: they come along): each 📥 list tab + its setup.
   // The final rebuild (step 6) then fills their columns / Additional Information.
-  try {
+  part("Your Lists", () => {
     const moved = od_migrateLists_(oldSS, newSS);
     if (moved) console.log("Migration: " + moved + " of Your Lists copied.");
-  } catch (e) { console.warn("Migration: Your Lists not copied: " + e.message); }
+  });
+  return { warnings: warnings };
+}
+
+/**
+ * Send Out (a Sheets Table): rows 2+ only (the new table keeps its own headers), each old column
+ * into the new column with the same header (none match: by position), one column at a time like
+ * loadFakeSendOut_, so a value the table refuses only skips that column. Returns the skipped
+ * columns' headers.
+ */
+function migrateSendOut_(oldSS, newSS) {
+  const oldSheet = oldSS.getSheetByName("Send Out"), newSheet = newSS.getSheetByName("Send Out");
+  if (!oldSheet || !newSheet) return [];
+  const data = oldSheet.getDataRange().getValues();
+  const rows = data.slice(1).filter(r => r.some(v => v !== "" && v !== null && v !== false));
+  if (!rows.length) return [];
+  const oldH = data[0].map(h => String(h).trim().toLowerCase());
+  const newHRaw = newSheet.getRange(1, 1, 1, Math.max(1, newSheet.getLastColumn())).getValues()[0];
+  const newH = newHRaw.map(h => String(h).trim().toLowerCase());
+  let map = migrationHeaderMap_(oldH, newH);
+  if (!Object.keys(map).length) { map = {}; oldH.forEach((h, i) => { if (i < newH.length) map[i] = i; }); }
+
+  if (newSheet.getMaxRows() < rows.length + 1) newSheet.insertRowsAfter(newSheet.getMaxRows(), rows.length + 1 - newSheet.getMaxRows());
+  const clearRows = Math.max(newSheet.getLastRow(), rows.length + 1) - 1;
+  const skipped = [];
+  Object.keys(map).forEach(oldIdx => {
+    const c = map[oldIdx] + 1;
+    try {
+      if (clearRows > 0) newSheet.getRange(2, c, clearRows, 1).clearContent();
+      newSheet.getRange(2, c, rows.length, 1).setValues(rows.map(r => [r[oldIdx] === undefined ? "" : r[oldIdx]]));
+    } catch (e) {
+      console.warn("Send Out column " + c + " not copied: " + e.message);
+      skipped.push('"' + (String(newHRaw[c - 1] || "").trim() || "column " + c) + '"');
+    }
+  });
+  return skipped;
+}
+
+/**
+ * The Notes tab (A OSIS, B Guardian, C Student, D Note; E = the delete checkbox): the old rows
+ * replace the new tab's rows 2+ (blank rows left out), each with its delete checkbox. These
+ * are the manual notes shown first in Combined Contact Tracking (2026-11-13: they were never
+ * copied). Returns the number of notes.
+ */
+function migrateNotesTab_(oldSS, newSS) {
+  const oldSheet = oldSS.getSheetByName("Notes"), newSheet = newSS.getSheetByName("Notes");
+  if (!oldSheet || !newSheet) return 0;
+  const last = oldSheet.getLastRow();
+  if (last < 2) return 0;
+  const rows = oldSheet.getRange(2, 1, last - 1, 4).getValues()
+    .filter(r => r.some(v => v !== "" && v !== null && v !== false));
+  if (!rows.length) return 0;
+  const newLast = newSheet.getLastRow();
+  if (newLast > 1) newSheet.getRange(2, 1, newLast - 1, 4).clearContent();
+  if (newSheet.getMaxRows() < rows.length + 1) newSheet.insertRowsAfter(newSheet.getMaxRows(), rows.length + 1 - newSheet.getMaxRows());
+  newSheet.getRange(2, 1, rows.length, 4).setValues(rows);
+  try { newSheet.getRange(2, 5, rows.length, 1).insertCheckboxes().setFontColor("#000000"); }
+  catch (e) { console.warn("Notes: delete checkboxes not added: " + e.message); }
+  try { clearNotesSourcesCache_(); } catch (e) { /* cache only */ }
+  return rows.length;
+}
+
+/**
+ * The Contact Log Type choices (Backend BL, or an old "Type List" tab): the old tracker's
+ * types first, in their order (the Type colors follow it), then any of this template's types
+ * it didn't have. Returns the number of types.
+ */
+function migrateTypeList_(oldSS, newSS) {
+  const clean = rows => rows.map(r => String(r[0] == null ? "" : r[0]).trim()).filter(Boolean);
+  const oldTypes = clean(readBackendBlockFromOtherSpreadsheet_(oldSS, "TYPES"));
+  if (!oldTypes.length) return 0;
+  const seen = {}, merged = [];
+  oldTypes.concat(clean(backendReadBlock_(newSS, "TYPES", false))).forEach(t => {
+    const k = t.toLowerCase();
+    if (!seen[k]) { seen[k] = true; merged.push(t); }
+  });
+  backendWriteBlock_(newSS, "TYPES", merged.map(t => [t]));
+  try { applyTypeDropdownColors(); } catch (e) { console.warn("Type colors not redrawn: " + e.message); }
+  return merged.length;
 }
 
 // Contact Log Follow-up column (N) and the old values (trackers before 2026-11-04) -> the new options
@@ -2935,7 +3074,7 @@ function ma_migrateContactLog(url) {
     return keep;
   });
   
-  if (oldRecords.length === 0) return; // Nothing to migrate
+  if (oldRecords.length === 0) return { records: 0 }; // Nothing to migrate
   
   // 2. Get New Headers & Find END
   const newData = newLog.getDataRange().getValues();
@@ -3015,11 +3154,15 @@ function ma_migrateContactLog(url) {
   // Instead of letting Google Sheets guess the formatting (which might pull the brown 'END' bar upwards), 
   // we take the clean formatting from Row 2 and physically paint it down over everything, 
   // ensuring the new blank row perfectly matches the data rows above it.
+  // (Each copy on its own: a Sheets Table can refuse one on its typed columns, which must not
+  // stop the rest of this step; 2026-11-13)
   if (neededSpace > 1) {
     const formatSource = newLog.getRange(2, 1, 1, logWidth);
     const formatTarget = newLog.getRange(3, 1, neededSpace - 1, logWidth);
-    formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-    formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+    try { formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false); }
+    catch (e) { console.warn("Contact Log formats not copied down: " + e.message); }
+    try { formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false); }
+    catch (e) { console.warn("Contact Log dropdowns not copied down: " + e.message); }
   }
   
   // ==========================================
@@ -3027,13 +3170,16 @@ function ma_migrateContactLog(url) {
   // ==========================================
   const spacerRow = newEndRow - 1;
   
-  // 1. Wipe Columns A through O completely clean of any cloned phantom text
-  newLog.getRange(spacerRow, 1, 1, 15).clearContent().clearDataValidations();
+  // 1. Wipe Columns A through O completely clean of any cloned phantom text. Their dropdowns stay
+  // (2026-11-13: they were cleared too, and the next rows, added under this one, then had none)
+  newLog.getRange(spacerRow, 1, 1, 15).clearContent();
   
   // 2. 💡 THE FIX: Target ONLY Column P (16). Wipe any "FALSE" text, then cleanly plant the checkbox.
   // Using the exact syntax provided to ensure a pure, working checkbox.
-  newLog.getRange(spacerRow, 16).clearContent().clearDataValidations();
-  newLog.getRange(spacerRow, 16).insertCheckboxes().setFontColor("#000000");
+  try {
+    newLog.getRange(spacerRow, 16).clearContent().clearDataValidations();
+    newLog.getRange(spacerRow, 16).insertCheckboxes().setFontColor("#000000");
+  } catch (e) { console.warn("Contact Log spacer checkbox: " + e.message); }
 
   // Repaint all background formulas instantly (Like the Week formula in A)
   // 🚨 FIX: Changed 'ss' to 'newSS' so it uses the correct defined variable!
@@ -3064,7 +3210,9 @@ function ma_migrateContactLog(url) {
   // step 6 checks again)
   try { ensureSpokeWithChoices_(newSS); } catch (e) { console.warn("Person Spoke With choices: " + e.message); }
 
-  SpreadsheetApp.getUi().alert(`Success! Migrated ${oldRecords.length} records into your Typed Table and applied your active Master Filter.`);
+  // No pop-up here (2026-11-13): a server alert while the wizard is open can close the wizard,
+  // and then step 6 (the rebuild) never ran. The wizard shows the count instead.
+  return { records: oldRecords.length };
 }
 
 // Contact Log headers that were renamed between versions (owner 2026-11-13: last year's "Notes" /
@@ -3135,8 +3283,9 @@ function copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, width) 
 
 /**
  * After step 6: marks the OLD tracker as replaced by this one (invisible developer metadata,
- * see REPLACED BY A NEWER TRACKER in Build.gs), so its nightly rebuild / phone sync turns
- * itself off the next time it fires, if the old tracker runs code that reads the mark.
+ * see REPLACED BY A NEWER TRACKER in Build.gs): if it runs code that reads the mark, its
+ * nightly rebuild / phone sync pause and opening it asks whether to keep it paused. An earlier
+ * mark (an earlier migration, e.g. into a test copy) is replaced: the latest one counts.
  * Never throws. Returns { url, name, marked } for the wizard's done screen, which always
  * also says how to turn it off by hand (older trackers ignore the mark; no edit access = no mark).
  */
@@ -3147,8 +3296,9 @@ function ma_markOldTracker(url) {
   try { res.name = oldSS.getName(); res.url = oldSS.getUrl(); } catch (e) { /* the link as given */ }
   try {
     const here = SpreadsheetApp.getActiveSpreadsheet();
-    if (replacedByUrl_(oldSS)) { res.marked = true; return res; }
-    oldSS.addDeveloperMetadata(REPLACED_BY_MARK_, JSON.stringify({ old: oldSS.getId(), newUrl: here.getUrl() }));
+    oldSS.createDeveloperMetadataFinder().withKey(REPLACED_BY_MARK_).find().forEach(m => m.remove());
+    oldSS.addDeveloperMetadata(REPLACED_BY_MARK_, JSON.stringify({
+      old: oldSS.getId(), newId: here.getId(), newUrl: here.getUrl(), newName: here.getName(), at: Date.now() }));
     res.marked = true;
   } catch (e) {
     console.warn("Old tracker not marked (no edit access?): " + e.message);
@@ -3157,13 +3307,47 @@ function ma_markOldTracker(url) {
 }
 
 /**
- * STEP 6: Final Rebuild
+ * Before step 6's build: the old Student List (every student it ever had, Discharged ones
+ * included) goes into this one, so the build keeps that history as on the old tracker
+ * (2026-11-13: students discharged before the move lost their Combined Contact Tracking rows,
+ * Last Interaction and notes, though their Contact Log rows came over). Only reads the old
+ * tracker. Returns the number of student rows copied.
  */
-function ma_finish() {
+function migrateStudentList_(oldSS, newSS) {
+  const oldSheet = oldSS.getSheetByName(STUDENT_LIST_SHEET) || oldSS.getSheetByName(LEGACY_STUDENT_LIST_SHEET);
+  const newSheet = getStudentListSheet_(newSS);
+  if (!oldSheet || !newSheet || oldSheet.getLastRow() < 1) return 0;
+  const data = oldSheet.getDataRange().getValues();
+  const h = data.findIndex((r, i) => i < 10 && String(r[0]).trim().toUpperCase() === "OSIS");
+  if (h < 0 || data.length - h < 2) return 0;
+  const rows = data.slice(h);
+  newSheet.clearContents();
+  if (newSheet.getMaxRows() < rows.length) newSheet.insertRowsAfter(newSheet.getMaxRows(), rows.length - newSheet.getMaxRows());
+  if (newSheet.getMaxColumns() < rows[0].length) newSheet.insertColumnsAfter(newSheet.getMaxColumns(), rows[0].length - newSheet.getMaxColumns());
+  newSheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
+  return rows.length - 1;
+}
+
+/**
+ * STEP 6: Final Rebuild. url (the old tracker): its Student List history comes first
+ * (migrateStudentList_). If the build fails, that copy is taken out again, so the tracker
+ * doesn't look built (full menus, no 🔄 Import Old Data) and Try Again starts this step over.
+ */
+function ma_finish(url) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.toast("Migration complete! Rebuilding master directories...", "Almost Done", 5);
-  
-  buildAllDerivedSheets();
+
+  let copied = 0;
+  if (url) {
+    try { copied = migrateStudentList_(SpreadsheetApp.openByUrl(url), ss); }
+    catch (e) { console.warn("Migration: Student List history not copied: " + e.message); }
+  }
+  try {
+    buildAllDerivedSheets();
+  } catch (e) {
+    if (copied) { try { getStudentListSheet_(ss).clearContents(); } catch (err) { console.warn(err.message); } }
+    throw e;
+  }
 
   // 💡 NEW: Instantly Unlock and Repaint the App Menu without requiring a refresh!
   PropertiesService.getDocumentProperties().setProperty('FULL_MENU_UNLOCKED', 'true');
@@ -3602,7 +3786,8 @@ function computeUpdatePayload_(showAll) {
     latestLink: latestLink,
     newestDateMs: entries.length ? entries[0].dateMs : baselineMs,
     newestDateStr: entries.length ? entries[0].dateStr : "",
-    installedDateStr: formatMsDate_(baselineMs),
+    // "Your version is dated ...": this copy's own date (the baseline can be a dismissed update's date)
+    installedDateStr: (function () { let b = NaN; try { b = trackerBuildDateMs_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) {} return formatMsDate_(isNaN(b) ? baselineMs : b); })(),
     majorsOnly: majorsOnly,
     dismissForever: props.getProperty('VERSION_DISMISS_FOREVER') === 'true'
   };
@@ -3616,18 +3801,26 @@ function computeUpdatePayload_(showAll) {
  */
 function getLocalBaselineDateMs_() {
   let buildMs = NaN;
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
-    const legacy = ss.getSheetByName("Version");
-    if (backend) buildMs = toDateMs_(backend.getRange(BACKEND_VERSION.BUILD_DATE).getValue());
-    else if (legacy) buildMs = toDateMs_(legacy.getRange("A1").getValue());
-  } catch (e) { console.error(e); }
+  try { buildMs = trackerBuildDateMs_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error(e); }
 
   const seenMs = Number(PropertiesService.getDocumentProperties().getProperty('VERSION_LAST_SEEN_DATE') || NaN);
 
   const candidates = [buildMs, seenMs].filter(n => !isNaN(n));
   return candidates.length ? Math.max.apply(null, candidates) : 0;
+}
+
+/**
+ * A tracker's version date (Backend A2, or an old "Version" tab's A1) as ms, NaN when unknown.
+ * Only reads (also used on another tracker by Migration's ma_verify).
+ */
+function trackerBuildDateMs_(ss) {
+  try {
+    const backend = ss.getSheetByName(BACKEND_SHEET_NAME);
+    if (backend) return toDateMs_(backend.getRange(BACKEND_VERSION.BUILD_DATE).getValue());
+    const legacy = ss.getSheetByName("Version");
+    if (legacy) return toDateMs_(legacy.getRange("A1").getValue());
+  } catch (e) { console.warn("Version date not read: " + e.message); }
+  return NaN;
 }
 
 // ==========================================

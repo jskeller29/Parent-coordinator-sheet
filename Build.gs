@@ -319,7 +319,7 @@ function nightlyTriggerShouldRun_(e) {
   try {
     const props = PropertiesService.getDocumentProperties();
     const uid = e && e.triggerUid ? String(e.triggerUid) : "";
-    if (retireIfReplaced_(props, uid)) return false;
+    if (nightlyPausedByReplacement_()) return false; // brought into a newer tracker (see REPLACED BY A NEWER TRACKER)
     const owned = props.getProperty(NIGHTLY_UID_KEY_);
     if (uid && !owned) rememberNightlyTrigger_(props, uid); // first one to fire keeps the job
     else if (uid && owned !== uid) {
@@ -348,61 +348,106 @@ function nightlyTriggerShouldRun_(e) {
 // ----------------------------------------------------------------------
 // REPLACED BY A NEWER TRACKER (owner's request 2026-11-13)
 // Bringing this tracker into a new one (Migration, Menus.gs ma_markOldTracker) puts an
-// invisible developer-metadata mark on THIS file: { old: this file's ID, new: the new
-// tracker's link }. The new tracker can't delete this one's triggers (they belong to this
-// script project and their maker), so the nightly trigger checks the mark when it fires:
-// it deletes itself, and "never at night" + phone sync off are saved so every other
-// person's nightly trigger here skips too (and deletes itself when it fires).
-// The mark names this file's ID, so a Drive copy of this tracker (which carries the mark)
-// is not affected. Only trackers with this code read it: older ones are turned off by
-// hand (the wizard's done screen says how).
+// invisible developer-metadata mark on THIS file:
+//   { old: this file's ID, newId, newUrl, newName: the new tracker, at: ms }.
+// The new tracker can't delete this one's triggers (they belong to this script project and
+// their maker), so this one checks the mark itself. While it is there:
+//   - every nightly trigger skips its run (nightlyTriggerShouldRun_): no rebuild, no phone
+//     sync. Nothing is deleted or changed, so taking the mark away undoes it completely;
+//   - opening the tracker (checkVersionOnOpen) asks once "Keep this tracker paused?":
+//     No = "I still use this tracker" -> the mark goes (a test migration into a copy must
+//     never stop the main sheet for good); Yes -> a short reminder on every later open.
+// The mark only counts while the new tracker exists: a trashed one -> the mark is removed
+// (the test copy was thrown away); one that can't be read (no access) -> no pause. The mark
+// names this file's ID, so a Drive copy of this tracker (it carries the mark) is not paused.
+// Only trackers with this code read it: older ones are turned off by hand (the wizard's
+// done screen says how).
 // ----------------------------------------------------------------------
 var REPLACED_BY_MARK_ = "PC_TRACKER_REPLACED_BY";
+var REPLACED_ACK_KEY_ = "REPLACED_BY_ACK"; // doc property: the mark's "at" the user said "keep it paused" to
 
-/** The newer tracker's link when this file was brought into one, else "". */
-function replacedByUrl_(ss) {
+/** This file's mark ({ old, newId, newUrl, newName, at }), or null. */
+function replacedByMark_(ss) {
   try {
     const id = ss.getId();
     const marks = ss.createDeveloperMetadataFinder().withKey(REPLACED_BY_MARK_).find();
     for (let i = 0; i < marks.length; i++) {
       const v = JSON.parse(marks[i].getValue() || "{}");
-      if (v && v.old === id) return String(v.newUrl || "(new tracker)");
+      if (v && v.old === id) return v;
     }
   } catch (err) { /* no mark */ }
-  return "";
+  return null;
 }
 
-/** True (and the nightly run stops for good here) when this tracker was replaced by a newer one. */
-function retireIfReplaced_(props, uid) {
-  let newUrl = "";
-  try { newUrl = replacedByUrl_(SpreadsheetApp.getActiveSpreadsheet()); } catch (err) { /* no sheet: no mark */ }
-  if (!newUrl) return false;
-  props.setProperty('disableNightlySync', 'true');
-  props.setProperty('syncToPhones', 'false');
+/** Takes the mark(s) off this file. Never throws. */
+function clearReplacedMark_(ss) {
+  try { ss.createDeveloperMetadataFinder().withKey(REPLACED_BY_MARK_).find().forEach(m => m.remove()); }
+  catch (err) { console.warn("Replaced mark not removed: " + err.message); }
+  try { PropertiesService.getDocumentProperties().deleteProperty(REPLACED_ACK_KEY_); } catch (err) { /* reminder only */ }
+}
+
+/**
+ * The mark when it counts (the new tracker is there), else null. A new tracker in the trash:
+ * the mark is removed. One that can't be read (no access, deleted for good): no pause, mark kept.
+ */
+function activeReplacedMark_(ss) {
+  const mark = replacedByMark_(ss);
+  if (!mark) return null;
+  if (!mark.newId) return mark;
   try {
-    ScriptApp.getProjectTriggers().forEach(t => {
-      if (t.getHandlerFunction() === "nightlyMasterSync" && (!uid || t.getUniqueId() === uid)) ScriptApp.deleteTrigger(t);
-    });
-  } catch (err) { console.warn("Nightly trigger not removed: " + err.message); }
-  console.log("Nightly sync: this tracker was brought into a newer one (" + newUrl + "): nightly rebuild turned off.");
+    if (!DriveApp.getFileById(mark.newId).isTrashed()) return mark;
+    clearReplacedMark_(ss);
+    console.log("Replaced mark removed: the new tracker (" + mark.newId + ") is in the trash.");
+  } catch (err) {
+    console.warn("New tracker not readable (" + err.message + "): this tracker keeps running.");
+  }
+  return null;
+}
+
+/** Nightly trigger: true = this tracker is replaced, skip the run (no rebuild, no phone sync). */
+function nightlyPausedByReplacement_() {
+  let mark = null;
+  try { mark = activeReplacedMark_(SpreadsheetApp.getActiveSpreadsheet()); } catch (err) { /* no sheet: no mark */ }
+  if (!mark) return false;
+  console.log("Nightly sync paused: this tracker was brought into \"" + (mark.newName || mark.newUrl || "a newer tracker") +
+    "\". Nothing rebuilt or synced.");
   return true;
 }
 
 /**
- * checkVersionOnOpen (Menus.gs; runs as the person who made that on-open trigger): on a replaced
- * tracker, removes that person's nightly triggers, saves nightly + phone sync off and toasts the
- * new tracker's link. Other people's triggers stop when they fire (retireIfReplaced_). Never throws.
+ * checkVersionOnOpen (Menus.gs): on a replaced tracker, asks once whether to keep it paused
+ * (No = still in use: the mark goes and the open goes on as usual), then only a reminder.
+ * Returns true when the tracker stays paused (the update pop-up / reminders are skipped).
+ * Never throws.
  */
 function retiredTrackerOnOpen_() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const newUrl = replacedByUrl_(ss);
-    if (!newUrl) return false;
-    retireIfReplaced_(PropertiesService.getDocumentProperties(), "");
-    ss.toast("This tracker was brought into a newer one, so its nightly rebuild and phone sync are off. " +
-      "Use the new tracker: " + newUrl, "📦 Old tracker", 20);
-    return true;
-  } catch (err) { console.warn("Retired tracker check failed: " + err.message); return false; }
+    const mark = activeReplacedMark_(ss);
+    if (!mark) return false;
+    const props = PropertiesService.getDocumentProperties();
+    const name = mark.newName ? '"' + mark.newName + '"' : "a newer tracker";
+    if (props.getProperty(REPLACED_ACK_KEY_) === String(mark.at)) {
+      ss.toast("This tracker's data was brought into " + name + ", so its nightly rebuild and phone sync are paused. " +
+        "Use the new tracker" + (mark.newUrl ? ": " + mark.newUrl : "."), "📦 Old tracker", 20);
+      return true;
+    }
+    const when = mark.at ? Utilities.formatDate(new Date(Number(mark.at)), Session.getScriptTimeZone(), "MM/dd/yy") : "";
+    const ui = SpreadsheetApp.getUi();
+    const answer = ui.alert("📦 This tracker was brought into a newer one",
+      (when ? "On " + when + ", this" : "This") + " tracker's data was copied into " + name + ".\n\n" +
+      "So the two don't both rebuild every night and update your Google Contacts, this tracker's nightly " +
+      "rebuild and phone sync are paused.\n\nKeep this tracker paused?\n\n" +
+      "Yes = keep it paused (use the new tracker).\nNo = I still use this tracker: turn its nightly rebuild back on.",
+      ui.ButtonSet.YES_NO);
+    if (answer === ui.Button.NO) {
+      clearReplacedMark_(ss);
+      ss.toast("This tracker rebuilds every night again.", "📦 Still in use", 8);
+      return false;
+    }
+    if (answer === ui.Button.YES) props.setProperty(REPLACED_ACK_KEY_, String(mark.at));
+    return true; // Yes, or the question was closed (asked again next time)
+  } catch (err) { console.warn("Replaced tracker check failed: " + err.message); return false; }
 }
 
 /**

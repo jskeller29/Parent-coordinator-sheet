@@ -70,7 +70,10 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 - [ ] Contact Log: type a parent name, paste a few rows, delete a row; the search bar notes follow
 - [ ] 🧱 Full Sync while you watch (the "more than half" question, if it comes, is asked at the start)
 - [ ] On a fresh template copy, before its first build: 🚀 App Menu → 🔄 Import Old Data from last year's tracker
-      (Follow-ups translated, lists copied; the menu item is gone once a sheet is built)
+      (Follow-ups translated, lists copied; the menu item is gone once a sheet is built). All 6 steps tick and the
+      done screen shows (no "Success!" pop-up half way); the Notes tab, Type list, Send Out and old "Notes" /
+      "Followup Notes" columns came over; Person Spoke With lists guardians; a Discharged student still has notes
+- [ ] Then open the OLD tracker (if it has this version): it asks "Keep this tracker paused?"; No = it rebuilds again
 - [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
 - [ ] Person Spoke With: a row whose student has 2 or 3 guardians (one from New/Edit Student) lists only
       them, the next student's row lists theirs. Then delete R2's formula and Build: it comes back

@@ -18,6 +18,8 @@
     .badge.small { background: var(--accent-soft); color: var(--accent); }
     .notes { font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; }
     .getlink { align-self: flex-start; margin-top: 4px; }
+    .howto { font-size: 13px; line-height: 1.5; color: var(--muted); }
+    .howto ol { margin: 4px 0 0; padding-left: 20px; }
     .older { display: flex; flex-direction: column; gap: 6px; }
     .older-head { border-bottom: 1px solid var(--line); padding-bottom: 5px; }
     .older-title { font-size: 13.5px; font-weight: 700; color: var(--muted); }
@@ -150,6 +152,16 @@
         a.rel = 'noopener';
         a.textContent = 'Get the latest version';
         card.appendChild(a);
+        // How an update works (2026-11-13): a new copy, then this tracker's data is brought into it
+        const how = document.createElement('div');
+        how.className = 'howto';
+        how.innerHTML = '<b>How to update</b><ol>' +
+          '<li>Click Get the latest version and make the copy.</li>' +
+          '<li>In the new copy: 🚀 App Menu → 🚨 Initial Setup.</li>' +
+          '<li>When it asks "Is this your first PC Tracker?", choose "No, bring over last year\'s tracker" (it works in the middle of the year too), pick this tracker and click Bring it over.</li>' +
+          '<li>When it is done, this tracker\'s nightly rebuild and phone sync pause by themselves. The next time you open this tracker, it asks whether to keep it paused: click Yes.</li>' +
+          '</ol>';
+        card.appendChild(how);
       }
       list.appendChild(card);
 
@@ -247,7 +259,7 @@
         .withFailureHandler(function(err) {
           showErrorBox('Server error while loading the changelog',
             String(err && err.message ? err.message : err) +
-            '\n\nIf this mentions an unknown function (like vc_getPayload), your VersionCheck.gs file is out of date — re-paste the latest version of BOTH files.');
+            '\n\nIf this mentions an unknown function (like vc_getPayload), the Menus script is out of date: re-paste the latest Menus and VersionDialog files.');
         })
         .vc_getPayload();
     }

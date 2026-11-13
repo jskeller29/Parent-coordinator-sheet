@@ -443,27 +443,6 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Migration: renamed Contact Log headers + cell notes (2026-11-13): re-paste Menus on every sheet.
 - Migration keeps the Person Spoke With formula (2026-11-13): re-paste Menus (and Build / Edits / Core if the
   Person Spoke With change isn't deployed yet) on every sheet.
-
-MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
-maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
-(case / spaces / punctuation ignored) for a new column still empty: old "Notes" / "Comments" -> Event Description,
-"Followup Notes" -> Additional Notes, "Followup" -> Follow-up, "Method" -> Method 1, etc.; each column used once.
-The cells' hover notes come too (copyContactLogCellNotes_, never throws). Google's threaded comments can't be copied
-by Apps Script.
-
-OLD TRACKER'S NIGHTLY AFTER MIGRATION (owner's request 2026-11-13): a new tracker can't delete another project's
-triggers, so: (1) after step 6 the wizard calls ma_markOldTracker(url) (Menus.gs): invisible developer metadata
-PC_TRACKER_REPLACED_BY = { old: old file ID, newUrl } on the OLD file (needs edit access; never throws); its done
-screen then always shows "One last step: turn off the old tracker's nightly rebuild" (Open "<old name>" button +
-Settings steps for new and old Settings labels), no more auto-close. (2) nightlyTriggerShouldRun_ starts with
-retireIfReplaced_ (Build.gs, REPLACED BY A NEWER TRACKER): a marked tracker deletes the firing nightly trigger and
-saves disableNightlySync = true / syncToPhones = false (other people's triggers then skip / delete themselves). The
-mark names the file's ID, so a Drive copy of a marked tracker is not affected. (3) checkVersionOnOpen starts with
-retiredTrackerOnOpen_ (Build.gs): opening a marked tracker removes the opener's nightly triggers, saves nightly +
-phone sync off, toasts the new tracker's link and skips the update pop-up / reminders / checklist. Same for a
-year-to-year move and a version update (both use the wizard). Only trackers with this code read the mark: trackers
-on older code need the manual Settings step (their code reads settings only from document properties, and the
-saved-settings block only at a fresh copy's setup, so the new tracker can't switch them off). Tested in test_features.js.
 - New-user flow fixes + bug pass (2026-11-12): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
   GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
   (HTML) on every sheet.
@@ -473,6 +452,59 @@ saved-settings block only at a fresh copy's setup, so the new tracker can't swit
   scopes, no re-approval). Then on the owner's sheet 🐞 Debug → 🎨 Apply Sheet Style once, then Make Release Copies.
 - Person Spoke With choices (2026-11-13): re-paste Core, Build, Edits on every sheet; Build once (writes Contact Log
   R2, hides R:AA); then on the master template and the owner's sheet set column D's dropdown BY HAND (DEPLOY.md step 9).
+- Migration + update run-through (2026-11-13): re-paste Build, Menus (scripts) and MigrationUI, VersionDialog
+  (HTML) on every sheet.
+
+MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
+maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
+(case / spaces / punctuation ignored) for a new column still empty: old "Notes" / "Comments" -> Event Description,
+"Followup Notes" -> Additional Notes, "Followup" -> Follow-up, "Method" -> Method 1, etc.; each column used once.
+The cells' hover notes come too (copyContactLogCellNotes_, never throws). Google's threaded comments can't be copied
+by Apps Script.
+
+OLD TRACKER'S NIGHTLY AFTER MIGRATION (owner's request 2026-11-13; PAUSE, not delete, since the final run-through
+the same day): a new tracker can't delete another project's triggers, so: (1) after step 6 the wizard calls
+ma_markOldTracker(url) (Menus.gs): invisible developer metadata PC_TRACKER_REPLACED_BY = { old: old file ID, newId,
+newUrl, newName, at } on the OLD file (an earlier mark is replaced; needs edit access; never throws); its done screen
+always shows "One last step: stop the old tracker's nightly rebuild" (Open "<old name>" button + the Settings steps
+for older trackers), no auto-close. (2) Build.gs REPLACED BY A NEWER TRACKER: nightlyTriggerShouldRun_ starts with
+nightlyPausedByReplacement_: while activeReplacedMark_ (mark for this file's ID AND DriveApp says the new tracker
+exists, not trashed) every nightly run is skipped; NOTHING is deleted or changed (taking the mark away undoes it).
+New tracker trashed -> the mark is removed by itself; unreadable (no access) -> no pause, mark kept. (3)
+checkVersionOnOpen starts with retiredTrackerOnOpen_: asks once (ui.alert YES_NO) "Keep this tracker paused?": No
+= still in use -> clearReplacedMark_, the open goes on; Yes -> doc property REPLACED_BY_ACK = the mark's at, later
+opens only toast; closed -> asked again. While paused the update pop-up / reminders / checklist are skipped. Why
+not delete: the owner tests migrations into copies; a deleted trigger would have stopped the main sheet for good.
+A Drive copy of a marked tracker is never paused (other ID). Only trackers with this code read the mark: trackers
+on older code (every school sheet today) need the manual Settings step (their code reads settings only from
+document properties, and the saved-settings block only at a fresh copy's setup). Tested in test_features.js.
+
+MIGRATION RUN-THROUGH (owner 2026-11-13, "final run through of migrate and update bugs"):
+- Step 5 had a server ui.alert ("Success! Migrated N records ...") while the wizard was open: an alert can close
+  the wizard, and then step 6 (build, Person Spoke With formula, done screen) never ran. Removed: ma_migrateContactLog
+  returns { records } and the checklist shows the count. Never put ui.alert / dialogs in a wizard step.
+- The wizard (MigrationUI.html) runs STEP_CALLS one by one; Try Again with the same tracker resumes at the failed
+  step (another tracker starts over); a failed step shows ✕; the tracker list works again after an error; step 4's
+  { warnings } are listed on the done screen. tests/check.js now also checks 'ma_*' names given as strings.
+- ma_verify refuses a tracker with a NEWER version date (trackerBuildDateMs_: Backend A2 / old Version A1; unknown
+  = allowed), so data never goes backwards (and the newer tracker is never marked as replaced).
+- Step 2 reads the old tracker's saved-settings block (readSavedSettingsFrom_, Backend A6:B / old Version A5:B;
+  SETTING_KEYS, not notesStartDate / notesEndDate) and then saves the block, refreshes the Contact Log filter and
+  the nightly trigger like a Settings save; only a tracker without the block gets the old tab-visibility guess
+  (which turned phone sync on whenever Phone Contacts showed).
+- Step 4 (each part in its own try/catch, a failure = a warning, the rest still comes over): New/Edit Student,
+  Events (as before), Send Out (migrateSendOut_: rows 2+ only, by header via migrationHeaderMap_, none match = by
+  position, one column at a time: a refused column, e.g. file chips, is skipped + warned; before, one refused cell
+  stopped the step and Events / Your Lists never came over), the NOTES TAB (migrateNotesTab_: A:D rows 2+, blank
+  rows left out, delete checkbox in E; it was never copied = every manual note lost), the TYPE LIST
+  (migrateTypeList_: old types first, then the template's new ones, applyTypeDropdownColors) and Your Lists.
+- Step 6 ma_finish(url): migrateStudentList_ copies the old Student List (header "OSIS" in A1:A10 and down, incl.
+  Discharged) into this one right before the build, so the build keeps that history (students discharged before
+  the move kept no Combined Contact Tracking row, notes or Last Interaction); a failed build clears the copy again
+  (the tracker must not look built: no Import Old Data menu item then) and the error goes to the wizard.
+- Step 5's spacer row keeps its dropdowns (only P is re-made); the format / dropdown copies are in try/catch.
+- Update dialog (VersionDialog.html): "How to update" steps under Get the latest version; "Your version is dated"
+  = this copy's own date (was the later of it and a dismissed update's date); error text names Menus / VersionDialog.
 
 NEW-USER FLOW (owner's bug lists 2026-11-12, "act as a new user who is not tech savvy"; walked step by step in
 tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# files like the owner's test copy):
