@@ -85,6 +85,14 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
     done: [{ name: 'Student Data', rows: 120, skipped: false }] });
   await shoot('InputDataSidebar', { idm_getState: ps, idm_check: ps }, 'idm_exit_build', async p => { await p.click('#exitBtn'); await p.waitForTimeout(150); });
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, ps, { canBuild: false }), idm_check: Object.assign({}, ps, { canBuild: false }) }, 'idm_exit_nobuild', async p => { await p.click('#exitBtn'); await p.waitForTimeout(150); });
+  // 2026-11-13: "Student Data (ATS) completed!" at the top of the next step; a list's tab icon
+  const psDone = Object.assign({}, ps, { notice: { type: 'imported', message: '✅ Student Data (ATS / Insight): 523 row(s) moved to Raw Data.',
+    done: { kind: 'ok', title: 'Student Data (ATS) completed!', sub: '523 rows moved to Raw Data. Next: Parent Square.' } } });
+  await shoot('InputDataSidebar', { idm_getState: psDone, idm_check: ps }, 'idm_done_banner', async p => { await p.waitForTimeout(2600); }); // still there after a poll
+  const listsIcons = Object.assign({}, lists, { lists: [Object.assign({}, lists.lists[0], { icon: '🚌', tabName: '🚌 Bus Routes' }), lists.lists[1]] });
+  await shoot('InputDataSidebar', { idm_getState: listsIcons }, 'idm_lists_icons', async p => {
+    await p.click('#listItems .li button.ico'); await p.click('#addListBtn'); await p.fill('#newListName', 'Field Trip');
+    await p.click('#newListIcons button[data-icon="🎉"]'); await p.waitForTimeout(150); });
   await shoot('YourListsSidebar', { od_getWizard: { phase: 'paste', list: { tabId: 1, name: 'Bus Routes', tabName: '📥 Bus Routes', ready: false } }, od_wizardCheck: { pasted: false } }, 'yl_paste');
   await shoot('YourListsSidebar', { od_getWizard: setupView }, 'yl_setup');
   await shoot('YourListsSidebar', { od_getWizard: setupView, od_matchPreview: matchView }, 'yl_match', async p => { await p.click('#nextBtn'); await p.waitForTimeout(200); await p.click('#nextBtn'); await p.waitForTimeout(500); });

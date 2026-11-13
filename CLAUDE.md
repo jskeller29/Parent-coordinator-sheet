@@ -81,6 +81,12 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   (idm_saveAndExit: saves Site / Class or moves an unmoved paste first; a problem keeps the mode on) / Exit without
   saving / Cancel. State in doc property
   INPUT_DATA_MODE_STATE; onOpen toasts a reminder if the mode was left on.
+  "<step> completed!" (owner 2026-11-13, "make it more obvious it uploaded"): idm_doneNotice_ (called before
+  idm_advance_ by the section write and the Site / Class save) adds notice.done = { kind 'ok', title "<doneName or
+  short> completed!" (ats doneName "Student Data (ATS)"), sub "1,234 rows moved to Raw Data. Next: Parent Square." }
+  and toasts the same on the sheet (6 s). The sidebar shows it as a green banner at the TOP of the next step
+  (#justDone; scrolls up; kept while that step shows, across polls; gone when the step changes). Site / Class with
+  nothing typed: done.kind 'info' (grey "Site / Class: nothing saved"). The old list under Option 1 stays.
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
   temp tab is cleared + renamed between steps; at the end it is deleted by a separate sidebar call
   (idm_deleteLeftoverTab, id in INPUT_DATA_MODE_DELETE_TAB; also retried on open). Debug panel: only with
@@ -122,7 +128,11 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
 
 - Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
-  One tab per list "📥 <name>" (rows 1-3 = OWN DATA band / status / column chips, header row 4 after a paste, data from
+  One tab per list "<icon> <name>" (icon = setup.icon, default 📥 OD_DEFAULT_ICON; owner 2026-11-13: picked in step 5's
+  "Add another list" form or by clicking the icon on a list's card: 24 offered + any typed emoji; od_cleanIcon_ = one
+  emoji / symbol, no letters, digits, spaces or tab-name characters; od_tabNameFor_; od_createList(name, icon),
+  od_renameList(tabId, name, icon) (icon left out = kept; od_saveList's rename keeps it too); lists are found by tab
+  ID, never by the icon; the row-1 band keeps "📥 OWN DATA") (rows 1-3 = OWN DATA band / status / column chips, header row 4 after a paste, data from
   row 5, tool columns "✔ Matched" / "How" after one blank spacer column). Its setup = one row in the Backend OWN_LISTS
   section (Tab ID, List, Setup JSON, Updated; od_loadLists_ / od_saveLists_): by (student / guardian), roles (osis,
   student / guardian as {col} or {first, last}, phone, email, class), vars (label, show = Additional Information,
@@ -460,6 +470,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - 🚀 App Menu first when a sheet opens (2026-11-13): re-paste Menus on every sheet (master template too).
 - Contact Log repair out of the menu run (2026-11-13, later): re-paste Menus on every sheet (master template too). Also the
   Initial Setup split below (same file).
+- "<step> completed!" banner + list icons + setup links at once (2026-11-13, later): re-paste Input Data, Menus
+  (scripts) and InputDataSidebar (HTML) on every sheet. User Guide: 3 small text changes (Input Data Mode paragraph,
+  "Your own lists", the tabs table); apply them to the Google Doc by hand.
 - Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 
@@ -547,9 +560,11 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   3 days (that trigger gone). Tested in test_input_flow.js.
   INITIAL SETUP (owner: "slow the first time, during setup"): runInitialSetupSteps_ redraws the menus (onOpen())
   right after the settings are saved (was after the tabs / columns / Sheet Lock); buildMenus_ skips
-  contactLogOpenRepair_ while IS_RUNNING_SETUP; zg_runSetup no longer looks up the links (returns links: null).
+  contactLogOpenRepair_ while IS_RUNNING_SETUP; zg_runSetup no longer looks up the links: it returns only the ones
+  typed in 📌 YOUR LINKS (zg_quickLinks_: downloadDataDoc / downloadDataVideo), so those buttons show at once.
   The setup window's SECOND call zg_setupFinish (after "Is this your first PC Tracker?" shows) does the repair +
-  zg_links_ (Version Tracker / Drive, seconds on a new copy) and fills the buttons (fillLinks). Never throws; if
+  zg_links_ (Version Tracker / Drive, seconds on a new copy) and fills the rest (fillLinks merges both parts, fixed
+  order: download doc, video, example). Never throws; if
   the window is closed first, the next open's checkVersionOnOpen does the repair.
 - 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined
   showing during setup looked wrong): newCopy (= Student List not built) -> showWelcomeTabOnly_ +

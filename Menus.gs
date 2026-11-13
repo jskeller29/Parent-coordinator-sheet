@@ -812,13 +812,19 @@ function showGuideWelcome_(opts) {
           })
           .zg_runSetup();
       }
+      // The links arrive in two parts (zg_runSetup: the typed-in ones, zg_setupFinish: the looked-up
+      // ones): each part adds what it has, always in the same order
+      var shownLinks = {};
       function fillLinks(l) {
+        if (!l) return;
+        var keys = [['downloadDataDoc', 'How to download your data'], ['downloadDataVideo', 'Watch the video'], ['example', 'See an example tracker']];
+        keys.forEach(function (x) { if (l[x[0]] && !shownLinks[x[0]]) shownLinks[x[0]] = l[x[0]]; });
         var box = document.getElementById('freshLinks');
-        if (!l || box.children.length) return;
-        [['downloadDataDoc', 'How to download your data'], ['downloadDataVideo', 'Watch the video'], ['example', 'See an example tracker']].forEach(function (x) {
-          if (!l[x[0]]) return;
+        box.innerHTML = '';
+        keys.forEach(function (x) {
+          if (!shownLinks[x[0]]) return;
           var a = document.createElement('a');
-          a.className = 'btn sec'; a.href = l[x[0]]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = x[1];
+          a.className = 'btn sec'; a.href = shownLinks[x[0]]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = x[1];
           box.appendChild(a);
         });
       }
@@ -954,15 +960,21 @@ function zg_finishSetup() {
 /** Initial Setup's window, step 1 (see showGuideWelcome_): the setup itself. */
 function zg_runSetup() {
   const migrate = runInitialSetup_();
-  // The links (Version Tracker / Drive: seconds on a new copy, nothing cached yet) and the Contact
-  // Log filter come in the window's NEXT call (zg_setupFinish), so this one, and the new 🚀 App
-  // Menu, end sooner (owner 2026-11-13: the menu took long during setup)
-  const links = null;
+  // Only the links typed in 📌 YOUR LINKS (no look-up) come now; the ones that need the Version
+  // Tracker / Drive (seconds on a new copy, nothing cached yet) and the Contact Log filter come in
+  // the window's NEXT call (zg_setupFinish), so this one, and the new 🚀 App Menu, end sooner
+  // (owner 2026-11-13: the menu took long during setup)
+  const links = migrate ? null : zg_quickLinks_();
   // replaces the 30-second "click Initial Setup" toast from the open
   SpreadsheetApp.getActiveSpreadsheet().toast("Your tracker is set up.", "✅ Setup done", 5);
   if (migrate) openMigrationWizard(); // replaces the setup window
   else openGuideChecklist();
   return { migrate: migrate, links: links };
+}
+
+/** The setup window's links that need no look-up (📌 YOUR LINKS); empty ones come with zg_setupFinish. */
+function zg_quickLinks_() {
+  return { downloadDataDoc: GUIDE_LINKS.downloadDataDoc || "", downloadDataVideo: GUIDE_LINKS.downloadDataVideo || "" };
 }
 
 /**

@@ -70,6 +70,7 @@ var IDM_PENDING_DELETE_KEY = 'INPUT_DATA_MODE_DELETE_TAB';
 var IDM_STEPS = [
   {
     key: 'ats', tab: 'Student Data', short: 'Student Data', zone: 'Student Data (ATS / Insight)', required: true,
+    doneName: 'Student Data (ATS)', // the "… completed!" banner (idm_doneNotice_); the other steps use short
     col: 1, stampCell: 'A1', stampPrefix: 'ATS - DATE UPDATED: ', minMatch: 3,
     headers: ["School Year","DBN","Student ID","Last Name","First Name","Race","Gender","Age","IEP Flag","ELL Flag","504 Flag","NYSAA Eligible","Housing Status","Temporary Housing Flag","Economic Disadvantage Flag","Cohort Year","Grade","Official Class","Home Language","Guardian Name 1","Guardian Relationship 1","Guardian Phone Number 1","Guardian Email 1","Guardian Spoken Language 1","Guardian Written Language 1","Guardian Name 2","Guardian Relationship 2","Guardian Phone Number 2","Guardian Email 2","Guardian Spoken Language 2","Guardian Written Language 2"],
     numberCols: ["Student ID","Guardian Phone Number 1","Guardian Phone Number 2"],
@@ -664,7 +665,8 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
 
   state.results[step.key] = { rows: mapped.rows.length };
   state.dataChanged = true; // step 5 builds first (idm_buildForLists)
-  return idm_advance_(ss, state, { type: 'imported', message: "✅ " + step.zone + ": " + mapped.rows.length + " row(s) moved to Raw Data." });
+  return idm_advance_(ss, state, idm_doneNotice_(ss, state, step, mapped.rows.length, "row", "rows", "moved to Raw Data",
+    "✅ " + step.zone + ": " + mapped.rows.length + " row(s) moved to Raw Data."));
 }
 
 /** A paste's cells for the sidebar to keep (Dates as the text shown: google.script.run can't send a Date). */
@@ -897,7 +899,9 @@ function idm_saveSiteClass_(ss, state, fromExit) {
       // A new sheet with no teachers or sites typed: nothing to save, on to the next step
       state.results[step.key] = { skipped: true };
       return idm_advance_(ss, state, { type: 'imported',
-        message: "No teacher names or sites were typed, so nothing was saved. You can add them any time in Input Data Mode." });
+        message: "No teacher names or sites were typed, so nothing was saved. You can add them any time in Input Data Mode.",
+        done: { kind: 'info', title: "Site / Class: nothing saved",
+                sub: "No teacher names or sites were typed. You can add them any time in Input Data Mode." } });
     }
 
     if (raw.getMaxColumns() < 61) raw.insertColumnsAfter(raw.getMaxColumns(), 61 - raw.getMaxColumns());
@@ -915,13 +919,34 @@ function idm_saveSiteClass_(ss, state, fromExit) {
     PropertiesService.getDocumentProperties().setProperty(IDM_SITECLASS_UPDATED_KEY, today);
     state.results[step.key] = { rows: classCount, saved: true };
     state.dataChanged = true; // step 5 builds first (idm_buildForLists)
-    return idm_advance_(ss, state, { type: 'imported', message: "✅ Site / Class: " + classCount + " class(es) saved to Raw Data." });
+    return idm_advance_(ss, state, idm_doneNotice_(ss, state, step, classCount, "class", "classes", "saved to Raw Data",
+      "✅ Site / Class: " + classCount + " class(es) saved to Raw Data."));
   }
 }
 
 // ---------------------------------------------------------------------
 // STEPS, TABS, HIDING
 // ---------------------------------------------------------------------
+
+/**
+ * The notice after a step went in (owner 2026-11-13: "make it more obvious it worked"): the
+ * message as before, plus done = { kind, title, sub } for the green banner the sidebar shows at
+ * the top of the NEXT step ("Student Data (ATS) completed!" / "523 rows moved to Raw Data. Next:
+ * Parent Square."), and the same as a toast on the sheet (a paste is done on the tab, so the
+ * user may be looking there). Call it before idm_advance_ (state.step is still this step).
+ */
+function idm_doneNotice_(ss, state, step, count, one, many, what, message) {
+  const name = step.doneName || step.short;
+  const next = IDM_STEPS[state.step + 1];
+  const sub = idm_countText_(count, one, many) + " " + what + "." + (next ? " Next: " + next.short + "." : "");
+  try { ss.toast(sub, "✅ " + name + " completed", 6); } catch (e) { console.warn("Toast: " + e.message); } // the banner says it too
+  return { type: 'imported', message: message, done: { kind: 'ok', title: name + " completed!", sub: sub } };
+}
+
+/** "1 row" / "1,234 rows". */
+function idm_countText_(n, one, many) {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " " + (n === 1 ? one : many);
+}
 
 /** Moves to the next step (new temp tab), or finishes. */
 function idm_advance_(ss, state, notice) {
@@ -1275,7 +1300,11 @@ function idm_errorView_(e) {
 // sidebar. Your decisions are kept per row (by what the row says) for the next paste.
 // ======================================================================
 
-var OD_TAB_PREFIX = "📥 ";
+var OD_TAB_PREFIX = "📥 ";            // OD_DEFAULT_ICON + " " (a list's tab before icons could be picked)
+// A list's tab = "<icon> <name>" (owner 2026-11-13: pick the icon in Input Data Mode's step 5).
+// The icon is kept in the list's setup (setup.icon), so it travels with Migration; lists are
+// always found by their tab ID, never by the icon. The row-1 band keeps 📥 (OD_BAND_TITLE).
+var OD_DEFAULT_ICON = "📥";
 var OD_PLACEHOLDER = "PASTE HERE";
 var OD_HEADER_ROW = 4;               // a list's header row after a paste; data from row 5
 var OD_WIZARD_KEY = "OD_WIZARD_TAB"; // tab id the setup sidebar works on
@@ -1293,7 +1322,7 @@ var OD_HEADER_WORDS_ = /osis|student|name|first|last|parent|guardian|mother|fath
 
 function od_emptySetup_() {
   return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null,
-           view: od_defaultView_(true) };
+           view: od_defaultView_(true), icon: OD_DEFAULT_ICON };
 }
 
 function od_fillSetup_(s) {
@@ -1353,6 +1382,27 @@ function od_uniqueTabName_(ss, base, self) {
     if (!other || (self && other.getSheetId() === self.getSheetId())) return name;
     name = base + " (" + (n++) + ")";
   }
+}
+
+/**
+ * A list's icon: one emoji or symbol (a few for an emoji made of several), no letters, digits,
+ * spaces or the characters a tab name can't hold. "" = not usable.
+ */
+function od_cleanIcon_(icon) {
+  const s = String(icon === undefined || icon === null ? "" : icon).trim();
+  if (!s || s.length > 16 || /[A-Za-z0-9\s\[\]:*?\/\\'"]/.test(s)) return "";
+  for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) >= 0x2000) return s; // symbols and emoji start here
+  return "";
+}
+
+/** The list's icon (📥 when none was picked, or the saved one can't be used). */
+function od_listIcon_(list) {
+  return od_cleanIcon_(list && list.setup && list.setup.icon) || OD_DEFAULT_ICON;
+}
+
+/** "🚌 Bus Routes". */
+function od_tabNameFor_(icon, name) {
+  return (od_cleanIcon_(icon) || OD_DEFAULT_ICON) + " " + name;
 }
 
 function od_cleanName_(name) {
@@ -2572,22 +2622,29 @@ function od_withLock_(fn) {
 /** For Input Data Mode's step 5: one line per list (from the Backend only, no tab reads). */
 function od_listSummaries_(ss) {
   return od_loadLists_(ss).filter(l => l.sheet).map(l => ({
-    tabId: l.tabId, name: l.name, tabName: l.sheet.getName(), by: l.setup.by, ready: !!l.setup.ready,
+    tabId: l.tabId, name: l.name, tabName: l.sheet.getName(), icon: od_listIcon_(l), by: l.setup.by, ready: !!l.setup.ready,
     updated: l.updated, stats: l.setup.stats || null
   }));
 }
 
-/** "Add another list": makes the "📥 Name" tab and opens the setup sidebar on it. */
-function od_createList(name) {
+/**
+ * "Add another list": makes the "<icon> Name" tab and opens the setup sidebar on it.
+ * icon: the emoji picked for its tab (none = 📥).
+ */
+function od_createList(name, icon) {
   const res = od_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     name = od_cleanName_(name);
     if (!name) return { error: "Give the list a name first." };
-    const sheet = ss.insertSheet(od_uniqueTabName_(ss, OD_TAB_PREFIX + name));
+    const ic = (icon === undefined || icon === null || String(icon).trim() === "") ? OD_DEFAULT_ICON : od_cleanIcon_(icon);
+    if (!ic) return { error: "That icon can't be used. Pick one of the emoji (one symbol, no letters or numbers)." };
+    const sheet = ss.insertSheet(od_uniqueTabName_(ss, od_tabNameFor_(ic, name)));
     if (sheet.getMaxColumns() < 26) sheet.insertColumnsAfter(sheet.getMaxColumns(), 26 - sheet.getMaxColumns());
     od_resetListTab_(sheet, name);
     const lists = od_loadLists_(ss);
-    lists.push({ tabId: sheet.getSheetId(), name: name, setup: od_emptySetup_(), updated: "", sheet: sheet });
+    const setup = od_emptySetup_();
+    setup.icon = ic;
+    lists.push({ tabId: sheet.getSheetId(), name: name, setup: setup, updated: "", sheet: sheet });
     od_saveLists_(ss, lists);
     sheet.activate();
     return { tabId: sheet.getSheetId() };
@@ -2625,7 +2682,8 @@ function od_repasteList(tabId) {
   return res;
 }
 
-function od_renameList(tabId, name) {
+/** Renames a list (its tab too); icon: a new emoji for its tab (left out = keep the one it has). */
+function od_renameList(tabId, name, icon) {
   return od_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const lists = od_loadLists_(ss);
@@ -2633,8 +2691,13 @@ function od_renameList(tabId, name) {
     name = od_cleanName_(name);
     if (!list || !list.sheet) return { error: "That list's tab is gone." };
     if (!name) return { error: "Give the list a name." };
+    if (icon !== undefined && icon !== null) {
+      const ic = od_cleanIcon_(icon);
+      if (!ic) return { error: "That icon can't be used. Pick one of the emoji (one symbol, no letters or numbers)." };
+      list.setup.icon = ic;
+    }
     list.name = name;
-    list.sheet.setName(od_uniqueTabName_(ss, OD_TAB_PREFIX + name, list.sheet));
+    list.sheet.setName(od_uniqueTabName_(ss, od_tabNameFor_(od_listIcon_(list), name), list.sheet));
     const title = String(list.sheet.getRange(1, 1).getValue());
     if (title.indexOf(OD_BAND_TITLE) === 0) list.sheet.getRange(1, 1).setValue(title.replace(/^📥 OWN DATA · .*? — /, OD_BAND_TITLE + name.toUpperCase() + " — "));
     od_saveLists_(ss, lists);
@@ -2900,7 +2963,7 @@ function od_saveList(p) {
     setup.stats = od_stats_(results);
     if (name && name !== list.name) {
       list.name = name;
-      list.sheet.setName(od_uniqueTabName_(ss, OD_TAB_PREFIX + name, list.sheet));
+      list.sheet.setName(od_uniqueTabName_(ss, od_tabNameFor_(od_listIcon_(list), name), list.sheet));
     }
     if (!list.updated) list.updated = od_today_();
     od_writeToolColumns_(list.sheet, list, table, results, idx);
@@ -2926,9 +2989,12 @@ function od_migrateLists_(oldSS, newSS) {
   oldRows.forEach(r => {
     const oldSheet = od_sheetById_(oldSS, r[0]);
     if (!oldSheet) return; // its tab was deleted on the old sheet
-    const name = toText_(r[1]) || oldSheet.getName().replace(OD_TAB_PREFIX, "");
     let setup = null;
     try { setup = JSON.parse(String(r[2] || "{}")); } catch (e) { setup = null; }
+    // (the tab name keeps its icon: copied as it is, and the icon comes along in the setup)
+    const oldIcon = od_listIcon_({ setup: setup }) + " ";
+    const oldTab = oldSheet.getName();
+    const name = toText_(r[1]) || (oldTab.indexOf(oldIcon) === 0 ? oldTab.slice(oldIcon.length) : oldTab.replace(OD_TAB_PREFIX, ""));
 
     // Same list already here: replace it (never the tab the user is on)
     lists.filter(l => l.name.toLowerCase() === name.toLowerCase()).forEach(l => {

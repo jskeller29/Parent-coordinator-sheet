@@ -64,6 +64,26 @@
     .li .btns button.soft { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
     .addlist { width: 100%; height: 36px; border: 1.5px dashed var(--faint); background: var(--panel); color: var(--accent); margin-top: 4px; }
     #newListForm input { margin: 6px 0; }
+    /* "<step> completed!" at the top of the next step (owner 2026-11-13: make it obvious it worked) */
+    .jdone { display: flex; gap: 10px; align-items: flex-start; background: var(--ok-soft); border: 1px solid #c3dccb; border-left: 4px solid var(--ok); border-radius: var(--radius); padding: 10px 12px; margin: 12px 0 2px; animation: jdIn .35s ease-out; }
+    .jdone .jd-mark { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--ok); color: #ffffff; display: flex; align-items: center; justify-content: center; font: 700 14px var(--font); margin-top: 1px; }
+    .jdone .jd-title { font-weight: 700; font-size: 15px; color: var(--ok); line-height: 1.3; }
+    .jdone .jd-sub { font-size: 12.5px; color: var(--ink); margin-top: 2px; }
+    .jdone.info { background: var(--panel); border-color: var(--line); border-left-color: var(--muted); }
+    .jdone.info .jd-mark { background: var(--muted); }
+    .jdone.info .jd-title { color: var(--ink); }
+    @keyframes jdIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .jdone { animation: none; } }
+    /* Step 5: the icon on a list's tab (owner 2026-11-13) */
+    .li .top button.ico { font-size: 17px; height: 28px; width: 32px; padding: 0; border: 1px solid var(--line); background: #ffffff; color: var(--ink); }
+    .icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 6px 0 4px; }
+    .icons button { height: 30px; padding: 0; font-size: 17px; border: 1px solid transparent; background: transparent; }
+    .icons button:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
+    .icons button.on { border-color: var(--accent); background: var(--accent-soft); }
+    .icon-other { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    #newListForm .icon-other input, .icon-other input { width: 64px; height: 28px; margin: 0; padding: 0 4px; text-align: center; font-size: 16px; }
+    .icon-other button { height: 28px; font-size: 12px; }
+    .iconpick { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
     /* Debug panel: only shown when z_InputDataDebug.gs is installed (the replies then carry .debug) */
     #debug { margin-top: 16px; border: 1px dashed var(--warn); border-radius: var(--radius); padding: 8px 10px; background: var(--warn-soft); font-size: 11.5px; }
     #debug summary { font-weight: 700; cursor: pointer; }
@@ -80,6 +100,11 @@
 
   <!-- ACTIVE STEP -->
   <div id="stepView" class="hidden">
+    <!-- "Student Data (ATS) completed!" (idm_doneNotice_): shown at the top of the next step -->
+    <div id="justDone" class="jdone hidden" role="status" aria-live="polite">
+      <span class="jd-mark" id="jdMark" aria-hidden="true">✓</span>
+      <div><div class="jd-title" id="jdTitle"></div><div class="jd-sub" id="jdSub"></div></div>
+    </div>
     <h3 id="stepTitle"></h3>
     <div><span id="stepPill" class="pill"></span> <span class="muted" id="lastUpdated"></span></div>
 
@@ -130,6 +155,9 @@
       <div id="newListForm" class="hidden">
         <b>New list</b>
         <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
+        <div class="muted">Icon for its tab</div>
+        <div class="icons" id="newListIcons"></div>
+        <div class="icon-other">Or type any emoji: <input id="newListIconOther" type="text" maxlength="8" oninput="newIconTyped(this.value)"></div>
         <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; add the list</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
       </div>
       <button class="addlist" id="addListBtn" onclick="showNewList()">Add another list</button>
@@ -205,6 +233,7 @@
   var buildPollTimer = null; // build progress while step 5 builds first
   var canBuildNow = false;   // "Save, exit and build" possible (Student Data there, or its step)
   var buildAfterExit = false; // "Save, exit and build" clicked: build once the mode has closed
+  var justDone = null;       // { step, kind, title, sub }: the "… completed!" banner, kept while that step shows
 
   function $(id) { return document.getElementById(id); }
 
@@ -259,6 +288,12 @@
     }
     show('stepView', true); show('doneView', false); show('footer', true);
     lastView = v;
+    // "<step> completed!" (idm_doneNotice_): at the top of the next step until another step shows
+    var fresh = !!(v.notice && v.notice.done);
+    if (fresh) justDone = { step: v.stepIndex, kind: v.notice.done.kind === 'info' ? 'info' : 'ok', title: v.notice.done.title, sub: v.notice.done.sub || '' };
+    else if (justDone && justDone.step !== v.stepIndex) justDone = null;
+    renderJustDone(fresh);
+    if (fresh) window.scrollTo(0, 0);
     buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
     canBuildNow = !!v.canBuild;
     renderProgress(v.progress || []);
@@ -333,6 +368,16 @@
     else schedule();
     // Step 5 matches lists to the Student List: a new sheet / new data is built first (idm_buildForLists)
     if (listsStep && v.needsBuild && !listsBuildStarted) { listsBuildStarted = true; buildForLists(); }
+  }
+
+  function renderJustDone(fresh) {
+    var el = $('justDone');
+    if (!justDone) { el.className = 'jdone hidden'; return; }
+    if (fresh) { el.className = 'jdone hidden'; void el.offsetWidth; } // a new one slides in again
+    el.className = 'jdone' + (justDone.kind === 'info' ? ' info' : '');
+    $('jdMark').textContent = justDone.kind === 'info' ? 'i' : '✓';
+    $('jdTitle').textContent = plainText(justDone.title);
+    $('jdSub').textContent = plainText(justDone.sub);
   }
 
   function renderProgress(steps) {
@@ -549,22 +594,57 @@
 
   // --- step 5: Your Lists (Input Data.gs, part 2) ---
   function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  // A list tab's icon (owner 2026-11-13): one of these, or any emoji typed in
+  var LIST_ICONS = ['📥', '🚌', '🎒', '🏫', '👪', '📝', '📋', '📅', '🎉', '⚽', '🏀', '🎨', '🎵', '🍎', '🧪', '📚',
+                    '💻', '🏆', '⭐', '🩺', '🍽️', '✈️', '🔔', '📌'];
+  var DEFAULT_ICON = '📥';
+  var listsById = {};
+  var newListIcon = DEFAULT_ICON;
+  function iconButtons(selected, onclickStart) {
+    return LIST_ICONS.map(function (ic) {
+      return '<button type="button"' + (ic === selected ? ' class="on"' : '') + ' data-icon="' + esc(ic) + '" title="Use ' + esc(ic) +
+        '" onclick="' + onclickStart + 'this)">' + ic + '</button>';
+    }).join('');
+  }
   function renderLists(lists) {
     show('addListBtn', true); show('newListForm', false); show('finishListsBtn', true);
+    listsById = {};
+    (lists || []).forEach(function (l) { listsById[l.tabId] = l; });
     $('listItems').innerHTML = (lists || []).map(function (l, i) {
       var st = l.stats, chips = '';
       if (!l.ready) chips = '<span class="chip warn">setup not finished</span>';
       else if (st) chips = '<span class="chip">' + st.matched + ' matched</span>' + (st.review ? '<span class="chip warn">' + st.review + ' to review</span>' : '') + (st.skipped ? '<span class="chip grey">' + st.skipped + ' skipped</span>' : '');
-      return '<div class="li"><div class="top"><span class="nm">' + esc(l.name) + '</span>' +
+      var icon = l.icon || DEFAULT_ICON;
+      return '<div class="li"><div class="top"><button class="ico" title="Change the icon on its tab" onclick="toggleIconPick(' + l.tabId + ')">' + esc(icon) + '</button><span class="nm">' + esc(l.name) + '</span>' +
         '<button title="Rename this list" onclick="renameList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Rename</button>' +
         '<button class="del" title="Delete this list and its tab" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Delete</button></div>' +
         '<div class="meta">by ' + (l.by === 'guardian' ? 'guardian' : 'student') + (st ? ' · ' + st.rows + ' rows' : '') + (l.updated ? ' · updated ' + esc(l.updated) : '') + '</div>' +
         (chips ? '<div class="chips">' + chips + '</div>' : '') +
         '<div class="btns"><button class="soft" onclick="listCall(\'od_repasteList\',' + l.tabId + ')">Paste new version</button>' +
-        '<button onclick="listCall(\'od_openList\',' + l.tabId + ')">' + (l.ready ? 'Edit setup' : 'Finish setup') + '</button></div></div>';
+        '<button onclick="listCall(\'od_openList\',' + l.tabId + ')">' + (l.ready ? 'Edit setup' : 'Finish setup') + '</button></div>' +
+        '<div class="iconpick hidden" id="ip' + l.tabId + '"><div class="muted">Pick an icon for its tab</div><div class="icons">' +
+        iconButtons(icon, 'pickListIcon(' + l.tabId + ', ') + '</div>' +
+        '<div class="icon-other">Or type any emoji: <input type="text" maxlength="8" id="ipo' + l.tabId + '"><button type="button" onclick="typedListIcon(' + l.tabId + ')">Use it</button></div></div></div>';
     }).join('');
   }
-  function showNewList() { show('addListBtn', false); show('newListForm', true); $('newListName').value = ''; $('newListName').focus(); }
+  function toggleIconPick(tabId) { var el = $('ip' + tabId); if (el) el.classList.toggle('hidden'); }
+  function pickListIcon(tabId, b) { setListIcon(tabId, b.getAttribute('data-icon')); }
+  function typedListIcon(tabId) { var v = ($('ipo' + tabId).value || '').trim(); if (v) setListIcon(tabId, v); }
+  function setListIcon(tabId, icon) {
+    var l = listsById[tabId];
+    if (!l) return;
+    if (icon === (l.icon || DEFAULT_ICON)) { toggleIconPick(tabId); return; }
+    working('Changing the icon…');
+    google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); })
+      .withFailureHandler(onFail).od_renameList(tabId, l.name, icon); // same name, new icon
+  }
+  function drawNewIcons() { $('newListIcons').innerHTML = iconButtons(newListIcon, 'pickNewIcon('); }
+  function pickNewIcon(b) { newListIcon = b.getAttribute('data-icon'); $('newListIconOther').value = ''; drawNewIcons(); }
+  function newIconTyped(v) { v = String(v || '').trim(); newListIcon = v || DEFAULT_ICON; drawNewIcons(); }
+  function showNewList() {
+    show('addListBtn', false); show('newListForm', true); $('newListName').value = '';
+    newListIcon = DEFAULT_ICON; $('newListIconOther').value = ''; drawNewIcons(); $('newListName').focus();
+  }
   function listReply(r) {
     if (r && r.error) { onFail(r.error); return; }
     busy = false; setButtons(true);
@@ -572,8 +652,8 @@
   function createList() {
     var name = $('newListName').value.trim();
     if (!name) { $('newListName').focus(); return; }
-    working('Making the "' + name + '" tab…');
-    google.script.run.withSuccessHandler(listReply).withFailureHandler(onFail).od_createList(name); // opens the list's own sidebar
+    working('Making the "' + newListIcon + ' ' + name + '" tab…');
+    google.script.run.withSuccessHandler(listReply).withFailureHandler(onFail).od_createList(name, newListIcon); // opens the list's own sidebar
   }
   function listCall(fn, tabId) { working('Opening the list…'); var r = google.script.run.withSuccessHandler(listReply).withFailureHandler(onFail); r[fn](tabId); }
   function renameList(tabId, name) {

@@ -87,6 +87,36 @@ const tabEmpty = t => t.getLastRow() === 2 && t.getLastColumn() === 1 && t.getRa
   console.log("wrong paste cleared, Use it anyway from kept rows: ok");
 }
 
+// ---------------------------------------------------------------- Your Lists: the tab's icon (owner 2026-11-13)
+{
+  const { ss, g } = newSheet();
+  let lists = [];
+  g.od_loadLists_ = () => lists.map(l => Object.assign({}, l, { setup: JSON.parse(JSON.stringify(l.setup)) }));
+  g.od_saveLists_ = (s, ls) => { lists = ls; };
+  g.od_showWizard_ = () => {};
+  const tab = id => ss.getSheets().filter(t => t.getSheetId() === id)[0];
+  let r = g.od_createList("Bus Routes", "🚌");
+  assert.strictEqual(tab(r.tabId).getName(), "🚌 Bus Routes", 'made with the picked icon');
+  assert.strictEqual(lists[0].setup.icon, "🚌", 'icon kept in the setup (travels with Migration)');
+  assert.strictEqual(g.od_listSummaries_(ss)[0].icon, "🚌", 'the step 5 card gets it');
+  const bus = r.tabId;
+  r = g.od_createList("PTA");
+  assert.strictEqual(tab(r.tabId).getName(), "📥 PTA", 'no icon picked: 📥');
+  r = g.od_createList("Trips", "AB");
+  assert(r.error && ss.getSheetByName("AB Trips") === null, 'letters are not an icon: ' + JSON.stringify(r));
+  assert(g.od_createList("Trips", "1").error, 'digits are not an icon');
+  r = g.od_createList("Family", "👨‍👩‍👧");
+  assert.strictEqual(tab(r.tabId).getName(), "👨‍👩‍👧 Family", 'any emoji, even one made of several');
+  assert.ok(g.od_renameList(bus, "Bus Routes", "🎒").ok);
+  assert.strictEqual(tab(bus).getName(), "🎒 Bus Routes", 'new icon, same name');
+  assert.ok(g.od_renameList(bus, "Buses").ok);
+  assert.strictEqual(tab(bus).getName(), "🎒 Buses", 'a rename keeps the icon');
+  assert(g.od_renameList(bus, "Buses", "x").error && tab(bus).getName() === "🎒 Buses", 'a bad icon changes nothing');
+  // A list saved before icons: 📥, as its tab already says
+  assert.strictEqual(g.od_listIcon_({ setup: g.od_fillSetup_({ v: 1 }) }), "📥");
+  console.log("Your Lists: the tab's icon: ok");
+}
+
 // ---------------------------------------------------------------- Your Lists upload
 function listsSheet() {
   const { ss, g } = newSheet();
@@ -233,7 +263,8 @@ function listsSheet() {
   // 3. The window's setup call: still ONLY the Welcome tab (no Contact Log / PCAR / Combined), now "You're set up"
   const setupReply = JSON.parse(JSON.stringify(g.zg_runSetup()));
   assert.strictEqual(setupReply.migrate, false);
-  assert.strictEqual(setupReply.links, null, '3. no link look-ups in the setup call (the menu waits for it)');
+  assert(setupReply.links && setupReply.links.downloadDataDoc && setupReply.links.example === undefined,
+    '3. the setup call brings only the typed-in links (no look-ups: the menu waits for it)');
   assert(/zg_setupFinish\(\)/.test(dialog), '3. the window makes a second call after the question shows');
   const finish = JSON.parse(JSON.stringify(g.zg_setupFinish()));
   assert(finish.links && finish.links.downloadDataDoc, '3. ...which brings the links');
@@ -274,8 +305,17 @@ function listsSheet() {
   // 6. A paste below the label + hint is read; the label / hint are not
   temp._put(asPasted(csv("1 - Student Data (ATS).csv")), 4, 2);
   assert.strictEqual(g.idm_check().pending, true, '6. a paste is seen');
+  let toasted = null;
+  const toast0 = ss.toast;
+  ss.toast = (m, t) => { toasted = t + ' | ' + m; return toast0 && toast0.call(ss, m, t); };
   const imported = g.idm_processPaste();
+  ss.toast = toast0;
   assert.strictEqual(imported.notice.type, 'imported', '6. imported: ' + JSON.stringify(imported.notice));
+  // "make it more obvious it worked" (owner 2026-11-13): a banner for the next step + a toast
+  assert.strictEqual(imported.notice.done.title, 'Student Data (ATS) completed!', '6. banner title');
+  assert(/^\d[\d,]* rows moved to Raw Data\. Next: Parent Square\.$/.test(imported.notice.done.sub), '6. banner text: ' + imported.notice.done.sub);
+  assert.strictEqual(imported.stepIndex, 1, '6. the banner comes with the Parent Square step');
+  assert(/Student Data \(ATS\) completed/.test(toasted) && /Next: Parent Square/.test(toasted), '6. toast: ' + toasted);
 
   // 7. Exit before building: back on the Welcome tab, nothing else shown
   const tempId = temp.getSheetId();
@@ -369,6 +409,7 @@ function listsSheet() {
   startMode(n.ss, n.g, 3);
   v = n.g.idm_saveSiteClass();
   assert(v.active && v.stepIndex === 4, 'nothing to save on a new sheet: on to Your Lists');
+  assert(v.notice.done && v.notice.done.kind === 'info' && /nothing saved/.test(v.notice.done.title), 'nothing saved: a grey note, not "completed"');
   console.log("Site / Class: an empty Save never erases: ok");
 }
 {

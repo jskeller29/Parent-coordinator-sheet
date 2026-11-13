@@ -155,7 +155,8 @@ work. If you close its panel by accident, the yellow tab still says how to bring
 For each export, either click Upload file and pick the file you downloaded, or open the
 file, select everything (Ctrl+A, Mac ⌘+A), copy it, and paste it anywhere on the
 temporary tab with Ctrl+Shift+V (Mac ⌘+Shift+V). The data moves into Raw Data on its
-own. If you pasted the wrong export, or Excel shortened the numbers (they show as
+own. When it is in, the top of the panel says so on the next step, for example "Student
+Data (ATS) completed!". If you pasted the wrong export, or Excel shortened the numbers (they show as
 7.19E+09), the tracker tells you and changes nothing. Skip keeps the old data for that
 export.
 
@@ -199,8 +200,10 @@ Tabs & columns): Student Data into cell A5, Parent Square into AG6, NYCSA into A
 #### Your own lists
 
 On the Your Lists step you can add any other list, such as bus routes, after-school
-sign-ups, PTA members or trip forms. Click Add another list, give it a name, and paste
-the whole sheet (headers too) into the new 📥 tab, or upload the file. The side panel
+sign-ups, PTA members or trip forms. Click Add another list, give it a name and pick an
+icon for its tab (📥 unless you pick another one). Then paste the whole sheet (headers
+too) into the new tab, or upload the file. To change the icon later, click it on the
+list's card. The side panel
 then has four steps:
 
 1. Columns. It finds the header row and guesses what each column is. Fix any guess, and
@@ -282,7 +285,7 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 | Events | Attendance for events and workshops. | No |
 | Send Out | Messages and flyers you sent, for the PCAR. | No |
 | Raw Data | Your exports: ATS, Parent Square, NYCSA, sites and classes. | No |
-| 📥 your lists | One tab per list from Your Lists. | No |
+| 📥 your lists | One tab per list from Your Lists, with the icon you picked (📥 unless you picked another). | No |
 | Backend | The tracker's own settings and data. Leave it alone, except the Type List in column BL. | No, always hidden |
 
 Turn tabs on or off in ⚙️ Settings → Tabs & columns. Hidden tabs keep updating.
