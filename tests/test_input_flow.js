@@ -996,7 +996,8 @@ function listsSheet() {
 
 // ---------------------------------------------------------------- the 🚀 App Menu first when a sheet opens (owner 2026-11-13)
 // A new copy's first open took long (or never) to show the menu: the menu is now the first thing
-// (after the copy check), the Contact Log filter isn't re-made before setup, Backend B3 is read once,
+// (after the copy check) with the pointer toast right after it, the Contact Log filter isn't re-made
+// before setup, Backend B3 is read once,
 // and the copy check only deletes the properties the copy has. A set-up sheet: every menu first,
 // then the filter (still re-made on every open).
 {
@@ -1027,7 +1028,10 @@ function listsSheet() {
   assert.strictEqual(order[0], 'menu:🚀 App Menu', 'new copy: the menu is the first thing');
   assert.deepStrictEqual(app._ui._menus[0].items, ['runInitialSetupWrapper'], 'with Initial Setup');
   assert.strictEqual(order.indexOf('filter'), -1, 'no Contact Log filter before setup');
-  assert(order.indexOf('welcome') > 0 && order.lastIndexOf('toast') > order.indexOf('welcome'), 'then the Welcome tab, then the pointer');
+  assert.deepStrictEqual(order.slice(0, 3), ['menu:🚀 App Menu', 'toast', 'welcome'], 'the menu, then the pointer toast, then the Welcome tab');
+  const wt = ss.getSheetByName("👋 Welcome");
+  assert([...wt._cells.values()].some(v => /can take up to a minute/.test(String(v)) && /reload the page/.test(String(v))),
+    'Welcome step 1: the first time can take up to a minute, then reload');
   assert.deepStrictEqual(deleted.slice().sort(), ['SETUP_COMPLETE', 'ZG_AUTO_OPEN'], 'only the properties the copy has are deleted');
   assert.strictEqual(g.__props.SETUP_COMPLETE, undefined, 'the copy starts over');
   assert.deepStrictEqual(ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"], 'only the Welcome tab');

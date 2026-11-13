@@ -458,6 +458,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Google Doc and paste each heading's link into 📌 YOUR LINKS (docs/README.md "The headings the tracker links to").
 - Faster Initial Setup (2026-11-13): re-paste Menus on every sheet (master template too: new copies get it from there).
 - 🚀 App Menu first when a sheet opens (2026-11-13): re-paste Menus on every sheet (master template too).
+- Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
+  Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
@@ -529,8 +531,10 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   OPEN SPEED (owner 2026-11-13: on a new copy's first open the 🚀 App Menu took long or never showed; a refresh
   showed it; a new copy only has the simple onOpen, 30 s limit): buildMenus_ reads every property ONCE
   (props.getProperties() -> prop(k)); the clone check deletes only the keys the copy has; before setup the 🚀 App
-  Menu is the FIRST thing done, then the nightly / sync toasts, the owner menus, showWelcomeTabOnly_ (the Welcome
-  tab's ID read once, not once per tab) and the pointer toast (isAutoMigrateOn_ read once); applyQBlackTextFilter_
+  Menu is the FIRST thing done, then the nightly / sync toasts, the pointer toast (isAutoMigrateOn_ read once; before
+  the tabs are switched, so it shows sooner), the owner menus and showWelcomeTabOnly_ (the Welcome tab's ID read once,
+  not once per tab). Welcome step 1 (buildWelcomeTab_) says the first open can take up to a minute, then reload (as
+  the User Guide's Part 1 says); applyQBlackTextFilter_
   (the Contact Log filter, re-made on every open) is NOT run before setup (setup's own onOpen() makes it) and runs
   AFTER the menus on a set-up sheet (it was the first thing, so every open's menus waited for it).
 - 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined

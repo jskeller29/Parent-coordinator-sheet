@@ -358,6 +358,17 @@ function buildMenus_(realOpen) {
   }
 
   if (isSetupDone !== 'true') {
+    // A short pointer only: the Welcome tab has the steps (it was a pop-up on top of it; simplified 2026-11-12).
+    // Upgrade-template copies: Initial Setup then opens the Migration Wizard (see runInitialSetupWrapper).
+    // Right after the menu, before the tabs are switched, so it shows sooner (owner 2026-11-13).
+    try {
+      const migrateCopy = isAutoMigrateOn_(); // read once (it reads the Backend)
+      ss.toast(
+        "Click 🚀 App Menu (top of the screen) → 🚨 Initial Setup (Run Once)" +
+          (migrateCopy ? " to bring over your old data." : " to get started."),
+        migrateCopy ? "🎉 Welcome to the newest version" : "👋 Welcome to the PC Tracker", 30);
+    } catch(e) { console.error(e); }
+
     // Owner's sheet only: a fresh copy of it (setup not run there yet) still gets the 🐞 Debug menu.
     // No-op on every other sheet.
     const ownerBeforeSetup = getOwnerHooks_();
@@ -367,16 +378,6 @@ function buildMenus_(realOpen) {
 
     // New copy: the 👋 Welcome tab is the only tab shown until Initial Setup has run
     try { showWelcomeTabOnly_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
-
-    // A short pointer only: the Welcome tab has the steps (it was a pop-up on top of it; simplified 2026-11-12).
-    // Upgrade-template copies: Initial Setup then opens the Migration Wizard (see runInitialSetupWrapper).
-    try {
-      const migrateCopy = isAutoMigrateOn_(); // read once (it reads the Backend)
-      ss.toast(
-        "Click 🚀 App Menu (top of the screen) → 🚨 Initial Setup (Run Once)" +
-          (migrateCopy ? " to bring over your old data." : " to get started."),
-        migrateCopy ? "🎉 Welcome to the newest version" : "👋 Welcome to the PC Tracker", 30);
-    } catch(e) { console.error(e); }
 
     // No Contact Log filter rebuild before setup (only the Welcome tab shows; setup's own
     // menu redraw makes it, see below)
@@ -1480,7 +1481,7 @@ function buildWelcomeTab_(ss, opts) {
 
   const steps = [
     ["Open 🚀 App Menu",
-     "It's in the menu bar at the top of the screen, after Help. Don't see it? Wait a few seconds, or reload the page."],
+     "It's in the menu bar at the top of the screen, after Help. The first time you open your copy it can take up to a minute. If it isn't there after a minute, reload the page."],
     ["Click 🚨 Initial Setup (Run Once)",
      "A \"Setting up your tracker\" window opens. Keep it open: it takes about 20 seconds."],
     ["Allow access (the permissions above)",
