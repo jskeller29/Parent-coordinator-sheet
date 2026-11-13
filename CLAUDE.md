@@ -458,6 +458,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Google Doc and paste each heading's link into 📌 YOUR LINKS (docs/README.md "The headings the tracker links to").
 - Faster Initial Setup (2026-11-13): re-paste Menus on every sheet (master template too: new copies get it from there).
 - 🚀 App Menu first when a sheet opens (2026-11-13): re-paste Menus on every sheet (master template too).
+- Contact Log repair out of the menu run (2026-11-13, later): re-paste Menus on every sheet (master template too).
 - Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 
@@ -537,6 +538,12 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   the User Guide's Part 1 says); applyQBlackTextFilter_
   (the Contact Log filter, re-made on every open) is NOT run before setup (setup's own onOpen() makes it) and runs
   AFTER the menus on a set-up sheet (it was the first thing, so every open's menus waited for it).
+  Later the same day (owner: "for some users the App Menu takes long"): on a set-up sheet the menus come first, then
+  the Welcome tab "next steps" (welcomeTabAfterSetup_, was before the menus); the Contact Log filter re-make + END
+  checkbox (contactLogOpenRepair_, Menus.gs, the old code word for word: whole E:E read + flush) runs in the
+  installable checkVersionOnOpen (its own run, after its checks; stamps doc property OPEN_CHECKS_LAST_RUN at the
+  start). buildMenus_ still runs it on a redraw (no event: setup, Settings) or when the stamp is missing / older than
+  3 days (that trigger gone). Tested in test_input_flow.js.
 - 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined
   showing during setup looked wrong): newCopy (= Student List not built) -> showWelcomeTabOnly_ +
   updateVisualSettings_(settings, columnsOnly = true); a built sheet -> default tabs + settings as before. Last step:

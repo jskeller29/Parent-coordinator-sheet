@@ -390,10 +390,8 @@ function buildMenus_(realOpen) {
 
   // 👋 Welcome tab after setup: "what to do next" until the sheets are built (shown and opened
   // on every open, so a closed pop-up / sidebar is never a dead end), then deleted (see WELCOME TAB)
-  // Only on a real open: a menu redraw (⚙️ Settings save ...) never moves the user
-  if (realOpen && !IS_RUNNING_SETUP) {
-    try { welcomeTabAfterSetup_(ss, true); } catch (e) { console.error("Welcome tab: " + e.message); }
-  }
+  // Only on a real open: a menu redraw (⚙️ Settings save ...) never moves the user.
+  // Done AFTER the menus (end of this function, 2026-11-13).
 
   // Check if the sheets have ACTUALLY been built (a student under the Student List header)
   const isBuilt = studentListIsBuilt_(ss);
@@ -475,6 +473,46 @@ function buildMenus_(realOpen) {
   const owner = getOwnerHooks_();
   if (owner) owner.addMenus(ui);
 
+  // Contact Log filter + END checkbox (contactLogOpenRepair_ below). On a real open the
+  // installable checkVersionOnOpen does it in its own run (2026-11-13: it re-reads the whole
+  // Contact Log and re-makes the filter, so every user's menu waited for it); here only when
+  // that run hasn't been seen for 3 days (trigger missing) or for a redraw (setup, Settings).
+  const openChecksRan = Number(prop(OPEN_CHECKS_RAN_KEY_)) || 0;
+  if (!realOpen || Date.now() - openChecksRan > 3 * 24 * 3600 * 1000) {
+    contactLogOpenRepair_(ss);
+  }
+
+  // After the menus (2026-11-13): the Welcome tab Initial Setup left as "next steps" (it may be rewritten)
+  if (realOpen && !IS_RUNNING_SETUP) {
+    try { welcomeTabAfterSetup_(ss, true); } catch (e) { console.error("Welcome tab: " + e.message); }
+  }
+
+  // Background Sync Lockout Check
+  try {
+    const cache = CacheService.getScriptCache();
+    const stateStr = cache.get('SYNC_UI_STATE');
+    
+    if (stateStr) {
+      const state = JSON.parse(stateStr);
+      if (state.phase === 'building' || state.phase === 'syncing' || state.phase === 'paused' || state.phase === 'quota') {
+        SpreadsheetApp.getUi().alert(
+          "📡 Background Sync in Progress", 
+          "The system is currently running a background sync.\n\nPlease do not enter new data until it finishes to prevent saving errors. Click '🚀 App Menu' -> '🧱 Full Sync' to view live progress.", 
+          SpreadsheetApp.getUi().ButtonSet.OK
+        );
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+/**
+ * The Contact Log repairs every open used to make before the menus could show (moved word for
+ * word out of buildMenus_, 2026-11-13): the "hide old rows" filter is re-made (Regenerate.gs)
+ * and the FILTER? checkbox on the END row (column O) is ticked. Run by checkVersionOnOpen (its
+ * own run, so the menus don't wait), and by buildMenus_ when that run is missing / on a redraw.
+ */
+var OPEN_CHECKS_RAN_KEY_ = 'OPEN_CHECKS_LAST_RUN';
+function contactLogOpenRepair_(ss) {
   // Contact Log "hide old rows" filter, re-made on every open (Regenerate.gs). After the menus
   // since 2026-11-13: it was the first thing here, so every open's menus waited for it.
   try {
@@ -503,23 +541,6 @@ function buildMenus_(realOpen) {
     // Fail silently if there's an issue so it doesn't break the rest of the startup
   }
   // ----------------------------------------------------
-
-  // Background Sync Lockout Check
-  try {
-    const cache = CacheService.getScriptCache();
-    const stateStr = cache.get('SYNC_UI_STATE');
-    
-    if (stateStr) {
-      const state = JSON.parse(stateStr);
-      if (state.phase === 'building' || state.phase === 'syncing' || state.phase === 'paused' || state.phase === 'quota') {
-        SpreadsheetApp.getUi().alert(
-          "📡 Background Sync in Progress", 
-          "The system is currently running a background sync.\n\nPlease do not enter new data until it finishes to prevent saving errors. Click '🚀 App Menu' -> '🧱 Full Sync' to view live progress.", 
-          SpreadsheetApp.getUi().ButtonSet.OK
-        );
-      }
-    }
-  } catch(e) { console.error(e); }
 }
 
 // ==========================================
@@ -3433,6 +3454,21 @@ const VERSION_CHECK_HOURS = 6;
  * limited-auth mode and is not allowed to open other spreadsheets.
  */
 function checkVersionOnOpen() {
+  // Its own run, next to the simple onOpen: the Contact Log filter / END checkbox the menus
+  // used to wait for are done here (contactLogOpenRepair_, after the checks below), and the
+  // stamp tells the next onOpen this run happens (2026-11-13)
+  const setUp = PropertiesService.getDocumentProperties().getProperty('SETUP_COMPLETE') === 'true';
+  if (setUp) {
+    try { PropertiesService.getDocumentProperties().setProperty(OPEN_CHECKS_RAN_KEY_, String(Date.now())); } catch (e) { console.warn(e); }
+  }
+  try {
+    checkVersionOnOpenRun_();
+  } finally {
+    if (setUp) contactLogOpenRepair_(SpreadsheetApp.getActiveSpreadsheet());
+  }
+}
+
+function checkVersionOnOpenRun_() {
   // Brought into a newer tracker (Migration, ma_markOldTracker): turn this one's nightly rebuild and
   // phone sync off now, without waiting for the trigger to fire, and say where the new one is.
   // No update pop-up / data reminder / checklist here: this tracker is retired (owner 2026-11-13)

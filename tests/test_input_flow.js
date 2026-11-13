@@ -1053,3 +1053,51 @@ function listsSheet() {
     assert(order.indexOf(m) !== -1 && order.indexOf(m) < f, m + ' before the filter'));
   console.log("the 🚀 App Menu first when a sheet opens: ok");
 }
+
+// ---------------------------------------------------------------- set-up sheet: the Contact Log repair is not in the menu run (2026-11-13)
+// "For some users the App Menu takes long": the filter re-make + whole-column END read moved to
+// checkVersionOnOpen (its own run); onOpen does it only when that run hasn't stamped for 3 days,
+// or on a redraw (no event). The Welcome tab "next steps" now comes after the menus.
+{
+  const ss = makeSpreadsheet(TABS);
+  const app = fakeSpreadsheetApp(ss);
+  const order = [];
+  const createMenu = app._ui.createMenu;
+  app._ui.createMenu = name => { order.push('menu:' + name); return createMenu(name); };
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true });
+  g.contactLogOpenRepair_ = () => { order.push('repair'); };
+  g.welcomeTabAfterSetup_ = () => { order.push('welcome'); };
+  g.checkVersionOnOpenRun_ = () => { order.push('checks'); };
+  const dp = g.PropertiesService.getDocumentProperties();
+  dp.setProperty('SETUP_COMPLETE', 'true');
+  dp.setProperty('ORIGINAL_SHEET_ID', 'FAKE_SS');
+  g.studentListIsBuilt_ = () => false;
+
+  g.onOpen({ source: ss });
+  assert(order.indexOf('repair') > order.indexOf('menu:🚀 App Menu'), 'no stamp yet (trigger never seen): repaired here, after the menu');
+  assert(order.indexOf('welcome') > order.indexOf('menu:🚀 App Menu'), 'Welcome tab after the menu');
+
+  order.length = 0;
+  g.checkVersionOnOpen();
+  assert.deepStrictEqual(order, ['checks', 'repair'], 'the on-open run: its checks, then the repair');
+  assert(Number(g.__props.OPEN_CHECKS_LAST_RUN) > 0, 'stamped');
+
+  order.length = 0;
+  g.onOpen({ source: ss });
+  assert.strictEqual(order.indexOf('repair'), -1, 'stamp fresh: the menu run leaves it to the other run');
+
+  order.length = 0;
+  g.onOpen();
+  assert.strictEqual(order.filter(x => x === 'repair').length, 1, 'a redraw (no event) still repairs');
+
+  order.length = 0;
+  dp.setProperty('OPEN_CHECKS_LAST_RUN', String(Date.now() - 4 * 24 * 3600 * 1000));
+  g.onOpen({ source: ss });
+  assert.strictEqual(order.filter(x => x === 'repair').length, 1, 'stamp older than 3 days: repaired here');
+
+  order.length = 0;
+  dp.deleteProperty('SETUP_COMPLETE');
+  g.checkVersionOnOpen();
+  assert.strictEqual(order.indexOf('repair'), -1, 'before setup: no repair');
+  console.log("set-up sheet: Contact Log repair outside the menu run: ok");
+}
