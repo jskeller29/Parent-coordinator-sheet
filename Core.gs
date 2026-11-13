@@ -25,6 +25,15 @@ const CL_COL_DIVIDER_NOTES = 13;    // M — divider line before Notes
 const CL_COL_FILTER_TOGGLE = 15;    // O — master hide-filter checkbox on the end bar row
 const CL_COL_DIVIDER_FOLLOWUP = 15; // O — divider line before Additional Notes
 const CL_COL_CHECKBOX = 16;         // P — row checkbox
+// R:W (hidden) = the Person Spoke With choices (Edits.gs ensureSpokeWithChoices_): the formula in R2
+// splits each row's Guardian cell (C, "Morticia Addams and Gomez Addams") into one name per cell;
+// D's dropdown (set by hand in the Table) reads 'Contact Log'!$R2:$W2, so each row lists its own
+// student's guardians. R1 stays EMPTY (Migration matches columns by their row-1 header, an empty one
+// is skipped; and row 1 takes no formula). Q stays blank so the Table does not grow into R.
+const CL_COL_SPOKE_CHOICES = 18;    // R — first choices column
+const CL_SPOKE_CHOICES_WIDTH = 6;   // R:W: up to 6 names (New/Edit Student holds 5 guardians)
+const SPOKE_WITH_CHOICES_FORMULA =
+  '=ARRAYFORMULA(IFERROR(SPLIT(INDEX(C:C, 2):INDEX(C:C, MATCH(TRUE, TRIM(E:E)="END", 0) - 1), " and ", FALSE), ""))';
 
 /**
  * Applies the standard Contact Log data-row formatting:

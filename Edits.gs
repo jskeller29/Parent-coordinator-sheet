@@ -652,6 +652,52 @@ function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
 }
 
 /**
+ * Person Spoke With choices (owner's request 2026-11-13; columns in Core.gs CL_COL_SPOKE_CHOICES).
+ * Every build makes sure the formula is in Contact Log R2, because Migration clears rows 2+ in every
+ * column and deleting row 2 takes the formula with it. The formula then lists rows 2 .. the row above
+ * END by itself (rows added / deleted / pasted need nothing from the script).
+ * - R2 has a formula (this one, or one changed by hand) -> kept. If it shows #REF! (its list is
+ *   blocked, e.g. a whole row was copied and pasted, which pastes the names as plain text), the rest
+ *   of R2:W(END-1) is cleared so it can list again: those cells only ever hold the formula's list.
+ * - no formula -> written, only when R2:W(END-1) is empty (never over a school's own data there);
+ *   then R:W are hidden.
+ * Returns "kept" / "unblocked" / "added" / "skipped: <why>". Called at the end of every build.
+ */
+function ensureSpokeWithChoices_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) return "skipped: no Contact Log";
+  const col = CL_COL_SPOKE_CHOICES, width = CL_SPOKE_CHOICES_WIDTH, lastCol = col + width - 1;
+  const maxCols = sheet.getMaxColumns();
+  const anchor = maxCols >= col ? sheet.getRange(2, col) : null;
+  const formula = anchor ? String(anchor.getFormula() || "") : "";
+  if (formula && String(anchor.getDisplayValue()).trim() !== "#REF!") return "kept";
+
+  const endRow = findEndRowInColumnE_(sheet);
+  if (!endRow || endRow < 3) return "skipped: no log rows above END";
+  const rows = endRow - 2; // rows 2 .. END-1
+  const growCols = () => { if (maxCols < lastCol) sheet.insertColumnsAfter(maxCols, lastCol - maxCols); };
+
+  if (formula) { // #REF!: something sits where the list goes (or the tab is too narrow for it)
+    growCols();
+    if (width > 1) sheet.getRange(2, col + 1, 1, width - 1).clearContent();
+    if (rows > 1) sheet.getRange(3, col, rows - 1, width).clearContent();
+    return "unblocked";
+  }
+
+  const have = Math.min(maxCols, lastCol) - col + 1; // the part of R:W the tab already has
+  if (have > 0 && sheet.getRange(2, col, rows, have).getValues().some(r => r.some(v => v !== "" && v !== null))) {
+    console.warn("Person Spoke With choices not added: Contact Log R2:W" + (endRow - 1) + " already holds data");
+    return "skipped: R:W hold data";
+  }
+  growCols();
+  sheet.getRange(2, col).setFormula(SPOKE_WITH_CHOICES_FORMULA)
+    .setNote("Person Spoke With choices: one guardian per cell for column D's dropdown " +
+             "('Contact Log'!$R2:$W2). Hidden on purpose; every build puts this formula back if it goes missing.");
+  sheet.hideColumns(col, width);
+  return "added";
+}
+
+/**
  * Makes the lookup box's guardian table exactly as tall as maxGuardians needs (at least
  * LOOKUP_BOX_GUARDIAN_ROWS_), so a student with a 3rd / 4th / 5th guardian (New/Edit Student)
  * does not spill into the small row above Communications (#REF!), and the extra rows go again

@@ -40,6 +40,10 @@ function makeRange(sheet, row, col, nr, nc) {
     getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet._get(row + i, col + j))),
     getDisplayValues: () => r.getValues().map(rw => rw.map(v => v instanceof Date ? (v.getMonth() + 1) + '/' + v.getDate() + '/' + v.getFullYear() : String(v))),
     getValue: () => sheet._get(row, col),
+    // formulas (sheet._formulas: "r,c" -> text); writing a value or clearing a cell removes its formula, like Sheets
+    getFormula: () => sheet._formulas.get(row + ',' + col) || "",
+    getFormulas: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet._formulas.get((row + i) + ',' + (col + j)) || "")),
+    setFormula: function (f) { log('setFormula', arguments); sheet._formulas.set(row + ',' + col, String(f)); return p; },
     getDisplayValue: () => r.getDisplayValues()[0][0],
     setValues: vals => {
       if (vals.length !== nr || vals.some(v => v.length !== nc)) throw new Error("fake sheet: setValues size " + vals.length + "x" + (vals[0] || []).length + " into " + nr + "x" + nc);
@@ -68,8 +72,8 @@ function makeSheet(ss, name) {
     getBandings: () => s._bandings.slice(),
     _logSheet: (fn, args) => { if (s._log) s._log.push({ tab: s._name, sheetCall: true, fn, args: Array.from(args) }); },
     _get: (r, c) => (cells.has(r + ',' + c) ? cells.get(r + ',' + c) : ""),
-    _set: (r, c, v) => { if (v === "" || v === null || v === undefined) cells.delete(r + ',' + c); else cells.set(r + ',' + c, v); },
-    _cells: cells,
+    _set: (r, c, v) => { s._formulas.delete(r + ',' + c); if (v === "" || v === null || v === undefined) cells.delete(r + ',' + c); else cells.set(r + ',' + c, v); },
+    _cells: cells, _formulas: new Map(),
     getName: () => s._name, setName: n => { s._name = n; return p; }, getSheetId: () => s._id,
     isSheetHidden: () => s._hidden,
     showSheet: () => { s._hidden = false; return p; },
@@ -93,8 +97,8 @@ function makeSheet(ss, name) {
     getLastColumn: () => { let m = 0; cells.forEach((v, k) => { m = Math.max(m, Number(k.split(',')[1])); }); return m; },
     getRange: (a, b, c, d) => (typeof a === 'string' ? makeRange(p, ...parseA1(a, s._maxRows)) : makeRange(p, a, b, c || 1, d || 1)),
     getDataRange: () => makeRange(p, 1, 1, Math.max(1, s.getLastRow()), Math.max(1, s.getLastColumn())),
-    clear: () => { cells.clear(); return p; },
-    clearContents: () => { cells.clear(); return p; },
+    clear: () => { cells.clear(); s._formulas.clear(); return p; },
+    clearContents: () => { cells.clear(); s._formulas.clear(); return p; },
     // test helper: put a 2D array at row, col
     _put: (rows, row, col) => { rows.forEach((rw, i) => rw.forEach((v, j) => s._set((row || 1) + i, (col || 1) + j, v))); return p; }
   };

@@ -260,6 +260,10 @@ function buildAllDerivedSheetsRun_() {
   // needs (a 3rd+ guardian from New/Edit Student; Edits.gs). Never stops a build.
   try { syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided); } catch (e) { console.warn("Lookup box guardian rows skipped: " + e.message); }
 
+  // Person Spoke With choices (Contact Log R:W, Edits.gs): put the formula back if Migration or a
+  // deleted row 2 took it, or free its list if a pasted row blocks it. Never stops a build.
+  try { ensureSpokeWithChoices_(ss); } catch (e) { console.warn("Person Spoke With choices skipped: " + e.message); }
+
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }

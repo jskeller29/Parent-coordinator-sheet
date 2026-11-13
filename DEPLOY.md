@@ -51,6 +51,12 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    `App Scripts (Mine).Json` manifest pasted, which turns on Google's Sheets service: no new permission).
    Its pop-up ends with what a script can't do (the Contact Log's dropdown chip colors, its widths).
    📦 Make Release Copies then gives the Example and Blank copies the same look.
+9. Master template and your sheet: the **Person Spoke With** dropdown, once, by hand (a script can't
+   change a Table's dropdown column). Contact Log → Person Spoke With column → Data validation →
+   **Dropdown (from a range)** `='Contact Log'!$R2:$W2` (no `$` before the 2), Advanced options →
+   **Show a warning** (other people can still be typed). The build in step 3 already wrote the formula
+   in Contact Log **R2** and hid columns R:W; leave R1 empty and Q blank. Schools' sheets: the same rule
+   by hand after their next build, or they get it with next year's copy of the template.
 
 ## 4. Quick test on the copy
 - [ ] 📥 Input Data Mode: all 5 steps with a real export (paste and upload). Paste a wrong export once: the tab
@@ -66,6 +72,8 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 - [ ] On a fresh template copy, before its first build: 🚀 App Menu → 🔄 Import Old Data from last year's tracker
       (Follow-ups translated, lists copied; the menu item is gone once a sheet is built)
 - [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
+- [ ] Person Spoke With: a row whose student has 2 or 3 guardians (one from New/Edit Student) lists only
+      them, the next student's row lists theirs. Then delete R2's formula and Build: it comes back
 - [ ] A fresh copy of the master template (no z_ / Z# files): only the 👋 Welcome tab shows. 🚨 Initial Setup opens
       "Setting up your tracker" at once; during and after it ONLY the Welcome tab shows (now "You're set up"). Yes,
       start fresh → Start Input Data Mode: only the yellow Student Data tab shows, with "PASTE HERE" and the grey "Closed
