@@ -864,8 +864,9 @@ function noteLineHeader_(dateText, braceText) {
 // - Tabs you type in (Contact Log, Events, Notes, Send Out): the Contact Log's
 //   brown header and cream rows. The Contact Log keeps its own hand-made look.
 // - Tabs the build makes (Student List, Parents Divided, Directory, Combined
-//   Contact Tracking, Phone Contacts, Students Override Report, PCAR): navy, the
+//   Contact Tracking, Phone Contacts, Students Override Report): navy, the
 //   same navy as the pop-ups (Styles.html), the Welcome tab and the guide.
+// - PCAR: the brown theme, a little darker than the Contact Log (owner 2026-11-13).
 // - Red / amber / green only where they mean something (follow-up, delete box,
 //   today). The Contact Log's week / today / workshop colors are unchanged.
 // Navy everywhere instead: give typing the same values as built.
@@ -890,7 +891,13 @@ const SHEET_LOOK_ = {
     soft: "#e3e8ee",           // section rows (Styles.html --accent-soft)
     line: "#d3d9e1"
   },
-  input: "#fff2cc",            // a cell you type in on a built tab (PCAR's own dates): the Raw Data paste boxes' yellow
+  pcar: {                      // PCAR's boxes (🎨 Apply Sheet Style, z_MINE.gs): a slightly darker brown
+    header: "#5b422f",         // title rows (This Week / Last Week / your own dates)
+    headerDark: "#4a3627",     // This Week / Last Week date rows
+    section: "#efe3d3",        // section rows (Parent/Family Consultations ...): light tan
+    sectionText: "#5b422f"
+  },
+  input: "#fff2cc",            // a cell you type in (PCAR's own dates): the Raw Data paste boxes' yellow
   workshopRow: "#e6f1ea",      // Contact Log rows whose Method (J) is "Workshop" (C:O, resetContactLogFormatting): pale green, was #b6d7a8
   danger: { fill: "#f8e9e7", text: "#a3312a" },   // delete boxes (Styles.html --danger-soft / --danger)
   // Contact Log Type column (L): one text color per type in Type List order (Backend BL),

@@ -646,9 +646,9 @@ function ownerDebugToast_(message, title, seconds) {
 //   the tables to recolor by hand).
 // - Header rows: the table's color with white bold text (also over Send Out's old
 //   orange / coral D1:E1), Your Lists headers after the tables included.
-// - Phone Contacts' colors; PCAR's 3 boxes (navy, the "own dates" box brown with its
-//   2 date cells as yellow input boxes; one label style; a missing section title is
-//   copied from the first box).
+// - Phone Contacts' colors; PCAR's 3 boxes (a slightly darker brown, SHEET_LOOK_.pcar;
+//   the "own dates" box's 2 date cells as yellow input boxes; one label style; a missing
+//   section title is copied from the first box).
 // - Widths: Student List / Parents Divided fit their text (within limits), Send Out B.
 // - Student List: the empty columns after the last header go ("Column 9"); Your Lists
 //   columns have a header, so they stay.
@@ -669,7 +669,8 @@ function ownerMenuApplySheetStyle() {
     "• Montserrat everywhere\n" +
     "• Tabs you type in (Events, Notes, Send Out): the Contact Log's brown headers and cream rows\n" +
     "• Tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking, " +
-    "Phone Contacts, Students Override Report, PCAR): navy headers and light grey rows\n\n" +
+    "Phone Contacts, Students Override Report): navy headers and light grey rows\n" +
+    "• PCAR: a slightly darker brown\n\n" +
     "Your data is not changed and the Contact Log keeps its own look. Continue?",
     ui.ButtonSet.OK_CANCEL);
   if (resp !== ui.Button.OK) return;
@@ -820,7 +821,7 @@ function ownerApplySheetStyle_(ss) {
   });
 
   // 9. PCAR
-  step("PCAR", () => ownerStylePcar_(ss, typing.header, rep));
+  step("PCAR", () => ownerStylePcar_(ss, rep));
 
   // 10. What the code paints itself, now instead of at the next build / reset
   step("Events tables", () => {
@@ -1015,14 +1016,14 @@ function ownerReadTables_(ss, api) {
 }
 
 /**
- * PCAR's boxes = a title in row 1 over 2 columns (This Week, Last Week, your own dates).
- * This Week / Last Week: navy title, darker navy date row; the other box: brown title, its
- * 2 date cells (row 2, typed by you) as yellow input boxes. Section rows (the first box's
- * 2 columns merged): light navy / light tan with bold text in the box color; a box missing
- * one gets the first box's title. Label rows: plain text (no italic), wrapped, centered.
- * Borders are not touched.
+ * PCAR's boxes = a title in row 1 over 2 columns (This Week, Last Week, your own dates), all in
+ * SHEET_LOOK_.pcar (owner 2026-11-13: the brown theme, a little darker than the Contact Log):
+ * brown title row; This Week / Last Week date rows a darker brown, the own-dates box's 2 date
+ * cells (row 2, typed by you) yellow input boxes. Section rows (the first box's 2 columns
+ * merged): light tan with bold brown text; a box missing one gets the first box's title.
+ * Label rows: plain text (no italic), wrapped, centered. Borders are not touched.
  */
-function ownerStylePcar_(ss, typingHeader, rep) {
+function ownerStylePcar_(ss, rep) {
   const L = SHEET_LOOK_;
   const sh = ss.getSheetByName("PCAR");
   if (!sh) return;
@@ -1049,16 +1050,16 @@ function ownerStylePcar_(ss, typingHeader, rep) {
   boxes.forEach(box => {
     const own = !/this week|last week/i.test(box.title); // the box for your own dates
     const c = box.c;
-    sh.getRange(1, c, 1, 2).setBackground(own ? typingHeader : L.built.header).setFontColor("#ffffff")
+    sh.getRange(1, c, 1, 2).setBackground(L.pcar.header).setFontColor("#ffffff")
       .setFontWeight("bold").setFontStyle("normal");
-    sh.getRange(2, c, 1, 2).setBackground(own ? L.input : L.built.headerDark)
+    sh.getRange(2, c, 1, 2).setBackground(own ? L.input : L.pcar.headerDark)
       .setFontColor(own ? L.typing.subHeaderText : "#ffffff").setFontWeight("bold");
     for (let r = 3; r <= bottom; r++) {
       if (sectionRows.indexOf(r) !== -1) {
         if (!pairAt(r, c)) sh.getRange(r, c, 1, 2).merge();
         if (text(r, c) === "" && text(r, first) !== "") { sh.getRange(r, c).setValue(text(r, first)); filled++; }
-        sh.getRange(r, c, 1, 2).setBackground(own ? L.typing.subHeader : L.built.soft)
-          .setFontColor(own ? typingHeader : L.built.header).setFontWeight("bold").setFontStyle("normal")
+        sh.getRange(r, c, 1, 2).setBackground(L.pcar.section)
+          .setFontColor(L.pcar.sectionText).setFontWeight("bold").setFontStyle("normal")
           .setHorizontalAlignment("center");
       } else {
         sh.getRange(r, c).setBackground(null).setFontColor(L.ink).setFontWeight("normal").setFontStyle("normal")
@@ -1068,7 +1069,7 @@ function ownerStylePcar_(ss, typingHeader, rep) {
       }
     }
   });
-  rep.done.push("PCAR: " + boxes.length + " boxes in one look (your own dates: brown, with yellow date boxes)" +
+  rep.done.push("PCAR: " + boxes.length + " boxes in a slightly darker brown (your own dates: yellow date boxes)" +
     (filled ? "; added " + filled + " missing section title" + (filled > 1 ? "s" : "") : ""));
 }
 

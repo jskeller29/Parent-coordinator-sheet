@@ -500,8 +500,11 @@ function listsSheet() {
     const n = made.length, c = makeSpreadsheet(TABS); c.getId = () => "COPY_" + n; c.getUrl = () => "https://example.org/" + n;
     c.getName = () => name; made.push({ label: name, copy: c }); return c;
   };
-  g.stampVersionDate_ = c => c.getSheetByName("Backend").getRange("A2").setValue(new Date(2026, 10, 12));
+  // today's date, like the code (the release names use new Date(); a fixed date broke this test at midnight)
+  const now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  g.stampVersionDate_ = c => c.getSheetByName("Backend").getRange("A2").setValue(today);
   g.Utilities.formatDate = d => (d.getMonth() + 1 + "").padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0") + "/" + String(d.getFullYear()).slice(2);
+  const TODAY = g.Utilities.formatDate(today);
   g.getOrCreateVersionSheet_ = ss => ss.getSheetByName("Backend");
   const steps = [];
   const overrides = [];
@@ -518,7 +521,7 @@ function listsSheet() {
   assert.deepStrictEqual(be0.getRange("D6:E6").getValues()[0].slice(), ["EXAMPLE copy", EX], 'Blank: the Example saved');
   assert.strictEqual(mine.getSheetByName("Backend").getRange("E6").getValue(), "", 'this sheet is not changed');
   // the release names: never this sheet's name ("Mine")
-  assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (11/12/26)"));
+  assert.deepStrictEqual(made.map(x => x.label), ["BLANK", "EXAMPLE"].map(t => "Parent Coordinator Sheet - (" + t + ") (" + TODAY + ")"));
   assert.deepStrictEqual(steps, [["reset", "No"], ["fake"]], 'B3 = No before the reset; Example loads fake data');
   assert.strictEqual(made[0].copy.getSheetByName("Backend").getRange("B3").getValue(), "No");
   assert.throws(() => g.ownerMakeCopy("migrate"), /Unknown copy/, 'no Migrate copy any more');
@@ -538,8 +541,8 @@ function listsSheet() {
   // 1. every copy gets the version date, the Example one too (it has no reset), and B3 = No there
   made.forEach(x => assert(x.copy.getSheetByName("Backend").getRange("A2").getValue() instanceof Date, 'version date in ' + x.label));
   assert.strictEqual(made[1].copy.getSheetByName("Backend").getRange("B3").getValue(), "No", 'Example: not an upgrade template');
-  assert.strictEqual(e.stamp, "11/12/26", 'the pop-up shows the version date');
-  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (11/12/26)", url: "https://example.org/0", stamp: "11/12/26",
+  assert.strictEqual(e.stamp, TODAY, 'the pop-up shows the version date');
+  assert.strictEqual(JSON.stringify(b), JSON.stringify({ name: "Parent Coordinator Sheet - (BLANK) (" + TODAY + ")", url: "https://example.org/0", stamp: TODAY,
     trackerLink: "https://docs.google.com/spreadsheets/d/COPY_0/copy" }), 'Blank: its /copy link goes in the tracker (D)');
   assert.strictEqual(e.trackerLink, "https://docs.google.com/spreadsheets/d/COPY_1/edit?usp=sharing", 'Example: its link goes in the tracker (E)');
   assert(e.url);

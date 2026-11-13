@@ -96,7 +96,7 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
       in the same run (no Initial Setup on the Blank copy, nothing to redo there)
 
 - [ ] 🎨 Apply Sheet Style: Montserrat on every tab; Notes / Send Out brown like the Contact Log; Student List,
-      Parents Divided, Directory, Combined navy; PCAR's boxes navy + brown with yellow date cells; no "Column 9" on
+      Parents Divided, Directory, Combined navy; PCAR's boxes a darker brown with yellow date cells; no "Column 9" on
       the Student List; "Raw Data" tab name; Raw Data's "DATE UPDATED" titles visible at the left. Then: a new event
       (brown title row), Workshop rows in the Contact Log pale green, a Type typed in the Contact Log keeps its
       color after the 10 PM run, a reset leaves the

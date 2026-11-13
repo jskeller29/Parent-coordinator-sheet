@@ -36,6 +36,9 @@ const plain = x => JSON.parse(JSON.stringify(x)); // arrays made inside the proj
   L.siteColors.forEach(c => assert(contrast(c, L.ink) >= 7, "text reads on site color " + c));
   assert(contrast("#ffffff", L.typing.header) >= 4.5 && contrast("#ffffff", L.built.header) >= 4.5, "white header text reads");
   assert(contrast(L.built.header, L.built.soft) >= 4.5 && contrast(L.typing.header, L.typing.subHeader) >= 4.5, "section rows read");
+  assert(contrast("#ffffff", L.pcar.header) >= 4.5 && contrast("#ffffff", L.pcar.headerDark) >= 4.5
+    && contrast(L.pcar.sectionText, L.pcar.section) >= 4.5, "PCAR's browns read");
+  assert(lum(L.pcar.header) < lum(L.typing.header), "PCAR's brown is darker than the Contact Log's");
   console.log("SHEET_LOOK_: readable colors: ok");
 }
 
@@ -273,12 +276,11 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
   const pc = t("PCAR");
   assert.strictEqual(pc.getRange(3, 8).getValue(), "Parent/Family Consultations", "missing section title added");
   assert(pc._merges.some(m => m.r === 3 && m.c === 8 && m.nc === 2), "and merged over the box");
-  assert.strictEqual(pc.getRange(1, 2).getBackground(), L.built.header, "This Week navy");
-  assert.strictEqual(pc.getRange(1, 5).getBackground(), L.built.header, "Last Week navy");
-  assert.strictEqual(pc.getRange(1, 8).getBackground(), CL_BROWN, "own dates brown");
+  [2, 5, 8].forEach(c => assert.strictEqual(pc.getRange(1, c).getBackground(), L.pcar.header, "box title darker brown, column " + c));
+  assert.strictEqual(pc.getRange(2, 2).getBackground(), L.pcar.headerDark, "This Week dates darkest brown");
   assert.strictEqual(pc.getRange(2, 9).getBackground(), L.input, "own date cells yellow");
-  assert.strictEqual(pc.getRange(3, 2).getBackground(), L.built.soft, "section row light navy");
-  assert.strictEqual(pc.getRange(3, 8).getBackground(), L.typing.subHeader, "own section row light tan");
+  [2, 5, 8].forEach(c => assert.strictEqual(pc.getRange(3, c).getBackground(), L.pcar.section, "section row light tan, column " + c));
+  assert(!pc._bg.size || ![...pc._bg.values()].some(v => v === L.built.header), "no navy left on PCAR");
   assert.strictEqual(pc.getRange(4, 9).getValue(), 0, "values kept");
   assert(calls(ss, "PCAR", "setFontStyle").some(c => c.row === 4 && c.col === 2 && c.args[0] === "normal"), "labels not italic");
 

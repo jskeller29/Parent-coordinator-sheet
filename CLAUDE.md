@@ -711,7 +711,9 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font the code paints on a tab):
 - Montserrat everywhere. Tabs you type in (Contact Log, Events, Notes, Send Out) = the Contact Log's brown header
   (~#6b4e37) + cream rows; tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking,
-  Phone Contacts, Students Override Report, PCAR) = navy #183e69 (the dialogs' navy) + light grey #f3f5f8 rows.
+  Phone Contacts, Students Override Report) = navy #183e69 (the dialogs' navy) + light grey #f3f5f8 rows; PCAR =
+  a slightly darker brown (owner 2026-11-13, SHEET_LOOK_.pcar: titles #5b422f, This / Last Week dates #4a3627,
+  section rows #efe3d3 with #5b422f text, own-dates cells #fff2cc; the owner may also set these by hand).
   Red / amber / green only where they mean something. The Contact Log keeps its hand-made look (table colors, lookup
   box, END bar, week / today rules); its Workshop rows are pale green now (SHEET_LOOK_.workshopRow, owner 2026-11-12).
   Navy everywhere = give typing the built values.
@@ -738,8 +740,8 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   header cell's fill), the 4 built tables navy; Send Out's table "Table1" -> "Send Out"; header rows painted with the
   table color + white bold (over Send Out's old D1:E1 fills); Phone Contacts banding; widths (Student List / Parents
   Divided fit within [OWNER_STYLE_WIDTHS_ min, 320], Send Out B 240); PCAR (boxes = row-1 titles over 2 columns;
-  This / Last Week navy, the own-dates box brown with yellow #fff2cc date cells, section rows #e3e8ee / #efe3d3, a
-  missing section title copied from the first box, labels plain + wrapped); the Student List's empty columns after
+  all SHEET_LOOK_.pcar brown, the own-dates box's date cells yellow #fff2cc, a missing section title copied from
+  the first box, labels plain + wrapped); the Student List's empty columns after
   the last header ("Column 9" counts as empty; Your Lists columns stay); tab "RAW Data" -> "Raw Data" (every lookup
   takes both); then repaints the code-painted parts now (the Contact Log's rules via resetContactLogFormatting, as the
   10 PM run does). Reports Send Out dropdowns that read Backend BH/BI/BJ from
