@@ -71,13 +71,29 @@ rename a heading in both places.
 `guideDoc` (Getting Started Help, "Getting started guide") opens the whole guide, so it has
 no heading. The two videos (`setupVideo`, `downloadDataVideo`) are YouTube links.
 
-To put these headings into the Google Doc that is already in Drive (it is edited in place):
+The Google Doc in Drive does not change when this file does. Its Contents page is plain
+text with links, made from the Word file it was imported from, so headings typed into the
+Doc later don't appear there by themselves. Two ways to get these headings into it:
 
-1. In the Doc, type each heading at the place in the table: rename "Where to get each
-   export" to "How to download your data", and add the other three as new lines (Build and
-   Full Sync also gets "What Full Sync does" above its second paragraph).
+**A. A new Doc from the new Word file** (also brings every other change made to the guide
+since the Doc was made):
+
+1. Upload the new `PC_Tracker_User_Guide.docx` to the guide folder, right-click it → Open
+   with → Google Docs, then delete the .docx. Share the Doc "Anyone with the link → Viewer".
+2. Put its link in the Version Tracker's Document column (F) in the newest release's row.
+3. Copy each heading's link (step 3 below) into 📌 YOUR LINKS, and the Doc's own link into
+   `guideDoc`. Update the two links in its **Start here** box.
+4. In the old Doc, type "This guide has moved:" and the new link at the very top (old links
+   still lead somewhere), or move the old Doc to the "Old guides" subfolder.
+
+**B. The same Doc, by hand** (keeps its link):
+
+1. Type each heading at the place in the table: rename "Where to get each export" to "How
+   to download your data", and add the others as new lines (Build and Full Sync also gets
+   "What Full Sync does" above its second paragraph).
 2. Make each one a Heading 3: click in the line, then pick Heading 3 in the style box
-   (where it says Normal text).
+   (where it says Normal text). The outline on the left lists it now; the Contents page only
+   if you type a line there too.
 3. Get its link: click the heading in the outline on the left; the address in the browser
    now ends in `#heading=h.` and a code. Copy the whole address. (A bookmark works too:
    Insert → Bookmark, then click the bookmark → Copy link.)

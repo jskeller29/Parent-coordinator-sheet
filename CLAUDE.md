@@ -643,7 +643,8 @@ Sync does" (Part 2, Build and Full Sync), settingsDoc "What each setting does" (
 log a parent contact" (Part 2, The Contact Log); all #### = Heading 3 in the Doc (outline + heading link). guideDoc =
 the whole guide. Each comment in the box names its heading; 🔗 My Links shows it (linkList_ heading); test_features.js
 fails if USER_GUIDE.md loses one or a Getting Started button stops saying it; docs/README.md has the table + the
-steps to add them to the Google Doc in place and copy each heading link into the box. linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
+steps to get them into the Google Doc (A: a new Doc from the new .docx + tracker F, B: by hand) and copy each heading
+link into the box. The Contents (PDF + docx, build_guide.js) lists #### headings too since 2026-11-13 (one page still). linkList_() = all of them with "where it shows" (🐞 Debug → 🔗 My Links,
 ownerMenuMyLinks in z_MINE.gs: set / not set + Open links). Keep new links in that box.
 VERSION TRACKER LINKS (owner 2026-11-12, "folder = backup"): the Version Tracker's first tab holds the 3 shared links,
 one row per release: D "Blank Copy" (the template's /copy link), E "Example" (a filled-in example tracker), F "Document"

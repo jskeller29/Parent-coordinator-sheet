@@ -143,6 +143,8 @@ function toHtml(doc, updated) {
   doc.blocks.forEach(b => {
     if (b.t === "h2") toc.push(`<li class="t2"><a href="#${b.id}">${esc(b.text)}</a></li>`);
     if (b.t === "h3") toc.push(`<li class="t3"><a href="#${b.id}">${esc(b.text)}</a></li>`);
+    // #### too (owner 2026-11-13): the headings the tracker's buttons open must show in the contents
+    if (b.t === "h4") toc.push(`<li class="t4"><a href="#${b.id}">${esc(b.text)}</a></li>`);
   });
   const body = doc.blocks.map(b => {
     switch (b.t) {
@@ -207,13 +209,15 @@ function toHtml(doc, updated) {
   .contents h2 { break-before: page; }
   .jump { display: flex; flex-wrap: wrap; gap: 6pt; margin: 0 0 16pt; }
   .jump a { text-decoration: none; border: 1px solid var(--line); border-radius: 3px; padding: 4pt 9pt; font-size: 9.5pt; font-weight: 600; }
-  .toc { list-style: none; padding: 0; margin: 0; }
+  .toc { list-style: none; padding: 0; margin: 0; line-height: 1.4; }
   .toc li { margin: 0; }
   .toc .t2 { font-weight: 600; margin-top: 8pt; padding-top: 6pt; border-top: 1px solid var(--line); }
   .toc .t2:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
   .toc .t3 { padding-left: 14pt; font-size: 9.5pt; }
   .toc a { color: var(--ink); text-decoration: none; }
   .toc .t3 a { color: var(--muted); }
+  .toc .t4 { padding-left: 28pt; font-size: 8.5pt; line-height: 1.3; }
+  .toc .t4 a { color: var(--faint); }
 </style>
 </head>
 <body>
@@ -326,10 +330,10 @@ function toDocx(doc, updated) {
   // Contents (links to the bookmarks on the headings)
   out.push(new Paragraph({ heading: HeadingLevel.HEADING_1, pageBreakBefore: true, children: [new TextRun("Contents")] }));
   doc.blocks.forEach(b => {
-    if (b.t !== "h2" && b.t !== "h3") return;
-    const top = b.t === "h2";
-    out.push(new Paragraph({ spacing: { before: top ? 160 : 0, after: top ? 40 : 20 }, indent: { left: top ? 0 : 360 },
-      children: [new InternalHyperlink({ anchor: ids.get(b.id), children: [new TextRun({ text: b.text, bold: top, size: top ? 21 : 19, color: top ? C.ink : C.muted })] })] }));
+    if (b.t !== "h2" && b.t !== "h3" && b.t !== "h4") return; // h4 too: the headings the tracker's buttons open
+    const top = b.t === "h2", sub = b.t === "h4";
+    out.push(new Paragraph({ spacing: { before: top ? 160 : 0, after: top ? 40 : 20 }, indent: { left: top ? 0 : sub ? 720 : 360 },
+      children: [new InternalHyperlink({ anchor: ids.get(b.id), children: [new TextRun({ text: b.text, bold: top, size: top ? 21 : sub ? 17 : 19, color: top ? C.ink : C.muted })] })] }));
   });
 
   doc.blocks.forEach(b => {
