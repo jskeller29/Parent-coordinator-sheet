@@ -62,7 +62,9 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   (🚀 App Menu, both the getting-started and full menus, via the 2 `addInputDataModeMenuItem_` lines in buildMenus_;
   also opened by the data update reminder and Getting Started). Hides all visible tabs (remembered),
   then one temp tab at a time ("Student Data", "Parent Square Data", "NYCSA Data"); paste anywhere or upload the
-  CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Sidebar polls every 2s, finds the header row, refuses the
+  CSV/Excel file (SheetJS from cdnjs, read in the sidebar). Which file to pick (owner 2026-11-13): IDM_STEPS' last
+  howTo line + fileHint (shown on the upload card): Student Data starts with general_, Parent Square = parents.csv,
+  NYCSA starts with Students_With_NonNycsa_Accts_Rpt_ (also in docs/USER_GUIDE.md "Where to get each export"). Sidebar polls every 2s, finds the header row, refuses the
   wrong export and numbers Excel cut off (E+ / #### / ID-phone columns ending in 000; "Use it anyway" allowed),
   then replaces that Raw Data section (rows 7+, same headers/stamps as cleanRawDataPasteZone_ /
   updateRawDataTimestamp_). Skip keeps old data. Step 4 "Site / Class" (manual, Save button): Class | Teacher Name |
@@ -418,6 +420,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - New-user flow fixes + bug pass (2026-11-12): re-paste Core, Build, Edits, Menus, Input Data (scripts) and
   GettingStartedSidebar, InputDataSidebar, ProgressSidebar, SettingsDialog, NewStudentDialog, ManageOverridesDialog
   (HTML) on every sheet.
+- Input Data Mode file names (2026-11-13): re-paste Input Data (script) and InputDataSidebar (HTML) on every sheet.
 - Sheet look + 🎨 Apply Sheet Style (2026-11-12, latest): re-paste Core, Build, Edits, Menus, Regenerate on every
   sheet; owner sheet also z_MINE and the manifest from App Scripts (Mine).Json (adds the Sheets service; same
   scopes, no re-approval). Then on the owner's sheet 🐞 Debug → 🎨 Apply Sheet Style once, then Make Release Copies.

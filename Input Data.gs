@@ -77,8 +77,11 @@ var IDM_STEPS = [
       "Go to <b>TeachHub</b> and sign in.",
       "In the search bar, look up and open <b>Insight</b>.",
       "Go to <b>Tools → Downloader</b>.",
-      "Under \"Data Available for Download,\" select only <b>Guardian Contact Information</b>, then download."
-    ]
+      "Under \"Data Available for Download,\" select only <b>Guardian Contact Information</b>, then download.",
+      "In your Downloads, look for the file whose name starts with <b>general_</b>."
+    ],
+    // the file to pick (owner 2026-11-13); shown on the upload card too
+    fileHint: 'its name starts with <b>general_</b>'
   },
   {
     key: 'ps', tab: 'Parent Square Data', short: 'Parent Square', zone: 'Parent Square', required: false,
@@ -88,8 +91,10 @@ var IDM_STEPS = [
     howTo: [
       "Go to <b>ParentSquare</b>, sign in, and open <b>Admin</b>.",
       "Under <b>Data Assistant</b>, select <b>Parents</b>.",
-      "Click <b>Export CSV</b>."
-    ]
+      "Click <b>Export CSV</b>.",
+      "In your Downloads, look for the file named <b>parents.csv</b>."
+    ],
+    fileHint: 'it is named <b>parents.csv</b>'
   },
   {
     key: 'nycsa', tab: 'NYCSA Data', short: 'NYCSA', zone: 'NYCSA', required: false,
@@ -99,8 +104,10 @@ var IDM_STEPS = [
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
       "Open <b>Family Access Management</b>.",
-      "Export the <b>\"Students with Non-NYCSA Account\"</b> report."
-    ]
+      "Export the <b>\"Students with Non-NYCSA Account\"</b> report.",
+      "In your Downloads, look for the file whose name starts with <b>Students_With_NonNycsa_Accts_Rpt_</b>."
+    ],
+    fileHint: 'its name starts with <b>Students_With_NonNycsa_Accts_Rpt_</b>'
   },
   {
     key: 'siteclass', tab: 'Site / Class', short: 'Site / Class', zone: 'Site / Class', required: false, manual: true,
@@ -1105,7 +1112,8 @@ function idm_view_(ss, state, notice) {
     active: true,
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
-    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists },
+    step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists,
+            fileHint: step.fileHint || '' },
     // Step 5: your lists (+ whether the sidebar must build first, and how that build went)
     lists: step.lists ? od_listSummaries_(ss) : undefined,
     needsBuild: step.lists ? idm_listsNeedBuild_(ss, state) : false,

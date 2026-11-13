@@ -171,17 +171,20 @@ Student Data (required), from ATS / Insight:
 2. Go to Tools → Downloader.
 3. Under "Data Available for Download", select only Guardian Contact Information, then
    download.
+4. In your Downloads, look for the file whose name starts with general_.
 
 Parent Square (optional):
 
 1. Sign in to ParentSquare and open Admin.
 2. Under Data Assistant, select Parents.
 3. Click Export CSV.
+4. In your Downloads, look for the file named parents.csv.
 
 NYCSA (optional):
 
 1. Sign in to TeachHub and open Family Access Management.
 2. Export the "Students with Non-NYCSA Account" report.
+3. In your Downloads, look for the file whose name starts with Students_With_NonNycsa_Accts_Rpt_.
 
 #### Pasting into Raw Data yourself
 

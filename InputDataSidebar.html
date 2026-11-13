@@ -87,12 +87,13 @@
 
     <div class="card">
       <b id="howToTitle">Where to get it</b>
-      <ol id="howTo"></ol>
+      <ol id="howTo" style="overflow-wrap:anywhere"></ol>
     </div>
 
     <div class="card" id="uploadCard">
       <b>Option 1: Upload the file (easiest)</b>
       <div class="muted">Pick the file you downloaded (CSV or Excel). Numbers come in exactly as they are in the file.</div>
+      <div id="fileHint" class="hidden" style="margin-top:4px;overflow-wrap:anywhere"></div>
       <div class="row">
         <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" class="hidden">
         <button class="primary" id="uploadBtn" onclick="document.getElementById('fileInput').click()">Upload file</button>
@@ -268,6 +269,9 @@
       ? 'Last updated ' + v.lastUpdated.text + (v.lastUpdated.days === null ? '' : ' (' + daysText(v.lastUpdated.days) + ')')
       : 'Never updated';
     $('howTo').innerHTML = v.step.howTo.map(function (h) { return '<li>' + h + '</li>'; }).join('');
+    // which file to pick (owner 2026-11-13; server text from IDM_STEPS)
+    $('fileHint').innerHTML = v.step.fileHint ? 'The right file: ' + v.step.fileHint + '.' : '';
+    $('fileHint').className = v.step.fileHint ? '' : 'hidden';
     $('tabName').textContent = '"' + v.tabName + '"';
     var manual = !!v.step.manual;
     var listsStep = !!v.step.lists;
