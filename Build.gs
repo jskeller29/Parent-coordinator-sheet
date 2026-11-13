@@ -1322,7 +1322,7 @@ function eventNoteLine_(row) {
 /* Divider line between notes lines in Combined Contact Tracking: a fixed 36
    "─" (owner's pick 2026-11-05; was the column width). */
 const NOTE_DIVIDER_CHAR_ = "─";
-const NOTE_DIVIDER_LENGTH_ = 36;
+const NOTE_DIVIDER_LENGTH_ = 44;
 
 function noteDivider_() {
   return NOTE_DIVIDER_CHAR_.repeat(NOTE_DIVIDER_LENGTH_);
