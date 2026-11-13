@@ -738,7 +738,9 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   the "Sheets" advanced service, in App Scripts (Mine).Json only, else UrlFetch to sheets.googleapis.com; updateTable
   rowsProperties header / first / second band) = Notes + Send Out get the Contact Log TABLE's own colors (or its
   header cell's fill), the 4 built tables navy; Send Out's table "Table1" -> "Send Out"; header rows painted with the
-  table color + white bold (over Send Out's old D1:E1 fills); Phone Contacts banding; widths (Student List / Parents
+  table color + white bold (over Send Out's old D1:E1 fills); Phone Contacts: header painted first, then each banding
+  recolored on its own with a flush (Google refused it on the owner's sheet 2026-11-13: "Service Spreadsheets failed
+  while accessing document"; a refusal = the row colors listed by hand with the values, not a failed step); widths (Student List / Parents
   Divided fit within [OWNER_STYLE_WIDTHS_ min, 320], Send Out B 240); PCAR (boxes = row-1 titles over 2 columns;
   all SHEET_LOOK_.pcar brown, the own-dates box's date cells yellow #fff2cc, a missing section title copied from
   the first box, labels plain + wrapped); the Student List's empty columns after

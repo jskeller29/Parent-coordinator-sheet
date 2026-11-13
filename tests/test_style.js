@@ -335,6 +335,23 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
 }
 
 {
+  // Google refuses the Phone Contacts banding change (owner's sheet 2026-11-13): the header is still painted,
+  // the row colors are listed to do by hand, and no step counts as failed
+  const ss = styleTestSheet();
+  const refusal = "Service Spreadsheets failed while accessing document with id X.";
+  ss.getSheetByName("Phone Contacts")._bandings = [{
+    setHeaderRowColor() { throw new Error(refusal); }, setFirstRowColor() { return this; }, setSecondRowColor() { return this; } }];
+  const g = loadProject({ owner: true, extra: { SpreadsheetApp: fakeSpreadsheetApp(ss), Sheets: fakeSheetsApi() }, noTrialFiles: true });
+  const L = g.__get("SHEET_LOOK_");
+  const rep = g.ownerApplySheetStyle_(ss);
+  assert.deepStrictEqual(plain(rep.failed), [], "a refused banding is not a failed step");
+  assert.strictEqual(ss.getSheetByName("Phone Contacts").getRange(1, 1).getBackground(), L.built.header, "the header is still navy");
+  assert(rep.byHand.some(l => /^Phone Contacts row colors/.test(l) && l.includes(refusal) && l.includes(L.built.band)), "row colors listed by hand with the values");
+  assert(rep.done.some(l => l === "Phone Contacts: navy header"), "reported as header only");
+  console.log("🎨 Apply Sheet Style: a refused Phone Contacts banding: ok");
+}
+
+{
   // The menu item is there and the Mine manifest has the Sheets service
   const fs = require('fs'), path = require('path');
   const { ROOT } = require('./lib/load');

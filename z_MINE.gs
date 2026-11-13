@@ -799,13 +799,31 @@ function ownerApplySheetStyle_(ss) {
   });
 
   // 7. Phone Contacts (alternating colors, not a Sheets Table)
+  // The header first, then each alternating-colors set on its own: Google can refuse a banding change
+  // ("Service Spreadsheets failed while accessing document", owner's sheet 2026-11-13), which then only
+  // skips the row colors (listed to do by hand) instead of the whole step. The flushes make a refusal
+  // show up here, not in a later step.
   step("Phone Contacts", () => {
     const sh = ss.getSheetByName("Phone Contacts");
     if (!sh || sh.getLastColumn() < 1) return;
-    const bands = sh.getBandings();
-    bands.forEach(b => b.setHeaderRowColor(L.built.header).setFirstRowColor("#ffffff").setSecondRowColor(L.built.band));
     sh.getRange(1, 1, 1, sh.getLastColumn()).setBackground(L.built.header).setFontColor("#ffffff").setFontWeight("bold");
-    rep.done.push("Phone Contacts: navy header" + (bands.length ? ", light grey rows" : ""));
+    SpreadsheetApp.flush();
+    let banded = 0, refused = "";
+    try {
+      sh.getBandings().forEach(b => {
+        try {
+          b.setHeaderRowColor(L.built.header).setFirstRowColor("#ffffff").setSecondRowColor(L.built.band);
+          SpreadsheetApp.flush();
+          banded++;
+        } catch (e) { refused = e.message; }
+      });
+    } catch (e) { refused = e.message; }
+    rep.done.push("Phone Contacts: navy header" + (banded ? ", light grey rows" : ""));
+    if (refused) {
+      rep.byHand.push("Phone Contacts row colors: Google didn't let the script change them (" + refused + "). " +
+        "Click any cell of the tab → Format → Alternating colors → Custom: Header " + L.built.header +
+        ", Color 1 #ffffff, Color 2 " + L.built.band + ".");
+    }
   });
 
   // 8. Widths
