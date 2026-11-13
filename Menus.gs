@@ -2953,11 +2953,16 @@ function ma_migrateContactLog(url) {
   
   // 3. Build Smart Mapping Dictionary (same header; then renamed headers, migrationHeaderMap_)
   const headerMap = migrationHeaderMap_(oldHeaders, newHeaders);
+  // Only the log's own columns (A:Q) are cleared / written: R:AA hold the Person Spoke With
+  // choices formula (R2, Edits.gs ensureSpokeWithChoices_), which column D's dropdown reads.
+  // Clearing them took the formula away (owner 2026-11-13: the dropdown was empty after Migration)
+  const logWidth = Math.min(newHeaders.length, CL_COL_SPOKE_CHOICES - 1);
+  Object.keys(headerMap).forEach(k => { if (headerMap[k] >= logWidth) delete headerMap[k]; });
   
   // 4. Construct Perfectly Mapped Array
   const mappedRecords = [];
   oldRecords.forEach(oldRow => {
-    const newRow = new Array(newHeaders.length).fill(""); 
+    const newRow = new Array(logWidth).fill(""); 
     Object.keys(headerMap).forEach(oldIdx => {
       const newIdx = headerMap[oldIdx];
       let val = oldRow[oldIdx];
@@ -2986,7 +2991,7 @@ function ma_migrateContactLog(url) {
 
   if (currentSpace > 0) {
     // Erase the blank spacer rows
-    newLog.getRange(2, 1, currentSpace, newLog.getMaxColumns()).clearContent();
+    newLog.getRange(2, 1, currentSpace, logWidth).clearContent();
   }
 
   // Adjust rows dynamically so the END row perfectly hugs the bottom (leaving 1 spacer)
@@ -3002,8 +3007,8 @@ function ma_migrateContactLog(url) {
 
   // Paste the migrated data starting exactly at row 2
   if (mappedRecords.length > 0) {
-    newLog.getRange(2, 1, mappedRecords.length, newHeaders.length).setValues(mappedRecords);
-    copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, newHeaders.length);
+    newLog.getRange(2, 1, mappedRecords.length, logWidth).setValues(mappedRecords);
+    copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, logWidth);
   }
   
   // 💡 CRITICAL FORMATTING OVERRIDE:
@@ -3011,8 +3016,8 @@ function ma_migrateContactLog(url) {
   // we take the clean formatting from Row 2 and physically paint it down over everything, 
   // ensuring the new blank row perfectly matches the data rows above it.
   if (neededSpace > 1) {
-    const formatSource = newLog.getRange(2, 1, 1, newLog.getMaxColumns());
-    const formatTarget = newLog.getRange(3, 1, neededSpace - 1, newLog.getMaxColumns());
+    const formatSource = newLog.getRange(2, 1, 1, logWidth);
+    const formatTarget = newLog.getRange(3, 1, neededSpace - 1, logWidth);
     formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
     formatSource.copyTo(formatTarget, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
   }
@@ -3055,6 +3060,10 @@ function ma_migrateContactLog(url) {
     console.error("Filter reset failed:", e);
   }
   
+  // The Person Spoke With choices formula (R2): put back if the template lacked it (the build at
+  // step 6 checks again)
+  try { ensureSpokeWithChoices_(newSS); } catch (e) { console.warn("Person Spoke With choices: " + e.message); }
+
   SpreadsheetApp.getUi().alert(`Success! Migrated ${oldRecords.length} records into your Typed Table and applied your active Master Filter.`);
 }
 

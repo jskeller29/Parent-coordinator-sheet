@@ -178,6 +178,7 @@ function fakeSpreadsheetApp(ss) {
     getActiveSpreadsheet: () => ss, flush() {}, newRichTextValue: builder, newTextStyle: builder, newDataValidation: builder,
     newConditionalFormatRule,
     BorderStyle: { SOLID: 'SOLID', SOLID_MEDIUM: 'SOLID_MEDIUM', SOLID_THICK: 'SOLID_THICK' },
+    CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT', PASTE_DATA_VALIDATION: 'PASTE_DATA_VALIDATION', PASTE_NORMAL: 'PASTE_NORMAL' },
     WrapStrategy: { CLIP: 'CLIP', WRAP: 'WRAP', OVERFLOW: 'OVERFLOW' },
     BandingTheme: new Proxy({}, { get: (t, k) => String(k) }),
     BooleanCriteria: { TEXT_EQUAL_TO: 'TEXT_EQUAL_TO', CUSTOM_FORMULA: 'CUSTOM_FORMULA' },

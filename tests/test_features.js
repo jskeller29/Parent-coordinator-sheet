@@ -97,6 +97,36 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   console.log("Migration: renamed Contact Log headers: ok");
 }
 
+// ---------------------------------------------------------------- Migration: Person Spoke With formula
+{
+  const here = makeSpreadsheet(["Contact Log", "Backend"]);
+  const old = makeSpreadsheet(["Contact Log"]); old.getId = () => "OLD";
+  const app = fakeSpreadsheetApp(here);
+  app.openByUrl = url => old;
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true });
+  const hdr = ["Week", "Date", "Guardian", "Person Spoke With", "OSIS", "Student", "#", "Site", "Class", "Method 1", "Method 2", "Type", "Event Description", "Follow-up", "Additional Notes", "Hide"];
+  const nl = here.getSheetByName("Contact Log");
+  nl._put([hdr]); nl._set(10, 5, "END");
+  nl.getRange(2, 18).setFormula(g.__get("SPOKE_WITH_CHOICES_FORMULA"));
+  nl._set(2, 19, "spilled name"); // what the formula shows (Sheets keeps the formula in R2 only)
+  const ol = old.getSheetByName("Contact Log");
+  ol._put([["Week", "Date", "Guardian", "Person Spoke With", "OSIS", "Student", "#", "Method 1", "Method 2", "Notes", "Followup", "Followup Notes", "Hide"],
+           ["", "10/1/2025", "Ann Lee", "Ann Lee", "111", "Bo Lee", 1, "Phone", "", "Talked about the bus", "No", "Call back", false],
+           ["", "10/2/2025", "Cy Diaz", "Cy Diaz", "222", "Di Diaz", 1, "Email", "", "Trip form", "Yes", "", false]]);
+  ol._set(4, 5, "END");
+  g.ma_migrateContactLog("old");
+  assert.strictEqual(nl.getRange(2, 18).getFormula(), g.__get("SPOKE_WITH_CHOICES_FORMULA"), 'R2 keeps the choices formula');
+  assert.strictEqual(nl.getRange(2, 13).getValue(), "Talked about the bus", 'old Notes -> Event Description');
+  assert.strictEqual(nl.getRange(2, 15).getValue(), "Call back", 'old Followup Notes -> Additional Notes');
+  assert.strictEqual(nl.getRange(3, 14).getValue(), "Followup Needed", 'Follow-up value mapped');
+
+  // A template without the formula gets it from the migration itself
+  nl.getRange(2, 18).clearContent(); nl.getRange(2, 19).clearContent();
+  g.ma_migrateContactLog("old");
+  assert.strictEqual(nl.getRange(2, 18).getFormula(), g.__get("SPOKE_WITH_CHOICES_FORMULA"), 'missing formula put back');
+  console.log("Migration: Person Spoke With formula kept: ok");
+}
+
 // ---------------------------------------------------------------- Migration: event tables
 {
   const ss = makeSpreadsheet(["Events", "Backend"]);

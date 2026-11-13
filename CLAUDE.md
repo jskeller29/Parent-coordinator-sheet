@@ -351,8 +351,10 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   row 1 there. Q stays blank (the Table must not grow into R). ensureSpokeWithChoices_ (Edits.gs, end of every build,
   try/catch): R2 has a formula -> kept (one changed by hand too) unless it shows #REF! (a pasted whole row put plain
   names in R:AA) -> S2:AA2 + R3:AA(END-1) cleared ("unblocked"); no formula -> written + R:AA hidden + a cell note, only
-  when R2:AA(END-1) is empty (a school's own data there = "skipped", warned). Needed because Migration clears rows 2+
-  in every column (ma_finish's build puts it back) and deleting row 2 deletes it. Code must never write into Contact
+  when R2:AA(END-1) is empty (a school's own data there = "skipped", warned). Needed because deleting row 2 deletes it
+  (and older Migration code cleared rows 2+ in every column). Since 2026-11-13 ma_migrateContactLog clears / writes /
+  formats only A:Q (logWidth, never R:AA) and ends with ensureSpokeWithChoices_ itself (the dropdown was empty
+  after a migration). Code must never write into Contact
   Log R:AA rows 2+ or put anything in R1. Owner's sheet: Old Master Table-only students keep their old guardian text
   (whatever separator it had). Rows logged before a guardian was added keep the old list (C is filled once).
   Contact Log getDataRange reads now reach W (more columns read, no extra call; positional readers unaffected).
@@ -439,6 +441,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Old tracker's nightly off after Migration (2026-11-13): re-paste Build, Menus (script) and MigrationUI (HTML) on
   every sheet.
 - Migration: renamed Contact Log headers + cell notes (2026-11-13): re-paste Menus on every sheet.
+- Migration keeps the Person Spoke With formula (2026-11-13): re-paste Menus (and Build / Edits / Core if the
+  Person Spoke With change isn't deployed yet) on every sheet.
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
