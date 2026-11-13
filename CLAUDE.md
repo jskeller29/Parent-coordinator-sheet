@@ -457,6 +457,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Guide link headings (2026-11-13): re-paste Menus (every sheet) and z_MINE (owner sheet); add the 4 headings to the
   Google Doc and paste each heading's link into 📌 YOUR LINKS (docs/README.md "The headings the tracker links to").
 - Faster Initial Setup (2026-11-13): re-paste Menus on every sheet (master template too: new copies get it from there).
+- 🚀 App Menu first when a sheet opens (2026-11-13): re-paste Menus on every sheet (master template too).
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
@@ -525,6 +526,13 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   every property with ONE getProperties (was ~26 getProperty calls; every caller, same values). Left as is: the 4
   triggers (an edit trigger must exist even if the window is closed), the links / "You're set up" tab rewrite /
   checklist (proposed: a second call after the question shows; not done). Tested in test_input_flow.js.
+  OPEN SPEED (owner 2026-11-13: on a new copy's first open the 🚀 App Menu took long or never showed; a refresh
+  showed it; a new copy only has the simple onOpen, 30 s limit): buildMenus_ reads every property ONCE
+  (props.getProperties() -> prop(k)); the clone check deletes only the keys the copy has; before setup the 🚀 App
+  Menu is the FIRST thing done, then the nightly / sync toasts, the owner menus, showWelcomeTabOnly_ (the Welcome
+  tab's ID read once, not once per tab) and the pointer toast (isAutoMigrateOn_ read once); applyQBlackTextFilter_
+  (the Contact Log filter, re-made on every open) is NOT run before setup (setup's own onOpen() makes it) and runs
+  AFTER the menus on a set-up sheet (it was the first thing, so every open's menus waited for it).
 - 3. During and after setup ONLY the Welcome tab shows until the first build (owner: Contact Log / PCAR / Combined
   showing during setup looked wrong): newCopy (= Student List not built) -> showWelcomeTabOnly_ +
   updateVisualSettings_(settings, columnsOnly = true); a built sheet -> default tabs + settings as before. Last step:

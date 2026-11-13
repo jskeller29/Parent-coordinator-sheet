@@ -993,3 +993,59 @@ function listsSheet() {
   assert.strictEqual(s.dataReminder, 'week');
   console.log("faster Initial Setup (no Sheet Lock on a new copy, one settings write / read): ok");
 }
+
+// ---------------------------------------------------------------- the 🚀 App Menu first when a sheet opens (owner 2026-11-13)
+// A new copy's first open took long (or never) to show the menu: the menu is now the first thing
+// (after the copy check), the Contact Log filter isn't re-made before setup, Backend B3 is read once,
+// and the copy check only deletes the properties the copy has. A set-up sheet: every menu first,
+// then the filter (still re-made on every open).
+{
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const app = fakeSpreadsheetApp(ss);
+  const order = [];
+  const createMenu = app._ui.createMenu;
+  app._ui.createMenu = name => { order.push('menu:' + name); return createMenu(name); };
+  const toast = ss.toast;
+  ss.toast = (m, t) => { order.push('toast'); return toast(m, t); };
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true });
+  let migrateReads = 0;
+  g.isAutoMigrateOn_ = () => { migrateReads++; return false; };
+  g.applyQBlackTextFilter_ = () => { order.push('filter'); };
+  const welcome = g.showWelcomeTabOnly_;
+  g.showWelcomeTabOnly_ = s => { order.push('welcome'); return welcome(s); };
+  const dp = g.PropertiesService.getDocumentProperties();
+  // a copy of a sheet that was set up: the copy check starts it over
+  dp.setProperty('ORIGINAL_SHEET_ID', 'THE_SHEET_IT_WAS_COPIED_FROM');
+  dp.setProperty('SETUP_COMPLETE', 'true');
+  dp.setProperty('ZG_AUTO_OPEN', 'off');
+  const deleted = [];
+  const del = dp.deleteProperty;
+  dp.deleteProperty = k => { deleted.push(k); return del(k); };
+
+  g.onOpen({ source: ss });
+  assert.strictEqual(order[0], 'menu:🚀 App Menu', 'new copy: the menu is the first thing');
+  assert.deepStrictEqual(app._ui._menus[0].items, ['runInitialSetupWrapper'], 'with Initial Setup');
+  assert.strictEqual(order.indexOf('filter'), -1, 'no Contact Log filter before setup');
+  assert(order.indexOf('welcome') > 0 && order.lastIndexOf('toast') > order.indexOf('welcome'), 'then the Welcome tab, then the pointer');
+  assert.deepStrictEqual(deleted.slice().sort(), ['SETUP_COMPLETE', 'ZG_AUTO_OPEN'], 'only the properties the copy has are deleted');
+  assert.strictEqual(g.__props.SETUP_COMPLETE, undefined, 'the copy starts over');
+  assert.deepStrictEqual(ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), ["👋 Welcome"], 'only the Welcome tab');
+  // the next open (the Welcome tab is there now; making it read B3 too): B3 read once, menu first again
+  migrateReads = 0; order.length = 0;
+  g.onOpen({ source: ss });
+  assert.strictEqual(migrateReads, 1, 'Backend B3 read once');
+  assert.strictEqual(order[0], 'menu:🚀 App Menu', 'menu first again');
+
+  // a set-up, built sheet: every menu, then the filter (once)
+  order.length = 0;
+  dp.setProperty('SETUP_COMPLETE', 'true');
+  dp.setProperty('ORIGINAL_SHEET_ID', 'FAKE_SS');
+  g.studentListIsBuilt_ = () => true;
+  g.onOpen();
+  const f = order.indexOf('filter');
+  assert(f > 0 && order.filter(x => x === 'filter').length === 1, 'set-up sheet: the filter is still re-made, once');
+  ['menu:🚀 App Menu', 'menu:👤 Student Overrides', 'menu:📆 Events'].forEach(m =>
+    assert(order.indexOf(m) !== -1 && order.indexOf(m) < f, m + ' before the filter'));
+  console.log("the 🚀 App Menu first when a sheet opens: ok");
+}

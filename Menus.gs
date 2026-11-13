@@ -301,63 +301,63 @@ function onOpen(e) {
 function buildMenus_(realOpen) {
   const ui = SpreadsheetApp.getUi();
   const props = PropertiesService.getDocumentProperties();
-
-  try {
-    applyQBlackTextFilter_();
-  } catch(e) { console.error(e); }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Every document property in ONE read, then read from that (owner 2026-11-13: on a new copy's
+  // first open the 🚀 App Menu took long or never showed; each property call takes time)
+  const startProps = props.getProperties();
+  const prop = k => (Object.prototype.hasOwnProperty.call(startProps, k) ? startProps[k] : null);
 
   // CLONE DETECTOR
-  const currentSheetId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  const savedSheetId = props.getProperty('ORIGINAL_SHEET_ID');
+  const currentSheetId = ss.getId();
+  const savedSheetId = prop('ORIGINAL_SHEET_ID');
 
   if (savedSheetId && savedSheetId !== currentSheetId) {
-    props.deleteProperty('SETUP_COMPLETE');
-    props.deleteProperty('WELCOME_DIALOG_SHOWN');
-    props.deleteProperty('MISSED_SYNC_MSG');
-    props.deleteProperty(NIGHTLY_FAILED_KEY_);
-    
-    // 🆕 Fresh copies start with clean version-check memory so any
-    // dismissals/preferences from the template never leak into copies.
-    props.deleteProperty('VERSION_LAST_SEEN');
-    props.deleteProperty('VERSION_LAST_SEEN_DATE');
-    props.deleteProperty('VERSION_DISMISS_FOREVER');
-    props.deleteProperty('VERSION_MAJORS_ONLY');
-    props.deleteProperty('VERSION_LAST_CHECK');
-    // A copy never starts half way through Input Data Mode, or with the checklist "finished"
-    props.deleteProperty('INPUT_DATA_MODE_STATE');
-    props.deleteProperty('INPUT_DATA_MODE_DELETE_TAB');
-    props.deleteProperty('ZG_AUTO_OPEN');
+    [
+      'SETUP_COMPLETE', 'WELCOME_DIALOG_SHOWN', 'MISSED_SYNC_MSG', NIGHTLY_FAILED_KEY_,
+      // 🆕 Fresh copies start with clean version-check memory so any
+      // dismissals/preferences from the template never leak into copies.
+      'VERSION_LAST_SEEN', 'VERSION_LAST_SEEN_DATE', 'VERSION_DISMISS_FOREVER', 'VERSION_MAJORS_ONLY', 'VERSION_LAST_CHECK',
+      // A copy never starts half way through Input Data Mode, or with the checklist "finished"
+      'INPUT_DATA_MODE_STATE', 'INPUT_DATA_MODE_DELETE_TAB', 'ZG_AUTO_OPEN'
+    ].forEach(k => {
+      if (prop(k) === null) return; // only the ones this copy has (each delete is a call)
+      props.deleteProperty(k);
+      delete startProps[k];
+    });
     // ℹ️ The Auto-Migrate toggle now lives in the Backend tab cell B3, not
     // a document property, so it travels with copies automatically — nothing
     // to preserve here.
   }
 
+  const isSetupDone = prop('SETUP_COMPLETE');
+
+  // New copy (Initial Setup not run yet): the 🚀 App Menu FIRST, before anything else is done
+  if (isSetupDone !== 'true') {
+    const initMenu = ui.createMenu("🚀 App Menu");
+    initMenu.addItem('🚨 Initial Setup (Run Once)', 'runInitialSetupWrapper');
+    initMenu.addToUi();
+  }
+
   // LAST NIGHT'S REBUILD FAILED (Build.gs nightlyMasterSyncRun_): said first; a sync
   // message then waits for the next open (only one toast shows at a time)
-  const nightlyFailed = props.getProperty(NIGHTLY_FAILED_KEY_);
+  const nightlyFailed = prop(NIGHTLY_FAILED_KEY_);
   if (nightlyFailed) {
-    SpreadsheetApp.getActiveSpreadsheet().toast(nightlyFailed, "⚠️ Last night's rebuild", 20);
+    ss.toast(nightlyFailed, "⚠️ Last night's rebuild", 20);
     props.deleteProperty(NIGHTLY_FAILED_KEY_);
   }
 
   // OFFLINE SYNC DETECTOR
-  const missedSync = nightlyFailed ? null : props.getProperty('MISSED_SYNC_MSG');
+  const missedSync = nightlyFailed ? null : prop('MISSED_SYNC_MSG');
   if (missedSync) {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      missedSync, 
-      "🔄 Synced Since Last Opened!", 
+    ss.toast(
+      missedSync,
+      "🔄 Synced Since Last Opened!",
       15
     );
-    props.deleteProperty('MISSED_SYNC_MSG'); 
+    props.deleteProperty('MISSED_SYNC_MSG');
   }
 
-  const isSetupDone = props.getProperty('SETUP_COMPLETE');
-
   if (isSetupDone !== 'true') {
-    const initMenu = ui.createMenu("🚀 App Menu");
-    initMenu.addItem('🚨 Initial Setup (Run Once)', 'runInitialSetupWrapper'); 
-    initMenu.addToUi(); 
-
     // Owner's sheet only: a fresh copy of it (setup not run there yet) still gets the 🐞 Debug menu.
     // No-op on every other sheet.
     const ownerBeforeSetup = getOwnerHooks_();
@@ -366,24 +366,26 @@ function buildMenus_(realOpen) {
     }
 
     // New copy: the 👋 Welcome tab is the only tab shown until Initial Setup has run
-    try { showWelcomeTabOnly_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error("Welcome tab: " + e.message); }
+    try { showWelcomeTabOnly_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
 
     // A short pointer only: the Welcome tab has the steps (it was a pop-up on top of it; simplified 2026-11-12).
     // Upgrade-template copies: Initial Setup then opens the Migration Wizard (see runInitialSetupWrapper).
     try {
-      SpreadsheetApp.getActiveSpreadsheet().toast(
+      const migrateCopy = isAutoMigrateOn_(); // read once (it reads the Backend)
+      ss.toast(
         "Click 🚀 App Menu (top of the screen) → 🚨 Initial Setup (Run Once)" +
-          (isAutoMigrateOn_() ? " to bring over your old data." : " to get started."),
-        isAutoMigrateOn_() ? "🎉 Welcome to the newest version" : "👋 Welcome to the PC Tracker", 30);
+          (migrateCopy ? " to bring over your old data." : " to get started."),
+        migrateCopy ? "🎉 Welcome to the newest version" : "👋 Welcome to the PC Tracker", 30);
     } catch(e) { console.error(e); }
 
+    // No Contact Log filter rebuild before setup (only the Welcome tab shows; setup's own
+    // menu redraw makes it, see below)
     return;
   }
 
   // ==============================================================
   // WHAT SHOWS AFTER SETUP IS COMPLETE:
   // ==============================================================
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // 👋 Welcome tab after setup: "what to do next" until the sheets are built (shown and opened
   // on every open, so a closed pop-up / sidebar is never a dead end), then deleted (see WELCOME TAB)
@@ -424,7 +426,7 @@ function buildMenus_(realOpen) {
   } else {
     // ✅ FULLY POPULATED STATE: Data exists and is built, unlock all menus!
     props.setProperty('FULL_MENU_UNLOCKED', 'true'); // Mark as explicitly unlocked
-    const syncToPhones = props.getProperty('syncToPhones') === 'true';
+    const syncToPhones = prop('syncToPhones') === 'true';
 
     const menu = ui.createMenu("🚀 App Menu");
     // Only show Full Sync if they have Phone Syncing enabled!
@@ -471,6 +473,12 @@ function buildMenus_(realOpen) {
   // Owner's sheet only (z_MINE.gs): the 🐞 Debug menu
   const owner = getOwnerHooks_();
   if (owner) owner.addMenus(ui);
+
+  // Contact Log "hide old rows" filter, re-made on every open (Regenerate.gs). After the menus
+  // since 2026-11-13: it was the first thing here, so every open's menus waited for it.
+  try {
+    applyQBlackTextFilter_();
+  } catch(e) { console.error(e); }
 
   // --- NEW: AUTO-REPAIR CONTACT LOG FILTER CHECKBOX ---
   // Shifted to the bottom so it doesn't block the menus from appearing instantly
@@ -1336,8 +1344,9 @@ function showWelcomeTabOnly_(ss) {
   const tab = ss.getSheetByName(WELCOME_TAB_NAME) || buildWelcomeTab_(ss);
   if (tab.isSheetHidden()) tab.showSheet();
   tab.activate();
+  const tabId = tab.getSheetId(); // once (it was asked again for every tab)
   ss.getSheets().forEach(function(sheet) {
-    if (sheet.getSheetId() !== tab.getSheetId() && !sheet.isSheetHidden()) sheet.hideSheet();
+    if (sheet.getSheetId() !== tabId && !sheet.isSheetHidden()) sheet.hideSheet();
   });
 }
 
