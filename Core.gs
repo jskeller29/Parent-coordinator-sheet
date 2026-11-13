@@ -32,11 +32,15 @@ const CL_COL_CHECKBOX = 16;         // P — row checkbox
  * - no horizontal borders anywhere (only the dark brown end bar carries one)
  * - divider lines before Event Description (M) and Additional Notes (O)
  * - checkboxes planted in P
+ * - Montserrat (SHEET_LOOK_.font) on the whole row (owner 2026-11-13: after Make Release Copies the
+ *   copies' Contact Log showed Roboto; rows the Sheets Table clears, keeps or adds can fall back to it).
+ *   Every reset, edited row and new blank row comes through here.
  */
 function formatContactLogRows_(sheet, startRow, numRows) {
   if (!numRows || numRows < 1) return;
   sheet.getRange(startRow, CL_COL_GUARDIAN, numRows, 2).setBorder(false, false, false, false, false, false);
-  sheet.getRange(startRow, 1, numRows, CL_WIDTH).setBorder(false, null, false, null, null, false);
+  sheet.getRange(startRow, 1, numRows, CL_WIDTH).setBorder(false, null, false, null, null, false)
+    .setFontFamily(SHEET_LOOK_.font);
   sheet.getRange(startRow, CL_COL_DIVIDER_NOTES, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
   sheet.getRange(startRow, CL_COL_DIVIDER_FOLLOWUP, numRows, 1).setBorder(null, null, null, true, null, null, null, SpreadsheetApp.BorderStyle.SOLID);
   sheet.getRange(startRow, CL_COL_CHECKBOX, numRows, 1).insertCheckboxes().setFontColor("#000000");

@@ -637,8 +637,8 @@ function ownerDebugToast_(message, title, seconds) {
 // ======================================================================
 // 🎨 APPLY SHEET STYLE (owner's one-time tool, 2026-11-12)
 // One click puts the house look (SHEET_LOOK_, Core.gs) on this sheet:
-// - Montserrat on every tab. The Contact Log keeps its own fonts except column D
-//   (Person Spoke With: every edit used to set it to Roboto).
+// - Montserrat on every tab. On the Contact Log: the header and entry rows (A:P above END;
+//   rows could show Roboto); the END bar and the lookup box keep their own fonts.
 // - Sheets Table colors: Notes and Send Out get the Contact Log's brown and cream,
 //   Student List / Parents Divided / Directory / Combined Contact Tracking navy and
 //   light grey. Needs the Sheets API: the "Sheets" service in App Scripts (Mine).Json
@@ -734,11 +734,12 @@ function ownerApplySheetStyle_(ss) {
       sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).setFontFamily(L.font);
       done.push(name);
     });
+    // Contact Log: the header and entry rows (A:P above END); the END bar and the lookup box keep theirs
     const cl = ss.getSheetByName("Contact Log");
     const end = cl && findEndRowInColumnE_(cl);
-    if (end && end > 2) {
-      cl.getRange(2, CL_COL_SPOKE_WITH, end - 2, 1).setFontFamily(L.font);
-      done.push("Contact Log column D");
+    if (end && end > 1) {
+      cl.getRange(1, 1, end - 1, CL_WIDTH).setFontFamily(L.font);
+      done.push("Contact Log (header + rows)");
     }
     rep.done.push("Montserrat on: " + done.join(", "));
   });

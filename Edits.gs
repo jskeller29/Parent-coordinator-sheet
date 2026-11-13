@@ -285,8 +285,7 @@ function handleEdit_(e) {
   if (safeNumRows > 0) {
     // --- INSTANT ROW REPAIR ---
     sheet.getRange(row, 1, safeNumRows, CL_WIDTH).setBackground(null);
-    formatContactLogRows_(sheet, row, safeNumRows);
-    sheet.getRange(row, CL_COL_SPOKE_WITH, safeNumRows, 1).setFontFamily(SHEET_LOOK_.font); // was Roboto (the one non-Montserrat column)
+    formatContactLogRows_(sheet, row, safeNumRows); // also the font (was: column D set to Roboto here)
   }
 
   autoAddBlankRow_(sheet, row, endRow);

@@ -270,7 +270,9 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
   ["Raw Data", "Events", "Notes", "Send Out", "PCAR", "Student List", "Directory", "Phone Contacts"].forEach(name =>
     assert(calls(ss, name, "setFontFamily").some(c => c.row === 1 && c.col === 1 && c.nr === t(name).getMaxRows() && c.args[0] === "Montserrat"), name + " in Montserrat"));
   const clFonts = calls(ss, "Contact Log", "setFontFamily");
-  assert.deepStrictEqual(clFonts.map(c => [c.row, c.col, c.nr, c.nc, c.args[0]]), [[2, 4, 3, 1, "Montserrat"]], "Contact Log: column D only");
+  assert(clFonts.some(c => c.row === 1 && c.col === 1 && c.nr === 4 && c.nc === 16 && c.args[0] === "Montserrat"),
+    "Contact Log: header + rows above END (A:P)");
+  assert(!clFonts.some(c => c.row + c.nr - 1 >= 5), "Contact Log: nothing from the END row down (END bar, lookup box)");
 
   // PCAR: one look, the missing title copied (and merged), the own-dates box brown with yellow date cells
   const pc = t("PCAR");
@@ -332,6 +334,27 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
   assert.strictEqual(t("Student List").getRange(1, 9).getBackground(), L.built.header, "and gets the header look");
   assert.strictEqual(t("Notes").getRange(1, 1).getBackground(), L.typing.header, "headers painted with the house brown");
   console.log("🎨 Apply Sheet Style without the Sheets API + a Your Lists column: ok");
+}
+
+{
+  // Make Release Copies (owner 2026-11-13): the copies' Contact Log showed Roboto. Both copies run the reset's
+  // resetContactLog_, and every edited / new row runs formatContactLogRows_: both set Montserrat on the rows
+  const ss = makeSpreadsheet(["Contact Log", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+  g.fixContactLogLookupBox_ = () => {}; // the lookup box under END is not this test's business
+  const cl = ss.getSheetByName("Contact Log");
+  cl._put([["", "Date", "Parent", "Person Spoke With", "OSIS"]], 1, 1);
+  cl._set(8, 5, "END");
+  g.resetContactLog_(ss);
+  const fonts = calls(ss, "Contact Log", "setFontFamily").map(c => [c.row, c.col, c.nr, c.nc, c.args[0]]);
+  assert(fonts.some(f => JSON.stringify(f) === JSON.stringify([2, 1, 6, 16, "Montserrat"])), "reset: rows 2..END-1, A:P in Montserrat");
+  assert(fonts.some(f => JSON.stringify(f) === JSON.stringify([1, 1, 1, 16, "Montserrat"])), "reset: the header row too");
+  assert(!fonts.some(f => f[0] + f[2] - 1 >= 8), "reset: nothing from the END row down");
+  ss._log.length = 0;
+  g.formatContactLogRows_(cl, 4, 1); // an edited row / the new blank row
+  assert(calls(ss, "Contact Log", "setFontFamily").some(c => c.row === 4 && c.nr === 1 && c.col === 1 && c.nc === 16 && c.args[0] === "Montserrat"),
+    "an edited row gets Montserrat on the whole row (A:P)");
+  console.log("Contact Log rows in Montserrat after a reset / edit (release copies): ok");
 }
 
 {

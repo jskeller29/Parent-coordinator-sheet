@@ -817,8 +817,10 @@ function resetContactLog_(ss) {
   // 3b. FORCE the Master Filter Checkbox on the exact "END" row to be checked (TRUE)
   sheet.getRange(endRow, 15).insertCheckboxes().check().setFontColor("#000000"); // ⚡ SHIFTED Col 15
 
-  // 4. Forcefully redraw the correct divider lines so the table looks perfect
+  // 4. Forcefully redraw the correct divider lines so the table looks perfect (+ Montserrat on the
+  //    rows, formatContactLogRows_), and the header row's font (owner 2026-11-13: release copies showed Roboto)
   formatContactLogRows_(sheet, 2, numRows);
+  sheet.getRange(1, 1, 1, CL_WIDTH).setFontFamily(SHEET_LOOK_.font);
 
   // 5 + 6. Student lookup box under the END row: delete the old UI rows under it and the
   //    leftover "Site / Phone Number / Parent Contact (COPY)" rows (header + its #REF! row),

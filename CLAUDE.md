@@ -726,7 +726,9 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   lines + brown outline; used by buildEventTable, restyleEventTables_ (Migration) and 🎨 with lookOnly; was green /
   tan / yellow / blue / red + grey + black lines, typed out twice); Contact Log Type colors (applyTypeDropdownColors:
   SHEET_LOOK_.typeColors by Type List place, no write when the L rules already match; they were random and
-  resetContactLogFormatting re-rolled them every night); column D font on every edit (was Roboto); Directory site
+  resetContactLogFormatting re-rolled them every night); Contact Log rows: formatContactLogRows_ (Core.gs) sets
+  Montserrat on every row it formats (edits, the new blank row, resets) and resetContactLog_ on the header (owner
+  2026-11-13: Make Release Copies' copies showed Roboto; was only column D, on edits, in Roboto); Directory site
   colors (formatDirectoryAuto_: SHEET_LOOK_.siteColors); Students Override Report (styleOverrideReport_, Menus.gs:
   navy header, Montserrat; its tab is cleared every rebuild); Raw Data (forceVibrantColors_, see Regenerate.gs).
   Your Lists headers after a table: styleLastInteractionHeader_ (Student List: every header from Last Interaction on)
@@ -734,7 +736,7 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   of its own gives no fill, never white).
 - 🐞 Debug → 🎨 Apply Sheet Style (ownerMenuApplySheetStyle, z_MINE.gs; owner's request "a button in debug to fix
   colors and fonts"): the hand-made parts, once, on the owner's sheet (Make Release Copies carries them on):
-  Montserrat on 12 tabs (Contact Log: column D only); Sheets Table colors through the Sheets API (ownerSheetsApi_:
+  Montserrat on 12 tabs (Contact Log: header + rows above END, not the END bar / lookup box); Sheets Table colors through the Sheets API (ownerSheetsApi_:
   the "Sheets" advanced service, in App Scripts (Mine).Json only, else UrlFetch to sheets.googleapis.com; updateTable
   rowsProperties header / first / second band) = Notes + Send Out get the Contact Log TABLE's own colors (or its
   header cell's fill), the 4 built tables navy; Send Out's table "Table1" -> "Send Out"; header rows painted with the
