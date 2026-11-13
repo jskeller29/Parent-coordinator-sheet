@@ -478,7 +478,8 @@ function buildMenus_(realOpen) {
   // Contact Log and re-makes the filter, so every user's menu waited for it); here only when
   // that run hasn't been seen for 3 days (trigger missing) or for a redraw (setup, Settings).
   const openChecksRan = Number(prop(OPEN_CHECKS_RAN_KEY_)) || 0;
-  if (!realOpen || Date.now() - openChecksRan > 3 * 24 * 3600 * 1000) {
+  // Not inside Initial Setup: the setup window's next call does it (zg_setupFinish)
+  if (!IS_RUNNING_SETUP && (!realOpen || Date.now() - openChecksRan > 3 * 24 * 3600 * 1000)) {
     contactLogOpenRepair_(ss);
   }
 
@@ -801,6 +802,9 @@ function showGuideWelcome_(opts) {
             if (r && r.migrate) return;
             fillLinks(r && r.links);
             show('ask');
+            // the slow part (links, Contact Log filter) after the menu is back: zg_setupFinish
+            google.script.run.withSuccessHandler(function (f) { fillLinks(f && f.links); })
+              .withFailureHandler(function () {}).zg_setupFinish();
           })
           .withFailureHandler(function (e) {
             document.getElementById('setupErrText').textContent = e.message;
@@ -950,12 +954,28 @@ function zg_finishSetup() {
 /** Initial Setup's window, step 1 (see showGuideWelcome_): the setup itself. */
 function zg_runSetup() {
   const migrate = runInitialSetup_();
-  const links = migrate ? null : zg_links_(); // the window's "how to download your data" buttons
+  // The links (Version Tracker / Drive: seconds on a new copy, nothing cached yet) and the Contact
+  // Log filter come in the window's NEXT call (zg_setupFinish), so this one, and the new 🚀 App
+  // Menu, end sooner (owner 2026-11-13: the menu took long during setup)
+  const links = null;
   // replaces the 30-second "click Initial Setup" toast from the open
   SpreadsheetApp.getActiveSpreadsheet().toast("Your tracker is set up.", "✅ Setup done", 5);
   if (migrate) openMigrationWizard(); // replaces the setup window
   else openGuideChecklist();
   return { migrate: migrate, links: links };
+}
+
+/**
+ * The setup window's second call, once the question shows: the Contact Log filter + END
+ * checkbox (contactLogOpenRepair_; skipped in the setup call) and the window's links.
+ * Never throws (a closed window / failure is fine: the next open's checkVersionOnOpen
+ * does the repair, and the links are only buttons).
+ */
+function zg_setupFinish() {
+  try { contactLogOpenRepair_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error(e); }
+  let links = null;
+  try { links = zg_links_(); } catch (e) { console.warn("Setup window links: " + e.message); }
+  return { links: links };
 }
 
 /** Welcome window "Not now": where to pick up again. */
@@ -1198,6 +1218,12 @@ function runInitialSetupSteps_(ss, props) {
   for (const [key, value] of Object.entries(finalSettings)) settingsToSave[key] = String(value);
   props.setProperties(settingsToSave);
 
+  // The new 🚀 App Menu right away (2026-11-13: was after the tabs / columns / locks below; it
+  // only needs the properties above). Suppress onOpen's own auto-migrate open for this call so
+  // the wizard isn't opened twice (the setup window opens it).
+  IS_RUNNING_SETUP = true;
+  try { onOpen(); } finally { IS_RUNNING_SETUP = false; }
+
   // =======================================================
   // WHICH TABS SHOW
   // New copy (sheets not built yet): ONLY the 👋 Welcome tab, during setup and until the first
@@ -1223,12 +1249,6 @@ function runInitialSetupSteps_(ss, props) {
   if (!newCopy) {
     try { applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
   }
-
-  // Instant UI swap without refresh! Suppress onOpen's own auto-migrate open
-  // for this synchronous call so the wizard isn't opened twice — the
-  // authoritative open happens in the if/else right below.
-  IS_RUNNING_SETUP = true;
-  try { onOpen(); } finally { IS_RUNNING_SETUP = false; }
 
   // Last, so it never says "You're set up" while setup is still running: the Welcome tab now
   // says what to do next (stays until the first build; every open brings the user back to it)

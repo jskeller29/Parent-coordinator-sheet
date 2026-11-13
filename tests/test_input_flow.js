@@ -233,7 +233,10 @@ function listsSheet() {
   // 3. The window's setup call: still ONLY the Welcome tab (no Contact Log / PCAR / Combined), now "You're set up"
   const setupReply = JSON.parse(JSON.stringify(g.zg_runSetup()));
   assert.strictEqual(setupReply.migrate, false);
-  assert(setupReply.links && setupReply.links.downloadDataDoc, '3. the window gets its links from the setup call');
+  assert.strictEqual(setupReply.links, null, '3. no link look-ups in the setup call (the menu waits for it)');
+  assert(/zg_setupFinish\(\)/.test(dialog), '3. the window makes a second call after the question shows');
+  const finish = JSON.parse(JSON.stringify(g.zg_setupFinish()));
+  assert(finish.links && finish.links.downloadDataDoc, '3. ...which brings the links');
   assert.strictEqual(g.__props.SETUP_COMPLETE, 'true');
   assert.deepStrictEqual(vis(), ["👋 Welcome"], '3. after setup: still only the Welcome tab');
   const w = ss.getSheetByName("👋 Welcome");
@@ -1100,4 +1103,35 @@ function listsSheet() {
   g.checkVersionOnOpen();
   assert.strictEqual(order.indexOf('repair'), -1, 'before setup: no repair');
   console.log("set-up sheet: Contact Log repair outside the menu run: ok");
+}
+{
+  // Initial Setup (2026-11-13, "slow during setup"): the new menu is drawn before the tabs /
+  // columns / Welcome tab work, no Contact Log repair or link look-ups in that call;
+  // the window's second call (zg_setupFinish) does them
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const app = fakeSpreadsheetApp(ss);
+  const order = [];
+  const createMenu = app._ui.createMenu;
+  const g = loadProject({ extra: { SpreadsheetApp: app }, noTrialFiles: true });
+  g.isAutoMigrateOn_ = () => false;
+  g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  g.onOpen({ source: ss });
+  app._ui.createMenu = name => { order.push('menu:' + name); return createMenu(name); };
+  g.contactLogOpenRepair_ = () => { order.push('repair'); };
+  g.zg_links_ = () => { order.push('links'); return {}; };
+  const vis = g.updateVisualSettings_;
+  g.updateVisualSettings_ = function () { order.push('columns'); return vis.apply(this, arguments); };
+  const wel = g.welcomeTabAfterSetup_;
+  g.welcomeTabAfterSetup_ = function () { order.push('welcome'); return wel.apply(this, arguments); };
+  g.openGuideChecklist = () => {};
+  g.zg_runSetup();
+  assert(order.indexOf('menu:🚀 App Menu') !== -1 && order.indexOf('menu:🚀 App Menu') < order.indexOf('columns') &&
+    order.indexOf('columns') < order.indexOf('welcome'), 'setup: the menu first, then columns, then the Welcome tab: ' + order);
+  assert.strictEqual(order.indexOf('repair'), -1, 'setup call: no Contact Log repair');
+  assert.strictEqual(order.indexOf('links'), -1, 'setup call: no link look-ups');
+  order.length = 0;
+  g.zg_setupFinish();
+  assert.deepStrictEqual(order, ['repair', 'links'], 'the second call does both');
+  console.log("Initial Setup: menu first, slow parts in the window's second call: ok");
 }
