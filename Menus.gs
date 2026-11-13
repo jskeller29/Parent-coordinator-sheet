@@ -60,24 +60,24 @@ const GUIDE_LINKS = {
   //    Shows on: the welcome pop-up ("How to download your data") and
   //    Getting Started step 1.
   //    Link to the User Guide heading "How to download your data" (Part 1, Step 5).
-  downloadDataDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.sfmhczeptaso",
+  downloadDataDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit#bookmark=id.oezx8x6ge43u",
 
   // 📄 A short getting-started guide, if you write one apart from the User Guide.
   //    Shows on: the welcome pop-up ("Read the User Guide") and Getting Started Help.
   //    No heading: the whole User Guide (or your own short guide).
-  guideDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit?usp=sharing",
+  guideDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit?usp=sharing",
 
   // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
   //    Link to the User Guide heading "What Build Sheets does" (Part 2, Build and Full Sync).
-  buildDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.el6l1nctxr0r",
+  buildDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit#bookmark=id.jk93e9512ti",
 
   // 📄 What each setting does.           Shows on: Getting Started step 3.
   //    Link to the User Guide heading "What each setting does" (Part 2, Settings).
-  settingsDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.q35hspwrw2p9",
+  settingsDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit#bookmark=id.rarbnx7yne80",
 
   // 📄 How to log a parent contact.       Shows on: Getting Started step 4.
   //    Link to the User Guide heading "How to log a parent contact" (Part 2, The Contact Log).
-  contactLogDoc: "https://docs.google.com/document/d/1pk-rnWhFxO5iZh92wZCZ2ZKiFtuaLqzI/edit#bookmark=id.2a6rj2ilhin4"
+  contactLogDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit#bookmark=id.lv8cnvthc8d9"
 };
 
 // 🗂️ FOLDERS, FORM AND TRACKER (already set; change only if you move them) ----
