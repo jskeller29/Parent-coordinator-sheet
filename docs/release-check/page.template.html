@@ -35,6 +35,7 @@
     color-scheme: dark;
   }
 
+  [hidden] { display: none !important; } /* the boxes below set display, which would beat the hidden attribute */
   body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
   body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
   h1, h2, h3 { font-family: var(--font-head); font-weight: 600; margin: 0; line-height: 1.25; text-wrap: balance; }
@@ -74,6 +75,16 @@
   .how { margin: 0; max-width: 66ch; color: var(--ink); }
   .how-list { margin: 0; padding-left: 20px; max-width: 66ch; display: grid; gap: 4px; }
   .links { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 14px; align-items: center; }
+  /* which checks show: the essentials or everything */
+  .viewrow { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .viewrow .lbl-in { font-weight: 700; font-size: 14px; }
+  .viewseg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .viewseg button { border: 0; background: var(--bg); padding: 5px 12px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted); }
+  .viewseg button + button { border-left: 1px solid var(--line); }
+  .viewseg button:hover { background: var(--surface); color: var(--ink); }
+  .viewseg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .viewrow .msg { flex: 1 1 220px; }
+  .opt { display: inline-block; margin-left: 8px; padding: 0 7px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); vertical-align: 2px; white-space: nowrap; }
   .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 22px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 14px; }
   .toc-part { display: grid; gap: 2px; align-content: start; min-width: 0; }
   .toc-part > span { font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
@@ -188,10 +199,19 @@
     </div>
     <ol class="how-list">
       <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4.</li>
+      <li>Do the <b>essentials</b> before any school gets this version. The switch below shows only them; the optional checks can wait.</li>
       <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
       <li>Your answers save as you go, on any device that opens this page.</li>
       <li>When you're done, tell Claude <b>"release check done"</b>: Claude reads your answers here. You can also copy the report or save it as a PDF at the bottom.</li>
     </ol>
+    <div class="viewrow">
+      <span class="lbl-in" id="viewLbl">Show</span>
+      <div class="viewseg" role="group" aria-labelledby="viewLbl">
+        <button type="button" data-view="essentials" aria-pressed="true">Essentials <span id="nEss"></span></button>
+        <button type="button" data-view="all" aria-pressed="false">Everything <span id="nAll"></span></button>
+      </div>
+      <span class="msg" id="viewNote"></span>
+    </div>
     <div class="links">
       <a href="https://github.com/jskeller29/Parent-coordinator-sheet/blob/Test-Version/DEPLOY.md" target="_blank" rel="noopener">DEPLOY.md (putting files on a copy)</a>
       <a href="https://github.com/jskeller29/Parent-coordinator-sheet/tree/Test-Version/test-data" target="_blank" rel="noopener">Test files (test-data)</a>
@@ -245,6 +265,13 @@
   });
   var BY_ID = {};
   ORDER.forEach(function (o) { BY_ID[o.check.id] = o; });
+  var N_ALL = ORDER.length, N_ESS = ORDER.filter(function (o) { return !o.check.optional; }).length;
+
+  // Which checks show: the essentials (default) or everything. This viewer's choice only (localStorage).
+  var VIEW_KEY = "pc-release-check-view";
+  var view = "essentials";
+  try { if (localStorage.getItem(VIEW_KEY) === "all") view = "all"; } catch (e) {}
+  function inView(o) { return view === "all" || !o.check.optional; }
 
   var state = { release: DATA.release, notes: "", results: {} };
   function res(id) { return state.results[id] || (state.results[id] = { status: "", note: "", seconds: null }); }
@@ -278,7 +305,7 @@
       st.checks.forEach(function (c) { sec.appendChild(buildCheck(BY_ID[c.id])); });
       host.appendChild(sec);
 
-      var a = el("a"); a.href = "#stage-" + st.id;
+      var a = el("a"); a.href = "#stage-" + st.id; a.id = "toc-" + st.id;
       a.appendChild(el("span", null, (st.safety ? "" : si + ". ") + st.title));
       var tc = el("span", "tc"); tc.id = "tc-" + st.id; a.appendChild(tc);
       tocPart.appendChild(a);
@@ -290,7 +317,9 @@
     art.id = "c-" + c.id; art.dataset.id = c.id; art.dataset.status = "";
     var head = el("div", "check-head");
     head.appendChild(el("span", "num", o.num));
-    head.appendChild(el("h4", null, c.title));
+    var h4 = el("h4", null, c.title);
+    if (c.optional) h4.appendChild(el("span", "opt", "Optional"));
+    head.appendChild(h4);
     var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
     ["pass", "problem", "skip"].forEach(function (r) {
       var b = el("button", null, r === "skip" ? "Skip" : LABEL[r]);
@@ -344,30 +373,53 @@
     if (ti && document.activeElement !== ti) { var v = r.seconds == null ? "" : String(r.seconds); if (ti.value !== v) ti.value = v; }
   }
 
+  // On screen: the checks in view. problemsAll counts every check (a problem never hides).
   function counts() {
-    var c = { pass: 0, problem: 0, skip: 0, total: ORDER.length };
-    ORDER.forEach(function (o) { var s = (state.results[o.check.id] || {}).status; if (c[s] != null) c[s]++; });
+    var c = { pass: 0, problem: 0, skip: 0, total: 0, problemsAll: 0 };
+    ORDER.forEach(function (o) {
+      var s = (state.results[o.check.id] || {}).status;
+      if (s === "problem") c.problemsAll++;
+      if (!inView(o)) return;
+      c.total++;
+      if (c[s] != null) c[s]++;
+    });
     c.done = c.pass + c.problem + c.skip;
     return c;
   }
+  // For the report: every check, whatever the view
+  function tally() {
+    var t = { pass: 0, problem: 0, skip: 0, essDone: 0, allDone: 0 };
+    ORDER.forEach(function (o) {
+      var s = (state.results[o.check.id] || {}).status;
+      if (!s) return;
+      t.allDone++; if (!o.check.optional) t.essDone++;
+      if (t[s] != null) t[s]++;
+    });
+    return t;
+  }
 
   function paintSummary() {
-    var c = counts(), pct = function (n) { return (100 * n / c.total) + "%"; };
+    var c = counts(), pct = function (n) { return (c.total ? 100 * n / c.total : 0) + "%"; };
     $("mOk").style.width = pct(c.pass); $("mBad").style.width = pct(c.problem); $("mSkip").style.width = pct(c.skip);
     $("counts").innerHTML = "";
     var b = el("b", null, String(c.done)); $("counts").appendChild(b);
-    $("counts").appendChild(document.createTextNode(" of " + c.total + " done" + (c.problem ? " · " + c.problem + (c.problem === 1 ? " problem" : " problems") : "")));
+    $("counts").appendChild(document.createTextNode(" of " + c.total + (view === "all" ? " done" : " essentials done") + (c.problemsAll ? " · " + c.problemsAll + (c.problemsAll === 1 ? " problem" : " problems") : "")));
 
     DATA.stages.forEach(function (st) {
-      var done = 0, bad = 0;
-      st.checks.forEach(function (k) { var s = (state.results[k.id] || {}).status; if (s) done++; if (s === "problem") bad++; });
+      var done = 0, bad = 0, shown = 0;
+      st.checks.forEach(function (k) {
+        var s = (state.results[k.id] || {}).status;
+        if (s === "problem") bad++;
+        if (!inView(BY_ID[k.id])) return;
+        shown++; if (s) done++;
+      });
       var tc = $("tc-" + st.id);
-      tc.textContent = bad ? bad + (bad === 1 ? " problem" : " problems") : done + " / " + st.checks.length;
-      tc.className = "tc" + (bad ? " has-bad" : (done === st.checks.length ? " all-done" : ""));
+      tc.textContent = bad ? bad + (bad === 1 ? " problem" : " problems") : done + " / " + shown;
+      tc.className = "tc" + (bad ? " has-bad" : (done === shown ? " all-done" : ""));
     });
 
     var sum = $("sum"); sum.innerHTML = "";
-    [["s-ok", c.pass, "worked"], ["s-bad", c.problem, c.problem === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, "not done yet"]].forEach(function (x) {
+    [["s-ok", c.pass, "worked"], ["s-bad", c.problemsAll, c.problemsAll === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, view === "all" ? "not done yet" : "essentials not done yet"]].forEach(function (x) {
       var s = el("span", x[0]); s.appendChild(el("b", null, String(x[1]))); s.appendChild(document.createTextNode(x[2])); sum.appendChild(s);
     });
 
@@ -389,6 +441,24 @@
   }
 
   function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintSummary(); paintMeta(); }
+
+  // Shows the checks in view; a stage (and its contents line) with none in view hides, and a part with no stage
+  function applyView() {
+    ORDER.forEach(function (o) { var a = $("c-" + o.check.id); if (a) a.hidden = !inView(o); });
+    DATA.stages.forEach(function (st) {
+      var any = st.checks.some(function (k) { return inView(BY_ID[k.id]); });
+      $("stage-" + st.id).hidden = !any; $("toc-" + st.id).hidden = !any;
+    });
+    (DATA.parts || []).forEach(function (p) {
+      var any = DATA.stages.some(function (st) { return st.part === p.n && !$("stage-" + st.id).hidden; });
+      var ph = $("part-" + p.n); if (ph) ph.hidden = !any;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
+    $("viewNote").textContent = view === "all"
+      ? "Every check. The ones marked Optional can wait."
+      : (N_ALL - N_ESS) + " optional checks are hidden. They can wait.";
+    paintSummary();
+  }
 
   // ---------- saving ----------
   var mode = "loading", db = null, docRef = null, docExists = false;
@@ -482,6 +552,14 @@
 
   // ---------- the viewer's actions ----------
   document.addEventListener("click", function (ev) {
+    var v = ev.target.closest("[data-view]");
+    if (v) {
+      if (view === v.dataset.view) return;
+      view = v.dataset.view;
+      try { localStorage.setItem(VIEW_KEY, view); } catch (e) {}
+      applyView();
+      return;
+    }
     var b = ev.target.closest(".seg button");
     if (b) {
       var id = b.closest(".check").dataset.id, r = res(id);
@@ -505,10 +583,11 @@
 
   // ---------- the report ----------
   function reportText() {
-    var c = counts(), now = new Date(), lines = [];
+    var t = tally(), now = new Date(), lines = [];
     lines.push(DATA.title + ": " + (state.release || DATA.release));
     lines.push("Report of " + now.toLocaleString());
-    lines.push("Done " + c.done + " of " + c.total + " · Works " + c.pass + " · Problems " + c.problem + " · Skipped " + c.skip + " · Not done yet " + (c.total - c.done));
+    lines.push("Essentials done " + t.essDone + " of " + N_ESS + " · All checks done " + t.allDone + " of " + N_ALL);
+    lines.push("Works " + t.pass + " · Problems " + t.problem + " · Skipped " + t.skip);
     function section(title, rows) { if (!rows.length) return; lines.push(""); lines.push(title); rows.forEach(function (x) { lines.push(x); }); }
     function rowsWith(pred, withNote) {
       var out = [];
@@ -526,7 +605,10 @@
     section("TIMINGS", times);
     section("NOTES ON CHECKS THAT WORKED OR WERE SKIPPED", rowsWith(function (r) { return (r.status === "pass" || r.status === "skip") && r.note; }, true));
     section("SKIPPED", rowsWith(function (r) { return r.status === "skip"; }, false));
-    section("NOT DONE YET", rowsWith(function (r) { return !r.status; }, false));
+    var essLeft = [], optLeft = [];
+    ORDER.forEach(function (o) { if ((state.results[o.check.id] || {}).status) return; (o.check.optional ? optLeft : essLeft).push(o); });
+    section("ESSENTIAL CHECKS NOT DONE YET", essLeft.map(function (o) { return o.num + " " + o.check.title; }));
+    if (optLeft.length) { lines.push(""); lines.push("OPTIONAL CHECKS NOT DONE (they can wait): " + optLeft.map(function (o) { return o.num; }).join(", ")); }
     if (state.notes) { lines.push(""); lines.push("OTHER NOTES"); state.notes.split("\n").forEach(function (l) { lines.push("    " + l); }); }
     return lines.join("\n");
   }
@@ -590,11 +672,12 @@
       });
       y += o.after == null ? 2 : o.after;
     }
-    var c = counts();
+    var t = tally();
     line(DATA.title, { size: 18, bold: true, color: [24, 62, 105], after: 2 });
     line(state.release || DATA.release, { size: 12, after: 2 });
     line("Report of " + new Date().toLocaleString(), { size: 9, color: [86, 97, 115], after: 8 });
-    line("Done " + c.done + " of " + c.total + "   Works " + c.pass + "   Problems " + c.problem + "   Skipped " + c.skip + "   Not done yet " + (c.total - c.done), { size: 11, bold: true, after: 10 });
+    line("Essentials done " + t.essDone + " of " + N_ESS + "   All checks done " + t.allDone + " of " + N_ALL, { size: 11, bold: true, after: 2 });
+    line("Works " + t.pass + "   Problems " + t.problem + "   Skipped " + t.skip, { size: 11, after: 10 });
     function head(t) { y += 6; line(t, { size: 12, bold: true, color: [24, 62, 105], after: 4 }); }
     var probs = ORDER.filter(function (o) { return (state.results[o.check.id] || {}).status === "problem"; });
     head("Problems");
@@ -614,7 +697,7 @@
       y += 4; line((st.safety ? "" : si + ". ") + st.title, { bold: true, after: 2 });
       st.checks.forEach(function (k) {
         var o = BY_ID[k.id], r = state.results[k.id] || {};
-        line(o.num + "  [" + (r.status ? LABEL[r.status] : "not done") + "]  " + k.title, { indent: 10, color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
+        line(o.num + "  [" + (r.status ? LABEL[r.status] : "not done") + "]  " + k.title + (k.optional ? "  (optional)" : ""), { indent: 10, color: r.status === "problem" ? [163, 49, 42] : (r.status || !k.optional ? [27, 36, 48] : [138, 148, 163]), after: 0 });
         if (r.note) line(r.note, { indent: 28, size: 9, color: [86, 97, 115], after: 0 });
       });
     });
@@ -658,8 +741,10 @@
 
   // ---------- start ----------
   buildPage();
+  $("nEss").textContent = "(" + N_ESS + ")"; $("nAll").textContent = "(" + N_ALL + ")";
   state.release = DATA.release;
   paintAll();
+  applyView();
   startDb();
   startDownloads();
 })();
