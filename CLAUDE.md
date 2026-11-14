@@ -362,7 +362,10 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   try/catch): R2 has a formula -> kept (one changed by hand too) unless it shows #REF! (a pasted whole row put plain
   names in R:AA) -> S2:AA2 + R3:AA(END-1) cleared ("unblocked"); no formula -> written + R:AA hidden + a cell note, only
   when R2:AA(END-1) is empty (a school's own data there = "skipped", warned). Needed because deleting row 2 deletes it
-  (and older Migration code cleared rows 2+ in every column). Since 2026-11-13 ma_migrateContactLog clears / writes /
+  (and older Migration code cleared rows 2+ in every column). A ROW DELETE puts it back at once (owner 2026-11-14, "only
+  row 2"): installedOnChange -> restoreSpokeWithChoicesAfterDelete_ (Edits.gs, own try/catch before the notes resync)
+  reads only R2 (one call per Contact Log row delete; the change event doesn't say which row went); no formula there =
+  row 2 went -> ensureSpokeWithChoices_ (same checks, never over typed R:AA data); a #REF! is left to the build. Since 2026-11-13 ma_migrateContactLog clears / writes /
   formats only A:Q (logWidth, never R:AA) and ends with ensureSpokeWithChoices_ itself (the dropdown was empty
   after a migration). Code must never write into Contact
   Log R:AA rows 2+ or put anything in R1. Owner's sheet: Old Master Table-only students keep their old guardian text
@@ -473,6 +476,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - "<step> completed!" banner + list icons + setup links at once (2026-11-13, later): re-paste Input Data, Menus
   (scripts) and InputDataSidebar (HTML) on every sheet. User Guide: 3 small text changes (Input Data Mode paragraph,
   "Your own lists", the tabs table); apply them to the Google Doc by hand.
+- Person Spoke With formula back when row 2 is deleted (2026-11-14): re-paste Edits on every sheet.
 - Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 

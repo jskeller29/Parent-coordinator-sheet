@@ -164,5 +164,34 @@ function sheetWithSiblings() {
   const build = fs.readFileSync(path.join(ROOT, 'Build.gs'), 'utf8');
   const run = build.slice(build.indexOf('function buildAllDerivedSheetsRun_'));
   assert(/try \{ ensureSpokeWithChoices_\(ss\); \} catch/.test(run.slice(0, run.indexOf('\nfunction '))), 'called by the build');
+
+  // A row delete (owner 2026-11-14): deleting row 2 takes the formula with it -> back right away,
+  // not at the next build. Only R2 is looked at; any other delete changes nothing.
+  {
+    const { ss, g, log, calls } = fresh();
+    const F = g.__get("SPOKE_WITH_CHOICES_FORMULA");
+    const del = { changeType: "REMOVE_ROW", source: ss };
+    g.ensureSpokeWithChoices_(ss);                       // set up as after a build
+    const writes = () => calls("setFormula").length + calls("hideColumns").length;
+    const before = writes();
+    log.activate();
+    g.installedOnChange(del);                            // row 5 deleted, say: R2 still has it
+    assert.strictEqual(writes(), before, 'another row deleted: nothing written');
+    log._set(2, 18, "");                                 // row 2 deleted: its formula is gone
+    g.installedOnChange(del);
+    assert.strictEqual(log.getRange(2, 18).getFormula(), F, 'row 2 deleted: the formula is back at once');
+    log._set(2, 18, "");
+    ss.getSheetByName("Backend").activate();             // a row deleted on another tab
+    g.installedOnChange(del);
+    assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'another tab: the Contact Log is not touched');
+    log.activate();
+    g.installedOnChange({ changeType: "INSERT_ROW", source: ss });
+    assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'not a delete: nothing');
+    log._set(3, 20, "my own note");                      // something typed into R:AA
+    g.installedOnChange(del);
+    assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'never written over what is typed in R:AA');
+    assert.strictEqual(log.getRange(3, 20).getValue(), "my own note");
+    assert.strictEqual(g.restoreSpokeWithChoicesAfterDelete_(ss, log), "skipped: R:AA hold data");
+  }
   console.log("Contact Log: Person Spoke With choices: ok");
 }

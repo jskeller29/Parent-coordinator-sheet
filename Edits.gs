@@ -32,6 +32,10 @@ function installedOnChange(e) {
     const sheet = ss.getActiveSheet();
     clDbg_("active tab: " + (sheet ? sheet.getName() : "?"));
     if (!sheet || sheet.getName().trim() !== "Contact Log") return;
+    // Row 2 holds the Person Spoke With formula: put it back now if that row went (own try/catch,
+    // so it never stops the notes below)
+    try { clDbg_("Person Spoke With formula (R2): " + restoreSpokeWithChoicesAfterDelete_(ss, sheet)); }
+    catch (err) { console.warn("Person Spoke With formula not checked: " + err.message); }
     resyncNotesAfterRowDelete_(ss, sheet);
   }));
 }
@@ -695,6 +699,21 @@ function ensureSpokeWithChoices_(ss) {
              "('Contact Log'!$R2:$AA2). Hidden on purpose; every build puts this formula back if it goes missing.");
   sheet.hideColumns(col, width);
   return "added";
+}
+
+/**
+ * After Contact Log rows are deleted (owner's request 2026-11-14): the Person Spoke With formula
+ * lives only in R2, so deleting row 2 takes it with it and every row's dropdown goes empty until
+ * the next build. The change event doesn't say which row went, so this reads R2 (one call, the
+ * only cost on a normal delete); no formula there = row 2 went -> ensureSpokeWithChoices_ puts it
+ * back now (with its checks: never over anything typed into R:AA). Returns what happened.
+ */
+function restoreSpokeWithChoicesAfterDelete_(ss, sheet) {
+  let formula;
+  try { formula = sheet.getRange(2, CL_COL_SPOKE_CHOICES).getFormula(); }
+  catch (e) { return "skipped: no column R yet (the next build adds R:AA)"; } // a tab narrower than R
+  if (formula) return "kept"; // row 2 is still there
+  return ensureSpokeWithChoices_(ss);
 }
 
 /**
