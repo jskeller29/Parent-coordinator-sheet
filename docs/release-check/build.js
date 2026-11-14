@@ -20,6 +20,8 @@ ORDER.forEach(o => {
   if (!/^[A-Za-z0-9_-]+$/.test(o.c.id)) throw new Error("Check id " + o.c.id + ": letters, digits, - and _ only");
   if (!o.c.title || !Array.isArray(o.c.do) || !Array.isArray(o.c.see)) throw new Error("Check " + o.c.id + " needs title, do, see");
 });
+const partOf = st => (DATA.parts || []).find(p => p.n === st.part) || { n: st.part, title: "", about: "" };
+const partStarts = (st, si) => si === 0 || DATA.stages[si - 1].part !== st.part;
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ---------- 1. the web page ----------
@@ -47,6 +49,7 @@ function buildIssueTemplate() {
   L.push("Test files: [test-data](https://github.com/jskeller29/Parent-coordinator-sheet/tree/Test-Version/test-data) (its README says what each one should show).");
   L.push("Something fails? Write it as a comment on this issue: the step, what you saw, a screenshot, and any red error from Extensions → Apps Script → **Executions**.");
   DATA.stages.forEach((st, si) => {
+    if (partStarts(st, si)) { const p = partOf(st); L.push("", "## Part " + p.n + ": " + p.title, p.about); }
     L.push("", "### " + (st.safety ? "" : si + ". ") + st.title, "_" + st.where + "_");
     st.checks.forEach((c, ci) => {
       const num = si + "." + (ci + 1);
@@ -77,7 +80,9 @@ function printHtml() {
   <div class="notes"><span>Notes</span><span class="rule"></span></div><div class="notes"><span></span><span class="rule"></span></div>
 </div>`;
     }).join("\n");
-    return `<section class="stage${st.safety ? " safety" : ""}"><h2>${st.safety ? "" : `<span class="sn">${si}</span>`}${esc(st.title)}</h2>
+    const p = partOf(st);
+    const partHead = partStarts(st, si) ? `<div class="part${si === 0 ? " first" : ""}"><p class="eyebrow">Part ${p.n} of ${DATA.parts.length}</p><h2 class="pt">${esc(p.title)}</h2><p class="about">${esc(p.about)}</p></div>` : "";
+    return `${partHead}<section class="stage${st.safety ? " safety" : ""}"><h2>${st.safety ? "" : `<span class="sn">${si}</span>`}${esc(st.title)}</h2>
 <p class="where">${esc(st.where)}</p>${checks}</section>`;
   }).join("\n");
   return `<!doctype html><html><head><meta charset="utf-8">
@@ -94,6 +99,11 @@ function printHtml() {
   .meta .blank { display: inline-block; width: 150pt; border-bottom: 1px solid var(--ink); }
   .how { margin: 8pt 0 0; padding-left: 14pt; color: var(--ink); }
   .how li { margin: 1pt 0; }
+  .part { margin-top: 0; padding-top: 10pt; border-top: 3px solid var(--accent); break-before: page; break-after: avoid; }
+  .part.first { break-before: auto; margin-top: 12pt; }
+  .part .eyebrow { color: var(--accent); }
+  .part h2.pt { font-size: 18pt; }
+  .part .about { margin: 2pt 0 0; color: var(--muted); }
   .stage { margin-top: 14pt; }
   .stage h2 { font-size: 14pt; border-bottom: 1.5px solid var(--ink); padding-bottom: 3pt; break-after: avoid; }
   .stage h2 .sn { font-family: "Source Sans 3", Arial, sans-serif; font-weight: 700; color: var(--accent); margin-right: 7pt; }
@@ -121,7 +131,7 @@ function printHtml() {
   <h1>${esc(DATA.title)}</h1>
   <div class="meta"><span>Version tested: <span class="blank"></span></span><span>Date: <span class="blank" style="width:90pt"></span></span></div>
   <ol class="how">
-    <li>Go through the stages in order, on copies of the tracker, never on your live sheet.</li>
+    <li>Four parts, in order: 1 set up the test copies, 2 test with fake data (the main test), 3 a short check with your real data, 4 release the new version. Your live sheet is only touched in part 4.</li>
     <li>Tick Works, Problem or Skip for each check. For a Problem, write what you saw under Notes.</li>
     <li>Done? Tell Claude what failed (the check numbers and your notes), or tick the same checks in the web checklist so Claude can read them.</li>
   </ol>

@@ -59,7 +59,9 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    by hand after their next build, or they get it with next year's copy of the template.
 
 ## 4. Test it on copies: the release checklist
-Every test, step by step, with what you should see. Three ways to use the same list:
+Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,
+test with fake data (the main test), a short check with your real data, then the release steps. Three ways to use
+the same list:
 - **The web checklist** (best): https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 (only you can open it). Mark each
   check Works, Problem or Skip and write what you saw. It saves as you go, on any device. When you're done, tell
   Claude "release check done": Claude reads your answers there. It can also copy the report or save it as a PDF.

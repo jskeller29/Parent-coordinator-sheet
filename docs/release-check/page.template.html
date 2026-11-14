@@ -74,28 +74,36 @@
   .how { margin: 0; max-width: 66ch; color: var(--ink); }
   .how-list { margin: 0; padding-left: 20px; max-width: 66ch; display: grid; gap: 4px; }
   .links { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 14px; align-items: center; }
-  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 14px; }
+  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 22px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 14px; }
+  .toc-part { display: grid; gap: 2px; align-content: start; min-width: 0; }
+  .toc-part > span { font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--accent); }
   .toc a { text-decoration: none; display: flex; justify-content: space-between; gap: 8px; color: var(--ink); padding: 3px 0; border-bottom: 1px dotted var(--line); }
   .toc a:hover { color: var(--accent); }
   .toc .tc { color: var(--muted); font-variant-numeric: tabular-nums; }
   .toc .tc.has-bad { color: var(--bad); font-weight: 600; }
   .toc .tc.all-done { color: var(--ok); font-weight: 600; }
 
+  /* parts: the four big steps */
+  .part { margin-top: 40px; padding-top: 18px; border-top: 4px solid var(--accent); display: grid; gap: 4px; scroll-margin-top: 64px; }
+  .part .eyebrow { color: var(--accent); }
+  .part h2 { font-size: clamp(24px, 4vw, 30px); }
+  .part p.about { margin: 0; color: var(--muted); max-width: 66ch; }
+
   /* stages */
   .stage { padding-block: 26px 4px; scroll-margin-top: 64px; }
   .stage-head { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 2px solid var(--ink); }
-  .stage-head h2 { font-size: 22px; display: flex; gap: 10px; align-items: baseline; }
+  .stage-head h3 { font-size: 21px; display: flex; gap: 10px; align-items: baseline; }
   .stage-head .snum { font-family: var(--font); font-weight: 700; font-size: 15px; color: var(--accent); font-variant-numeric: tabular-nums; }
   .stage-head p { margin: 0; color: var(--muted); max-width: 70ch; }
   .stage.safety { margin-top: 18px; padding: 18px 18px 6px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--radius); }
   .stage.safety .stage-head { border-bottom-color: var(--warn); }
-  .stage.safety .stage-head h2 { color: var(--warn); }
+  .stage.safety .stage-head h3 { color: var(--warn); }
 
   /* one check */
   .check { border-bottom: 1px solid var(--line); padding-block: 14px; display: grid; gap: 10px; }
   .check-head { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; }
   .num { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
-  .check h3 { font-family: var(--font); font-size: 16.5px; font-weight: 700; padding-top: 1px; min-width: 0; }
+  .check h4 { margin: 0; font-family: var(--font); font-size: 16.5px; font-weight: 700; line-height: 1.3; padding-top: 1px; min-width: 0; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
   .seg button { border: 0; background: var(--bg); padding: 5px 11px; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
   .seg button + button { border-left: 1px solid var(--line); }
@@ -122,7 +130,7 @@
   .check[data-status="problem"] .note textarea { border-color: var(--bad); }
   .check[data-status="problem"] .note label { color: var(--bad); font-weight: 600; }
   .check.folded .check-body { display: none; }
-  .check.folded h3 { color: var(--muted); font-weight: 600; }
+  .check.folded h4 { color: var(--muted); font-weight: 600; }
   .fold { justify-self: start; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px; font-weight: 600; margin-left: calc(3.2em + 10px); }
   .fold[hidden] { display: none !important; }
 
@@ -179,7 +187,7 @@
       <input id="release" type="text" autocomplete="off">
     </div>
     <ol class="how-list">
-      <li>Go through the stages in order, on copies of the tracker, never on your live sheet.</li>
+      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4.</li>
       <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
       <li>Your answers save as you go, on any device that opens this page.</li>
       <li>When you're done, tell Claude <b>"release check done"</b>: Claude reads your answers here. You can also copy the report or save it as a PDF at the bottom.</li>
@@ -246,12 +254,22 @@
   function list(tag, items) { var l = el(tag); items.forEach(function (t) { l.appendChild(el("li", null, t)); }); return l; }
 
   function buildPage() {
-    var host = $("stages"), toc = $("toc");
+    var host = $("stages"), toc = $("toc"), lastPart = null, tocPart = null;
     DATA.stages.forEach(function (st, si) {
+      if (st.part !== lastPart) {
+        lastPart = st.part;
+        var part = (DATA.parts || []).filter(function (p) { return p.n === st.part; })[0] || { n: st.part, title: "", about: "" };
+        var ph = el("section", "part"); ph.id = "part-" + part.n;
+        ph.appendChild(el("p", "eyebrow", "Part " + part.n + " of " + (DATA.parts || []).length));
+        ph.appendChild(el("h2", null, part.title));
+        if (part.about) ph.appendChild(el("p", "about", part.about));
+        host.appendChild(ph);
+        tocPart = el("div", "toc-part"); tocPart.appendChild(el("span", null, part.n + ". " + part.title)); toc.appendChild(tocPart);
+      }
       var sec = el("section", "stage" + (st.safety ? " safety" : ""));
       sec.id = "stage-" + st.id;
       var head = el("div", "stage-head");
-      var h = el("h2");
+      var h = el("h3");
       if (!st.safety) h.appendChild(el("span", "snum", String(si)));
       h.appendChild(document.createTextNode(st.title));
       head.appendChild(h);
@@ -263,7 +281,7 @@
       var a = el("a"); a.href = "#stage-" + st.id;
       a.appendChild(el("span", null, (st.safety ? "" : si + ". ") + st.title));
       var tc = el("span", "tc"); tc.id = "tc-" + st.id; a.appendChild(tc);
-      toc.appendChild(a);
+      tocPart.appendChild(a);
     });
   }
 
@@ -272,7 +290,7 @@
     art.id = "c-" + c.id; art.dataset.id = c.id; art.dataset.status = "";
     var head = el("div", "check-head");
     head.appendChild(el("span", "num", o.num));
-    head.appendChild(el("h3", null, c.title));
+    head.appendChild(el("h4", null, c.title));
     var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
     ["pass", "problem", "skip"].forEach(function (r) {
       var b = el("button", null, r === "skip" ? "Skip" : LABEL[r]);
@@ -586,7 +604,13 @@
     if (times.length) { head("Timings"); times.forEach(function (o) { line(o.num + "  " + o.check.timing + ": " + state.results[o.check.id].seconds + " s"); }); }
     if (state.notes) { head("Other notes"); line(state.notes); }
     head("Every check");
+    var lastPart = null;
     DATA.stages.forEach(function (st, si) {
+      if (st.part !== lastPart) {
+        lastPart = st.part;
+        var part = (DATA.parts || []).filter(function (p) { return p.n === st.part; })[0];
+        if (part) { y += 8; line("Part " + part.n + ": " + part.title, { size: 11, bold: true, color: [24, 62, 105], after: 2 }); }
+      }
       y += 4; line((st.safety ? "" : si + ". ") + st.title, { bold: true, after: 2 });
       st.checks.forEach(function (k) {
         var o = BY_ID[k.id], r = state.results[k.id] || {};

@@ -992,7 +992,16 @@ Workflow:
   after-deploy steps, going live). Keep it in step when files are added / renamed.
 - RELEASE CHECK (owner's request 2026-11-14: "a UI to go through and do checks", "make it look good", a PDF, a report
   for Claude; NOT in Google Sheets): the tests to do on copies before a version goes to schools. ONE SOURCE:
-  docs/release-check/checks.js (stages; each check: id, title, do[], see[], optional why / timing). NEVER change a
+  docs/release-check/checks.js (parts[] + stages with a part; each check: id, title, do[], see[], optional why /
+  timing). FOUR PARTS (owner 2026-11-14: "test with fake data and make sure things work"; both set-up and tests):
+  1 Set up for testing (safety rules; a TEST master = File → Make a copy of the live sheet + the new files + Initial
+  Setup; a fake-data copy = 🐞 Debug → 🧪 Copy Sheet, Then Load Fake Data on the Copy, z_ files deleted, General
+  manifest, Initial Setup; a test template = 📄 Copy Sheet, Then Reset the Copy, z_ files deleted, copied for each
+  new-school test), 2 Test with fake data (new school with test-data, returning school bringing over "Last year
+  (test)" = a set-up copy of the fake-data copy with 1b loaded, day to day on the fake-data copy, someone else, phone
+  sync ONLY from a second Google account's own copy), 3 A short check with real data (the TEST master: speed at real
+  size, row 2, this month's exports, own lists, next morning), 4 Release (live sheet, Make Release Copies, BLANK =
+  template, folder, pilot, Version Tracker row, links, guide Doc, merge, clean up). NEVER change a
   check's id once used (saved answers are kept under it); add new checks THERE. `node docs/release-check/build.js`
   makes from it: (1) docs/release-check/release-check.html (from page.template.html: the web checklist), (2)
   docs/release-check/PC_Tracker_Release_Check.pdf (printable, Playwright), (3) .github/ISSUE_TEMPLATE/release-check.md
