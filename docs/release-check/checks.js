@@ -44,7 +44,7 @@ module.exports = {
     },
     {
       id: "s1", part: 1, title: "Make the test copies",
-      where: "A TEST master (a copy of your sheet with the new version), then a fake-data copy and a test template made from it.",
+      where: "A TEST master (a copy of your sheet with the new version). Then 📦 Make Release Copies on it makes the other two: its Example is your fake-data copy, its Blank your test template.",
       checks: [
         { id: "s1-1", title: "The TEST master",
           do: ["Open your live tracker → File → Make a copy. Name it \"TEST master\" and the date.",
@@ -60,17 +60,18 @@ module.exports = {
                "🐞 Debug → 🔧 Fix Dropdown Criteria, then 🐞 Debug → 🎨 Apply Sheet Style.",
                "Set the Person Spoke With dropdown by hand (DEPLOY.md section 3, step 9)."],
           see: ["Phone sync was already off, without you changing it.", "The build sidebar ticks every step.", "Apply Sheet Style ends with its list of things to do by hand."] },
-        { id: "s1-4", title: "The fake-data copy",
-          do: ["On the TEST master: 🐞 Debug → 🧪 Copy Sheet, Then Load Fake Data on the Copy. Open the link it gives.",
-               "Answer No to \"Is this your MAIN sheet?\". Extensions → Apps Script: delete every file starting with z_ and paste App Scripts (General).Json into appsscript.json. Save. Now it acts like a school's sheet.",
+        { id: "s1-4", title: "The fake-data copy and the test template, in one go",
+          do: ["On the TEST master (never your live sheet): 🐞 Debug → 📦 Make Release Copies (Example + Blank) → Make the 2 copies. When it's done, ignore what it says to do next (Version Tracker, sharing, template folder): these are only test copies.",
+               "Rename the Example \"TEST fake-data copy\" and the Blank \"TEST template\" (File → Rename), so they can't be mixed up with the real release copies in part 4.",
+               "Open the TEST fake-data copy. Answer No to \"Is this your MAIN sheet?\". Extensions → Apps Script: delete every file starting with z_ and paste App Scripts (General).Json into appsscript.json. Save. Now it acts like a school's sheet.",
                "Reload → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off."],
-          see: ["The fake students (Simpsons, Addams, Belchers…), 26 Contact Log rows, 3 events and 5 Notes.",
-                "No 🐞 Debug menu."] },
+          see: ["Both copies are made, each with a link, in the TEST master's folder.",
+                "The fake-data copy has the fake students (Simpsons, Addams, Belchers…), 26 Contact Log rows, 3 events and 5 Notes, and no 🐞 Debug menu."],
+          why: "A copy gets the code of the sheet it is made from, and your live sheet still has the old version. Part 4 runs this same menu item on your live sheet, so this also tests it." },
         { id: "s1-5", title: "The test template",
-          do: ["On the TEST master: 🐞 Debug → 📄 Copy Sheet, Then Reset the Copy. Open the link it gives.",
-               "Answer No to the MAIN question, delete every z_ file, paste App Scripts (General).Json. Save. Don't run Initial Setup on it.",
+          do: ["Open the TEST template. Answer No to the MAIN question, delete every z_ file, paste App Scripts (General).Json. Save. Don't run Initial Setup on it.",
                "For every new-school test, make a copy of it (File → Make a copy): that copy is what a school gets."],
-          see: ["Only the 👋 Welcome tab shows.", "Extensions → Apps Script shows no file starting with z_."] }
+          see: ["Only the 👋 Welcome tab shows, and its \"See an example tracker\" opens the TEST fake-data copy.", "Extensions → Apps Script shows no file starting with z_."] }
       ]
     },
     {
@@ -178,15 +179,15 @@ module.exports = {
       where: "A copy of the test template brings over \"last year's tracker\": a copy of your fake-data copy.",
       checks: [
         { id: "s3-0", title: "Last year's tracker, for the test",
-          do: ["Open your fake-data copy → File → Make a copy. Name it \"Last year (test)\".",
+          do: ["Open your TEST fake-data copy → File → Make a copy. Name it \"PC Tracker - Last year (test)\" (\"PC Tracker\" in the name puts it in the wizard's list).",
                "Open it → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off.",
                "📥 Input Data Mode → upload \"1b - Student Data (ATS) - next month (2 new, 1 left).xlsx\" → Finish or exit → Save, exit and build."],
           see: ["It has the fake data, and the build report shows Tony Stark discharged.",
                 "It plays last year's tracker, so your fake-data copy stays as it is for stage 4."] },
         { id: "s3-1", title: "Choosing the old tracker",
           do: ["Make a new copy of the test template → Initial Setup → \"No, bring over last year's tracker\".",
-               "First paste this new tracker's own link and try it. Then pick \"Last year (test)\" from the list (or paste its link)."],
-          see: ["Its own link is refused.", "The wizard lists your trackers."] },
+               "First paste this new tracker's own link and try it. Then pick \"PC Tracker - Last year (test)\" from the list. Never your live sheet: it can be in the list too."],
+          see: ["Its own link is refused.", "The wizard lists your trackers, \"PC Tracker - Last year (test)\" among them."] },
         { id: "s3-2", title: "All 6 steps",
           do: ["Let the wizard run."],
           see: ["Each step ticks, no \"Success!\" pop-up comes half way, and the done screen shows.",
@@ -203,10 +204,10 @@ module.exports = {
           do: ["Look in the 🚀 App Menu on a new copy before its first build, then on the tracker you just brought over."],
           see: ["🔄 Import Old Data is there before the first build and gone after it."] },
         { id: "s3-6", title: "The old tracker pauses itself",
-          do: ["Open \"Last year (test)\" again."],
+          do: ["Open \"PC Tracker - Last year (test)\" again."],
           see: ["It asks \"Keep this tracker paused?\". No means it rebuilds again at 10 PM; Yes keeps it paused."] },
         { id: "s3-7", optional: true, title: "End of Year Rollover",
-          do: ["On \"Last year (test)\": 🚀 App Menu → 🔄 End of Year Rollover, and follow it."],
+          do: ["On \"PC Tracker - Last year (test)\": 🚀 App Menu → 🔄 End of Year Rollover, and follow it."],
           see: ["The archive PDF is named for the school year that ends (in June 2026: 2025-2026)."] }
       ]
     },
@@ -361,7 +362,7 @@ module.exports = {
           do: ["Ask Claude to merge Test-Version into main."],
           see: ["main is the version schools have."] },
         { id: "s8-12", title: "Clean up the test copies",
-          do: ["Move each test copy to the trash: the TEST master, the fake-data copy, \"Last year (test)\", the test template and the copies made from it."],
+          do: ["Move each test copy to the trash: the TEST master, the TEST fake-data copy, \"PC Tracker - Last year (test)\", the TEST template and the copies made from it."],
           see: ["Nothing else to do: a tracker in the trash skips its 10 PM rebuild by itself."],
           why: "Every copy that ran Initial Setup has its own 10 PM rebuild under your account, and Google can keep running a trashed sheet's script until the trash is emptied. This version checks for the trash, so trashing is enough." }
       ]

@@ -1019,10 +1019,16 @@ Workflow:
   essential unless marked. Page CSS has [hidden] { display: none !important } (the Start over question box, display:
   flex, showed all the time before). FOUR PARTS (owner 2026-11-14: "test with fake data and make sure things work"; both set-up and tests):
   1 Set up for testing (safety rules; a TEST master = File → Make a copy of the live sheet + the new files + Initial
-  Setup; a fake-data copy = 🐞 Debug → 🧪 Copy Sheet, Then Load Fake Data on the Copy, z_ files deleted, General
-  manifest, Initial Setup; a test template = 📄 Copy Sheet, Then Reset the Copy, z_ files deleted, copied for each
-  new-school test), 2 Test with fake data (new school with test-data, returning school bringing over "Last year
-  (test)" = a set-up copy of the fake-data copy with 1b loaded, day to day on the fake-data copy, someone else, phone
+  Setup; then 🐞 Debug → 📦 Make Release Copies ON THE TEST MASTER (owner's idea 2026-11-14; never on the live sheet:
+  a copy gets the code of the sheet it comes from) makes both test copies and dry-runs part 4's step: its Example =
+  the fake-data copy, its Blank = the test template, renamed "TEST fake-data copy" / "TEST template" (no "(BLANK)" in
+  a name the template-folder scan could find, no mix-up with the real copies; its done message's Version Tracker /
+  sharing steps are ignored), z_ files deleted, General manifest; Initial Setup on the fake-data copy only, the test
+  template is copied for each new-school test. Same results as 🧪 / 📄 copies: the Example mark only matters before
+  setup, and both copies carry the same version date, so the migration's "newer version" refusal can't trigger),
+  2 Test with fake data (new school with test-data, returning school bringing over "PC Tracker - Last year (test)" (a
+  name with tracker words, so the wizard lists it and the live sheet isn't the only tracker there) = a set-up copy of
+  the fake-data copy with 1b loaded, day to day on the fake-data copy, someone else, phone
   sync ONLY from a second Google account's own copy), 3 A short check with real data (the TEST master: speed at real
   size, row 2, this month's exports, own lists, next morning), 4 Release (live sheet, Make Release Copies, BLANK =
   template, folder, pilot, Version Tracker row, links, guide Doc, merge, clean up). NEVER change a
