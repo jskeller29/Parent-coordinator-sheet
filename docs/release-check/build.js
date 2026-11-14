@@ -23,7 +23,15 @@ ORDER.forEach(o => {
 const partOf = st => (DATA.parts || []).find(p => p.n === st.part) || { n: st.part, title: "", about: "" };
 const partStarts = (st, si) => si === 0 || DATA.stages[si - 1].part !== st.part;
 const allOptional = st => st.checks.every(c => c.optional);
-const N_ESS = ORDER.filter(o => !o.c.optional).length;
+// An essential: not optional and not a "Try to break it" test (round 2)
+const isEss = c => !c.optional && !c.breakit;
+const N_ESS = ORDER.filter(o => isEss(o.c)).length;
+const LAST = (DATA.lastRound && DATA.lastRound.results) || {};
+const LAST_LABEL = { pass: "Works", problem: "Problem", skip: "Skipped" };
+// "Last time: Problem. <note>" for a check round 1 answered (the PDF and the issue show it too)
+const lastText = id => { const r = LAST[id]; if (!r || (!r.status && !r.note)) return ""; return (r.status ? LAST_LABEL[r.status] : "No answer") + (r.seconds != null ? " (" + r.seconds + " s)" : "") + (r.note ? ". " + r.note.replace(/\s+/g, " ") : ""); };
+Object.keys(LAST).forEach(id => { if (!ids.has(id)) throw new Error("lastRound has an answer for an unknown check " + id); });
+(DATA.fixes || []).forEach(f => (f.checks || []).forEach(id => { if (!ids.has(id)) throw new Error("fixes points at an unknown check " + id); }));
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ---------- 1. the web page ----------
@@ -33,9 +41,11 @@ function buildPage() {
   if (tpl.split(marker).length !== 2) throw new Error("page.template.html must have the DATA line exactly once");
   const LS = String.fromCharCode(0x2028), PS = String.fromCharCode(0x2029); // separators JSON allows but a script does not
   const json = JSON.stringify(DATA).replace(/</g, "\\u003c").split(LS).join("\\u2028").split(PS).join("\\u2029");
-  const out = tpl.replace(marker, () => "var DATA = " + json + ";");
+  // The page's name: "PC Tracker Release Check Round 2" from round 2 on (a new page per round)
+  const pageTitle = DATA.title + (DATA.round > 1 ? " Round " + DATA.round : "");
+  const out = tpl.replace(marker, () => "var DATA = " + json + ";").replace("<title>__PAGE_TITLE__</title>", () => "<title>" + esc(pageTitle) + "</title>");
   fs.writeFileSync(path.join(HERE, "release-check.html"), out);
-  return "release-check.html: written (" + ORDER.length + " checks, " + N_ESS + " essentials)";
+  return "release-check.html: written (" + ORDER.length + " checks, " + N_ESS + " essentials, " + ORDER.filter(o => o.c.breakit).length + " try-to-break-it, " + ORDER.filter(o => o.c.fixed).length + " fixed)";
 }
 
 // ---------- 2. the GitHub issue template ----------
@@ -50,14 +60,16 @@ function buildIssueTemplate() {
   L.push("How to put the new version on a copy: [DEPLOY.md](https://github.com/jskeller29/Parent-coordinator-sheet/blob/Test-Version/DEPLOY.md), sections 1 to 3.");
   L.push("Test files: [test-data](https://github.com/jskeller29/Parent-coordinator-sheet/tree/Test-Version/test-data) (its README says what each one should show).");
   L.push("Something fails? Write it as a comment on this issue: the step, what you saw, a screenshot, and any red error from Extensions → Apps Script → **Executions**.");
-  L.push("Checks marked _(optional)_ can wait. Do the other " + N_ESS + " (the essentials) before any school gets this version.");
+  L.push("Checks marked _(optional)_ can wait, and _(try to break it)_ ones are extra. Do the other " + N_ESS + " (the essentials) before any school gets this version." + (DATA.round ? " Round " + DATA.round + ": **Fixed, re-test** marks what changed since the last round." : ""));
   DATA.stages.forEach((st, si) => {
     if (partStarts(st, si)) { const p = partOf(st); L.push("", "## Part " + p.n + ": " + p.title, p.about); }
     L.push("", "### " + (st.safety ? "" : si + ". ") + st.title + (allOptional(st) ? " (optional)" : ""), "_" + st.where + "_");
     st.checks.forEach((c, ci) => {
       const num = si + "." + (ci + 1);
-      let line = "- [ ] **" + num + " " + c.title + ".**" + (c.optional ? " _(optional)_" : "") + " " + c.do.join(" ") + " **You should see:** " + c.see.join(" ");
+      let line = "- [ ] **" + num + " " + c.title + ".**" + (c.optional ? " _(optional)_" : "") + (c.breakit ? " _(try to break it)_" : "") + (c.fixed ? " **Fixed, re-test.**" : "") + " " + c.do.join(" ") + " **You should see:** " + c.see.join(" ");
       if (c.why) line += " _Why: " + c.why + "_";
+      if (c.fixed) line += " _Fixed: " + c.fixed + "_";
+      if (lastText(c.id)) line += " _Last time: " + lastText(c.id) + "_";
       if (c.timing) line += " (" + c.timing + ": ___)";
       L.push(line);
     });
@@ -74,11 +86,13 @@ function printHtml() {
     const checks = st.checks.map((c, ci) => {
       const num = si + "." + (ci + 1);
       return `<div class="check">
-  <div class="ch"><span class="num">${num}</span><span class="t">${esc(c.title)}${c.optional ? '<span class="opt">Optional</span>' : ""}</span>
+  <div class="ch"><span class="num">${num}</span><span class="t">${esc(c.title)}${c.optional ? '<span class="opt">Optional</span>' : ""}${c.breakit ? '<span class="opt">Try to break it</span>' : ""}${c.fixed ? '<span class="opt fx">Fixed, re-test</span>' : ""}</span>
     <span class="boxes"><span class="box"></span>Works <span class="box"></span>Problem <span class="box"></span>Skip</span></div>
   <div class="cols"><div><p class="lbl">Do</p><ol>${c.do.map(x => "<li>" + esc(x) + "</li>").join("")}</ol></div>
   <div><p class="lbl">You should see</p><ul>${c.see.map(x => "<li>" + esc(x) + "</li>").join("")}</ul></div></div>
   ${c.why ? `<p class="why"><b>Why:</b> ${esc(c.why)}</p>` : ""}
+  ${c.fixed ? `<p class="fixed"><b>Fixed, re-test:</b> ${esc(c.fixed)}</p>` : ""}
+  ${lastText(c.id) ? `<p class="last"><b>Last time:</b> ${esc(lastText(c.id))}</p>` : ""}
   ${c.timing ? `<p class="timing">${esc(c.timing)}: <span class="blank"></span> seconds</p>` : ""}
   <div class="notes"><span>Notes</span><span class="rule"></span></div><div class="notes"><span></span><span class="rule"></span></div>
 </div>`;
@@ -124,7 +138,9 @@ function printHtml() {
   .lbl { margin: 0 0 1pt; font-size: 7pt; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
   ol, ul { margin: 0; padding-left: 12pt; }
   li { margin: 0.5pt 0; }
-  .why, .timing { margin: 3pt 0 0 32pt; color: var(--muted); font-size: 9pt; }
+  .why, .timing, .fixed, .last { margin: 3pt 0 0 32pt; color: var(--muted); font-size: 9pt; }
+  .fixed { color: var(--accent); }
+  .opt.fx { color: var(--accent); border-color: var(--accent); }
   .timing .blank { display: inline-block; width: 40pt; border-bottom: 1px solid var(--ink); }
   .notes { display: flex; gap: 6pt; margin: 6pt 0 0 32pt; font-size: 8.5pt; color: var(--muted); }
   .notes span:first-child { width: 28pt; }
@@ -136,7 +152,7 @@ function printHtml() {
   <div class="meta"><span>Version tested: <span class="blank"></span></span><span>Date: <span class="blank" style="width:90pt"></span></span></div>
   <ol class="how">
     <li>Four parts, in order: 1 set up the test copies, 2 test with fake data (the main test), 3 a short check with your real data, 4 release the new version. Your live sheet is only touched in part 4.</li>
-    <li>Do the ${N_ESS} essentials before any school gets this version. The checks marked OPTIONAL can wait.</li>
+    <li>Do the ${N_ESS} essentials before any school gets this version. The checks marked OPTIONAL can wait.${DATA.round ? " Round " + DATA.round + ": the checks marked FIXED, RE-TEST changed since the last round; \"Last time\" is what you wrote then." : ""}</li>
     <li>Tick Works, Problem or Skip for each check. For a Problem, write what you saw under Notes.</li>
     <li>Done? Tell Claude what failed (the check numbers and your notes), or tick the same checks in the web checklist so Claude can read them.</li>
   </ol>

@@ -68,7 +68,10 @@ Everything for a new version, step by step, with what you should see, in four pa
 test with fake data (the main test), a short check with your real data, then the release steps. Do the 48
 **essentials** before any school gets a version; the 27 checks marked Optional can wait. Three ways to use the same
 list:
-- **The web checklist** (best): https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 (only you can open it). Mark each
+- **The web checklist** (best), **round 2** (2026-11-14): https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc (only you can
+  open it). It marks every check fixed since round 1 "Fixed, re-test", shows what you wrote last time on each check, and has a
+  third view, **Try to break it**, where you can also add tests of your own. (Round 1's page,
+  https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1, keeps its answers.) Mark each
   check Works, Problem or Skip and write what you saw. It saves as you go, on any device. When you're done, tell
   Claude "release check done": Claude reads your answers there. It can also copy the report or save it as a PDF.
 - **On paper:** `docs/release-check/PC_Tracker_Release_Check.pdf` (also a button on the web checklist).

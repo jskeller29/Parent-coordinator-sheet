@@ -1115,8 +1115,20 @@ Workflow:
   docs/release-check/PC_Tracker_Release_Check.pdf (printable, Playwright), (3) .github/ISSUE_TEMPLATE/release-check.md
   (the GitHub issue version). After a build, republish the web page: Artifact publish of
   docs/release-check/release-check.html with files {"release-check-printable.pdf": "docs/release-check/PC_Tracker_Release_Check.pdf"}
-  (keeps the URL https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 when published from this file path in the same
-  session; from another session pass that url; capabilities db + downloads are kept when omitted). The page:
+  ROUND 2 (owner 2026-11-14: "a new Release Check site that includes these, with what happened in my last test, a third
+  Show with random tests that may break the sheet, and my own tests"): a NEW page, https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc
+  (title "PC Tracker Release Check Round 2" from DATA.round; capabilities db + downloads; same checks/current document,
+  plus "custom" = the owner's own tests { id: { title, saw, status pass|problem|unsure, at, deleted? } }; a delete keeps
+  deleted: true, the report lists them under YOUR OWN TESTS and RE-TESTS). checks.js: round, lastRound =
+  round1-results.json (round 1's answers from the old page's db: shown on each check as "Last time"), fixes[] (the
+  "Since round 1" list, each linking to its re-tests), check.fixed ("Fixed, re-test" chip + box), check.breakit / part 5
+  "Try to break it" (stage sb, b-01..b-16; its own Show view, never an essential; "Everything" = essentials + optional).
+  Round 2's setup checks are 1.6 / 1.7 (s1r-1, s1r-2) at the END of stage s1, so every round 1 number stays the same.
+  A later round: copy that round's db doc into roundN-results.json, point lastRound at it, bump round, publish the
+  built page WITHOUT url (a new page). When the owner says "release check done", read checks/current on the round 2 url.
+  Republishing round 2 (a check fixed, a typo): publish release-check.html with url = the round 2 page (from another
+  session pass that url; capabilities db + downloads are kept when omitted). Round 1's page,
+  https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1, keeps round 1's answers: never publish over it. The page:
   "District" look, Works / Problem / Skip + notes + seconds per check, progress bar, report section; saves to its db
   doc checks/current = { release, notes, updatedAt, results: { <check id>: { status pass|problem|skip|"", note,
   seconds, at } } } (localStorage only when db is unavailable); Copy report (text), Save the report as a PDF (jsPDF

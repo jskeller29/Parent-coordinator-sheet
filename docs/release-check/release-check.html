@@ -1,8 +1,9 @@
-<title>PC Tracker Release Check</title>
+<title>PC Tracker Release Check Round 2</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!-- Made by docs/release-check/build.js from checks.js (it fills in the DATA line of the script below).
      Edit checks.js or this template, run the build, then republish the page. Answers live in the
-     page's db (one document: checks/current). -->
+     page's db (one document: checks/current; "custom" = the viewer's own tests). Round 2 (2026-11-14):
+     "Fixed, re-test" + "Last time" on each check, a third Show ("Try to break it"), your own tests. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <style>
@@ -166,6 +167,46 @@
   .copybox { width: 100%; min-height: 12em; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .tell { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg); }
 
+  /* round 2: what changed since the last round, and what you wrote then */
+  .round { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+  .round h2 { font-size: 19px; }
+  .round .lastsum { margin: 0; color: var(--muted); font-size: 14px; }
+  .fixlist { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 74ch; }
+  .fixlist .go { font-weight: 600; text-decoration: none; white-space: nowrap; margin-left: 4px; }
+  .fixlist .go + .go::before { content: "· "; color: var(--faint); font-weight: 400; }
+  .chip { display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 999px; font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; white-space: nowrap; }
+  .chip.fix { background: var(--accent); color: var(--accent-ink); }
+  .chip.brk { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); }
+  .fixed-box, .last-box { margin: 0; padding: 8px 10px; font-size: 14px; border-radius: 0 var(--radius) var(--radius) 0; }
+  .fixed-box { border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .last-box { border-left: 3px solid var(--line); background: var(--surface); color: var(--muted); }
+  .last-box[data-was="problem"] { border-left-color: var(--bad); }
+  .last-box[data-was="pass"] { border-left-color: var(--ok); }
+  .last-box b { color: var(--ink); }
+  .last-box .lt { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .last-box details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13px; }
+  /* your own tests */
+  .own { margin-top: 40px; padding-top: 18px; border-top: 4px solid var(--warn); display: grid; gap: 14px; scroll-margin-top: 64px; }
+  .own .eyebrow { color: var(--warn); }
+  .own h2 { font-size: clamp(22px, 4vw, 27px); }
+  .own > p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .ownform { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .ownform label { font-weight: 600; font-size: 14px; }
+  .ownform input[type=text], .ownform textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--bg); line-height: 1.4; }
+  .ownform textarea { min-height: 4.5em; resize: vertical; }
+  .ownform .row { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; }
+  .ownlist { display: grid; }
+  .owncard { border-bottom: 1px solid var(--line); padding-block: 12px; display: grid; gap: 6px; }
+  .owncard[data-status="problem"] { background: linear-gradient(90deg, var(--bad-soft), transparent 70%); }
+  .owncard .oh { display: flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; }
+  .owncard .ot { font-weight: 700; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+  .os { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+  .os.pass { background: var(--ok-soft); color: var(--ok); } .os.problem { background: var(--bad-soft); color: var(--bad); } .os.unsure { background: var(--skip-soft); color: var(--skip); }
+  .owncard .ow { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .owncard .oa { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; }
+  .linkbtn.del { color: var(--bad); }
+
   @media (max-width: 640px) {
     .check-head { grid-template-columns: 2.6em minmax(0, 1fr); }
     .seg { grid-column: 1 / -1; justify-self: start; }
@@ -198,17 +239,24 @@
       <input id="release" type="text" autocomplete="off">
     </div>
     <ol class="how-list">
-      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4.</li>
+      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4. A fifth part, <b>Try to break it</b>, is extra: Show → Try to break it, where you can also add tests of your own.</li>
       <li>Do the <b>essentials</b> before any school gets this version. The switch below shows only them; the optional checks can wait.</li>
       <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
       <li>Your answers save as you go, on any device that opens this page.</li>
       <li>When you're done, tell Claude <b>"release check done"</b>: Claude reads your answers here. You can also copy the report or save it as a PDF at the bottom.</li>
     </ol>
+    <section class="round" id="roundBox" hidden>
+      <h2 id="roundTitle">Since the last round</h2>
+      <p class="lastsum" id="lastSum"></p>
+      <p class="lbl" style="margin:4px 0 0">Fixed: re-test these first</p>
+      <ul class="fixlist" id="fixList"></ul>
+    </section>
     <div class="viewrow">
       <span class="lbl-in" id="viewLbl">Show</span>
       <div class="viewseg" role="group" aria-labelledby="viewLbl">
         <button type="button" data-view="essentials" aria-pressed="true">Essentials <span id="nEss"></span></button>
         <button type="button" data-view="all" aria-pressed="false">Everything <span id="nAll"></span></button>
+        <button type="button" data-view="breakit" aria-pressed="false">Try to break it <span id="nBreak"></span></button>
       </div>
       <span class="msg" id="viewNote"></span>
     </div>
@@ -221,6 +269,30 @@
   </section>
 
   <div id="stages"></div>
+
+  <!-- Your own tests (round 2): anything else you tried; saved with your answers (the "custom" field) -->
+  <section class="own" id="own" hidden>
+    <p class="eyebrow">Your own tests</p>
+    <h2>Something else you tried</h2>
+    <p>Did something not on this list? Write what you did and what happened, mark it, and add it. Claude reads these with your answers.</p>
+    <form class="ownform" id="ownForm" autocomplete="off">
+      <label for="ownTitle">What did you try?</label>
+      <input type="text" id="ownTitle" maxlength="200" placeholder="e.g. Pasted the Contact Log into Notes, then undid it">
+      <label for="ownSaw">What happened?</label>
+      <textarea id="ownSaw" maxlength="4000" placeholder="What you saw, any message, how long it took."></textarea>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Result of your test" id="ownSeg">
+          <button type="button" data-own="pass" aria-pressed="false">Works</button>
+          <button type="button" data-own="problem" aria-pressed="false">Problem</button>
+          <button type="button" data-own="unsure" aria-pressed="false">Not sure</button>
+        </div>
+        <button class="btn primary" type="submit" id="ownAdd">Add the test</button>
+        <button class="btn" type="button" id="ownCancel" hidden>Cancel</button>
+        <span class="msg" id="ownMsg" role="status"></span>
+      </div>
+    </form>
+    <div class="ownlist" id="ownList"></div>
+  </section>
 
   <section class="report" id="report">
     <h2>Your report</h2>
@@ -241,7 +313,7 @@
       <span class="msg" id="reportMsg" role="status"></span>
     </div>
     <div class="confirm" id="confirmClear" hidden>
-      <span>Clear every answer and note?</span>
+      <span>Clear every answer, note and your own tests?</span>
       <button class="btn small" id="clearYes" type="button">Yes, clear them</button>
       <button class="btn small" id="clearNo" type="button">Keep them</button>
     </div>
@@ -252,7 +324,7 @@
 <script>
 (function () {
   "use strict";
-  var DATA = {"title":"PC Tracker Release Check","release":"Test-Version (November 2026)","parts":[{"n":1,"title":"Set up for testing","about":"Make the test copies. Your live sheet is never touched."},{"n":2,"title":"Test with fake data","about":"The main test. Fake students and fake exports, so nothing real can be hurt and every answer is known."},{"n":3,"title":"A short check with your real data","about":"Fake data is small. These few checks show speed and this month's real exports."},{"n":4,"title":"Release the new version","about":"Once the tests pass: your sheet, the release copies, a pilot, then every school."}],"stages":[{"id":"s0","part":1,"title":"Before you start","safety":true,"where":"Four rules for every test copy.","checks":[{"id":"s0-1","title":"One Google account in this browser","do":["Use a browser window signed in to only your school Google account (a private window where you sign in once works too)."],"see":["Only one account shows when you click your picture at the top right of Google Sheets."],"why":"Several accounts in one browser can make the 🚀 App Menu slow or missing."},{"id":"s0-2","title":"Phone sync stays off on test copies","do":["Never turn on ⚙️ Settings → Contacts & sync → \"Sync contacts to my phone every night\" on a test copy. Stage 6 is the one exception, from a second Google account.","A new copy starts with it off, so there is nothing to turn off: just look once after each copy's Initial Setup."],"see":["The switch is off when you open ⚙️ Settings on a test copy."],"why":"A test copy with it on would put its families into the \"School Directory\" label of YOUR Google Contacts every night at 10 PM. Before this version a copy took the switch from the sheet it was copied from."},{"id":"s0-3","title":"Never bring over from your live sheet","do":["When a test asks you to bring over last year's tracker, pick a test copy, never your live sheet."],"see":["Your live sheet never asks \"Keep this tracker paused?\"."],"why":"Bringing a tracker over pauses that tracker's 10 PM rebuild. If it happens to your live sheet: open it and answer No."},{"id":"s0-4","title":"The test files","do":["Download \"PC Tracker test data.zip\" from the test-data folder on GitHub and unzip it."],"see":["A folder with 1 - Student Data (ATS), 2 - Parent Square, 3 - NYCSA, 4 - Site and Class and four 5 - Your Lists files."]}]},{"id":"s1","part":1,"title":"Make the test copies","where":"A TEST master (a copy of your sheet with the new version). Then 📦 Make Release Copies on it makes the other two: its Example is your fake-data copy, its Blank your test template.","checks":[{"id":"s1-1","title":"The TEST master","do":["Open your live tracker → File → Make a copy. Name it \"TEST master\" and the date.","Open it. When it asks \"Is this your MAIN sheet?\", answer No, and close the New Copy Checklist."],"see":["It has all your data and your 🐞 Debug menu."]},{"id":"s1-2","title":"The new version on the TEST master","do":["In the TEST master: Extensions → Apps Script.","Follow DEPLOY.md sections 1 and 2: delete the old files it lists, paste every file from Test-Version, keep your z_ files, paste App Scripts (Mine).Json into appsscript.json. Save."],"see":["Saving shows no red error.","The file list matches the table in DEPLOY.md section 2."]},{"id":"s1-3","title":"Setting up the TEST master","do":["Reload. 🚀 App Menu → 🚨 Initial Setup (a copy asks again) → approve the permissions → close the question window.","Open ⚙️ Settings and look: phone sync is off (a new copy starts with it off). Close it. Then 🚀 App Menu → 🏗️ Build Sheets Only.","🐞 Debug → 🔧 Fix Dropdown Criteria, then 🐞 Debug → 🎨 Apply Sheet Style.","Set the Person Spoke With dropdown by hand (DEPLOY.md section 3, step 9)."],"see":["Phone sync was already off, without you changing it.","The build sidebar ticks every step.","Apply Sheet Style ends with its list of things to do by hand."]},{"id":"s1-4","title":"The fake-data copy and the test template, in one go","do":["On the TEST master (never your live sheet): 🐞 Debug → 📦 Make Release Copies (Example + Blank) → Make the 2 copies. When it's done, ignore what it says to do next (Version Tracker, sharing, template folder): these are only test copies.","Rename the Example \"TEST fake-data copy\" and the Blank \"TEST template\" (File → Rename), so they can't be mixed up with the real release copies in part 4.","Open the TEST fake-data copy. Answer No to \"Is this your MAIN sheet?\". Extensions → Apps Script: delete every file starting with z_ and paste App Scripts (General).Json into appsscript.json. Save. Now it acts like a school's sheet.","Reload → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off."],"see":["Both copies are made, each with a link, in the TEST master's folder.","The fake-data copy has the fake students (Simpsons, Addams, Belchers…), 26 Contact Log rows, 3 events and 5 Notes, and no 🐞 Debug menu."],"why":"A copy gets the code of the sheet it is made from, and your live sheet still has the old version. Part 4 runs this same menu item on your live sheet, so this also tests it."},{"id":"s1-5","title":"The test template","do":["Open the TEST template. Answer No to the MAIN question, delete every z_ file, paste App Scripts (General).Json. Save. Don't run Initial Setup on it.","For every new-school test, make a copy of it (File → Make a copy): that copy is what a school gets."],"see":["Only the 👋 Welcome tab shows, and its \"See an example tracker\" opens the TEST fake-data copy.","Extensions → Apps Script shows no file starting with z_."]}]},{"id":"s2","part":2,"title":"A brand-new school","where":"A copy of the test template, and the test files.","checks":[{"id":"s2-01","title":"Opening a fresh copy","do":["Open the test template → File → Make a copy → open the copy.","Count the seconds until 🚀 App Menu shows at the top."],"see":["Only the 👋 Welcome tab shows, starting with the 6 permissions Google will ask for.","A note at the bottom right points to 🚀 App Menu → 🚨 Initial Setup.","The menu shows. The very first open can take up to a minute; if it still isn't there, reload."],"timing":"Seconds until the menu showed"},{"id":"s2-02","optional":true,"title":"Typing is blocked before setup","do":["Type anything in a cell of the Welcome tab and press Enter."],"see":["\"🔒 Action Blocked\", and your typing is undone."]},{"id":"s2-03","title":"Initial Setup and Google's screens","do":["🚀 App Menu → 🚨 Initial Setup (Run Once).","Authorization required → OK → pick your account.","\"Google hasn't verified this app\" → Advanced → Go to … (unsafe).","Select all → Continue. Count the seconds until the question shows."],"see":["\"Setting up your tracker\" opens right away, with a spinner.","Only the Welcome tab shows during and after setup; it now says \"You're set up\".","The 🚀 App Menu changes to the getting-started menu."],"timing":"Seconds until the question showed"},{"id":"s2-04","title":"\"Is this your first PC Tracker?\"","do":["Click \"Yes, start fresh\"."],"see":["\"How to download your data\" and \"Watch the video\" are there at once; \"See an example tracker\" can come a few seconds later.","The ✅ Getting Started checklist opens on the right."]},{"id":"s2-05","title":"Starting Input Data Mode","do":["Click \"Start Input Data Mode\"."],"see":["Only the yellow \"Student Data\" tab shows, with PASTE HERE in A1 and a grey \"Closed the side panel?\" line.","The side panel says \"Data 1 of 5: Student Data (ATS / Insight)\" and which file to pick (its name starts with general_)."]},{"id":"s2-06","optional":true,"title":"The side panel comes back","do":["Close the side panel with its X, then reload the page."],"see":["Input Data Mode comes back by itself, on the same step."]},{"id":"s2-07","optional":true,"title":"Leaving before any build","do":["In the side panel: Finish or exit → Exit without saving.","Then 🚀 App Menu → 📥 Input Data Mode to start it again."],"see":["After the exit you are back on the 👋 Welcome tab, and no other tab shows."]},{"id":"s2-08","title":"Student Data: upload the file","do":["Upload file → pick \"1 - Student Data (ATS).xlsx\" from the test files."],"see":["The next step opens with a green box at the top: \"Student Data (ATS) completed!\" and \"18 rows moved to Raw Data. Next: Parent Square.\"","The same message shows for a few seconds at the bottom of the sheet."]},{"id":"s2-09","title":"Parent Square: a wrong paste, then the right one","do":["Open \"1 - Student Data (ATS).csv\", press Ctrl+A, Ctrl+C, and paste it on the Parent Square Data tab with Ctrl+Shift+V.","Then do the same with \"2 - Parent Square.csv\"."],"see":["The wrong paste: a red message says it looks like another export, and the tab empties by itself.","The right paste: \"Parent Square completed!\" and \"28 rows moved to Raw Data. Next: NYCSA.\""]},{"id":"s2-10","title":"NYCSA","do":["Upload \"3 - NYCSA (Students with Non-NYCSA Account).xlsx\"."],"see":["\"NYCSA completed!\" and \"25 rows moved to Raw Data. Next: Site / Class.\""]},{"id":"s2-11","title":"Site / Class","do":["Open \"4 - Site and Class.csv\", copy the three columns with their header and paste them over A1 of the Site / Class tab.","Click ✅ Save Site / Class."],"see":["\"Site / Class completed!\" with the number of classes saved, and \"Next: Your Lists.\""]},{"id":"s2-12","title":"Your Lists builds the sheets first","do":["Wait on the Your Lists step."],"see":["A spinner shows the build's steps, then \"Sheets built, so your lists can find your students.\""]},{"id":"s2-13","title":"A list with an icon (upload)","do":["Add another list → name it \"Bus Routes\" → pick 🚌 → Make the tab & add the list.","In its panel: Upload the file → \"5a - Your Lists - Bus Routes (student list).xlsx\".","Go through Columns → Variables → Match (click \"Accept the … high-confidence\") → View, then Save."],"see":["The new tab is named \"🚌 Bus Routes\".","On Match: 10 matched, 6 best guesses with a % (Violet Incredable 96%), 2 not found."]},{"id":"s2-14","optional":true,"title":"A pasted guardian list","do":["Back to Input Data Mode → Add another list → \"PTA\".","Open \"5b - Your Lists - PTA Members (guardian list).csv\", copy everything and paste it in the yellow box on the new tab. Go through the steps and Save."],"see":["It is guessed as a guardian list.","On Match: 11 matched, 1 best guess (Martha K. 84%), 1 not found."]},{"id":"s2-15","optional":true,"title":"Changing a list's icon","do":["On the Your Lists card, click the 🚌 next to Bus Routes and pick 🎒.","Then type any other emoji in \"Or type any emoji\" and click Use it."],"see":["The tab is renamed each time (\"🎒 Bus Routes\", then your emoji).","Letters or numbers in that box are refused with a message."]},{"id":"s2-16","title":"Finishing Input Data Mode","do":["Click Finish on the Your Lists step."],"see":["The end screen offers \"Build sheets now\" only if something changed after step 5's build.","The list tabs are hidden afterwards. Contact Log, Combined Contact Tracking, PCAR and Directory show; the Welcome tab is gone."]},{"id":"s2-17","optional":true,"title":"Save and exit from Site / Class","do":["🚀 App Menu → 📥 Input Data Mode → click Site / Class in the bar at the top.","Change one teacher's name, then Finish or exit → \"Save, exit and build my sheets\"."],"see":["The note at the bottom says \"Site / Class completed\" with NO \"Next:\" part.","Your tabs come back and the build runs."]},{"id":"s2-18","optional":true,"title":"Next month's data","do":["📥 Input Data Mode → upload \"1b - Student Data (ATS) - next month (2 new, 1 left).xlsx\" → Finish or exit → Save, exit and build."],"see":["The build report shows 2 new students (Steve Rogers, Lucia Lopez) and 1 discharged (Tony Stark)."]},{"id":"s2-19","title":"Logging contacts","do":["In the Contact Log, type a parent's name in the Guardian column of the empty row (try Morticia Addams), then Enter. Log 3 contacts."],"see":["The student, OSIS, date, # and follow-up fill in by themselves.","Person Spoke With lists only that student's guardians (Morticia and Gomez for an Addams child).","The Communications box under END shows the new notes."]},{"id":"s2-20","optional":true,"title":"Finishing the Getting Started checklist","do":["✅ Getting Started → Finish setup."],"see":["A pop-up says you can always open it from 🚀 App Menu → ✅ Getting Started, and it no longer opens by itself."]},{"id":"s2-21","optional":true,"title":"Mistakes a new user makes","do":["On a second copy of the test template, right after Initial Setup:","🏗️ Build Sheets Only before loading any data. Type on the Welcome tab.","In Input Data Mode: Skip on Student Data. On Site / Class with nothing filled in: Save.","Open ⚙️ Settings and try Save straight away."],"see":["Build: a note, nothing built. Typing: a \"Heads up\" warning. Skip: it asks first.","The empty Site / Class save doesn't erase saved sites. Settings: Save stays grey until \"Loading your settings…\" goes away."]}]},{"id":"s3","part":2,"title":"A returning school","where":"A copy of the test template brings over \"last year's tracker\": a copy of your fake-data copy.","checks":[{"id":"s3-0","title":"Last year's tracker, for the test","do":["Open your TEST fake-data copy → File → Make a copy. Name it \"PC Tracker - Last year (test)\" (\"PC Tracker\" in the name puts it in the wizard's list).","Open it → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off.","📥 Input Data Mode → upload \"1b - Student Data (ATS) - next month (2 new, 1 left).xlsx\" → Finish or exit → Save, exit and build."],"see":["It has the fake data, and the build report shows Tony Stark discharged.","It plays last year's tracker, so your fake-data copy stays as it is for stage 4."]},{"id":"s3-1","title":"Choosing the old tracker","do":["Make a new copy of the test template → Initial Setup → \"No, bring over last year's tracker\".","First paste this new tracker's own link and try it. Then pick \"PC Tracker - Last year (test)\" from the list. Never your live sheet: it can be in the list too."],"see":["Its own link is refused.","The wizard lists your trackers, \"PC Tracker - Last year (test)\" among them."]},{"id":"s3-2","title":"All 6 steps","do":["Let the wizard run."],"see":["Each step ticks, no \"Success!\" pop-up comes half way, and the done screen shows.","The done screen says \"One last step: stop the old tracker's nightly rebuild\"."]},{"id":"s3-3","title":"Everything came over","do":["Look through the new tracker."],"see":["The Contact Log rows, the Notes tab, the Type list, Send Out, and the 3 events with their delete box and dropdowns.","The New / Edit Student changes (Tina Belcher, Peter Parker), and Your Lists with their icons if you added any.","Tony Stark is still on the Student List, as Discharged."]},{"id":"s3-4","title":"Person Spoke With after the move","do":["Open the Person Spoke With dropdown on a few rows."],"see":["Each lists that row's student's guardians."]},{"id":"s3-5","optional":true,"title":"The Import Old Data menu item","do":["Look in the 🚀 App Menu on a new copy before its first build, then on the tracker you just brought over."],"see":["🔄 Import Old Data is there before the first build and gone after it."]},{"id":"s3-6","title":"The old tracker pauses itself","do":["Open \"PC Tracker - Last year (test)\" again."],"see":["It asks \"Keep this tracker paused?\". No means it rebuilds again at 10 PM; Yes keeps it paused."]},{"id":"s3-7","optional":true,"title":"End of Year Rollover","do":["On \"PC Tracker - Last year (test)\": 🚀 App Menu → 🔄 End of Year Rollover, and follow it."],"see":["The archive PDF is named for the school year that ends (in June 2026: 2025-2026)."]}]},{"id":"s4","part":2,"title":"Day to day","where":"Your fake-data copy.","checks":[{"id":"s4-01","title":"Typing in the Contact Log","do":["Type a fake parent's name (Marge Simpson) in the Guardian column of the empty row and press Enter. Count the seconds until the row is filled in."],"see":["The student, OSIS, date, # and follow-up fill in by themselves."],"timing":"Seconds until the row filled in"},{"id":"s4-02","optional":true,"title":"Pasting and deleting rows","do":["Paste a few rows into the Contact Log, then delete one row."],"see":["The notes in the Communications box follow (the deleted row's note goes away)."]},{"id":"s4-03","title":"Deleting row 2","do":["Delete Contact Log row 2 (right-click its number → Delete row). Wait a few seconds."],"see":["The Person Spoke With dropdowns list names again, on row 2 and further down."]},{"id":"s4-04","title":"Inserting a row above row 2","do":["Right-click row 2's number → Insert 1 row above. Wait a few seconds.","Open the Person Spoke With dropdown on two rows with different students. Then delete the empty row."],"see":["Each row lists ITS OWN student's guardians (not the row above's)."]},{"id":"s4-05","optional":true,"title":"A student with 3 guardians","do":["👤 Student Overrides → ✨ New / Edit Student: add a third guardian to Wednesday Addams, Save, and let the build run.","Log a contact for Wednesday and one for another student."],"see":["Wednesday's row lists all 3 guardians; the other row lists only its own."]},{"id":"s4-06","optional":true,"title":"The formula comes back after a build","do":["Show columns R to AA (the small arrows between Q and AB), clear cell R2, then 🏗️ Build Sheets Only."],"see":["The formula is back in R2 and the columns are hidden again."]},{"id":"s4-07","optional":true,"title":"The lookup box","do":["Copy an OSIS from the Student List and type it in the OSIS box under END."],"see":["No \"are you sure?\" warning; the student's details and notes fill in."]},{"id":"s4-08","optional":true,"title":"Your Lists: how it reads","do":["📥 Input Data Mode → click Your Lists in the bar at the top → Add another list → upload \"5c - Your Lists - Field Trip Forms\".","Step 2 Variables: keep the form column, shown in Additional Information and as a Student List column.","Step 4 View: \"One line\" and \"Bold the names\" → Save → Back to Input Data Mode → Finish → Build sheets now."],"see":["Phone Contacts' notes show \"Additional Information\" reading like the preview.","The Student List has the list's column, with a navy header."]},{"id":"s4-09","optional":true,"title":"The sheet's look","do":["Look over the tabs (the look came from 🎨 Apply Sheet Style on the TEST master)."],"see":["Montserrat everywhere. Notes and Send Out brown like the Contact Log; Student List, Parents Divided, Directory and Combined navy.","PCAR's boxes a darker brown with yellow date cells; no \"Column 9\" on the Student List; the tab is named \"Raw Data\" with its DATE UPDATED titles at the left."]},{"id":"s4-10","optional":true,"title":"Events and colors","do":["📆 Events → 📋 New Event and add a parent. Log a Workshop row in the Contact Log, and type a Type in it."],"see":["The event has a brown title row and its dropdowns work; the Workshop row is pale green; the Type gets its color."]},{"id":"s4-11","optional":true,"title":"Backend New / Edit Student headers","do":["Show the hidden Backend tab and look at columns G to AV. Hide it again after."],"see":["The headers are on row 2 and students start on row 3."]},{"id":"s4-12","title":"Settings and Build","do":["⚙️ Settings → change nothing → Save. Then 🚀 App Menu → 🏗️ Build Sheets Only."],"see":["Settings closes without an error; the build sidebar ticks every step."]},{"id":"s4-13","title":"The next morning","do":["Open the fake-data copy the morning after. Then Extensions → Apps Script → Executions."],"see":["No \"Last night's rebuild didn't finish\" note; Last Interaction shows yesterday's contacts; the Type from 4.10 kept its color.","nightlyMasterSync ran around 10 PM with no red error."]}]},{"id":"s5","part":2,"title":"Someone else","where":"Share your fake-data copy with a colleague, or with your own second Google account, as an Editor.","checks":[{"id":"s5-1","optional":true,"title":"Another person opens it","do":["They open the copy and count the seconds until the 🚀 App Menu shows."],"see":["The menus show for them too."],"timing":"Seconds until the menu showed for them"},{"id":"s5-2","optional":true,"title":"They work in it","do":["They log a contact and open 📥 Input Data Mode."],"see":["The Contact Log fills in for them, and Input Data Mode opens."]},{"id":"s5-3","optional":true,"title":"Still one nightly rebuild","do":["They open ⚙️ Settings → Save. The next morning, you open Extensions → Apps Script → Executions."],"see":["ONE nightlyMasterSync run around 10 PM, not two."]}]},{"id":"s6","part":2,"title":"Phone sync","where":"Only from a SECOND Google account (a free Gmail account works), so the fake families land in that account's contacts, not yours.","checks":[{"id":"s6-1","title":"A copy of its own","do":["Share your fake-data copy with the second account as an Editor (Share → its email). In a browser signed in to that account: open it → File → Make a copy.","In that copy: 🚀 App Menu → 🚨 Initial Setup → approve."],"see":["The copy belongs to the second account (its name shows in that account's Drive)."]},{"id":"s6-2","title":"Full Sync while you watch","do":["⚙️ Settings → Contacts & sync → turn on \"Sync contacts to my phone every night\" → Save.","🚀 App Menu → 🧱 Full Sync (Build + Push to Google Contacts). Watch it to the end."],"see":["The bar fills and it ends with a summary.","The \"more than half\" question, if it comes at all, comes at the start."]},{"id":"s6-3","title":"The contacts","do":["Open contacts.google.com in that account → the \"School Directory\" label. Then move that copy to the trash (a tracker in the trash skips its nightly job)."],"see":["The fake families with their phones and emails; the notes newest first; \"Additional Information\" from a list if the copy had one."]}]},{"id":"s7","part":3,"title":"Your real data","where":"The TEST master: your real data with the new version. Leave phone sync off on it.","checks":[{"id":"s7-1","title":"Typing at real size","do":["Type a real parent's name in the Contact Log's empty row and press Enter. Count the seconds until the row is filled in."],"see":["As fast as on your live sheet, or faster."],"timing":"Seconds until the row filled in"},{"id":"s7-2","title":"Opening at real size","do":["Close and reopen the TEST master 3 times. Count the seconds until the 🚀 App Menu shows."],"see":["The menu shows quickly. A few seconds after opening, the old Contact Log rows hide."],"timing":"Seconds until the menu showed"},{"id":"s7-3","optional":true,"title":"Row 2 at real size","do":["Delete Contact Log row 2, wait a few seconds. Then insert a row above row 2, wait, and delete it again."],"see":["Each row's Person Spoke With dropdown lists its own student's guardians after each change."]},{"id":"s7-4","title":"This month's real exports","do":["📥 Input Data Mode: load your real ATS, Parent Square and NYCSA exports (one upload, one paste). Finish → Build."],"see":["Each step says \"completed!\" with sensible row counts; the build report's new and discharged students look right."]},{"id":"s7-5","optional":true,"title":"Your own lists","do":["If your sheet has Your Lists lists: after the build, look at a few phone contacts' Additional Information."],"see":["Your lists read exactly as they did before this version."]},{"id":"s7-6","title":"The next morning","do":["Open the TEST master the morning after. Then Extensions → Apps Script → Executions."],"see":["No \"Last night's rebuild didn't finish\" note; nightlyMasterSync ran around 10 PM with no red error."]}]},{"id":"s8","part":4,"title":"Release it","where":"In this order, once the tests pass.","checks":[{"id":"s8-01","title":"Problems fixed","do":["Tell Claude \"release check done\" (Claude reads your answers here) or give the report. Re-test each check that gets a fix."],"see":["No check is left at Problem."]},{"id":"s8-02","title":"Final check with Claude","do":["Ask Claude for the final check: the tests, the file list in DEPLOY.md, what to paste where."],"see":["Claude reports everything in order."]},{"id":"s8-03","title":"Your live sheet","do":["Put the new version on your live tracker: DEPLOY.md sections 1 to 3 (as you did on the TEST master)."],"see":["It opens, builds and logs a contact as the TEST master did."]},{"id":"s8-04","title":"Release copies","do":["On your live sheet: 🐞 Debug → 📦 Make Release Copies (Example + Blank)."],"see":["Two copies, \"Parent Coordinator Sheet - (EXAMPLE) (date)\" and \"- (BLANK) (date)\", a link each and one version date (it goes in the Version Tracker's column A)."]},{"id":"s8-05","title":"The Blank copy becomes the template","do":["Open the BLANK copy: delete every file starting with z_ and paste App Scripts (General).Json (its New Copy Checklist says so)."],"see":["Only the 👋 Welcome tab shows; \"See an example tracker\" on it opens the EXAMPLE copy made in the same run."]},{"id":"s8-06","title":"The template folder","do":["Put the BLANK copy in the template folder; move older (BLANK) and (MIGRATE) files to a subfolder."],"see":["Only the newest (BLANK) file is in the folder itself."]},{"id":"s8-07","title":"Pilot","do":["Give 1 or 2 friendly schools the BLANK copy's /copy link and let them use it for a week or two."],"see":["Nothing they report is left unfixed."]},{"id":"s8-08","title":"The Version Tracker row","do":["Add a row: A = the version date, D \"Blank Copy\" = the BLANK's /copy link, E \"Example\" = the EXAMPLE's link, F \"Document\" = the User Guide (when it changed)."],"see":["Every school's tracker now offers \"New Version Available\"."]},{"id":"s8-09","optional":true,"title":"Links","do":["🐞 Debug → 🔗 My Links. Then 📖 Open User Guide."],"see":["Every link from the 📌 YOUR LINKS box, and \"Version Tracker, column D/E/F\" with each link.","\"See an example tracker\" shows in 📖 Open User Guide."]},{"id":"s8-10","optional":true,"title":"The User Guide Doc","do":["Ask Claude for the list of what changed in docs/USER_GUIDE.md, and make those changes in the Google Doc."],"see":["The Google Doc matches this version."]},{"id":"s8-11","optional":true,"title":"Merge into main","do":["Ask Claude to merge Test-Version into main."],"see":["main is the version schools have."]},{"id":"s8-12","title":"Clean up the test copies","do":["Move each test copy to the trash: the TEST master, the TEST fake-data copy, \"PC Tracker - Last year (test)\", the TEST template and the copies made from it."],"see":["Nothing else to do: a tracker in the trash skips its 10 PM rebuild by itself."],"why":"Every copy that ran Initial Setup has its own 10 PM rebuild under your account, and Google can keep running a trashed sheet's script until the trash is emptied. This version checks for the trash, so trashing is enough."}]}]};
+  var DATA = {"title":"PC Tracker Release Check","release":"Test-Version (November 2026), round 2","round":2,"lastRound":{"label":"Round 1","date":"11/14/2026","release":"Test-Version (November 2026)","summary":"Works 23 · Problems 5 · Skipped 7 · Essentials done 35 of 48","results":{"s0-1":{"status":"skip"},"s0-2":{"status":"pass"},"s0-3":{"status":"pass"},"s0-4":{"status":"pass"},"s1-1":{"status":"skip","note":"using my regular master sheet and just clicking  make release copies from there."},"s1-2":{"status":"skip","note":"ill do the deleting in the other files themselves"},"s1-3":{"status":"skip"},"s1-4":{"status":"pass"},"s1-5":{"status":"skip","note":"deleting all z_ code directly from both copies and not doing the test master"},"s2-01":{"status":"pass"},"s2-03":{"status":"problem","note":"took 10 seconds for app menu to intiialy show up. for question (20 second) maybe do similar progress bar and be communicative with user about whats it loading. did it again with logging out of other profiles took 15 seconds. just maybe still do loading or tell user whats happening so they know if something went wrong or if it just being slow","seconds":150},"s2-04":{"status":"pass"},"s2-05":{"status":"pass"},"s2-08":{"status":"pass"},"s2-09":{"status":"pass","note":"works! but still maybe having something pop up or toast immediately saying \"paste\" or \"upload\" registered so they know it works but just needs to move it. like it already does say \"move data to raw data\""},"s2-10":{"status":"pass"},"s2-11":{"status":"pass","note":"when all is done, nothing says anything. maybe have the \"next\" show up instead of skip when data is inputted? even if not all teachers are filled, show it if either all teachers are filled or all sites are filed. something pointing to next direction because save site/ class, skip, or exit, are a bit confusing options"},"s2-12":{"status":"","note":"Building your sheets first, so your lists can find your students. This can take a minute or two… maybe do progress bar? have this UI of progress bar be present for any time build and make it same across be it for new student data or anytime build is activated. if you do think it should have different ui then ok .\n\nunder your lists finish and finish / exit is there twice"},"s2-13":{"status":"pass"},"s2-16":{"status":"problem","note":"when you back to input data mode, it stays on 🚌 Bus Routes / your list. maybe similar to welcome have a input data mode landing page even before it goes to student data leting user know in a sheet where to get all data, what each data is used for or something and when last time each data was updated. also if a user accidentally closed input data mode screen, make a toast or something in each page of input data mode letting them know how to get page back.\n\nBUG: when i click finish (again there are two finishes) it asks to build or click next steps. i clicked \"next steps\" instead of build, it then said in next steps build was done, but it wasnt really since even tho initial build was done, the your list build wasnt done. so make sure to check if everythijgn is built in next steps and when clicking finish and its asking for build, let user know to do your list build you have to build again.\n\nother bug, i clicked exit out of next steps then when back to input data mode, then clicked finish and it just didnt do anything. i exited and clicked it again and it worked. maybe something to look at"},"s2-19":{"status":"pass","note":"Bug: i deleted row 2 a couple times and it worked but then it created two arrayformula leaving one to have a ref. so maybe make a thing that detects if any changes were made to R2? i dont want it to add lag but should be fixed. or at least something also fixed on nightlysync at least"},"s3-0":{"status":"problem","note":"sync to phone was already off, seem like it didnt read settings page? tried hitting input data mode and it got stuck with message of Running script. then got error Exception: Lock timeout: another process was holding the lock for too long. on refresh it says input data mode was still on, but tabs werte not hidden. \n\ncreated new document and Script runInitialSetupWrapper experienced an errorDetails. i refreshed page and it did let me click it now. \n\nclicked input data mode but no tabs were closed. it did let me open it tho.\n\n2 new and 1 left did work. but at bottom it says \"start new build\" for some reason when it should say exit or something.\n\ni did my own test and clicked input data mode to test. i went to NYCSA from top, it didnt work first click but second, uploaded then clicked build. build still showed 2 new 1 left even tho that was a past build but didnt show NYCSA upgrades. NYCSA works where qwhen its made the user is no longer there. \n\ni tried again for some reason now student data tab is visible but rest of tabs are. when iupload file it is still saying \"25\" moved when it is only 24\n\ni clicked back to NYCSAS which was checkmarked and it said Script error: Sheet 763596992 not found\nand says Data 1 of 5: (unknown)\nOptional Never updated\nWhere to get it. when i refreshed, a toast did say data mode still on and clicked input data mode it went back to normal\n\nnow input data mode weirdly fully went back to closing tabs on a new try but in same sheet. had to click nycsa multiple times to get there. after nycsa (which still said 25 when its 24) it showed student data instead of site / class which. top said it was on. exiting didnt bring back tabs. made new document and pasted 22 students then uploaded and still saying 25. it did go to site/ class next tho. this was all using upload. using paste it still said 25 students. raw data did have 22 students in it so must of sent over. did build sheets only. new build still said no new NYCSA."},"s3-1":{"status":"pass","note":"created new copy of template, new bug found was if i leave tab menu of app menu never shows up. maybe have soemthing at top saying if app menu doesnt show, refresh page.\n\naside, it did work where it showed pc tracker on list putting own link did sauy \"That's this tracker. Pick last year's tracker (the old one) instead\""},"s3-2":{"status":"pass","note":"it finished, maybe have something in backend that identified if it is an older version or newer version, maybe a new cell or just seeing if last update was past 11/13/26, it is newer version. if it is before that, then it is an older versiobn they will have to do. \n\nwelcome tab still there at end"},"s3-3":{"status":"pass"},"s3-4":{"status":"pass"},"s3-6":{"status":"pass","note":"📦 This tracker was brought into a newer one did show."},"s4-01":{"status":"pass","seconds":4},"s4-03":{"status":"problem","note":"cant delete table row \"because You cannot insert or delete cells over an array formula.\" but if i highlight row and delete it, arrayformula doesnt come back."},"s4-04":{"status":"problem","note":"ut breaks the row 2 arrayformula and shows row above. also bug is that the border above search is not longer the thick bold. ask me for picture and ill show you what i mean"},"s4-12":{"status":"pass"},"s4-13":{"status":"skip"},"s6-1":{"status":"","note":"in other sheet menu doesnt show initial set up just regular menu options"},"s6-2":{"status":"pass"},"s6-3":{"status":"","note":"made contactrs in new emails thing."},"s7-1":{"status":"pass","note":"1237 notes","seconds":8},"s7-2":{"status":"","seconds":3},"s7-4":{"status":"pass"},"s7-6":{"status":"skip"}}},"fixes":[{"text":"Input Data Mode: a click on a step, Finish or exit always works (it was ignored while the panel checked the tab), and the exit question stays open.","checks":["s3-0","s2-16"]},{"text":"Input Data Mode starts on a Start Here page: what each file is for, where to get it, when you last loaded it.","checks":["s2-05"]},{"text":"Input Data Mode never ends in \"Lock timeout\" (it waits for setup or a build), keeps the other tabs hidden, brings your tabs back when you exit, and says to reload after \"Sheet … not found\".","checks":["s3-0"]},{"text":"Row counts leave out rows with no student or guardian, and say how many students.","checks":["s2-08","s2-10","s3-0"]},{"text":"\"Got your paste / file\" shows at once; Site / Class counts what you filled in and offers \"Save and go to Your Lists\".","checks":["s2-09","s2-11"]},{"text":"Your Lists: one Finish button; Back to Input Data Mode lands on the Your Lists tab; a list changed after the build asks for a build, and the checklist says \"Build your sheets again\".","checks":["s2-16"]},{"text":"One progress bar for every build: Build Sheets, Input Data Mode, Migration and Initial Setup.","checks":["s2-03","s2-12","s4-12"]},{"text":"The build report is always this build's (an older one showed again); the panel ends with Close and Build again.","checks":["s3-0","s4-12"]},{"text":"Person Spoke With: the list moved to the hidden Backend tab, so Delete table row works and deleting or inserting rows can't break it. Needs the dropdown change in 1.7.","checks":["s1r-2","s4-03","s4-04","s2-19"]},{"text":"The thick line above the lookup box stays thick after rows are added or deleted.","checks":["s4-04"]},{"text":"Migration: a newer old tracker pauses itself (no Settings steps); the Welcome tab is gone at the end.","checks":["s3-2"]},{"text":"The Welcome tab's first line says to reload when 🚀 App Menu doesn't show.","checks":["s2-01","s3-1"]}],"parts":[{"n":1,"title":"Set up for testing","about":"Make the test copies. Your live sheet is never touched."},{"n":2,"title":"Test with fake data","about":"The main test. Fake students and fake exports, so nothing real can be hurt and every answer is known."},{"n":3,"title":"A short check with your real data","about":"Fake data is small. These few checks show speed and this month's real exports."},{"n":4,"title":"Release the new version","about":"Once the tests pass: your sheet, the release copies, a pilot, then every school."},{"n":5,"title":"Try to break it","about":"Things a busy or curious person might do. None of these should lose data or leave the sheet stuck. Shown with Show → Try to break it. Add your own tests at the end.","breakit":true}],"stages":[{"id":"s0","part":1,"title":"Before you start","safety":true,"where":"Four rules for every test copy.","checks":[{"id":"s0-1","title":"One Google account in this browser","do":["Use a browser window signed in to only your school Google account (a private window where you sign in once works too)."],"see":["Only one account shows when you click your picture at the top right of Google Sheets."],"why":"Several accounts in one browser can make the 🚀 App Menu slow or missing."},{"id":"s0-2","title":"Phone sync stays off on test copies","do":["Never turn on ⚙️ Settings → Contacts & sync → \"Sync contacts to my phone every night\" on a test copy. Stage 6 is the one exception, from a second Google account.","A new copy starts with it off, so there is nothing to turn off: just look once after each copy's Initial Setup."],"see":["The switch is off when you open ⚙️ Settings on a test copy."],"why":"A test copy with it on would put its families into the \"School Directory\" label of YOUR Google Contacts every night at 10 PM. Before this version a copy took the switch from the sheet it was copied from."},{"id":"s0-3","title":"Never bring over from your live sheet","do":["When a test asks you to bring over last year's tracker, pick a test copy, never your live sheet."],"see":["Your live sheet never asks \"Keep this tracker paused?\"."],"why":"Bringing a tracker over pauses that tracker's 10 PM rebuild. If it happens to your live sheet: open it and answer No."},{"id":"s0-4","title":"The test files","do":["Download \"PC Tracker test data.zip\" from the test-data folder on GitHub and unzip it."],"see":["A folder with 1 - Student Data (ATS), 2 - Parent Square, 3 - NYCSA, 4 - Site and Class and four 5 - Your Lists files."]}]},{"id":"s1","part":1,"title":"Make the test copies","where":"A TEST master (a copy of your sheet with the new version). Then 📦 Make Release Copies on it makes the other two: its Example is your fake-data copy, its Blank your test template.","checks":[{"id":"s1-1","title":"The TEST master","do":["Open your live tracker → File → Make a copy. Name it \"TEST master\" and the date.","Open it. When it asks \"Is this your MAIN sheet?\", answer No, and close the New Copy Checklist."],"see":["It has all your data and your 🐞 Debug menu."]},{"id":"s1-2","title":"The new version on the TEST master","do":["In the TEST master: Extensions → Apps Script.","Follow DEPLOY.md sections 1 and 2: delete the old files it lists, paste every file from Test-Version, keep your z_ files, paste App Scripts (Mine).Json into appsscript.json. Save."],"see":["Saving shows no red error.","The file list matches the table in DEPLOY.md section 2."]},{"id":"s1-3","title":"Setting up the TEST master","do":["Reload. 🚀 App Menu → 🚨 Initial Setup (a copy asks again) → approve the permissions → close the question window.","Open ⚙️ Settings and look: phone sync is off (a new copy starts with it off). Close it. Then 🚀 App Menu → 🏗️ Build Sheets Only.","🐞 Debug → 🔧 Fix Dropdown Criteria, then 🐞 Debug → 🎨 Apply Sheet Style.","Set the Person Spoke With dropdown by hand (DEPLOY.md section 3, step 9)."],"see":["Phone sync was already off, without you changing it.","The build sidebar ticks every step.","Apply Sheet Style ends with its list of things to do by hand."]},{"id":"s1-4","title":"The fake-data copy and the test template, in one go","do":["On the TEST master (never your live sheet): 🐞 Debug → 📦 Make Release Copies (Example + Blank) → Make the 2 copies. When it's done, ignore what it says to do next (Version Tracker, sharing, template folder): these are only test copies.","Rename the Example \"TEST fake-data copy\" and the Blank \"TEST template\" (File → Rename), so they can't be mixed up with the real release copies in part 4.","Open the TEST fake-data copy. Answer No to \"Is this your MAIN sheet?\". Extensions → Apps Script: delete every file starting with z_ and paste App Scripts (General).Json into appsscript.json. Save. Now it acts like a school's sheet.","Reload → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off."],"see":["Both copies are made, each with a link, in the TEST master's folder.","The fake-data copy has the fake students (Simpsons, Addams, Belchers…), 26 Contact Log rows, 3 events and 5 Notes, and no 🐞 Debug menu."],"why":"A copy gets the code of the sheet it is made from, and your live sheet still has the old version. Part 4 runs this same menu item on your live sheet, so this also tests it."},{"id":"s1-5","title":"The test template","do":["Open the TEST template. Answer No to the MAIN question, delete every z_ file, paste App Scripts (General).Json. Save. Don't run Initial Setup on it.","For every new-school test, make a copy of it (File → Make a copy): that copy is what a school gets."],"see":["Only the 👋 Welcome tab shows, and its \"See an example tracker\" opens the TEST fake-data copy.","Extensions → Apps Script shows no file starting with z_."]},{"id":"s1r-1","title":"Round 2: the fixes on your test copies","do":["Paste these from Test-Version into the sheet you made your test copies from, then 🐞 Debug → 📦 Make Release Copies again and set the new copies up as in 1.4 and 1.5 (the easy way). Or paste them into each test copy (TEST fake-data copy, TEST template, \"PC Tracker - Last year (test)\").","Scripts: Core, Build, Edits, Menus, Input Data. Pages: Styles, ProgressSidebar, InputDataSidebar, MigrationUI. Save, then reload."],"see":["Saving shows no red error.","📥 Input Data Mode opens on \"Before you start\"."]},{"id":"s1r-2","title":"Round 2: Person Spoke With reads the Backend","do":["On the TEST fake-data copy and the TEST template (and later your live sheet and the master template): Contact Log → click a cell in the Person Spoke With column → Data → Data validation → the column's rule.","Dropdown (from a range): ='Backend'!$CF2:$CO2 (a 2 on both ends, no $ before them). Keep Advanced → Show a warning. Done.","🚀 App Menu → 🏗️ Build Sheets Only."],"see":["The dropdown on a few rows lists that row's student's guardians.","Contact Log column R is empty now (show columns R to AA to look, then hide them again): the old formula is gone."],"why":"The list's results used to fill Contact Log R:AA on every row, and Google then refuses \"Delete table row\". Now the same list sits on the hidden Backend tab.","fixed":"New in round 2 (round 1: 4.3, 4.4, 2.19)."}]},{"id":"s2","part":2,"title":"A brand-new school","where":"A copy of the test template, and the test files.","checks":[{"id":"s2-01","title":"Opening a fresh copy","do":["Open the test template → File → Make a copy → open the copy.","Count the seconds until 🚀 App Menu shows at the top."],"see":["Only the 👋 Welcome tab shows. Its first line (pale yellow) says what to do if 🚀 App Menu doesn't show: wait up to a minute, then reload.","Then the 6 permissions Google will ask for. A note at the bottom right points to 🚀 App Menu → 🚨 Initial Setup.","The menu shows. The very first open can take up to a minute; if it still isn't there, reload."],"timing":"Seconds until the menu showed","fixed":"The Welcome tab's first line now says to reload when the menu doesn't show (round 1, 3.2)."},{"id":"s2-02","optional":true,"title":"Typing is blocked before setup","do":["Type anything in a cell of the Welcome tab and press Enter."],"see":["\"🔒 Action Blocked\", and your typing is undone."]},{"id":"s2-03","title":"Initial Setup and Google's screens","do":["🚀 App Menu → 🚨 Initial Setup (Run Once).","Authorization required → OK → pick your account.","\"Google hasn't verified this app\" → Advanced → Go to … (unsafe).","Select all → Continue. Count the seconds until the question shows."],"see":["\"Setting up your tracker\" opens right away, with a progress bar that names each step (Turning on the automatic updates, Saving your settings, Making your 🚀 App Menu, Getting your tabs ready, Finishing) and a clock.","Only the Welcome tab shows during and after setup; it now says \"You're set up\".","The 🚀 App Menu changes to the getting-started menu."],"timing":"Seconds until the question showed","fixed":"The setup window shows each step on a progress bar, and after 90 seconds with no new step it says what to do. If Google says \"experienced an error\" right after you allow access, reload and click Initial Setup again (the Welcome tab says so too)."},{"id":"s2-04","title":"\"Is this your first PC Tracker?\"","do":["Click \"Yes, start fresh\"."],"see":["\"How to download your data\" and \"Watch the video\" are there at once; \"See an example tracker\" can come a few seconds later.","The ✅ Getting Started checklist opens on the right."]},{"id":"s2-05","title":"Starting Input Data Mode","do":["Click \"Start Input Data Mode\"."],"see":["The side panel starts on \"Before you start\": the 5 kinds of data, what each is for, where to get it and when you last loaded it. The only tab is \"Start Here\" with the same table.","Click Start with Student Data: only the yellow \"Student Data\" tab shows, with PASTE HERE in A1 and a blue \"Closed the side panel?\" line.","The side panel says \"Data 1 of 5: Student Data (ATS / Insight)\" and which file to pick (its name starts with general_)."],"fixed":"New start page (round 1, 2.16: \"a landing page before Student Data\"). Every Input Data Mode tab now says how to bring the side panel back."},{"id":"s2-06","optional":true,"title":"The side panel comes back","do":["Close the side panel with its X, then reload the page."],"see":["Input Data Mode comes back by itself, on the same step."]},{"id":"s2-07","optional":true,"title":"Leaving before any build","do":["In the side panel: Finish or exit → Exit without saving.","Then 🚀 App Menu → 📥 Input Data Mode to start it again."],"see":["After the exit you are back on the 👋 Welcome tab, and no other tab shows."]},{"id":"s2-08","title":"Student Data: upload the file","do":["Upload file → pick \"1 - Student Data (ATS).xlsx\" from the test files."],"see":["Right after you pick the file: \"Got your file. Moving it to Raw Data…\" at the top of the panel and on the sheet.","The next step opens with a green box at the top: \"Student Data (ATS) completed!\" and \"18 rows moved to Raw Data (18 students). Next: Parent Square.\"","The same message shows for a few seconds at the bottom of the sheet."],"fixed":"\"Got your file\" at once; the count also says how many students (round 1, 2.9 and 3.1)."},{"id":"s2-09","title":"Parent Square: a wrong paste, then the right one","do":["Open \"1 - Student Data (ATS).csv\", press Ctrl+A, Ctrl+C, and paste it on the Parent Square Data tab with Ctrl+Shift+V.","Then do the same with \"2 - Parent Square.csv\"."],"see":["Right after each paste: \"Got your paste. Moving it to Raw Data…\" at the top of the panel and on the sheet.","The wrong paste: a red message says it looks like another export, and the tab empties by itself.","The right paste: \"Parent Square completed!\" and \"28 rows moved to Raw Data. Next: NYCSA.\""],"fixed":"The paste is said at once, before the move (round 1 note on 2.9)."},{"id":"s2-10","title":"NYCSA","do":["Upload \"3 - NYCSA (Students with Non-NYCSA Account).xlsx\"."],"see":["\"NYCSA completed!\" and \"25 rows moved to Raw Data (17 students). Next: Site / Class.\" (one row per guardian; one student has no NYCSA row)."],"fixed":"Counts: a row with no student or guardian is left out and said so; the students are counted (round 1, 3.1: \"25 when it was 24\")."},{"id":"s2-11","title":"Site / Class","do":["Open \"4 - Site and Class.csv\", copy the three columns with their header and paste them over A1 of the Site / Class tab.","Watch the panel for a few seconds, then click the button at the bottom."],"see":["The panel counts what you filled in (\"12 of 12 classes have a teacher · … have a site\").","Once every class has a teacher or a site, the bottom button changes from Skip to \"Save and go to Your Lists\".","After it: \"Site / Class completed!\" with the number of classes saved, and \"Next: Your Lists.\""],"fixed":"Counts + \"Save and go to Your Lists\" in place of Skip once it is filled in (round 1 note on 2.11)."},{"id":"s2-12","title":"Your Lists builds the sheets first","do":["Wait on the Your Lists step."],"see":["A progress bar with the build's steps and a clock (the same bar as 🏗️ Build Sheets), then \"Sheets built\" and \"Sheets built, so your lists can find your students.\""],"fixed":"One progress bar for every build (round 1 note on 2.12)."},{"id":"s2-13","title":"A list with an icon (upload)","do":["Add another list → name it \"Bus Routes\" → pick 🚌 → Make the tab & add the list.","In its panel: Upload the file → \"5a - Your Lists - Bus Routes (student list).xlsx\".","Go through Columns → Variables → Match (click \"Accept the … high-confidence\") → View, then Save."],"see":["The new tab is named \"🚌 Bus Routes\".","On Match: 10 matched, 6 best guesses with a % (Violet Incredable 96%), 2 not found."]},{"id":"s2-14","optional":true,"title":"A pasted guardian list","do":["Back to Input Data Mode → Add another list → \"PTA\".","Open \"5b - Your Lists - PTA Members (guardian list).csv\", copy everything and paste it in the yellow box on the new tab. Go through the steps and Save."],"see":["It is guessed as a guardian list.","On Match: 11 matched, 1 best guess (Martha K. 84%), 1 not found."]},{"id":"s2-15","optional":true,"title":"Changing a list's icon","do":["On the Your Lists card, click the 🚌 next to Bus Routes and pick 🎒.","Then type any other emoji in \"Or type any emoji\" and click Use it."],"see":["The tab is renamed each time (\"🎒 Bus Routes\", then your emoji).","Letters or numbers in that box are refused with a message."]},{"id":"s2-16","title":"Finishing Input Data Mode","do":["On Your Lists: click Edit setup on your list, then Back to Input Data Mode.","Click Finish Input Data Mode (the only Finish on this step). On the end screen click Next steps (not Build), and Cancel when it asks.","Then 🚀 App Menu → 📥 Input Data Mode again → Finish or exit: the question must stay open until you answer it."],"see":["Back lands on the \"Your Lists\" tab, not on the list's own tab.","The end screen offers \"Build sheets now\" only if something changed after step 5's build; if you saved a list after it, it says the lists need a build.","Next steps asks \"Build your sheets first?\"; after Cancel the checklist shows \"Build your sheets again\", not ticked.","The list tabs are hidden afterwards. Contact Log, Combined Contact Tracking, PCAR and Directory show; the Welcome tab is gone."],"fixed":"One Finish; Back lands on Your Lists; \"build again\" when a list changed after the build (end screen + checklist); a click is never ignored while the panel checks the tab, and the exit question stays open (round 1, 2.16)."},{"id":"s2-17","optional":true,"title":"Save and exit from Site / Class","do":["🚀 App Menu → 📥 Input Data Mode → click Site / Class in the bar at the top.","Change one teacher's name, then Finish or exit → \"Save, exit and build my sheets\"."],"see":["The note at the bottom says \"Site / Class completed\" with NO \"Next:\" part.","Your tabs come back and the build runs."]},{"id":"s2-18","optional":true,"title":"Next month's data","do":["📥 Input Data Mode → upload \"1b - Student Data (ATS) - next month (2 new, 1 left).xlsx\" → Finish or exit → Save, exit and build."],"see":["The build report shows 2 new students (Steve Rogers, Lucia Lopez) and 1 discharged (Tony Stark), and when it was built.","Build again right away: the report now says 0 new and 0 discharged (it is always the last build's own)."],"fixed":"The build panel never shows an older build's report (round 1, 3.1)."},{"id":"s2-19","title":"Logging contacts","do":["In the Contact Log, type a parent's name in the Guardian column of the empty row (try Morticia Addams), then Enter. Log 3 contacts."],"see":["The student, OSIS, date, # and follow-up fill in by themselves.","Person Spoke With lists only that student's guardians (Morticia and Gomez for an Addams child).","The Communications box under END shows the new notes."],"fixed":"With 1.7's Backend dropdown there is no formula in Contact Log R any more, so no second copy can appear; on a sheet still set the old way, every build removes an extra copy (round 1 note on 2.19)."},{"id":"s2-20","optional":true,"title":"Finishing the Getting Started checklist","do":["✅ Getting Started → Finish setup."],"see":["A pop-up says you can always open it from 🚀 App Menu → ✅ Getting Started, and it no longer opens by itself."]},{"id":"s2-21","optional":true,"title":"Mistakes a new user makes","do":["On a second copy of the test template, right after Initial Setup:","🏗️ Build Sheets Only before loading any data. Type on the Welcome tab.","In Input Data Mode: Skip on Student Data. On Site / Class with nothing filled in: Save.","Open ⚙️ Settings and try Save straight away."],"see":["Build: a note, nothing built. Typing: a \"Heads up\" warning. Skip: it asks first.","The empty Site / Class save doesn't erase saved sites. Settings: Save stays grey until \"Loading your settings…\" goes away."]}]},{"id":"s3","part":2,"title":"A returning school","where":"A copy of the test template brings over \"last year's tracker\": a copy of your fake-data copy.","checks":[{"id":"s3-0","title":"Last year's tracker, for the test","do":["Open your TEST fake-data copy → File → Make a copy. Name it \"PC Tracker - Last year (test)\" (\"PC Tracker\" in the name puts it in the wizard's list).","Open it → 🚀 App Menu → 🚨 Initial Setup → approve → close the question window. Look in ⚙️ Settings: phone sync is off.","Right away: 📥 Input Data Mode (don't wait for anything). Start → upload \"1b - Student Data (ATS) - next month (2 new, 1 left).xlsx\" → click NYCSA in the bar at the top → upload a copy of \"3 - NYCSA\" with Kim Possible's row (guardian ANN POSSIBLE) deleted → Finish or exit → Save, exit and build.","Then 🏗️ Build Sheets Only once more."],"see":["No \"Lock timeout\": at worst the panel says \"Waiting for the sheet…\" for a moment and goes on by itself. Only the Input Data Mode tab shows while it is on.","Each click in the bar works the first time. NYCSA says \"24 rows moved to Raw Data (16 students)\".","The build report shows Tony Stark discharged and 1 NYCSA sign-up (ANN POSSIBLE, Kim Possible), and at the bottom Close and Build again. Your tabs are back.","The second build's report shows 0 new, 0 discharged, 0 NYCSA sign-ups.","Phone sync off on this copy is on purpose: a new copy's Initial Setup always starts with it off (your other settings come along)."],"fixed":"Round 1 (3.1): \"Lock timeout\" right after setup, tabs not hidden or not brought back, \"Sheet … not found\", clicks needing two tries, the wrong step after NYCSA, \"25\" for 24 rows, an old build report, \"Start new build\". All fixed; this check walks through them again."},{"id":"s3-1","title":"Choosing the old tracker","do":["Make a new copy of the test template → Initial Setup → \"No, bring over last year's tracker\".","First paste this new tracker's own link and try it. Then pick \"PC Tracker - Last year (test)\" from the list. Never your live sheet: it can be in the list too."],"see":["Its own link is refused.","The wizard lists your trackers, \"PC Tracker - Last year (test)\" among them.","The new copy's Welcome tab starts with \"Don't see 🚀 App Menu? … reload the page\"."],"fixed":"The Welcome tab's first line says to reload when the menu doesn't show (round 1 note on 3.2)."},{"id":"s3-2","title":"All 6 steps","do":["Let the wizard run."],"see":["Each step ticks, no \"Success!\" pop-up comes half way, and step 6 shows the progress bar.","The done screen says \"Done. Your old tracker pauses itself\" (last year's tracker for this test is a newer version), with no Settings steps.","The 👋 Welcome tab is gone; Contact Log, Combined Contact Tracking, PCAR and Directory show."],"fixed":"A newer old tracker is recognized (a mark its builds leave, or a version date from 11/14/2026), so the Settings steps only show for older trackers; the Welcome tab is deleted at the end (round 1 notes on 3.3)."},{"id":"s3-3","title":"Everything came over","do":["Look through the new tracker."],"see":["The Contact Log rows, the Notes tab, the Type list, Send Out, and the 3 events with their delete box and dropdowns.","The New / Edit Student changes (Tina Belcher, Peter Parker), and Your Lists with their icons if you added any.","Tony Stark is still on the Student List, as Discharged."]},{"id":"s3-4","title":"Person Spoke With after the move","do":["Open the Person Spoke With dropdown on a few rows."],"see":["Each lists that row's student's guardians."]},{"id":"s3-5","optional":true,"title":"The Import Old Data menu item","do":["Look in the 🚀 App Menu on a new copy before its first build, then on the tracker you just brought over."],"see":["🔄 Import Old Data is there before the first build and gone after it."]},{"id":"s3-6","title":"The old tracker pauses itself","do":["Open \"PC Tracker - Last year (test)\" again."],"see":["It asks \"Keep this tracker paused?\". No means it rebuilds again at 10 PM; Yes keeps it paused."]},{"id":"s3-7","optional":true,"title":"End of Year Rollover","do":["On \"PC Tracker - Last year (test)\": 🚀 App Menu → 🔄 End of Year Rollover, and follow it."],"see":["The archive PDF is named for the school year that ends (in June 2026: 2025-2026)."]}]},{"id":"s4","part":2,"title":"Day to day","where":"Your fake-data copy.","checks":[{"id":"s4-01","title":"Typing in the Contact Log","do":["Type a fake parent's name (Marge Simpson) in the Guardian column of the empty row and press Enter. Count the seconds until the row is filled in."],"see":["The student, OSIS, date, # and follow-up fill in by themselves."],"timing":"Seconds until the row filled in"},{"id":"s4-02","optional":true,"title":"Pasting and deleting rows","do":["Paste a few rows into the Contact Log, then delete one row."],"see":["The notes in the Communications box follow (the deleted row's note goes away)."]},{"id":"s4-03","title":"Deleting row 2","do":["After 1.7 (the dropdown reads the Backend): delete Contact Log row 2 with the Table's own delete (right-click a cell in row 2 → Delete row).","Then delete the new row 2 the other way: right-click its row number → Delete row."],"see":["Both work: no \"You cannot insert or delete cells over an array formula\".","The Person Spoke With dropdowns list names on row 2 and further down, right away (nothing to wait for)."],"fixed":"The list lives on the hidden Backend tab now, so Contact Log rows hold no formula results (round 1, 4.3)."},{"id":"s4-04","title":"Inserting a row above row 2","do":["Right-click row 2's number → Insert 1 row above. Wait a few seconds.","Open the Person Spoke With dropdown on two rows with different students. Then delete the empty row."],"see":["Each row lists ITS OWN student's guardians (not the row above's).","The thick black line above the lookup box (under END) is still thick after the delete."],"fixed":"Inserted rows can't move the list (it is on the Backend); a row change redraws only the line above the END bar, and every build redraws the box's thick outline (round 1, 4.4)."},{"id":"s4-05","optional":true,"title":"A student with 3 guardians","do":["👤 Student Overrides → ✨ New / Edit Student: add a third guardian to Wednesday Addams, Save, and let the build run.","Log a contact for Wednesday and one for another student."],"see":["Wednesday's row lists all 3 guardians; the other row lists only its own."]},{"id":"s4-06","optional":true,"title":"The formula comes back after a build","do":["Show columns R to AA (the small arrows between Q and AB), clear cell R2, then 🏗️ Build Sheets Only."],"see":["The formula is back in R2 and the columns are hidden again."]},{"id":"s4-07","optional":true,"title":"The lookup box","do":["Copy an OSIS from the Student List and type it in the OSIS box under END."],"see":["No \"are you sure?\" warning; the student's details and notes fill in."]},{"id":"s4-08","optional":true,"title":"Your Lists: how it reads","do":["📥 Input Data Mode → click Your Lists in the bar at the top → Add another list → upload \"5c - Your Lists - Field Trip Forms\".","Step 2 Variables: keep the form column, shown in Additional Information and as a Student List column.","Step 4 View: \"One line\" and \"Bold the names\" → Save → Back to Input Data Mode → Finish → Build sheets now."],"see":["Phone Contacts' notes show \"Additional Information\" reading like the preview.","The Student List has the list's column, with a navy header."]},{"id":"s4-09","optional":true,"title":"The sheet's look","do":["Look over the tabs (the look came from 🎨 Apply Sheet Style on the TEST master)."],"see":["Montserrat everywhere. Notes and Send Out brown like the Contact Log; Student List, Parents Divided, Directory and Combined navy.","PCAR's boxes a darker brown with yellow date cells; no \"Column 9\" on the Student List; the tab is named \"Raw Data\" with its DATE UPDATED titles at the left."]},{"id":"s4-10","optional":true,"title":"Events and colors","do":["📆 Events → 📋 New Event and add a parent. Log a Workshop row in the Contact Log, and type a Type in it."],"see":["The event has a brown title row and its dropdowns work; the Workshop row is pale green; the Type gets its color."]},{"id":"s4-11","optional":true,"title":"Backend New / Edit Student headers","do":["Show the hidden Backend tab and look at columns G to AV. Hide it again after."],"see":["The headers are on row 2 and students start on row 3."]},{"id":"s4-12","title":"Settings and Build","do":["⚙️ Settings → change nothing → Save. Then 🚀 App Menu → 🏗️ Build Sheets Only."],"see":["Settings closes without an error; the build sidebar shows the progress bar and ticks every step.","At the end: the build report, then Close and Build again (no \"Start new build\")."],"fixed":"The progress bar; Close + Build again (round 1, 3.1)."},{"id":"s4-13","title":"The next morning","do":["Open the fake-data copy the morning after. Then Extensions → Apps Script → Executions."],"see":["No \"Last night's rebuild didn't finish\" note; Last Interaction shows yesterday's contacts; the Type from 4.10 kept its color.","nightlyMasterSync ran around 10 PM with no red error."]}]},{"id":"s5","part":2,"title":"Someone else","where":"Share your fake-data copy with a colleague, or with your own second Google account, as an Editor.","checks":[{"id":"s5-1","optional":true,"title":"Another person opens it","do":["They open the copy and count the seconds until the 🚀 App Menu shows."],"see":["The menus show for them too."],"timing":"Seconds until the menu showed for them"},{"id":"s5-2","optional":true,"title":"They work in it","do":["They log a contact and open 📥 Input Data Mode."],"see":["The Contact Log fills in for them, and Input Data Mode opens."]},{"id":"s5-3","optional":true,"title":"Still one nightly rebuild","do":["They open ⚙️ Settings → Save. The next morning, you open Extensions → Apps Script → Executions."],"see":["ONE nightlyMasterSync run around 10 PM, not two."]}]},{"id":"s6","part":2,"title":"Phone sync","where":"Only from a SECOND Google account (a free Gmail account works), so the fake families land in that account's contacts, not yours.","checks":[{"id":"s6-1","title":"A copy of its own","do":["Share your fake-data copy with the second account as an Editor (Share → its email). In a browser signed in to that account: open it → File → Make a copy.","In that copy: 🚀 App Menu → 🚨 Initial Setup → approve."],"see":["The copy belongs to the second account (its name shows in that account's Drive).","Before you copy it, the SHARED sheet shows the full menus (it is already set up). The COPY shows 🚨 Initial Setup until you run it."],"fixed":"Round 1 note: \"the other sheet's menu showed the regular menus\". That is right for the shared sheet; tell Claude if the COPY shows them."},{"id":"s6-2","title":"Full Sync while you watch","do":["⚙️ Settings → Contacts & sync → turn on \"Sync contacts to my phone every night\" → Save.","🚀 App Menu → 🧱 Full Sync (Build + Push to Google Contacts). Watch it to the end."],"see":["The bar fills and it ends with a summary.","The \"more than half\" question, if it comes at all, comes at the start."]},{"id":"s6-3","title":"The contacts","do":["Open contacts.google.com in that account → the \"School Directory\" label. Then move that copy to the trash (a tracker in the trash skips its nightly job)."],"see":["The fake families with their phones and emails; the notes newest first; \"Additional Information\" from a list if the copy had one."]}]},{"id":"s7","part":3,"title":"Your real data","where":"The TEST master: your real data with the new version. Leave phone sync off on it.","checks":[{"id":"s7-1","title":"Typing at real size","do":["Type a real parent's name in the Contact Log's empty row and press Enter. Count the seconds until the row is filled in."],"see":["As fast as on your live sheet, or faster."],"timing":"Seconds until the row filled in"},{"id":"s7-2","title":"Opening at real size","do":["Close and reopen the TEST master 3 times. Count the seconds until the 🚀 App Menu shows."],"see":["The menu shows quickly. A few seconds after opening, the old Contact Log rows hide."],"timing":"Seconds until the menu showed"},{"id":"s7-3","optional":true,"title":"Row 2 at real size","do":["Delete Contact Log row 2, wait a few seconds. Then insert a row above row 2, wait, and delete it again."],"see":["Each row's Person Spoke With dropdown lists its own student's guardians after each change."]},{"id":"s7-4","title":"This month's real exports","do":["📥 Input Data Mode: load your real ATS, Parent Square and NYCSA exports (one upload, one paste). Finish → Build."],"see":["Each step says \"completed!\" with sensible row counts; the build report's new and discharged students look right."]},{"id":"s7-5","optional":true,"title":"Your own lists","do":["If your sheet has Your Lists lists: after the build, look at a few phone contacts' Additional Information."],"see":["Your lists read exactly as they did before this version."]},{"id":"s7-6","title":"The next morning","do":["Open the TEST master the morning after. Then Extensions → Apps Script → Executions."],"see":["No \"Last night's rebuild didn't finish\" note; nightlyMasterSync ran around 10 PM with no red error."]}]},{"id":"s8","part":4,"title":"Release it","where":"In this order, once the tests pass.","checks":[{"id":"s8-01","title":"Problems fixed","do":["Tell Claude \"release check done\" (Claude reads your answers here) or give the report. Re-test each check that gets a fix."],"see":["No check is left at Problem."]},{"id":"s8-02","title":"Final check with Claude","do":["Ask Claude for the final check: the tests, the file list in DEPLOY.md, what to paste where."],"see":["Claude reports everything in order."]},{"id":"s8-03","title":"Your live sheet","do":["Put the new version on your live tracker: DEPLOY.md sections 1 to 3 (as you did on the TEST master)."],"see":["It opens, builds and logs a contact as the TEST master did."]},{"id":"s8-04","title":"Release copies","do":["On your live sheet: 🐞 Debug → 📦 Make Release Copies (Example + Blank)."],"see":["Two copies, \"Parent Coordinator Sheet - (EXAMPLE) (date)\" and \"- (BLANK) (date)\", a link each and one version date (it goes in the Version Tracker's column A)."]},{"id":"s8-05","title":"The Blank copy becomes the template","do":["Open the BLANK copy: delete every file starting with z_ and paste App Scripts (General).Json (its New Copy Checklist says so)."],"see":["Only the 👋 Welcome tab shows; \"See an example tracker\" on it opens the EXAMPLE copy made in the same run."]},{"id":"s8-06","title":"The template folder","do":["Put the BLANK copy in the template folder; move older (BLANK) and (MIGRATE) files to a subfolder."],"see":["Only the newest (BLANK) file is in the folder itself."]},{"id":"s8-07","title":"Pilot","do":["Give 1 or 2 friendly schools the BLANK copy's /copy link and let them use it for a week or two."],"see":["Nothing they report is left unfixed."]},{"id":"s8-08","title":"The Version Tracker row","do":["Add a row: A = the version date, D \"Blank Copy\" = the BLANK's /copy link, E \"Example\" = the EXAMPLE's link, F \"Document\" = the User Guide (when it changed)."],"see":["Every school's tracker now offers \"New Version Available\"."]},{"id":"s8-09","optional":true,"title":"Links","do":["🐞 Debug → 🔗 My Links. Then 📖 Open User Guide."],"see":["Every link from the 📌 YOUR LINKS box, and \"Version Tracker, column D/E/F\" with each link.","\"See an example tracker\" shows in 📖 Open User Guide."]},{"id":"s8-10","optional":true,"title":"The User Guide Doc","do":["Ask Claude for the list of what changed in docs/USER_GUIDE.md, and make those changes in the Google Doc."],"see":["The Google Doc matches this version."]},{"id":"s8-11","optional":true,"title":"Merge into main","do":["Ask Claude to merge Test-Version into main."],"see":["main is the version schools have."]},{"id":"s8-12","title":"Clean up the test copies","do":["Move each test copy to the trash: the TEST master, the TEST fake-data copy, \"PC Tracker - Last year (test)\", the TEST template and the copies made from it."],"see":["Nothing else to do: a tracker in the trash skips its 10 PM rebuild by itself."],"why":"Every copy that ran Initial Setup has its own 10 PM rebuild under your account, and Google can keep running a trashed sheet's script until the trash is emptied. This version checks for the trash, so trashing is enough."}]},{"id":"sb","part":5,"title":"Things that might break it","breakit":true,"where":"The TEST fake-data copy (or a fresh copy of the test template where it says so). Never your live sheet. Mark each one Works (nothing broke) or Problem, and write what happened.","checks":[{"id":"b-01","breakit":true,"title":"Click around fast in Input Data Mode","do":["📥 Input Data Mode → Start. Click Parent Square, NYCSA, Site / Class and Student Data in the bar as fast as you can, a few times."],"see":["It ends on the last step you clicked, with one yellow tab. No error, no \"Sheet … not found\"."]},{"id":"b-02","breakit":true,"title":"Close the panel half way through a move","do":["Upload the Student Data file and close the side panel (its X) right away. Wait 20 seconds, then 🚀 App Menu → 📥 Input Data Mode."],"see":["The panel comes back on the step after Student Data (the file went in), or on Student Data with nothing half written. Raw Data's student rows are complete."]},{"id":"b-03","breakit":true,"title":"Two browser tabs on the same sheet","do":["Open the same sheet in a second browser tab. Start 📥 Input Data Mode in both, and upload a file in one."],"see":["Both panels end on the same step. Only one Input Data Mode tab. Exiting in one brings your tabs back."]},{"id":"b-04","breakit":true,"title":"Show a hidden tab while Input Data Mode is on","do":["While Input Data Mode is on: View → Hidden sheets → Contact Log. Stay on the yellow tab for 15 seconds."],"see":["The Contact Log is hidden again within about 10 seconds. When you exit, your usual tabs come back."]},{"id":"b-05","breakit":true,"title":"Delete Input Data Mode's own tab","do":["While Input Data Mode is on, go to another tab (View → Hidden sheets), then right-click the yellow tab → Delete."],"see":["The panel makes a new yellow tab at its next check, or says to reload the page. After a reload it goes on where you were."]},{"id":"b-06","breakit":true,"title":"Settings in the middle of Input Data Mode","do":["While Input Data Mode is on: 🚀 App Menu → ⚙️ Settings → Save."],"see":["Within about 10 seconds the other tabs are hidden again. Exit brings them back."]},{"id":"b-07","breakit":true,"title":"Build twice at once","do":["🚀 App Menu → 🏗️ Build Sheets Only, and as soon as the panel opens, the same menu item again."],"see":["One build runs; the other says another build is running. Nothing is half built."]},{"id":"b-08","breakit":true,"title":"Input Data Mode during a build","do":["Start 🏗️ Build Sheets Only, then right away 📥 Input Data Mode."],"see":["The panel waits (\"Waiting for the sheet…\") if it must, then opens. No \"Lock timeout\". The tabs are hidden once it is on."]},{"id":"b-09","breakit":true,"title":"The wrong file at every step","do":["In Input Data Mode upload: a Your Lists file at Student Data, the Student Data file at NYCSA, and any picture or PDF renamed to .csv."],"see":["A clear message each time (\"This looks like … data\" or \"couldn't be read\"), nothing moved to Raw Data."]},{"id":"b-10","breakit":true,"title":"Delete several Contact Log rows at once","do":["Select Contact Log rows 3 to 6 (their numbers) → Delete rows. Then the Table's own delete on two rows."],"see":["The rows go. Person Spoke With still lists each row's own guardians. The Communications box under END drops the deleted notes. The thick line above the box stays."]},{"id":"b-11","breakit":true,"title":"Insert rows in the middle of the Contact Log","do":["Right-click a row number in the middle → Insert 5 rows above. Log a contact on one of the new rows."],"see":["The new row fills in (student, OSIS, date…); its Person Spoke With lists its own guardians; END is still below the last row."]},{"id":"b-12","breakit":true,"title":"Copy a whole row","do":["Copy a whole Contact Log row (its row number) and paste it over an empty row above END."],"see":["The pasted row keeps its student; the dropdowns on every row still work (no #REF!)."]},{"id":"b-13","breakit":true,"title":"Sort the Contact Log","do":["Click a cell in the Contact Log → Data → Sort range by Date, newest first. Then sort it back."],"see":["Each row keeps its own student, OSIS and notes; Person Spoke With follows each row."]},{"id":"b-14","breakit":true,"title":"Rename a list's tab by hand","do":["Right-click a Your Lists tab (🚌 Bus Routes) → Rename → \"Bus\". Then 📥 Input Data Mode → Your Lists, and build."],"see":["The list still shows on the Your Lists step and the build still adds its column."]},{"id":"b-15","breakit":true,"title":"Initial Setup twice, or reload in the middle","do":["On a fresh copy of the test template: Initial Setup, and while the bar is moving reload the page. Then Initial Setup again."],"see":["The second setup finishes normally. One 10 PM job (Extensions → Apps Script → Triggers shows one nightlyMasterSync)."]},{"id":"b-16","breakit":true,"title":"A very long note","do":["Paste a very long text (a few pages) into a Contact Log row's notes column."],"see":["The row saves; Combined Contact Tracking and the Communications box still show the student's notes."]}]}]};
   var LABEL = { pass: "Works", problem: "Problem", skip: "Skipped" };
   var LS_KEY = "pc-release-check-v1";
   var DOC_PATH = "checks/current";
@@ -265,15 +337,25 @@
   });
   var BY_ID = {};
   ORDER.forEach(function (o) { BY_ID[o.check.id] = o; });
-  var N_ALL = ORDER.length, N_ESS = ORDER.filter(function (o) { return !o.check.optional; }).length;
+  // ess = an essential, opt = optional, brk = a "Try to break it" test (round 2; never an essential)
+  function kindOf(c) { return c.breakit ? "brk" : (c.optional ? "opt" : "ess"); }
+  var N_ESS = ORDER.filter(function (o) { return kindOf(o.check) === "ess"; }).length;
+  var N_BREAK = ORDER.filter(function (o) { return kindOf(o.check) === "brk"; }).length;
+  var N_ALL = ORDER.length - N_BREAK; // "Everything" = essentials + optional
+  var LAST = (DATA.lastRound && DATA.lastRound.results) || {};
 
-  // Which checks show: the essentials (default) or everything. This viewer's choice only (localStorage).
+  // Which checks show: the essentials (default), everything, or the "Try to break it" tests + your own.
+  // This viewer's choice only (localStorage).
   var VIEW_KEY = "pc-release-check-view";
   var view = "essentials";
-  try { if (localStorage.getItem(VIEW_KEY) === "all") view = "all"; } catch (e) {}
-  function inView(o) { return view === "all" || !o.check.optional; }
+  try { var sv = localStorage.getItem(VIEW_KEY); if (sv === "all" || sv === "breakit") view = sv; } catch (e) {}
+  function inView(o) {
+    var k = kindOf(o.check);
+    if (view === "breakit") return k === "brk";
+    return k !== "brk" && (view === "all" || k === "ess");
+  }
 
-  var state = { release: DATA.release, notes: "", results: {} };
+  var state = { release: DATA.release, notes: "", results: {}, custom: {} };
   function res(id) { return state.results[id] || (state.results[id] = { status: "", note: "", seconds: null }); }
 
   // ---------- building the page (once) ----------
@@ -310,6 +392,11 @@
       var tc = el("span", "tc"); tc.id = "tc-" + st.id; a.appendChild(tc);
       tocPart.appendChild(a);
     });
+    // "Your own tests" goes with the Try to break it part (last); shown in that view only
+    var oa = el("a"); oa.href = "#own"; oa.id = "toc-own"; oa.hidden = true;
+    oa.appendChild(el("span", null, "Your own tests"));
+    var otc = el("span", "tc"); otc.id = "tc-own"; otc.textContent = "0"; oa.appendChild(otc);
+    if (tocPart) tocPart.appendChild(oa);
   }
 
   function buildCheck(o) {
@@ -319,6 +406,8 @@
     head.appendChild(el("span", "num", o.num));
     var h4 = el("h4", null, c.title);
     if (c.optional) h4.appendChild(el("span", "opt", "Optional"));
+    if (c.fixed) h4.appendChild(el("span", "chip fix", "Fixed, re-test"));
+    if (c.breakit) h4.appendChild(el("span", "chip brk", "Try to break it"));
     head.appendChild(h4);
     var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
     ["pass", "problem", "skip"].forEach(function (r) {
@@ -335,6 +424,24 @@
     var d2 = el("div", "see"); d2.appendChild(el("p", "lbl", "You should see")); d2.appendChild(list("ul", c.see));
     cols.appendChild(d1); cols.appendChild(d2); body.appendChild(cols);
     if (c.why) { var w = el("p", "why"); w.appendChild(el("b", null, "Why: ")); w.appendChild(document.createTextNode(c.why)); body.appendChild(w); }
+    // Round 2: what changed since the last round, and what you wrote then
+    if (c.fixed) { var fx = el("p", "fixed-box"); fx.appendChild(el("b", null, "Fixed, re-test: ")); fx.appendChild(document.createTextNode(c.fixed)); body.appendChild(fx); }
+    var lr = LAST[c.id];
+    if (lr && (lr.status || lr.note)) {
+      var lb = el("div", "last-box"); lb.dataset.was = lr.status || "";
+      var who = (DATA.lastRound.label || "Last round") + (DATA.lastRound.date ? " (" + DATA.lastRound.date + ")" : "");
+      var head2 = el("p"); head2.style.margin = "0";
+      head2.appendChild(el("b", null, "Last time, " + who + ": "));
+      head2.appendChild(document.createTextNode((lr.status ? LABEL[lr.status] : "no answer") + (lr.seconds != null ? ", " + lr.seconds + " s" : "") + (lr.note ? "." : "")));
+      lb.appendChild(head2);
+      if (lr.note) {
+        if (lr.note.length > 420) {
+          var det = el("details"); det.appendChild(el("summary", null, "Show what you wrote (" + lr.note.length + " characters)"));
+          det.appendChild(el("p", "lt", lr.note)); lb.appendChild(det);
+        } else lb.appendChild(el("p", "lt", lr.note));
+      }
+      body.appendChild(lb);
+    }
     var fields = el("div", "fields");
     if (c.timing) {
       var t = el("label", "timing"); t.htmlFor = "t-" + c.id;
@@ -388,11 +495,13 @@
   }
   // For the report: every check, whatever the view
   function tally() {
-    var t = { pass: 0, problem: 0, skip: 0, essDone: 0, allDone: 0 };
+    var t = { pass: 0, problem: 0, skip: 0, essDone: 0, allDone: 0, brkDone: 0 };
     ORDER.forEach(function (o) {
       var s = (state.results[o.check.id] || {}).status;
       if (!s) return;
-      t.allDone++; if (!o.check.optional) t.essDone++;
+      var k = kindOf(o.check);
+      if (k === "brk") t.brkDone++; else t.allDone++;
+      if (k === "ess") t.essDone++;
       if (t[s] != null) t[s]++;
     });
     return t;
@@ -403,7 +512,9 @@
     $("mOk").style.width = pct(c.pass); $("mBad").style.width = pct(c.problem); $("mSkip").style.width = pct(c.skip);
     $("counts").innerHTML = "";
     var b = el("b", null, String(c.done)); $("counts").appendChild(b);
-    $("counts").appendChild(document.createTextNode(" of " + c.total + (view === "all" ? " done" : " essentials done") + (c.problemsAll ? " · " + c.problemsAll + (c.problemsAll === 1 ? " problem" : " problems") : "")));
+    var ownProbs = ownList().filter(function (t) { return t.status === "problem"; }).length;
+    var probsAll = c.problemsAll + ownProbs;
+    $("counts").appendChild(document.createTextNode(" of " + c.total + (view === "all" ? " done" : view === "breakit" ? " tried" : " essentials done") + (probsAll ? " · " + probsAll + (probsAll === 1 ? " problem" : " problems") : "")));
 
     DATA.stages.forEach(function (st) {
       var done = 0, bad = 0, shown = 0;
@@ -419,17 +530,23 @@
     });
 
     var sum = $("sum"); sum.innerHTML = "";
-    [["s-ok", c.pass, "worked"], ["s-bad", c.problemsAll, c.problemsAll === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, view === "all" ? "not done yet" : "essentials not done yet"]].forEach(function (x) {
+    [["s-ok", c.pass, "worked"], ["s-bad", probsAll, probsAll === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, view === "all" ? "not done yet" : view === "breakit" ? "not tried yet" : "essentials not done yet"], ["", ownList().length, ownList().length === 1 ? "own test" : "own tests"]].forEach(function (x) {
       var s = el("span", x[0]); s.appendChild(el("b", null, String(x[1]))); s.appendChild(document.createTextNode(x[2])); sum.appendChild(s);
     });
 
     var pl = $("plist"); pl.innerHTML = "";
     var probs = ORDER.filter(function (o) { return (state.results[o.check.id] || {}).status === "problem"; });
-    if (!probs.length) { var e = el("li"); e.style.borderLeftColor = "var(--line)"; e.appendChild(el("span", "pn", "None so far.")); pl.appendChild(e); }
+    var ownP = ownList().filter(function (t) { return t.status === "problem"; });
+    if (!probs.length && !ownP.length) { var e = el("li"); e.style.borderLeftColor = "var(--line)"; e.appendChild(el("span", "pn", "None so far.")); pl.appendChild(e); }
     probs.forEach(function (o) {
       var li = el("li"), a = el("a", null, o.num + " " + o.check.title); a.href = "#c-" + o.check.id;
       li.appendChild(a);
       li.appendChild(el("span", "pn", state.results[o.check.id].note ? state.results[o.check.id].note : "No note yet: write what you saw."));
+      pl.appendChild(li);
+    });
+    ownP.forEach(function (t) {
+      var li = el("li"), a = el("a", null, "Your test: " + t.title); a.href = "#own";
+      li.appendChild(a); li.appendChild(el("span", "pn", t.saw || "No note yet."));
       pl.appendChild(li);
     });
   }
@@ -440,7 +557,7 @@
     if (document.activeElement !== n && n.value !== (state.notes || "")) n.value = state.notes || "";
   }
 
-  function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintSummary(); paintMeta(); }
+  function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintOwn(); paintSummary(); paintMeta(); }
 
   // Shows the checks in view; a stage (and its contents line) with none in view hides, and a part with no stage
   function applyView() {
@@ -456,18 +573,23 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
     $("viewNote").textContent = view === "all"
       ? "Every check. The ones marked Optional can wait."
+      : view === "breakit"
+      ? "Things a busy or curious person might do, on a test copy. Add your own at the end."
       : (N_ALL - N_ESS) + " optional checks are hidden. They can wait.";
+    $("own").hidden = view !== "breakit";
+    var ownToc = $("toc-own"); if (ownToc) ownToc.hidden = view !== "breakit";
     paintSummary();
   }
 
   // ---------- saving ----------
   var mode = "loading", db = null, docRef = null, docExists = false;
-  var dirty = {}, metaDirty = false, timer = null, saving = false, again = false;
+  var dirty = {}, dirtyOwn = {}, metaDirty = false, timer = null, saving = false, again = false;
   function setSave(text, kind) { var s = $("saveState"); s.textContent = text; s.className = "save" + (kind ? " " + kind : ""); }
   function entry(id) { var r = res(id); return { status: r.status || "", note: r.note || "", seconds: r.seconds == null ? null : r.seconds, at: new Date().toISOString() }; }
   function fullDoc() {
     var out = { release: state.release || "", notes: state.notes || "", results: {}, updatedAt: new Date().toISOString() };
     Object.keys(state.results).forEach(function (id) { if (BY_ID[id]) out.results[id] = entry(id); });
+    out.custom = JSON.parse(JSON.stringify(state.custom || {}));
     return out;
   }
   function queue(id, delay) {
@@ -477,32 +599,34 @@
     if (mode !== "loading") setSave("Saving…");
   }
   function saveLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ release: state.release, notes: state.notes, results: state.results })); setSave("Saved in this browser only"); }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ release: state.release, notes: state.notes, results: state.results, custom: state.custom })); setSave("Saved in this browser only"); }
     catch (e) { setSave("Not saved: this browser blocks saving here. Copy the report before you leave.", "warn"); }
   }
   function flush() {
     clearTimeout(timer);
-    if (mode === "local") { dirty = {}; metaDirty = false; saveLocal(); return; }
+    if (mode === "local") { dirty = {}; dirtyOwn = {}; metaDirty = false; saveLocal(); return; }
     if (mode !== "db") return; // the first answer from the store sends what is waiting
     if (saving) { again = true; return; }
-    var ids = Object.keys(dirty), meta = metaDirty;
-    if (!ids.length && !meta) return;
-    dirty = {}; metaDirty = false; saving = true;
+    var ids = Object.keys(dirty), own = Object.keys(dirtyOwn), meta = metaDirty;
+    if (!ids.length && !own.length && !meta) return;
+    dirty = {}; dirtyOwn = {}; metaDirty = false; saving = true;
     var job;
     if (!docExists) job = docRef.set(fullDoc()).then(function () { docExists = true; });
     else {
       var patch = { updatedAt: new Date().toISOString() };
       if (ids.length) { patch.results = {}; ids.forEach(function (id) { patch.results[id] = entry(id); }); }
+      // nested objects merge, so only the own tests that changed are sent (a deleted one keeps deleted: true)
+      if (own.length) { patch.custom = {}; own.forEach(function (id) { patch.custom[id] = state.custom[id]; }); }
       if (meta) { patch.release = state.release || ""; patch.notes = state.notes || ""; }
       job = docRef.update(patch);
     }
     job.then(function () { setSave("Saved"); }, function (e) {
-      ids.forEach(function (id) { dirty[id] = true; }); if (meta) metaDirty = true;
+      ids.forEach(function (id) { dirty[id] = true; }); own.forEach(function (id) { dirtyOwn[id] = true; }); if (meta) metaDirty = true;
       if (e && e.code === "invalid_argument" && docExists) { docExists = false; again = true; return; } // gone: write it whole
       setSave("Not saved" + (e && e.message ? " (" + e.message + ")" : "") + ". Your answers stay on this screen; change anything to try again.", "error");
     }).then(function () {
       saving = false;
-      if (again) { again = false; if (Object.keys(dirty).length || metaDirty) setTimeout(flush, 400); }
+      if (again) { again = false; if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) setTimeout(flush, 400); }
     });
   }
 
@@ -518,6 +642,8 @@
       if (d && typeof d.release === "string" && d.release) state.release = d.release;
       state.notes = d && typeof d.notes === "string" ? d.notes : state.notes;
     }
+    var cu = (d && d.custom) || {};
+    Object.keys(cu).forEach(function (id) { if (!dirtyOwn[id] && cu[id] && typeof cu[id] === "object") state.custom[id] = cu[id]; });
     paintAll();
   }
 
@@ -525,7 +651,7 @@
     mode = "local";
     try { var raw = localStorage.getItem(LS_KEY); if (raw) { var d = JSON.parse(raw); takeRemote(d); } } catch (e) {}
     setSave(why || "Saved in this browser only");
-    if (Object.keys(dirty).length || metaDirty) flush();
+    if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) flush();
   }
 
   function startDb() {
@@ -542,13 +668,106 @@
         docExists = snap.exists;
         takeRemote(snap.exists ? snap.data() : null);
         if (mode !== "db") { mode = "db"; setSave(snap.exists ? "Saved" : "Ready: answers save as you go"); }
-        if (Object.keys(dirty).length || metaDirty) flush();
+        if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) flush();
       }, function (e) {
         clearTimeout(loadTimer);
         startLocal("Can't save here any more (" + (e && e.code ? e.code : "error") + "): answers now save in this browser only.");
       });
     }, function () { clearTimeout(loadTimer); startLocal(); });
   }
+
+  // ---------- your own tests (round 2) ----------
+  // state.custom = { id: { title, saw, status: "pass" | "problem" | "unsure", at } }. A delete keeps the id with
+  // deleted: true, so every other open copy of the page drops it too (an update merges, it can't remove a field).
+  var OWN_LABEL = { pass: "Works", problem: "Problem", unsure: "Not sure" };
+  var ownStatus = "", editing = null, confirmDel = null;
+  function ownList() {
+    return Object.keys(state.custom || {}).map(function (id) { return Object.assign({ id: id }, state.custom[id]); })
+      .filter(function (t) { return t && !t.deleted && t.title; })
+      .sort(function (a, b) { return String(a.at || "").localeCompare(String(b.at || "")); });
+  }
+  function queueOwn(id) {
+    dirtyOwn[id] = true;
+    clearTimeout(timer); timer = setTimeout(flush, 200);
+    if (mode !== "loading") setSave("Saving…");
+  }
+  function paintOwnSeg() {
+    Array.prototype.forEach.call(document.querySelectorAll("#ownSeg button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.own === ownStatus)); });
+  }
+  function paintOwn() {
+    var host = $("ownList"); if (!host) return;
+    host.innerHTML = "";
+    var list = ownList();
+    if (!list.length) host.appendChild(el("p", "empty", "No tests of your own yet. Add one above."));
+    list.forEach(function (t, i) {
+      var card = el("article", "owncard"); card.dataset.status = t.status || ""; card.id = "own-" + t.id;
+      var oh = el("div", "oh");
+      oh.appendChild(el("span", "num", "Y" + (i + 1)));
+      oh.appendChild(el("span", "ot", t.title));
+      oh.appendChild(el("span", "os " + (t.status || "unsure"), OWN_LABEL[t.status] || "Not marked"));
+      card.appendChild(oh);
+      if (t.saw) card.appendChild(el("p", "ow", t.saw));
+      var oa = el("div", "oa");
+      if (confirmDel === t.id) {
+        oa.appendChild(el("span", "msg error", "Delete this test?"));
+        var yes = el("button", "btn small", "Yes, delete it"); yes.type = "button"; yes.dataset.ownDelYes = t.id; oa.appendChild(yes);
+        var no = el("button", "btn small", "Keep it"); no.type = "button"; no.dataset.ownDelNo = t.id; oa.appendChild(no);
+      } else {
+        var ed = el("button", "linkbtn", "Edit"); ed.type = "button"; ed.dataset.ownEdit = t.id; oa.appendChild(ed);
+        var dl = el("button", "linkbtn del", "Delete"); dl.type = "button"; dl.dataset.ownDel = t.id; oa.appendChild(dl);
+      }
+      card.appendChild(oa);
+      host.appendChild(card);
+    });
+    var tc = $("tc-own"); if (tc) tc.textContent = String(list.length);
+  }
+  function resetOwnForm() {
+    editing = null; ownStatus = "";
+    $("ownTitle").value = ""; $("ownSaw").value = "";
+    $("ownAdd").textContent = "Add the test"; $("ownCancel").hidden = true;
+    paintOwnSeg();
+  }
+  $("ownForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var title = $("ownTitle").value.trim(), saw = $("ownSaw").value.trim(), msg = $("ownMsg");
+    if (!title) { msg.className = "msg error"; msg.textContent = "Write what you tried first."; $("ownTitle").focus(); return; }
+    var id = editing || ("t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    var was = state.custom[id] || {};
+    state.custom[id] = { title: title, saw: saw, status: ownStatus, at: was.at || new Date().toISOString() };
+    if (editing) state.custom[id].edited = new Date().toISOString();
+    msg.className = "msg"; msg.textContent = editing ? "Changed." : "Added. Claude reads it with your answers.";
+    resetOwnForm(); paintOwn(); paintSummary(); queueOwn(id);
+  });
+  $("ownCancel").addEventListener("click", function () { resetOwnForm(); $("ownMsg").textContent = ""; });
+  document.addEventListener("click", function (ev) {
+    var ob = ev.target.closest("[data-own]");
+    if (ob) { ownStatus = ownStatus === ob.dataset.own ? "" : ob.dataset.own; paintOwnSeg(); return; }
+    var oe = ev.target.closest("[data-own-edit]");
+    if (oe) {
+      var t = state.custom[oe.dataset.ownEdit]; if (!t) return;
+      editing = oe.dataset.ownEdit; ownStatus = t.status || "";
+      $("ownTitle").value = t.title || ""; $("ownSaw").value = t.saw || "";
+      $("ownAdd").textContent = "Save the change"; $("ownCancel").hidden = false; $("ownMsg").textContent = "";
+      paintOwnSeg(); $("ownForm").scrollIntoView({ block: "nearest" }); $("ownTitle").focus();
+      return;
+    }
+    var od = ev.target.closest("[data-own-del]");
+    if (od) { confirmDel = od.dataset.ownDel; paintOwn(); return; }
+    var oy = ev.target.closest("[data-own-del-yes]");
+    if (oy) {
+      var id = oy.dataset.ownDelYes;
+      if (state.custom[id]) { state.custom[id] = Object.assign({}, state.custom[id], { deleted: true }); queueOwn(id); }
+      confirmDel = null; if (editing === id) resetOwnForm(); paintOwn(); paintSummary();
+      return;
+    }
+    if (ev.target.closest("[data-own-del-no]")) { confirmDel = null; paintOwn(); return; }
+    // a "Fixed" link to a check the current view hides: show everything first
+    var fl = ev.target.closest(".fixlist a[data-check]");
+    if (fl) {
+      var o = BY_ID[fl.dataset.check];
+      if (o && !inView(o)) { view = "all"; try { localStorage.setItem(VIEW_KEY, view); } catch (e) {} applyView(); }
+    }
+  });
 
   // ---------- the viewer's actions ----------
   document.addEventListener("click", function (ev) {
@@ -560,7 +779,7 @@
       applyView();
       return;
     }
-    var b = ev.target.closest(".seg button");
+    var b = ev.target.closest(".check .seg button");
     if (b) {
       var id = b.closest(".check").dataset.id, r = res(id);
       r.status = r.status === b.dataset.r ? "" : b.dataset.r;
@@ -583,11 +802,12 @@
 
   // ---------- the report ----------
   function reportText() {
-    var t = tally(), now = new Date(), lines = [];
+    var t = tally(), now = new Date(), lines = [], own = ownList();
     lines.push(DATA.title + ": " + (state.release || DATA.release));
     lines.push("Report of " + now.toLocaleString());
-    lines.push("Essentials done " + t.essDone + " of " + N_ESS + " · All checks done " + t.allDone + " of " + N_ALL);
-    lines.push("Works " + t.pass + " · Problems " + t.problem + " · Skipped " + t.skip);
+    lines.push("Essentials done " + t.essDone + " of " + N_ESS + " · All checks done " + t.allDone + " of " + N_ALL +
+      (N_BREAK ? " · Try to break it: " + t.brkDone + " of " + N_BREAK + " tried" : "") + " · Your own tests: " + own.length);
+    lines.push("Works " + t.pass + " · Problems " + (t.problem + own.filter(function (x) { return x.status === "problem"; }).length) + " · Skipped " + t.skip);
     function section(title, rows) { if (!rows.length) return; lines.push(""); lines.push(title); rows.forEach(function (x) { lines.push(x); }); }
     function rowsWith(pred, withNote) {
       var out = [];
@@ -600,6 +820,20 @@
       return out;
     }
     section("PROBLEMS", rowsWith(function (r) { return r.status === "problem"; }, true));
+    // Round 2: each fixed check, now and last time
+    var re = [];
+    ORDER.forEach(function (o) {
+      if (!o.check.fixed) return;
+      var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
+      re.push(o.num + " " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? " (last time: " + LABEL[l.status] + ")" : ""));
+    });
+    section("RE-TESTS (fixed since the last round)", re);
+    var ownLines = [];
+    own.forEach(function (x, i) {
+      ownLines.push("Y" + (i + 1) + " [" + (OWN_LABEL[x.status] || "Not marked") + "] " + x.title);
+      if (x.saw) x.saw.split("\n").forEach(function (l) { ownLines.push("    " + l); });
+    });
+    section("YOUR OWN TESTS", ownLines);
     var times = [];
     ORDER.forEach(function (o) { var r = state.results[o.check.id] || {}; if (o.check.timing && r.seconds != null) times.push(o.num + " " + o.check.timing + ": " + r.seconds + " s"); });
     section("TIMINGS", times);
@@ -632,6 +866,7 @@
   $("clearYes").addEventListener("click", function () {
     $("confirmClear").hidden = true; $("startOver").disabled = false;
     state.results = {}; state.notes = ""; opened = {};
+    Object.keys(state.custom || {}).forEach(function (id) { state.custom[id] = Object.assign({}, state.custom[id], { deleted: true }); dirtyOwn[id] = true; });
     ORDER.forEach(function (o) { dirty[o.check.id] = true; }); metaDirty = true;
     paintAll(); flush();
     $("reportMsg").textContent = "Cleared. Every check is back to not done.";
@@ -683,6 +918,19 @@
     head("Problems");
     if (!probs.length) line("None.", { color: [86, 97, 115] });
     probs.forEach(function (o) { line(o.num + "  " + o.check.title, { bold: true }); line(state.results[o.check.id].note || "(no note)", { indent: 18, after: 6 }); });
+    var fixedOnes = ORDER.filter(function (o) { return o.check.fixed; });
+    if (fixedOnes.length) {
+      head("Re-tests (fixed since the last round)");
+      fixedOnes.forEach(function (o) {
+        var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
+        line(o.num + "  " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? "  (last time: " + LABEL[l.status] + ")" : ""), { color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
+      });
+    }
+    var ownT = ownList();
+    if (ownT.length) {
+      head("Your own tests");
+      ownT.forEach(function (x, i) { line("Y" + (i + 1) + "  [" + (OWN_LABEL[x.status] || "Not marked") + "]  " + x.title, { bold: true, after: 0 }); if (x.saw) line(x.saw, { indent: 18, size: 9, color: [86, 97, 115], after: 4 }); });
+    }
     var times = ORDER.filter(function (o) { var r = state.results[o.check.id] || {}; return o.check.timing && r.seconds != null; });
     if (times.length) { head("Timings"); times.forEach(function (o) { line(o.num + "  " + o.check.timing + ": " + state.results[o.check.id].seconds + " s"); }); }
     if (state.notes) { head("Other notes"); line(state.notes); }
@@ -741,7 +989,22 @@
 
   // ---------- start ----------
   buildPage();
-  $("nEss").textContent = "(" + N_ESS + ")"; $("nAll").textContent = "(" + N_ALL + ")";
+  $("nEss").textContent = "(" + N_ESS + ")"; $("nAll").textContent = "(" + N_ALL + ")"; $("nBreak").textContent = "(" + N_BREAK + ")";
+  if (!N_BREAK) $("nBreak").parentNode.hidden = true;
+  // Round 2: what changed since the last round, each with links to its re-test
+  if (DATA.lastRound && (DATA.fixes || []).length) {
+    $("roundBox").hidden = false;
+    $("roundTitle").textContent = "Since " + (DATA.lastRound.label || "the last round").toLowerCase() + (DATA.lastRound.date ? " (" + DATA.lastRound.date + ")" : "");
+    $("lastSum").textContent = "Last time: " + (DATA.lastRound.summary || "") + ". Each check shows what you wrote then.";
+    DATA.fixes.forEach(function (f) {
+      var li = el("li", null, f.text + " ");
+      (f.checks || []).forEach(function (id) {
+        var o = BY_ID[id]; if (!o) return;
+        var a = el("a", "go", "Re-test " + o.num); a.href = "#c-" + id; a.dataset.check = id; li.appendChild(a);
+      });
+      $("fixList").appendChild(li);
+    });
+  }
   state.release = DATA.release;
   paintAll();
   applyView();

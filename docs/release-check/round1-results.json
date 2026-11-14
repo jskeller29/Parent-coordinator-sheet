@@ -1,0 +1,147 @@
+{
+ "label": "Round 1",
+ "date": "11/14/2026",
+ "release": "Test-Version (November 2026)",
+ "summary": "Works 23 · Problems 5 · Skipped 7 · Essentials done 35 of 48",
+ "results": {
+  "s0-1": {
+   "status": "skip"
+  },
+  "s0-2": {
+   "status": "pass"
+  },
+  "s0-3": {
+   "status": "pass"
+  },
+  "s0-4": {
+   "status": "pass"
+  },
+  "s1-1": {
+   "status": "skip",
+   "note": "using my regular master sheet and just clicking  make release copies from there."
+  },
+  "s1-2": {
+   "status": "skip",
+   "note": "ill do the deleting in the other files themselves"
+  },
+  "s1-3": {
+   "status": "skip"
+  },
+  "s1-4": {
+   "status": "pass"
+  },
+  "s1-5": {
+   "status": "skip",
+   "note": "deleting all z_ code directly from both copies and not doing the test master"
+  },
+  "s2-01": {
+   "status": "pass"
+  },
+  "s2-03": {
+   "status": "problem",
+   "note": "took 10 seconds for app menu to intiialy show up. for question (20 second) maybe do similar progress bar and be communicative with user about whats it loading. did it again with logging out of other profiles took 15 seconds. just maybe still do loading or tell user whats happening so they know if something went wrong or if it just being slow",
+   "seconds": 150
+  },
+  "s2-04": {
+   "status": "pass"
+  },
+  "s2-05": {
+   "status": "pass"
+  },
+  "s2-08": {
+   "status": "pass"
+  },
+  "s2-09": {
+   "status": "pass",
+   "note": "works! but still maybe having something pop up or toast immediately saying \"paste\" or \"upload\" registered so they know it works but just needs to move it. like it already does say \"move data to raw data\""
+  },
+  "s2-10": {
+   "status": "pass"
+  },
+  "s2-11": {
+   "status": "pass",
+   "note": "when all is done, nothing says anything. maybe have the \"next\" show up instead of skip when data is inputted? even if not all teachers are filled, show it if either all teachers are filled or all sites are filed. something pointing to next direction because save site/ class, skip, or exit, are a bit confusing options"
+  },
+  "s2-12": {
+   "status": "",
+   "note": "Building your sheets first, so your lists can find your students. This can take a minute or two… maybe do progress bar? have this UI of progress bar be present for any time build and make it same across be it for new student data or anytime build is activated. if you do think it should have different ui then ok .\n\nunder your lists finish and finish / exit is there twice"
+  },
+  "s2-13": {
+   "status": "pass"
+  },
+  "s2-16": {
+   "status": "problem",
+   "note": "when you back to input data mode, it stays on 🚌 Bus Routes / your list. maybe similar to welcome have a input data mode landing page even before it goes to student data leting user know in a sheet where to get all data, what each data is used for or something and when last time each data was updated. also if a user accidentally closed input data mode screen, make a toast or something in each page of input data mode letting them know how to get page back.\n\nBUG: when i click finish (again there are two finishes) it asks to build or click next steps. i clicked \"next steps\" instead of build, it then said in next steps build was done, but it wasnt really since even tho initial build was done, the your list build wasnt done. so make sure to check if everythijgn is built in next steps and when clicking finish and its asking for build, let user know to do your list build you have to build again.\n\nother bug, i clicked exit out of next steps then when back to input data mode, then clicked finish and it just didnt do anything. i exited and clicked it again and it worked. maybe something to look at"
+  },
+  "s2-19": {
+   "status": "pass",
+   "note": "Bug: i deleted row 2 a couple times and it worked but then it created two arrayformula leaving one to have a ref. so maybe make a thing that detects if any changes were made to R2? i dont want it to add lag but should be fixed. or at least something also fixed on nightlysync at least"
+  },
+  "s3-0": {
+   "status": "problem",
+   "note": "sync to phone was already off, seem like it didnt read settings page? tried hitting input data mode and it got stuck with message of Running script. then got error Exception: Lock timeout: another process was holding the lock for too long. on refresh it says input data mode was still on, but tabs werte not hidden. \n\ncreated new document and Script runInitialSetupWrapper experienced an errorDetails. i refreshed page and it did let me click it now. \n\nclicked input data mode but no tabs were closed. it did let me open it tho.\n\n2 new and 1 left did work. but at bottom it says \"start new build\" for some reason when it should say exit or something.\n\ni did my own test and clicked input data mode to test. i went to NYCSA from top, it didnt work first click but second, uploaded then clicked build. build still showed 2 new 1 left even tho that was a past build but didnt show NYCSA upgrades. NYCSA works where qwhen its made the user is no longer there. \n\ni tried again for some reason now student data tab is visible but rest of tabs are. when iupload file it is still saying \"25\" moved when it is only 24\n\ni clicked back to NYCSAS which was checkmarked and it said Script error: Sheet 763596992 not found\nand says Data 1 of 5: (unknown)\nOptional Never updated\nWhere to get it. when i refreshed, a toast did say data mode still on and clicked input data mode it went back to normal\n\nnow input data mode weirdly fully went back to closing tabs on a new try but in same sheet. had to click nycsa multiple times to get there. after nycsa (which still said 25 when its 24) it showed student data instead of site / class which. top said it was on. exiting didnt bring back tabs. made new document and pasted 22 students then uploaded and still saying 25. it did go to site/ class next tho. this was all using upload. using paste it still said 25 students. raw data did have 22 students in it so must of sent over. did build sheets only. new build still said no new NYCSA."
+  },
+  "s3-1": {
+   "status": "pass",
+   "note": "created new copy of template, new bug found was if i leave tab menu of app menu never shows up. maybe have soemthing at top saying if app menu doesnt show, refresh page.\n\naside, it did work where it showed pc tracker on list putting own link did sauy \"That's this tracker. Pick last year's tracker (the old one) instead\""
+  },
+  "s3-2": {
+   "status": "pass",
+   "note": "it finished, maybe have something in backend that identified if it is an older version or newer version, maybe a new cell or just seeing if last update was past 11/13/26, it is newer version. if it is before that, then it is an older versiobn they will have to do. \n\nwelcome tab still there at end"
+  },
+  "s3-3": {
+   "status": "pass"
+  },
+  "s3-4": {
+   "status": "pass"
+  },
+  "s3-6": {
+   "status": "pass",
+   "note": "📦 This tracker was brought into a newer one did show."
+  },
+  "s4-01": {
+   "status": "pass",
+   "seconds": 4
+  },
+  "s4-03": {
+   "status": "problem",
+   "note": "cant delete table row \"because You cannot insert or delete cells over an array formula.\" but if i highlight row and delete it, arrayformula doesnt come back."
+  },
+  "s4-04": {
+   "status": "problem",
+   "note": "ut breaks the row 2 arrayformula and shows row above. also bug is that the border above search is not longer the thick bold. ask me for picture and ill show you what i mean"
+  },
+  "s4-12": {
+   "status": "pass"
+  },
+  "s4-13": {
+   "status": "skip"
+  },
+  "s6-1": {
+   "status": "",
+   "note": "in other sheet menu doesnt show initial set up just regular menu options"
+  },
+  "s6-2": {
+   "status": "pass"
+  },
+  "s6-3": {
+   "status": "",
+   "note": "made contactrs in new emails thing."
+  },
+  "s7-1": {
+   "status": "pass",
+   "note": "1237 notes",
+   "seconds": 8
+  },
+  "s7-2": {
+   "status": "",
+   "seconds": 3
+  },
+  "s7-4": {
+   "status": "pass"
+  },
+  "s7-6": {
+   "status": "skip"
+  }
+ }
+}

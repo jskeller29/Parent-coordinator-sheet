@@ -1,8 +1,9 @@
-<title>PC Tracker Release Check</title>
+<title>__PAGE_TITLE__</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <!-- Made by docs/release-check/build.js from checks.js (it fills in the DATA line of the script below).
      Edit checks.js or this template, run the build, then republish the page. Answers live in the
-     page's db (one document: checks/current). -->
+     page's db (one document: checks/current; "custom" = the viewer's own tests). Round 2 (2026-11-14):
+     "Fixed, re-test" + "Last time" on each check, a third Show ("Try to break it"), your own tests. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <style>
@@ -166,6 +167,46 @@
   .copybox { width: 100%; min-height: 12em; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .tell { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg); }
 
+  /* round 2: what changed since the last round, and what you wrote then */
+  .round { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: var(--radius); background: var(--surface); }
+  .round h2 { font-size: 19px; }
+  .round .lastsum { margin: 0; color: var(--muted); font-size: 14px; }
+  .fixlist { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 74ch; }
+  .fixlist .go { font-weight: 600; text-decoration: none; white-space: nowrap; margin-left: 4px; }
+  .fixlist .go + .go::before { content: "· "; color: var(--faint); font-weight: 400; }
+  .chip { display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 999px; font-family: var(--font); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; white-space: nowrap; }
+  .chip.fix { background: var(--accent); color: var(--accent-ink); }
+  .chip.brk { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); }
+  .fixed-box, .last-box { margin: 0; padding: 8px 10px; font-size: 14px; border-radius: 0 var(--radius) var(--radius) 0; }
+  .fixed-box { border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--ink); }
+  .last-box { border-left: 3px solid var(--line); background: var(--surface); color: var(--muted); }
+  .last-box[data-was="problem"] { border-left-color: var(--bad); }
+  .last-box[data-was="pass"] { border-left-color: var(--ok); }
+  .last-box b { color: var(--ink); }
+  .last-box .lt { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .last-box details summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13px; }
+  /* your own tests */
+  .own { margin-top: 40px; padding-top: 18px; border-top: 4px solid var(--warn); display: grid; gap: 14px; scroll-margin-top: 64px; }
+  .own .eyebrow { color: var(--warn); }
+  .own h2 { font-size: clamp(22px, 4vw, 27px); }
+  .own > p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .ownform { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .ownform label { font-weight: 600; font-size: 14px; }
+  .ownform input[type=text], .ownform textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--bg); line-height: 1.4; }
+  .ownform textarea { min-height: 4.5em; resize: vertical; }
+  .ownform .row { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; }
+  .ownlist { display: grid; }
+  .owncard { border-bottom: 1px solid var(--line); padding-block: 12px; display: grid; gap: 6px; }
+  .owncard[data-status="problem"] { background: linear-gradient(90deg, var(--bad-soft), transparent 70%); }
+  .owncard .oh { display: flex; gap: 6px 12px; align-items: baseline; flex-wrap: wrap; }
+  .owncard .ot { font-weight: 700; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+  .os { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
+  .os.pass { background: var(--ok-soft); color: var(--ok); } .os.problem { background: var(--bad-soft); color: var(--bad); } .os.unsure { background: var(--skip-soft); color: var(--skip); }
+  .owncard .ow { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+  .owncard .oa { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; font-size: 13px; cursor: pointer; }
+  .linkbtn.del { color: var(--bad); }
+
   @media (max-width: 640px) {
     .check-head { grid-template-columns: 2.6em minmax(0, 1fr); }
     .seg { grid-column: 1 / -1; justify-self: start; }
@@ -198,17 +239,24 @@
       <input id="release" type="text" autocomplete="off">
     </div>
     <ol class="how-list">
-      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4.</li>
+      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4. A fifth part, <b>Try to break it</b>, is extra: Show → Try to break it, where you can also add tests of your own.</li>
       <li>Do the <b>essentials</b> before any school gets this version. The switch below shows only them; the optional checks can wait.</li>
       <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
       <li>Your answers save as you go, on any device that opens this page.</li>
       <li>When you're done, tell Claude <b>"release check done"</b>: Claude reads your answers here. You can also copy the report or save it as a PDF at the bottom.</li>
     </ol>
+    <section class="round" id="roundBox" hidden>
+      <h2 id="roundTitle">Since the last round</h2>
+      <p class="lastsum" id="lastSum"></p>
+      <p class="lbl" style="margin:4px 0 0">Fixed: re-test these first</p>
+      <ul class="fixlist" id="fixList"></ul>
+    </section>
     <div class="viewrow">
       <span class="lbl-in" id="viewLbl">Show</span>
       <div class="viewseg" role="group" aria-labelledby="viewLbl">
         <button type="button" data-view="essentials" aria-pressed="true">Essentials <span id="nEss"></span></button>
         <button type="button" data-view="all" aria-pressed="false">Everything <span id="nAll"></span></button>
+        <button type="button" data-view="breakit" aria-pressed="false">Try to break it <span id="nBreak"></span></button>
       </div>
       <span class="msg" id="viewNote"></span>
     </div>
@@ -221,6 +269,30 @@
   </section>
 
   <div id="stages"></div>
+
+  <!-- Your own tests (round 2): anything else you tried; saved with your answers (the "custom" field) -->
+  <section class="own" id="own" hidden>
+    <p class="eyebrow">Your own tests</p>
+    <h2>Something else you tried</h2>
+    <p>Did something not on this list? Write what you did and what happened, mark it, and add it. Claude reads these with your answers.</p>
+    <form class="ownform" id="ownForm" autocomplete="off">
+      <label for="ownTitle">What did you try?</label>
+      <input type="text" id="ownTitle" maxlength="200" placeholder="e.g. Pasted the Contact Log into Notes, then undid it">
+      <label for="ownSaw">What happened?</label>
+      <textarea id="ownSaw" maxlength="4000" placeholder="What you saw, any message, how long it took."></textarea>
+      <div class="row">
+        <div class="seg" role="group" aria-label="Result of your test" id="ownSeg">
+          <button type="button" data-own="pass" aria-pressed="false">Works</button>
+          <button type="button" data-own="problem" aria-pressed="false">Problem</button>
+          <button type="button" data-own="unsure" aria-pressed="false">Not sure</button>
+        </div>
+        <button class="btn primary" type="submit" id="ownAdd">Add the test</button>
+        <button class="btn" type="button" id="ownCancel" hidden>Cancel</button>
+        <span class="msg" id="ownMsg" role="status"></span>
+      </div>
+    </form>
+    <div class="ownlist" id="ownList"></div>
+  </section>
 
   <section class="report" id="report">
     <h2>Your report</h2>
@@ -241,7 +313,7 @@
       <span class="msg" id="reportMsg" role="status"></span>
     </div>
     <div class="confirm" id="confirmClear" hidden>
-      <span>Clear every answer and note?</span>
+      <span>Clear every answer, note and your own tests?</span>
       <button class="btn small" id="clearYes" type="button">Yes, clear them</button>
       <button class="btn small" id="clearNo" type="button">Keep them</button>
     </div>
@@ -265,15 +337,25 @@
   });
   var BY_ID = {};
   ORDER.forEach(function (o) { BY_ID[o.check.id] = o; });
-  var N_ALL = ORDER.length, N_ESS = ORDER.filter(function (o) { return !o.check.optional; }).length;
+  // ess = an essential, opt = optional, brk = a "Try to break it" test (round 2; never an essential)
+  function kindOf(c) { return c.breakit ? "brk" : (c.optional ? "opt" : "ess"); }
+  var N_ESS = ORDER.filter(function (o) { return kindOf(o.check) === "ess"; }).length;
+  var N_BREAK = ORDER.filter(function (o) { return kindOf(o.check) === "brk"; }).length;
+  var N_ALL = ORDER.length - N_BREAK; // "Everything" = essentials + optional
+  var LAST = (DATA.lastRound && DATA.lastRound.results) || {};
 
-  // Which checks show: the essentials (default) or everything. This viewer's choice only (localStorage).
+  // Which checks show: the essentials (default), everything, or the "Try to break it" tests + your own.
+  // This viewer's choice only (localStorage).
   var VIEW_KEY = "pc-release-check-view";
   var view = "essentials";
-  try { if (localStorage.getItem(VIEW_KEY) === "all") view = "all"; } catch (e) {}
-  function inView(o) { return view === "all" || !o.check.optional; }
+  try { var sv = localStorage.getItem(VIEW_KEY); if (sv === "all" || sv === "breakit") view = sv; } catch (e) {}
+  function inView(o) {
+    var k = kindOf(o.check);
+    if (view === "breakit") return k === "brk";
+    return k !== "brk" && (view === "all" || k === "ess");
+  }
 
-  var state = { release: DATA.release, notes: "", results: {} };
+  var state = { release: DATA.release, notes: "", results: {}, custom: {} };
   function res(id) { return state.results[id] || (state.results[id] = { status: "", note: "", seconds: null }); }
 
   // ---------- building the page (once) ----------
@@ -310,6 +392,11 @@
       var tc = el("span", "tc"); tc.id = "tc-" + st.id; a.appendChild(tc);
       tocPart.appendChild(a);
     });
+    // "Your own tests" goes with the Try to break it part (last); shown in that view only
+    var oa = el("a"); oa.href = "#own"; oa.id = "toc-own"; oa.hidden = true;
+    oa.appendChild(el("span", null, "Your own tests"));
+    var otc = el("span", "tc"); otc.id = "tc-own"; otc.textContent = "0"; oa.appendChild(otc);
+    if (tocPart) tocPart.appendChild(oa);
   }
 
   function buildCheck(o) {
@@ -319,6 +406,8 @@
     head.appendChild(el("span", "num", o.num));
     var h4 = el("h4", null, c.title);
     if (c.optional) h4.appendChild(el("span", "opt", "Optional"));
+    if (c.fixed) h4.appendChild(el("span", "chip fix", "Fixed, re-test"));
+    if (c.breakit) h4.appendChild(el("span", "chip brk", "Try to break it"));
     head.appendChild(h4);
     var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
     ["pass", "problem", "skip"].forEach(function (r) {
@@ -335,6 +424,24 @@
     var d2 = el("div", "see"); d2.appendChild(el("p", "lbl", "You should see")); d2.appendChild(list("ul", c.see));
     cols.appendChild(d1); cols.appendChild(d2); body.appendChild(cols);
     if (c.why) { var w = el("p", "why"); w.appendChild(el("b", null, "Why: ")); w.appendChild(document.createTextNode(c.why)); body.appendChild(w); }
+    // Round 2: what changed since the last round, and what you wrote then
+    if (c.fixed) { var fx = el("p", "fixed-box"); fx.appendChild(el("b", null, "Fixed, re-test: ")); fx.appendChild(document.createTextNode(c.fixed)); body.appendChild(fx); }
+    var lr = LAST[c.id];
+    if (lr && (lr.status || lr.note)) {
+      var lb = el("div", "last-box"); lb.dataset.was = lr.status || "";
+      var who = (DATA.lastRound.label || "Last round") + (DATA.lastRound.date ? " (" + DATA.lastRound.date + ")" : "");
+      var head2 = el("p"); head2.style.margin = "0";
+      head2.appendChild(el("b", null, "Last time, " + who + ": "));
+      head2.appendChild(document.createTextNode((lr.status ? LABEL[lr.status] : "no answer") + (lr.seconds != null ? ", " + lr.seconds + " s" : "") + (lr.note ? "." : "")));
+      lb.appendChild(head2);
+      if (lr.note) {
+        if (lr.note.length > 420) {
+          var det = el("details"); det.appendChild(el("summary", null, "Show what you wrote (" + lr.note.length + " characters)"));
+          det.appendChild(el("p", "lt", lr.note)); lb.appendChild(det);
+        } else lb.appendChild(el("p", "lt", lr.note));
+      }
+      body.appendChild(lb);
+    }
     var fields = el("div", "fields");
     if (c.timing) {
       var t = el("label", "timing"); t.htmlFor = "t-" + c.id;
@@ -388,11 +495,13 @@
   }
   // For the report: every check, whatever the view
   function tally() {
-    var t = { pass: 0, problem: 0, skip: 0, essDone: 0, allDone: 0 };
+    var t = { pass: 0, problem: 0, skip: 0, essDone: 0, allDone: 0, brkDone: 0 };
     ORDER.forEach(function (o) {
       var s = (state.results[o.check.id] || {}).status;
       if (!s) return;
-      t.allDone++; if (!o.check.optional) t.essDone++;
+      var k = kindOf(o.check);
+      if (k === "brk") t.brkDone++; else t.allDone++;
+      if (k === "ess") t.essDone++;
       if (t[s] != null) t[s]++;
     });
     return t;
@@ -403,7 +512,9 @@
     $("mOk").style.width = pct(c.pass); $("mBad").style.width = pct(c.problem); $("mSkip").style.width = pct(c.skip);
     $("counts").innerHTML = "";
     var b = el("b", null, String(c.done)); $("counts").appendChild(b);
-    $("counts").appendChild(document.createTextNode(" of " + c.total + (view === "all" ? " done" : " essentials done") + (c.problemsAll ? " · " + c.problemsAll + (c.problemsAll === 1 ? " problem" : " problems") : "")));
+    var ownProbs = ownList().filter(function (t) { return t.status === "problem"; }).length;
+    var probsAll = c.problemsAll + ownProbs;
+    $("counts").appendChild(document.createTextNode(" of " + c.total + (view === "all" ? " done" : view === "breakit" ? " tried" : " essentials done") + (probsAll ? " · " + probsAll + (probsAll === 1 ? " problem" : " problems") : "")));
 
     DATA.stages.forEach(function (st) {
       var done = 0, bad = 0, shown = 0;
@@ -419,17 +530,23 @@
     });
 
     var sum = $("sum"); sum.innerHTML = "";
-    [["s-ok", c.pass, "worked"], ["s-bad", c.problemsAll, c.problemsAll === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, view === "all" ? "not done yet" : "essentials not done yet"]].forEach(function (x) {
+    [["s-ok", c.pass, "worked"], ["s-bad", probsAll, probsAll === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, view === "all" ? "not done yet" : view === "breakit" ? "not tried yet" : "essentials not done yet"], ["", ownList().length, ownList().length === 1 ? "own test" : "own tests"]].forEach(function (x) {
       var s = el("span", x[0]); s.appendChild(el("b", null, String(x[1]))); s.appendChild(document.createTextNode(x[2])); sum.appendChild(s);
     });
 
     var pl = $("plist"); pl.innerHTML = "";
     var probs = ORDER.filter(function (o) { return (state.results[o.check.id] || {}).status === "problem"; });
-    if (!probs.length) { var e = el("li"); e.style.borderLeftColor = "var(--line)"; e.appendChild(el("span", "pn", "None so far.")); pl.appendChild(e); }
+    var ownP = ownList().filter(function (t) { return t.status === "problem"; });
+    if (!probs.length && !ownP.length) { var e = el("li"); e.style.borderLeftColor = "var(--line)"; e.appendChild(el("span", "pn", "None so far.")); pl.appendChild(e); }
     probs.forEach(function (o) {
       var li = el("li"), a = el("a", null, o.num + " " + o.check.title); a.href = "#c-" + o.check.id;
       li.appendChild(a);
       li.appendChild(el("span", "pn", state.results[o.check.id].note ? state.results[o.check.id].note : "No note yet: write what you saw."));
+      pl.appendChild(li);
+    });
+    ownP.forEach(function (t) {
+      var li = el("li"), a = el("a", null, "Your test: " + t.title); a.href = "#own";
+      li.appendChild(a); li.appendChild(el("span", "pn", t.saw || "No note yet."));
       pl.appendChild(li);
     });
   }
@@ -440,7 +557,7 @@
     if (document.activeElement !== n && n.value !== (state.notes || "")) n.value = state.notes || "";
   }
 
-  function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintSummary(); paintMeta(); }
+  function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintOwn(); paintSummary(); paintMeta(); }
 
   // Shows the checks in view; a stage (and its contents line) with none in view hides, and a part with no stage
   function applyView() {
@@ -456,18 +573,23 @@
     Array.prototype.forEach.call(document.querySelectorAll("[data-view]"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.view === view)); });
     $("viewNote").textContent = view === "all"
       ? "Every check. The ones marked Optional can wait."
+      : view === "breakit"
+      ? "Things a busy or curious person might do, on a test copy. Add your own at the end."
       : (N_ALL - N_ESS) + " optional checks are hidden. They can wait.";
+    $("own").hidden = view !== "breakit";
+    var ownToc = $("toc-own"); if (ownToc) ownToc.hidden = view !== "breakit";
     paintSummary();
   }
 
   // ---------- saving ----------
   var mode = "loading", db = null, docRef = null, docExists = false;
-  var dirty = {}, metaDirty = false, timer = null, saving = false, again = false;
+  var dirty = {}, dirtyOwn = {}, metaDirty = false, timer = null, saving = false, again = false;
   function setSave(text, kind) { var s = $("saveState"); s.textContent = text; s.className = "save" + (kind ? " " + kind : ""); }
   function entry(id) { var r = res(id); return { status: r.status || "", note: r.note || "", seconds: r.seconds == null ? null : r.seconds, at: new Date().toISOString() }; }
   function fullDoc() {
     var out = { release: state.release || "", notes: state.notes || "", results: {}, updatedAt: new Date().toISOString() };
     Object.keys(state.results).forEach(function (id) { if (BY_ID[id]) out.results[id] = entry(id); });
+    out.custom = JSON.parse(JSON.stringify(state.custom || {}));
     return out;
   }
   function queue(id, delay) {
@@ -477,32 +599,34 @@
     if (mode !== "loading") setSave("Saving…");
   }
   function saveLocal() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ release: state.release, notes: state.notes, results: state.results })); setSave("Saved in this browser only"); }
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ release: state.release, notes: state.notes, results: state.results, custom: state.custom })); setSave("Saved in this browser only"); }
     catch (e) { setSave("Not saved: this browser blocks saving here. Copy the report before you leave.", "warn"); }
   }
   function flush() {
     clearTimeout(timer);
-    if (mode === "local") { dirty = {}; metaDirty = false; saveLocal(); return; }
+    if (mode === "local") { dirty = {}; dirtyOwn = {}; metaDirty = false; saveLocal(); return; }
     if (mode !== "db") return; // the first answer from the store sends what is waiting
     if (saving) { again = true; return; }
-    var ids = Object.keys(dirty), meta = metaDirty;
-    if (!ids.length && !meta) return;
-    dirty = {}; metaDirty = false; saving = true;
+    var ids = Object.keys(dirty), own = Object.keys(dirtyOwn), meta = metaDirty;
+    if (!ids.length && !own.length && !meta) return;
+    dirty = {}; dirtyOwn = {}; metaDirty = false; saving = true;
     var job;
     if (!docExists) job = docRef.set(fullDoc()).then(function () { docExists = true; });
     else {
       var patch = { updatedAt: new Date().toISOString() };
       if (ids.length) { patch.results = {}; ids.forEach(function (id) { patch.results[id] = entry(id); }); }
+      // nested objects merge, so only the own tests that changed are sent (a deleted one keeps deleted: true)
+      if (own.length) { patch.custom = {}; own.forEach(function (id) { patch.custom[id] = state.custom[id]; }); }
       if (meta) { patch.release = state.release || ""; patch.notes = state.notes || ""; }
       job = docRef.update(patch);
     }
     job.then(function () { setSave("Saved"); }, function (e) {
-      ids.forEach(function (id) { dirty[id] = true; }); if (meta) metaDirty = true;
+      ids.forEach(function (id) { dirty[id] = true; }); own.forEach(function (id) { dirtyOwn[id] = true; }); if (meta) metaDirty = true;
       if (e && e.code === "invalid_argument" && docExists) { docExists = false; again = true; return; } // gone: write it whole
       setSave("Not saved" + (e && e.message ? " (" + e.message + ")" : "") + ". Your answers stay on this screen; change anything to try again.", "error");
     }).then(function () {
       saving = false;
-      if (again) { again = false; if (Object.keys(dirty).length || metaDirty) setTimeout(flush, 400); }
+      if (again) { again = false; if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) setTimeout(flush, 400); }
     });
   }
 
@@ -518,6 +642,8 @@
       if (d && typeof d.release === "string" && d.release) state.release = d.release;
       state.notes = d && typeof d.notes === "string" ? d.notes : state.notes;
     }
+    var cu = (d && d.custom) || {};
+    Object.keys(cu).forEach(function (id) { if (!dirtyOwn[id] && cu[id] && typeof cu[id] === "object") state.custom[id] = cu[id]; });
     paintAll();
   }
 
@@ -525,7 +651,7 @@
     mode = "local";
     try { var raw = localStorage.getItem(LS_KEY); if (raw) { var d = JSON.parse(raw); takeRemote(d); } } catch (e) {}
     setSave(why || "Saved in this browser only");
-    if (Object.keys(dirty).length || metaDirty) flush();
+    if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) flush();
   }
 
   function startDb() {
@@ -542,13 +668,106 @@
         docExists = snap.exists;
         takeRemote(snap.exists ? snap.data() : null);
         if (mode !== "db") { mode = "db"; setSave(snap.exists ? "Saved" : "Ready: answers save as you go"); }
-        if (Object.keys(dirty).length || metaDirty) flush();
+        if (Object.keys(dirty).length || Object.keys(dirtyOwn).length || metaDirty) flush();
       }, function (e) {
         clearTimeout(loadTimer);
         startLocal("Can't save here any more (" + (e && e.code ? e.code : "error") + "): answers now save in this browser only.");
       });
     }, function () { clearTimeout(loadTimer); startLocal(); });
   }
+
+  // ---------- your own tests (round 2) ----------
+  // state.custom = { id: { title, saw, status: "pass" | "problem" | "unsure", at } }. A delete keeps the id with
+  // deleted: true, so every other open copy of the page drops it too (an update merges, it can't remove a field).
+  var OWN_LABEL = { pass: "Works", problem: "Problem", unsure: "Not sure" };
+  var ownStatus = "", editing = null, confirmDel = null;
+  function ownList() {
+    return Object.keys(state.custom || {}).map(function (id) { return Object.assign({ id: id }, state.custom[id]); })
+      .filter(function (t) { return t && !t.deleted && t.title; })
+      .sort(function (a, b) { return String(a.at || "").localeCompare(String(b.at || "")); });
+  }
+  function queueOwn(id) {
+    dirtyOwn[id] = true;
+    clearTimeout(timer); timer = setTimeout(flush, 200);
+    if (mode !== "loading") setSave("Saving…");
+  }
+  function paintOwnSeg() {
+    Array.prototype.forEach.call(document.querySelectorAll("#ownSeg button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.own === ownStatus)); });
+  }
+  function paintOwn() {
+    var host = $("ownList"); if (!host) return;
+    host.innerHTML = "";
+    var list = ownList();
+    if (!list.length) host.appendChild(el("p", "empty", "No tests of your own yet. Add one above."));
+    list.forEach(function (t, i) {
+      var card = el("article", "owncard"); card.dataset.status = t.status || ""; card.id = "own-" + t.id;
+      var oh = el("div", "oh");
+      oh.appendChild(el("span", "num", "Y" + (i + 1)));
+      oh.appendChild(el("span", "ot", t.title));
+      oh.appendChild(el("span", "os " + (t.status || "unsure"), OWN_LABEL[t.status] || "Not marked"));
+      card.appendChild(oh);
+      if (t.saw) card.appendChild(el("p", "ow", t.saw));
+      var oa = el("div", "oa");
+      if (confirmDel === t.id) {
+        oa.appendChild(el("span", "msg error", "Delete this test?"));
+        var yes = el("button", "btn small", "Yes, delete it"); yes.type = "button"; yes.dataset.ownDelYes = t.id; oa.appendChild(yes);
+        var no = el("button", "btn small", "Keep it"); no.type = "button"; no.dataset.ownDelNo = t.id; oa.appendChild(no);
+      } else {
+        var ed = el("button", "linkbtn", "Edit"); ed.type = "button"; ed.dataset.ownEdit = t.id; oa.appendChild(ed);
+        var dl = el("button", "linkbtn del", "Delete"); dl.type = "button"; dl.dataset.ownDel = t.id; oa.appendChild(dl);
+      }
+      card.appendChild(oa);
+      host.appendChild(card);
+    });
+    var tc = $("tc-own"); if (tc) tc.textContent = String(list.length);
+  }
+  function resetOwnForm() {
+    editing = null; ownStatus = "";
+    $("ownTitle").value = ""; $("ownSaw").value = "";
+    $("ownAdd").textContent = "Add the test"; $("ownCancel").hidden = true;
+    paintOwnSeg();
+  }
+  $("ownForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var title = $("ownTitle").value.trim(), saw = $("ownSaw").value.trim(), msg = $("ownMsg");
+    if (!title) { msg.className = "msg error"; msg.textContent = "Write what you tried first."; $("ownTitle").focus(); return; }
+    var id = editing || ("t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+    var was = state.custom[id] || {};
+    state.custom[id] = { title: title, saw: saw, status: ownStatus, at: was.at || new Date().toISOString() };
+    if (editing) state.custom[id].edited = new Date().toISOString();
+    msg.className = "msg"; msg.textContent = editing ? "Changed." : "Added. Claude reads it with your answers.";
+    resetOwnForm(); paintOwn(); paintSummary(); queueOwn(id);
+  });
+  $("ownCancel").addEventListener("click", function () { resetOwnForm(); $("ownMsg").textContent = ""; });
+  document.addEventListener("click", function (ev) {
+    var ob = ev.target.closest("[data-own]");
+    if (ob) { ownStatus = ownStatus === ob.dataset.own ? "" : ob.dataset.own; paintOwnSeg(); return; }
+    var oe = ev.target.closest("[data-own-edit]");
+    if (oe) {
+      var t = state.custom[oe.dataset.ownEdit]; if (!t) return;
+      editing = oe.dataset.ownEdit; ownStatus = t.status || "";
+      $("ownTitle").value = t.title || ""; $("ownSaw").value = t.saw || "";
+      $("ownAdd").textContent = "Save the change"; $("ownCancel").hidden = false; $("ownMsg").textContent = "";
+      paintOwnSeg(); $("ownForm").scrollIntoView({ block: "nearest" }); $("ownTitle").focus();
+      return;
+    }
+    var od = ev.target.closest("[data-own-del]");
+    if (od) { confirmDel = od.dataset.ownDel; paintOwn(); return; }
+    var oy = ev.target.closest("[data-own-del-yes]");
+    if (oy) {
+      var id = oy.dataset.ownDelYes;
+      if (state.custom[id]) { state.custom[id] = Object.assign({}, state.custom[id], { deleted: true }); queueOwn(id); }
+      confirmDel = null; if (editing === id) resetOwnForm(); paintOwn(); paintSummary();
+      return;
+    }
+    if (ev.target.closest("[data-own-del-no]")) { confirmDel = null; paintOwn(); return; }
+    // a "Fixed" link to a check the current view hides: show everything first
+    var fl = ev.target.closest(".fixlist a[data-check]");
+    if (fl) {
+      var o = BY_ID[fl.dataset.check];
+      if (o && !inView(o)) { view = "all"; try { localStorage.setItem(VIEW_KEY, view); } catch (e) {} applyView(); }
+    }
+  });
 
   // ---------- the viewer's actions ----------
   document.addEventListener("click", function (ev) {
@@ -560,7 +779,7 @@
       applyView();
       return;
     }
-    var b = ev.target.closest(".seg button");
+    var b = ev.target.closest(".check .seg button");
     if (b) {
       var id = b.closest(".check").dataset.id, r = res(id);
       r.status = r.status === b.dataset.r ? "" : b.dataset.r;
@@ -583,11 +802,12 @@
 
   // ---------- the report ----------
   function reportText() {
-    var t = tally(), now = new Date(), lines = [];
+    var t = tally(), now = new Date(), lines = [], own = ownList();
     lines.push(DATA.title + ": " + (state.release || DATA.release));
     lines.push("Report of " + now.toLocaleString());
-    lines.push("Essentials done " + t.essDone + " of " + N_ESS + " · All checks done " + t.allDone + " of " + N_ALL);
-    lines.push("Works " + t.pass + " · Problems " + t.problem + " · Skipped " + t.skip);
+    lines.push("Essentials done " + t.essDone + " of " + N_ESS + " · All checks done " + t.allDone + " of " + N_ALL +
+      (N_BREAK ? " · Try to break it: " + t.brkDone + " of " + N_BREAK + " tried" : "") + " · Your own tests: " + own.length);
+    lines.push("Works " + t.pass + " · Problems " + (t.problem + own.filter(function (x) { return x.status === "problem"; }).length) + " · Skipped " + t.skip);
     function section(title, rows) { if (!rows.length) return; lines.push(""); lines.push(title); rows.forEach(function (x) { lines.push(x); }); }
     function rowsWith(pred, withNote) {
       var out = [];
@@ -600,6 +820,20 @@
       return out;
     }
     section("PROBLEMS", rowsWith(function (r) { return r.status === "problem"; }, true));
+    // Round 2: each fixed check, now and last time
+    var re = [];
+    ORDER.forEach(function (o) {
+      if (!o.check.fixed) return;
+      var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
+      re.push(o.num + " " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? " (last time: " + LABEL[l.status] + ")" : ""));
+    });
+    section("RE-TESTS (fixed since the last round)", re);
+    var ownLines = [];
+    own.forEach(function (x, i) {
+      ownLines.push("Y" + (i + 1) + " [" + (OWN_LABEL[x.status] || "Not marked") + "] " + x.title);
+      if (x.saw) x.saw.split("\n").forEach(function (l) { ownLines.push("    " + l); });
+    });
+    section("YOUR OWN TESTS", ownLines);
     var times = [];
     ORDER.forEach(function (o) { var r = state.results[o.check.id] || {}; if (o.check.timing && r.seconds != null) times.push(o.num + " " + o.check.timing + ": " + r.seconds + " s"); });
     section("TIMINGS", times);
@@ -632,6 +866,7 @@
   $("clearYes").addEventListener("click", function () {
     $("confirmClear").hidden = true; $("startOver").disabled = false;
     state.results = {}; state.notes = ""; opened = {};
+    Object.keys(state.custom || {}).forEach(function (id) { state.custom[id] = Object.assign({}, state.custom[id], { deleted: true }); dirtyOwn[id] = true; });
     ORDER.forEach(function (o) { dirty[o.check.id] = true; }); metaDirty = true;
     paintAll(); flush();
     $("reportMsg").textContent = "Cleared. Every check is back to not done.";
@@ -683,6 +918,19 @@
     head("Problems");
     if (!probs.length) line("None.", { color: [86, 97, 115] });
     probs.forEach(function (o) { line(o.num + "  " + o.check.title, { bold: true }); line(state.results[o.check.id].note || "(no note)", { indent: 18, after: 6 }); });
+    var fixedOnes = ORDER.filter(function (o) { return o.check.fixed; });
+    if (fixedOnes.length) {
+      head("Re-tests (fixed since the last round)");
+      fixedOnes.forEach(function (o) {
+        var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
+        line(o.num + "  " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? "  (last time: " + LABEL[l.status] + ")" : ""), { color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
+      });
+    }
+    var ownT = ownList();
+    if (ownT.length) {
+      head("Your own tests");
+      ownT.forEach(function (x, i) { line("Y" + (i + 1) + "  [" + (OWN_LABEL[x.status] || "Not marked") + "]  " + x.title, { bold: true, after: 0 }); if (x.saw) line(x.saw, { indent: 18, size: 9, color: [86, 97, 115], after: 4 }); });
+    }
     var times = ORDER.filter(function (o) { var r = state.results[o.check.id] || {}; return o.check.timing && r.seconds != null; });
     if (times.length) { head("Timings"); times.forEach(function (o) { line(o.num + "  " + o.check.timing + ": " + state.results[o.check.id].seconds + " s"); }); }
     if (state.notes) { head("Other notes"); line(state.notes); }
@@ -741,7 +989,22 @@
 
   // ---------- start ----------
   buildPage();
-  $("nEss").textContent = "(" + N_ESS + ")"; $("nAll").textContent = "(" + N_ALL + ")";
+  $("nEss").textContent = "(" + N_ESS + ")"; $("nAll").textContent = "(" + N_ALL + ")"; $("nBreak").textContent = "(" + N_BREAK + ")";
+  if (!N_BREAK) $("nBreak").parentNode.hidden = true;
+  // Round 2: what changed since the last round, each with links to its re-test
+  if (DATA.lastRound && (DATA.fixes || []).length) {
+    $("roundBox").hidden = false;
+    $("roundTitle").textContent = "Since " + (DATA.lastRound.label || "the last round").toLowerCase() + (DATA.lastRound.date ? " (" + DATA.lastRound.date + ")" : "");
+    $("lastSum").textContent = "Last time: " + (DATA.lastRound.summary || "") + ". Each check shows what you wrote then.";
+    DATA.fixes.forEach(function (f) {
+      var li = el("li", null, f.text + " ");
+      (f.checks || []).forEach(function (id) {
+        var o = BY_ID[id]; if (!o) return;
+        var a = el("a", "go", "Re-test " + o.num); a.href = "#c-" + id; a.dataset.check = id; li.appendChild(a);
+      });
+      $("fixList").appendChild(li);
+    });
+  }
   state.release = DATA.release;
   paintAll();
   applyView();
