@@ -58,62 +58,19 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    in Contact Log **R2** and hid columns R:AA; leave R1 empty and Q blank. Schools' sheets: the same rule
    by hand after their next build, or they get it with next year's copy of the template.
 
-## 4. Quick test on the copy
-- [ ] 📥 Input Data Mode: all 5 steps with a real export (paste and upload). Paste a wrong export once: the tab
-      empties by itself. Step 5 builds the sheets first; the end screen only offers Build if something changed
-- [ ] Your Lists: upload a CSV and an Excel list as well as pasting one; after closing Input Data Mode the 📥 list
-      tabs are hidden
-- [ ] Your Lists step 4 View: try One line + bold names, Build, and look at a phone contact's Additional Information;
-      a list saved before this version reads exactly as it did
-- [ ] Input Data Mode: "Finish or exit" → "Save, exit and build my sheets" in the middle of the steps
-- [ ] Your Lists: paste a list with a few misspelled names; check the % and the picks
-- [ ] Contact Log: type a parent name, paste a few rows, delete a row; the search bar notes follow
-- [ ] 🧱 Full Sync while you watch (the "more than half" question, if it comes, is asked at the start)
-- [ ] On a fresh template copy, before its first build: 🚀 App Menu → 🔄 Import Old Data from last year's tracker
-      (Follow-ups translated, lists copied; the menu item is gone once a sheet is built). All 6 steps tick and the
-      done screen shows (no "Success!" pop-up half way); the Notes tab, Type list, Send Out and old "Notes" /
-      "Followup Notes" columns came over; Person Spoke With lists guardians; a Discharged student still has notes
-- [ ] Then open the OLD tracker (if it has this version): it asks "Keep this tracker paused?"; No = it rebuilds again
-- [ ] The lookup box: type an OSIS below END (no "are you sure?" warning)
-- [ ] Person Spoke With: a row whose student has 2 or 3 guardians (one from New/Edit Student) lists only
-      them, the next student's row lists theirs. Then delete R2's formula and Build: it comes back
-- [ ] A fresh copy of the master template (no z_ / Z# files): only the 👋 Welcome tab shows. 🚨 Initial Setup opens
-      "Setting up your tracker" at once; during and after it ONLY the Welcome tab shows (now "You're set up"). Yes,
-      start fresh → Start Input Data Mode: only the yellow Student Data tab shows, with "PASTE HERE" and the grey "Closed
-      the side panel?" line. Close the sidebar, reload: it comes back on its own. Exit before building: back on the
-      Welcome tab. After the first build: Contact Log, Combined, PCAR, Directory appear and the Welcome tab goes.
-      Getting Started → Finish setup: a pop-up, and it no longer opens by itself
-- [ ] Mistakes a new user makes: 🏗️ Build Sheets Only before loading data (a note, nothing built); type on the
-      Welcome tab after setup ("Heads up" warning); Skip on Student Data (asks first); empty Site / Class + Save
-      (your saved sites stay); ⚙️ Settings: Save is greyed out until "Loading your settings…" goes away
-- [ ] Bring over last year's tracker: pasting this tracker's own link is refused; the old events come over with their
-      delete box and dropdowns; the archive PDF from 🔄 End of Year Rollover is named for the year that ends
-- [ ] Before Initial Setup: typing in a copy WITHOUT z_ files shows "🔒 Action Blocked" and undoes it; in a copy that
-      still has a z_ file, typing works
-- [ ] Reset to Display Mode on the master template: only the 👋 Welcome tab shows (with the 6 permissions explained
-      first), also after reopening it. Then Google's permission page on a copy: Select all → Continue
-- [ ] Your sheet: 🐞 Debug → 📦 Make Release Copies: two copies "Parent Coordinator Sheet - (EXAMPLE / BLANK) (date)"
-      with a link each and one version date (that date goes in the Version Tracker's column A); 🔗 My Links
-      lists every link from the 📌 YOUR LINKS box at the top of Menus
-- [ ] Backend New/Edit Student (G:AV): after one build, the headers are on row 2 and students start on row 3, on your
-      sheet and in each copy
-- [ ] One template: on a copy of the (BLANK) file, Initial Setup asks "Is this your first PC Tracker?". Start fresh =
-      the four steps; Bring over last year's tracker = the wizard, which lists your old trackers (pick one, Bring it over)
-- [ ] Template folder: only the newest "(BLANK)" file in it (move old "(MIGRATE)" files to a subfolder); the Version
-      Tracker's column D = that (BLANK) file's /copy link
-- [ ] Version Tracker headers: D "Blank Copy", E "Example", F "Document" (clear the old values in E first); 🔗 My Links
-      shows "Version Tracker, column D/E/F" with each link, and "See an example tracker" appears in 📖 Open User Guide
-- [ ] Make Release Copies: the Blank copy's 👋 Welcome tab has "See an example tracker" opening the Example copy made
-      in the same run (no Initial Setup on the Blank copy, nothing to redo there)
-
-- [ ] 🎨 Apply Sheet Style: Montserrat on every tab; Notes / Send Out brown like the Contact Log; Student List,
-      Parents Divided, Directory, Combined navy; PCAR's boxes a darker brown with yellow date cells; no "Column 9" on
-      the Student List; "Raw Data" tab name; Raw Data's "DATE UPDATED" titles visible at the left. Then: a new event
-      (brown title row), Workshop rows in the Contact Log pale green, a Type typed in the Contact Log keeps its
-      color after the 10 PM run, a reset leaves the
-      Student List at A:H, a Your Lists list adds its column back with a navy header
+## 4. Test it on copies: tick the boxes in GitHub
+The checks are a GitHub checklist you tick with a click (github.com or the GitHub app): one issue per
+release, made from `.github/ISSUE_TEMPLATE/release-check.md`. The ticks save by themselves.
+- Start one: the repository's **Issues** tab → **New issue** → **Release check**. (GitHub only offers it
+  once Test-Version is merged into main; until then ask Claude to open one, or copy that file's text into a
+  new issue.)
+- Read its **Before you start** box first: phone sync and "bring over last year's tracker" on a test copy
+  can touch your real Google Contacts and pause your live sheet.
+- Something fails: write it as a comment on the issue (the step, what you saw, a screenshot, any red error
+  from Extensions → Apps Script → Executions). Claude can read the comments in a later session.
 
 ## 5. Going live (after the copy works)
+0. Pilot first: 1 or 2 friendly schools use it for a week or two (the checklist's last box).
 1. Merge Test-Version into main.
 2. Update the master template (General manifest, no z_ files).
 3. Add a row to the Version Tracker so schools get the update prompt: A = the version date, D "Blank Copy" = the
