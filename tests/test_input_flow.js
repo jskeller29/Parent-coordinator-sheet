@@ -1060,6 +1060,26 @@ function listsSheet() {
   assert.strictEqual(s.dataReminder, 'week');
   console.log("faster Initial Setup (no Sheet Lock on a new copy, one settings write / read): ok");
 }
+{
+  // Phone sync never starts on by itself (2026-11-14): a reset saves the settings of the sheet that ran it
+  // into the template (the owner's: sync on). A new copy's setup still starts sync off; the other saved
+  // settings still come along.
+  const ss = makeSpreadsheet(TABS);
+  ss.getSheetByName("Backend").hideSheet();
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
+  g.isAutoMigrateOn_ = () => false; g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
+  const dp = g.PropertiesService.getDocumentProperties();
+  dp.setProperty('syncToPhones', 'true'); dp.setProperty('showRawData', 'true');
+  g.saveSettingsToVersionSheet_(ss);                                    // what a reset saves into the template
+  assert.strictEqual(g.loadSettingsFromVersionSheet_().syncToPhones, 'true', 'the template says sync on');
+  dp.deleteProperty('syncToPhones'); dp.deleteProperty('showRawData');  // a copy starts with no properties
+  g.onOpen({ source: ss });
+  g.runInitialSetup_();
+  assert.strictEqual(g.__props.syncToPhones, 'false', 'phone sync starts off on a new copy');
+  assert.strictEqual(g.__props.showRawData, 'true', 'the other saved settings still come along');
+  assert.strictEqual(g.getSettings().syncToPhones, false);
+  console.log("Initial Setup: phone sync starts off even when the template says on: ok");
+}
 
 // ---------------------------------------------------------------- the 🚀 App Menu first when a sheet opens (owner 2026-11-13)
 // A new copy's first open took long (or never) to show the menu: the menu is now the first thing

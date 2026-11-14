@@ -36,9 +36,9 @@ var NEW_COPY_STEPS_ = [
   ] },
   { id: "test", title: "A TEST copy for you", steps: [
     { id: "keep",     text: "Keep the z_ files and the \"App Scripts (Mine)\" manifest." },
-    { id: "setup",    text: "Run 🚀 App Menu → 🚨 Initial Setup (Run Once): a copy has no automatic jobs until then." },
+    { id: "setup",    text: "Run 🚀 App Menu → 🚨 Initial Setup (Run Once): a copy has no automatic jobs until then. Phone sync starts off: leave it off on a test copy." },
     { id: "build",    text: "Run 🏗️ Build Sheets Only, then open ⚙️ Settings and click Save once." },
-    { id: "cleanup",  text: "When you're done testing, delete the copy (or its triggers): its nightly job keeps running otherwise." }
+    { id: "cleanup",  text: "When you're done testing, move the copy to the trash: a tracker in the trash skips its nightly job by itself." }
   ] }
 ];
 

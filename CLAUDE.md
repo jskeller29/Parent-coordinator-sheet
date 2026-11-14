@@ -490,6 +490,23 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   (Menus only has a comment change).
 - Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
+- Phone sync starts off + a trashed tracker skips its nightly (2026-11-14): re-paste Menus and Build on every sheet
+  (master template too: new copies run its setup code); owner sheet also z_NewCopy (2 checklist texts).
+
+PHONE SYNC STARTS OFF (owner 2026-11-14, found while writing the release check): runInitialSetupSteps_ (Menus.gs)
+loads the Backend saved-settings block over the defaults, and every reset (resetToDisplayModeSteps_ ->
+saveSettingsToVersionSheet_) saves the RUNNING sheet's settings into the reset sheet's block. Make Release Copies /
+Copy Sheet, Then Reset the Copy run on the owner's sheet, so the template (and every test copy) carried the owner's
+syncToPhones 'true': a school's Initial Setup turned phone sync on, and its 10 PM job put the families into the
+Google Contacts of whoever ran setup (the Welcome tab says it stays off until turned on). Now finalSettings.syncToPhones
+= 'false' right after the block is loaded; every other saved setting still comes along; Migration step 2 still brings
+the old tracker's own choice. Tested in test_input_flow.js. Schools set up from an older template may have it on.
+
+A TRACKER IN THE TRASH (owner 2026-11-14, Build.gs): Google can go on firing a trashed sheet's triggers until the
+trash is emptied, so a thrown-away tracker (test copies, last year's tracker) kept rebuilding (and syncing) at 10 PM.
+nightlyTriggerShouldRun_ starts with nightlyPausedInTrash_: DriveApp.getFileById(own ID).isTrashed() -> the run is
+skipped before any trigger is claimed or removed; nothing is deleted (out of the trash = runs again); no answer from
+Drive = runs as before. Cleaning up test copies = moving them to the trash. Tested in test_features.js.
 
 MIGRATION CONTACT LOG HEADERS (owner 2026-11-13: last year's notes / comments did not come over): ma_migrateContactLog
 maps columns with migrationHeaderMap_ (Menus.gs): the same header first (as before), then MIGRATION_HEADER_ALIASES_
@@ -993,7 +1010,14 @@ Workflow:
 - RELEASE CHECK (owner's request 2026-11-14: "a UI to go through and do checks", "make it look good", a PDF, a report
   for Claude; NOT in Google Sheets): the tests to do on copies before a version goes to schools. ONE SOURCE:
   docs/release-check/checks.js (parts[] + stages with a part; each check: id, title, do[], see[], optional why /
-  timing). FOUR PARTS (owner 2026-11-14: "test with fake data and make sure things work"; both set-up and tests):
+  timing / optional: true). ESSENTIALS (owner 2026-11-14, "do I need to do all of this?"): a check without
+  optional: true is an essential (48 of 75: every set-up step, the tests of what changed or can lose data, the release
+  steps); the 27 optional ones can wait. The page's "Show" switch (Essentials by default / Everything; this viewer's
+  choice in localStorage pc-release-check-view) hides them, its counts follow the switch (problems always count),
+  the report says "Essentials done X of 48 · All checks done Y of 75", lists the essentials not done and the
+  optional numbers on one line; the PDF marks them OPTIONAL and the GitHub issue "(optional)". A new check is an
+  essential unless marked. Page CSS has [hidden] { display: none !important } (the Start over question box, display:
+  flex, showed all the time before). FOUR PARTS (owner 2026-11-14: "test with fake data and make sure things work"; both set-up and tests):
   1 Set up for testing (safety rules; a TEST master = File → Make a copy of the live sheet + the new files + Initial
   Setup; a fake-data copy = 🐞 Debug → 🧪 Copy Sheet, Then Load Fake Data on the Copy, z_ files deleted, General
   manifest, Initial Setup; a test template = 📄 Copy Sheet, Then Reset the Copy, z_ files deleted, copied for each

@@ -319,6 +319,7 @@ function nightlyTriggerShouldRun_(e) {
   try {
     const props = PropertiesService.getDocumentProperties();
     const uid = e && e.triggerUid ? String(e.triggerUid) : "";
+    if (nightlyPausedInTrash_()) return false;       // this tracker is in the trash (see A TRACKER IN THE TRASH)
     if (nightlyPausedByReplacement_()) return false; // brought into a newer tracker (see REPLACED BY A NEWER TRACKER)
     const owned = props.getProperty(NIGHTLY_UID_KEY_);
     if (uid && !owned) rememberNightlyTrigger_(props, uid); // first one to fire keeps the job
@@ -342,6 +343,28 @@ function nightlyTriggerShouldRun_(e) {
       return false;
     }
   } catch (err) { console.warn("Nightly trigger check failed (running anyway): " + err.message); }
+  return true;
+}
+
+// ----------------------------------------------------------------------
+// A TRACKER IN THE TRASH (owner 2026-11-14)
+// Moving a sheet to the trash does not stop its script: Google can go on firing its
+// triggers until the trash is emptied. So a thrown-away tracker (a test copy, last year's
+// tracker) kept rebuilding at 10 PM under the account that set it up, and with phone sync on
+// it kept updating that account's Google Contacts with old data. Now the nightly trigger
+// first asks Drive whether its own file is in the trash and skips the run if it is (before it
+// claims or removes any trigger). Nothing is deleted or changed: taking the file out of the
+// trash brings the nightly rebuild back. No answer from Drive = runs as before.
+// ----------------------------------------------------------------------
+function nightlyPausedInTrash_() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss || !DriveApp.getFileById(ss.getId()).isTrashed()) return false;
+  } catch (err) {
+    console.warn("Trash check skipped (" + err.message + "): the nightly runs as usual.");
+    return false;
+  }
+  console.log("Nightly sync skipped: this tracker is in the trash. Nothing rebuilt or synced.");
   return true;
 }
 

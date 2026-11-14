@@ -104,6 +104,30 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   console.log("Migration: the old tracker pauses (and can be undone): ok");
 }
 
+// ---------------------------------------------------------------- A tracker in the trash skips its nightly
+{
+  // Google can keep firing a trashed sheet's triggers: the nightly asks Drive first (2026-11-14)
+  const ss = makeSpreadsheet(["Contact Log", "Backend"]);
+  let trashed = true, asked = [];
+  const deleted = [];
+  const drive = { getFileById: id => { asked.push(id); return { isTrashed: () => trashed }; } };
+  const scriptApp = { getProjectTriggers: () => [], deleteTrigger: t => deleted.push(t) };
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss), ScriptApp: scriptApp, DriveApp: drive }, noTrialFiles: true });
+  g.__props.NIGHTLY_TRIGGER_UID = "OTHER"; g.__props.NIGHTLY_LAST_RUN = String(Date.now());
+  assert.strictEqual(g.nightlyTriggerShouldRun_({ triggerUid: "T9" }), false, 'in the trash: skipped');
+  assert.deepStrictEqual(asked, ["FAKE_SS"], 'it asks about its own file');
+  assert.strictEqual(g.__props.NIGHTLY_TRIGGER_UID, "OTHER", 'nothing claimed');
+  assert.strictEqual(g.__props.NIGHTLY_LAST_RUN.length > 0, true);
+  assert.deepStrictEqual(deleted, [], 'no trigger deleted');
+  // Out of the trash again: runs as before
+  trashed = false; delete g.__props.NIGHTLY_TRIGGER_UID;
+  assert.strictEqual(g.nightlyTriggerShouldRun_({ triggerUid: "T9" }), true, 'restored: runs');
+  // Drive can't answer: runs as before
+  const h = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss), DriveApp: { getFileById: () => { throw new Error("Drive down"); } } }, noTrialFiles: true });
+  assert.strictEqual(h.nightlyTriggerShouldRun_({ triggerUid: "T1" }), true, 'no answer from Drive: runs');
+  console.log("A tracker in the trash skips its nightly run: ok");
+}
+
 // ---------------------------------------------------------------- Migration: final run-through (2026-11-13)
 {
   const mk = () => {

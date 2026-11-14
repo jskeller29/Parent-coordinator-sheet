@@ -1223,6 +1223,12 @@ function runInitialSetupSteps_(ss, props) {
 
   const savedSettings = loadSettingsFromVersionSheet_();
   const finalSettings = Object.assign({}, defaultSettings, savedSettings || {});
+  // Phone sync never starts on by itself (owner 2026-11-14): the saved settings come from the template,
+  // and a reset saves the settings of the sheet that ran it (the owner's, sync on), so every school's copy
+  // (and every test copy) started with sync on: its 10 PM job then put that copy's families into the
+  // Google Contacts of whoever ran setup, unasked. Turned on in ⚙️ Settings; bringing over last year's
+  // tracker (Migration step 2) still brings that tracker's own choice. The Welcome tab promises this too.
+  finalSettings.syncToPhones = 'false';
 
   // Write variables straight into memory to eliminate any TypeError possibilities.
   // One call for all of them (was one per setting; owner 2026-11-13: setup speed).

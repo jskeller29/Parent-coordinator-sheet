@@ -60,8 +60,9 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 
 ## 4. Test it on copies: the release checklist
 Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,
-test with fake data (the main test), a short check with your real data, then the release steps. Three ways to use
-the same list:
+test with fake data (the main test), a short check with your real data, then the release steps. Do the 48
+**essentials** before any school gets a version; the 27 checks marked Optional can wait. Three ways to use the same
+list:
 - **The web checklist** (best): https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 (only you can open it). Mark each
   check Works, Problem or Skip and write what you saw. It saves as you go, on any device. When you're done, tell
   Claude "release check done": Claude reads your answers there. It can also copy the report or save it as a PDF.
@@ -70,7 +71,8 @@ the same list:
   Claude to open one). Ticks save by themselves; write failures as comments.
 
 Read its **Before you start** part first: phone sync and "bring over last year's tracker" on a test copy can touch
-your real Google Contacts and pause your live sheet. The checks come from `docs/release-check/checks.js`
+your real Google Contacts and pause your live sheet. When you're done, move the test copies to the trash: a tracker
+in the trash skips its 10 PM rebuild by itself. The checks come from `docs/release-check/checks.js`
 (`node docs/release-check/build.js` remakes all three).
 
 ## 5. Going live (after the copy works)
