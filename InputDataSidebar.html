@@ -84,6 +84,16 @@
     #newListForm .icon-other input, .icon-other input { width: 64px; height: 28px; margin: 0; padding: 0 4px; text-align: center; font-size: 16px; }
     .icon-other button { height: 28px; font-size: 12px; }
     .iconpick { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
+    /* Start page: one card per kind of data (click one to go to it) */
+    .si { width: 100%; height: auto; display: block; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; margin: 8px 0 0; background: #ffffff; color: var(--ink); font: 400 12.5px var(--font); cursor: pointer; }
+    .si:hover:not(:disabled) { border-color: var(--accent); background: var(--panel); }
+    .si .si-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .si .si-top b { font-size: 13.5px; }
+    .si .si-when { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+    .si .si-when.old { color: var(--warn); }
+    .si .si-uses { margin-top: 3px; line-height: 1.4; }
+    .si .si-where { margin-top: 3px; color: var(--muted); line-height: 1.35; }
+    .footer > .row #startBtn { flex: 2; }
     /* Debug panel: only shown when z_InputDataDebug.gs is installed (the replies then carry .debug) */
     #debug { margin-top: 16px; border: 1px dashed var(--warn); border-radius: var(--radius); padding: 8px 10px; background: var(--warn-soft); font-size: 11.5px; }
     #debug summary { font-weight: 700; cursor: pointer; }
@@ -97,6 +107,17 @@
   <div id="progress" class="hidden"></div>
 
   <div id="loading" class="status"><div class="spinner"></div><div>Loading…</div></div>
+
+  <!-- "Got it, moving your data…" at the TOP while a paste / upload moves (release check 2.9) -->
+  <div id="workingTop" class="status hidden" role="status" aria-live="polite"><div class="spinner"></div><div id="workingTopText"></div></div>
+
+  <!-- START PAGE (owner 2026-11-14, release check 2.16): what each file is for, where to get it, last loaded -->
+  <div id="startView" class="hidden">
+    <h3>Before you start</h3>
+    <div class="muted">Five kinds of data, one at a time. Only Student Data is needed; the rest are optional. The same list is on the "Start Here" tab.</div>
+    <div id="startItems"></div>
+    <div class="muted" style="margin-top:8px">Closed this panel by mistake? 🚀 App Menu → 📥 Input Data Mode brings it back, on the same step.</div>
+  </div>
 
   <!-- ACTIVE STEP -->
   <div id="stepView" class="hidden">
@@ -142,14 +163,18 @@
     <div class="card" id="siteCard">
       <b>Fill in the <span id="siteTabName"></span> tab</b>
       <div class="muted">Your entries are only saved to Raw Data when you click Save.</div>
+      <!-- "8 of 12 classes have a teacher" (idm_check reads the tab; release check 2.11) -->
+      <div id="siteCount" class="done-line hidden" style="margin-top:6px"></div>
       <div class="row">
-        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">Save Site / Class</button>
+        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">Save and go to Your Lists</button>
         <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
       </div>
     </div>
 
     <div class="card" id="listsCard">
       <b>Your lists</b>
+      <!-- the shared progress bar while step 5 builds the sheets first (Styles.html pcBar; release check 2.12) -->
+      <div id="listsBuildBar" class="hidden" style="margin:8px 0"></div>
       <div id="listsBuildNote" class="hidden"></div>
       <div id="listItems"></div>
       <div id="newListForm" class="hidden">
@@ -161,8 +186,9 @@
         <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; add the list</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
       </div>
       <button class="addlist" id="addListBtn" onclick="showNewList()">Add another list</button>
-      <div class="muted" style="margin-top:6px">No lists? Click Finish to skip this step.</div>
-      <div class="row"><button class="primary" id="finishListsBtn" style="flex:1" onclick="finishLists()">Finish</button></div>
+      <!-- One Finish (release check 2.12 / 2.16: "Finish" here and "Finish or exit" below looked like two finishes):
+           on this step the button at the bottom is the only one -->
+      <div class="muted" style="margin-top:6px">No lists? Click Finish Input Data Mode at the bottom to skip this step.</div>
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
@@ -182,6 +208,8 @@
     <div id="doneNotice" class="ok hidden"></div>
     <div class="card"><div id="summary"></div></div>
     <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span><span id="builtHint" class="hidden"> Your sheets are already built with the new data.</span></div>
+    <!-- Lists changed after step 5's build (release check 2.16): say why it needs another build -->
+    <div id="listsBuildHint" class="warnline hidden">You changed your lists after the sheets were built. Build again to put them in the Student List, Parents Divided and the phone contacts.</div>
     <div class="row">
       <button class="primary" id="buildBtn" onclick="build()">Build sheets now</button>
       <button id="nextStepsBtn" class="hidden" onclick="nextSteps()">Next steps</button>
@@ -215,25 +243,43 @@
       </div>
     </div>
     <div class="row" style="margin:0">
+      <button id="startBtn" class="primary hidden" onclick="goToStep(0)">Start with Student Data</button>
       <button id="skipBtn" onclick="skip()">Skip</button>
+      <!-- Site / Class filled in (every class has a teacher or a site): saving is the way on (2.11) -->
+      <button id="siteNextBtn" class="primary hidden" onclick="saveSiteClass()">Save and go to Your Lists</button>
+      <button id="finishBtn" class="primary hidden" onclick="finishLists()">Finish Input Data Mode</button>
       <button id="exitBtn" class="danger" onclick="exitMode()">Finish or exit</button>
     </div>
   </div>
 
 <script>
-  var POLL_MS = 2000;
+  var POLL_MS = 2000;        // paste steps: look for a paste every 2 s
+  var SLOW_POLL_MS = 3500;   // Site / Class (counts what is filled in) and the start page
   var pollTimer = null;
-  var busy = false;          // a server call is running
+  // busy = a call the USER started is running (its buttons are off meanwhile). The background check
+  // (idm_check) is separate: pollInFlight. A click no longer waits for it (release check 3.1 / 2.16:
+  // a click while a check ran was dropped, so NYCSA "needed two clicks" and Finish "did nothing"):
+  // the click makes the check stale (pollSeq) and its reply is ignored.
+  var busy = false;
+  var pollInFlight = false;
+  var pollSeq = 0;
+  var pollCount = 0;         // every 5th check also hides any tab shown again (idm_check(true))
   var paused = false;        // an error is showing: wait for the user
-  var pendingUpload = null;
-  var currentManual = false; // on the Site / Class step (no polling)  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
-  var currentLists = false;  // on step 5, Your Lists (no polling)
+  var asking = false;        // "Leave Input Data Mode?" is open: no checks (a check's redraw used to close it)
+  var pendingUpload = null;  // { kind: 'csv'|'rows', data } kept for "Use it anyway"
+  var currentManual = false; // on the Site / Class step
+  var currentLists = false;  // on step 5, Your Lists (no checks)
+  var currentOverview = false; // on the start page
+  var lastStartKey = '';     // the start page as last drawn (a check redraws it only when it changed)
   var stickyError = null;    // a wrong paste was cleared off the tab: its message stays while polling goes on (step index)
   var listsBuildStarted = false; // step 5's build-first ran on this visit (never started twice in a row)
-  var buildPollTimer = null; // build progress while step 5 builds first
+  var listsBar = null, listsFollow = null; // the shared progress bar while step 5 builds first (Styles.html)
   var canBuildNow = false;   // "Save, exit and build" possible (Student Data there, or its step)
   var buildAfterExit = false; // "Save, exit and build" clicked: build once the mode has closed
   var justDone = null;       // { step, kind, title, sub }: the "… completed!" banner, kept while that step shows
+  var lastCall = null;       // { fn, args }: asked again while the sheet is busy (setup / a build)
+  var busyTries = 0;
+  var lastDone = null;       // the end screen's reply (Next steps asks to build first when needed)
 
   function $(id) { return document.getElementById(id); }
 
@@ -248,7 +294,7 @@
   function dbgStatus() {
     $('dbgStatus').innerHTML = 'Polls: <b>' + dbg.polls + '</b> · failed: <b>' + dbg.fails + '</b>' +
       ' · last reply: <b>' + (dbg.lastAt || '—') + '</b>' + (dbg.lastMs !== null ? ' (' + dbg.lastMs + ' ms)' : '') +
-      '<br>busy=' + busy + ' paused=' + paused + ' timer=' + (pollTimer ? 'set' : 'none') +
+      '<br>busy=' + busy + ' check=' + pollInFlight + ' paused=' + paused + ' asking=' + asking + ' timer=' + (pollTimer ? 'set' : 'none') +
       ' · Excel reader: ' + (typeof XLSX === 'undefined' ? '<b>NOT loaded</b>' : 'loaded');
   }
   function dbgReply(v, what) {
@@ -262,7 +308,7 @@
     $('dbgServer').textContent = 'SERVER (' + what + ' @ ' + dbg.lastAt + ')\n' + summary + '\n' + lines.join('\n');
     dbgStatus();
   }
-  function checkNow() { paused = false; busy = false; stopPolling(); clog('Check now clicked'); poll(); }
+  function checkNow() { paused = false; busy = false; cancelPoll(); clog('Check now clicked'); poll(); }
   function copyDebug() {
     var text = $('dbgStatus').innerText + '\n\n' + $('dbgServer').textContent + '\n\n' + $('dbgClient').textContent;
     var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
@@ -273,30 +319,46 @@
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
 
   function render(v) {
-    busy = false;
-    stopBuildPoll();
+    if (v && v.busy) return waitBusy(v); // the sheet is busy: ask again shortly (not an error)
+    busy = false; busyTries = 0;
+    show('workingTop', false);
     dbgReply(v, 'reply');
     show('loading', false);
-    if (!v || !v.active) {
+    if (!v || !v.active || v.broken) {
       if (v && v.finished) return renderDone(v);
-      show('stepView', false); show('footer', false);
+      stopListsBar();
+      show('stepView', false); show('startView', false); show('progress', false); show('footer', false);
       $('loading').innerHTML = '<div>' + (v && v.notice && v.notice.type === 'error'
         ? esc(plainText(v.notice.message))
         : 'Input Data Mode is not on. Open 🚀 App Menu → 📥 Input Data Mode to start.') + '</div>';
       show('loading', true);
       return;
     }
-    show('stepView', true); show('doneView', false); show('footer', true);
     lastView = v;
+    currentOverview = !!v.overview;
+    show('doneView', false); show('footer', true);
+    if (!asking) show('exitAsk', false);
+    canBuildNow = !!v.canBuild;
+    buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
+    renderProgress(v.progress || []);
+    if (currentOverview) {
+      // The start page (release check 2.16): no paste to look for; a slow check keeps the tabs hidden
+      stopListsBar(); justDone = null; renderJustDone(false);
+      show('stepView', false); show('startView', true);
+      renderStart(v);
+      setFooter('start');
+      currentManual = false; currentLists = false; paused = false; stickyError = null;
+      setButtons(true);
+      schedule();
+      return;
+    }
+    show('startView', false); show('stepView', true);
     // "<step> completed!" (idm_doneNotice_): at the top of the next step until another step shows
     var fresh = !!(v.notice && v.notice.done);
     if (fresh) justDone = { step: v.stepIndex, kind: v.notice.done.kind === 'info' ? 'info' : 'ok', title: v.notice.done.title, sub: v.notice.done.sub || '' };
     else if (justDone && justDone.step !== v.stepIndex) justDone = null;
     renderJustDone(fresh);
     if (fresh) window.scrollTo(0, 0);
-    buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
-    canBuildNow = !!v.canBuild;
-    renderProgress(v.progress || []);
     $('stepTitle').textContent = 'Data ' + (v.stepIndex + 1) + ' of ' + v.stepCount + ': ' + v.step.zone;
     $('stepPill').textContent = v.step.required ? 'Required' : 'Optional';
     $('stepPill').className = 'pill' + (v.step.required ? '' : ' opt');
@@ -315,8 +377,10 @@
     show('uploadCard', !manual && !listsStep); show('pasteCard', !manual && !listsStep); show('siteCard', manual);
     show('listsCard', listsStep);
     if (listsStep) renderLists(v.lists);
-    if (!listsStep) listsBuildStarted = false;
+    if (!listsStep) { listsBuildStarted = false; stopListsBar(); }
     var lb = listsStep ? v.listsBuild : null;
+    // The build-first bar ends with the build's outcome and stays on the card (it was a spinner)
+    if (listsBar && lb) { if (lb.ok) listsBar.done('Sheets built'); else listsBar.fail('The sheets were not built'); listsBar = null; if (listsFollow) { listsFollow.stop(); listsFollow = null; } }
     $('listsBuildNote').className = lb ? (lb.ok ? 'done-line' : 'warnline') : 'hidden';
     $('listsBuildNote').innerHTML = lb ? (lb.ok ? '<span class="mk yes">✓</span>' : '') + esc(plainText(lb.message)) : '';
     // The "Reading… / Moving data…" spinner and any error sit right under Option 1
@@ -329,8 +393,9 @@
     $('howToTitle').textContent = (manual || listsStep) ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
     $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? 'Skip' : 'Skip (don\'t save) and finish';
-    show('skipBtn', !listsStep); // step 5 ends with its own Finish button
-    show('exitAsk', false);
+    // Site / Class: "Save and go to Your Lists" once every class has a teacher or a site (release check 2.11)
+    var siteReady = manual ? renderSiteCount(v.siteClass) : false;
+    setFooter(listsStep ? 'lists' : manual ? 'site' : 'paste', siteReady);
 
     var n = v.notice;
     show('notice', false); // success now shows in the list under Option 1
@@ -364,10 +429,46 @@
       show('waiting', !manual && !listsStep);
     }
     setButtons(true);
-    if (manual || listsStep) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks a button
-    else schedule();
+    if (listsStep) { paused = true; stopPolling(); dbgStatus(); } // nothing to detect: the user clicks a button
+    else schedule(); // paste steps: a paste; Site / Class: what is filled in
     // Step 5 matches lists to the Student List: a new sheet / new data is built first (idm_buildForLists)
     if (listsStep && v.needsBuild && !listsBuildStarted) { listsBuildStarted = true; buildForLists(); }
+  }
+
+  // The buttons at the bottom for where you are: one way on at each place (release check 2.11 / 2.16)
+  function setFooter(mode, siteReady) {
+    show('startBtn', mode === 'start');
+    show('skipBtn', mode === 'paste' || (mode === 'site' && !siteReady));
+    show('siteNextBtn', mode === 'site' && !!siteReady);
+    show('saveSiteBtn', !(mode === 'site' && siteReady)); // one "Save and go" at a time (the card's, or the footer's when filled in)
+    show('finishBtn', mode === 'lists');   // the one Finish on Your Lists (there were two)
+    show('exitBtn', mode !== 'lists');
+    $('exitBtn').textContent = mode === 'start' ? 'Exit' : 'Finish or exit';
+  }
+
+  // "8 of 12 classes have a teacher · 5 have a site": true when every class has a teacher or a site
+  function renderSiteCount(c) {
+    if (!c || !c.classes) { show('siteCount', false); return false; }
+    var ready = c.teachers === c.classes || c.sites === c.classes;
+    $('siteCount').innerHTML = (ready ? '<span class="mk yes">✓</span>' : '') + c.teachers + ' of ' + c.classes +
+      ' classes have a teacher · ' + c.sites + ' have a site' + (ready ? '. Ready to save.' : '');
+    show('siteCount', true);
+    return ready;
+  }
+
+  // The start page: one card per kind of data; a card goes to its step
+  function renderStart(v) {
+    var items = v.start || [];
+    lastStartKey = JSON.stringify(items);
+    $('startItems').innerHTML = items.map(function (it) {
+      var last = it.last ? ('Last loaded ' + it.last.text + (it.last.days === null ? '' : ' (' + daysText(it.last.days) + ')')) : 'Never loaded';
+      var old = it.last && it.last.days !== null && it.last.days > 30;
+      return '<button type="button" class="si" onclick="goToStep(' + it.index + ')" title="Go to this step">' +
+        '<div class="si-top"><b>' + (it.index + 1) + '. ' + esc(it.name) + '</b><span class="si-when' + (old ? ' old' : '') + '">' + esc(last) + '</span></div>' +
+        '<div class="si-uses">' + (it.required ? '<b>Needed.</b> ' : '') + esc(it.uses) + '</div>' +
+        (it.where ? '<div class="si-where">Where: ' + esc(it.where) + (it.fileHint ? '. The file: ' + it.fileHint + '.' : '') + '</div>' : '') +
+        '</button>';
+    }).join('');
   }
 
   function renderJustDone(fresh) {
@@ -392,9 +493,9 @@
   }
 
   function goToStep(i) {
-    if (busy) return;
-    working('Switching step…');
+    if (busy) return; // a call you started is still running (its buttons are off)
     hideExitAsk();
+    working(i === -1 ? 'Back to the start page…' : 'Switching step…');
     call('idm_goToStep', i);
   }
 
@@ -404,15 +505,18 @@
     // separate call, which also deletes that tab) opens the Build sidebar in place of this one
     if (buildAfterExit && v.exited && v.canBuild && !v.builtAlready) {
       buildAfterExit = false;
-      show('progress', false); show('stepView', false); show('footer', false); show('doneView', false);
+      show('progress', false); show('startView', false); show('stepView', false); show('footer', false); show('doneView', false);
       $('loading').innerHTML = '<div class="status"><div class="spinner"></div><div>Your tabs are back. Opening the build…</div></div>';
       show('loading', true);
       google.script.run.withFailureHandler(onFail).idm_build();
       return;
     }
     var askedBuild = buildAfterExit; buildAfterExit = false;
-    show('progress', false);
+    lastDone = v;
+    stopListsBar();
+    show('progress', false); show('startView', false);
     show('stepView', false); show('footer', false); show('loading', false); show('doneView', true);
+    show('listsBuildHint', v.buildReason === 'lists');
     $('doneTitle').textContent = v.exited ? 'Input Data Mode closed' : 'All done';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = plainText(v.notice.message); show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported); show('builtHint', !v.anyImported && !!v.builtAlready);
@@ -453,26 +557,34 @@
   function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
 
   function setButtons(on) {
-    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn', 'addListBtn', 'createListBtn', 'finishListsBtn'].forEach(function (id) { $(id).disabled = !on; });
+    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn', 'addListBtn', 'createListBtn', 'startBtn', 'siteNextBtn', 'finishBtn'].forEach(function (id) { $(id).disabled = !on; });
+    Array.prototype.forEach.call(document.querySelectorAll('#startItems button'), function (b) { b.disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#listItems button'), function (b) { b.disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#progress .pstep'), function (b) { b.disabled = !on; });
   }
 
-  function working(text) {
+  // top: also say it at the TOP of the panel (a paste / upload being moved; release check 2.9)
+  function working(text, top) {
+    cancelPoll();
     busy = true;
-    stopPolling();
     setButtons(false);
     show('errorBox', false);
     $('waitingText').textContent = text;
     show('waiting', true);
+    if (top) { $('workingTopText').textContent = top; show('workingTop', true); window.scrollTo(0, 0); }
   }
 
+  var RELOAD_TEXT = 'The sheet lost track of a tab that was deleted while it was open. Reload the page (Ctrl+R, on a Mac ⌘+R): Input Data Mode comes back where you were, and nothing you loaded is lost.';
   function onFail(err) {
     busy = false;
-    dbg.fails++; clog('CALL FAILED: ' + (err && err.message ? err.message : err)); dbgStatus();
+    show('workingTop', false);
+    var msg = String(err && err.message ? err.message : err);
+    dbg.fails++; clog('CALL FAILED: ' + msg); dbgStatus();
     setButtons(true);
     paused = true;
-    $('errorText').textContent = plainText(err && err.message ? err.message : err);
+    // "Sheet 123 not found": this page's session can't recover by itself (release check 3.1)
+    if (/sheet\s+\S+\s+not found/i.test(msg)) msg = RELOAD_TEXT;
+    $('errorText').textContent = plainText(msg);
     $('retryBtn').textContent = 'OK';
     show('anywayBtn', false);
     show('errorBox', true);
@@ -482,51 +594,86 @@
   function call(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
     clog('call ' + fn);
+    lastCall = { fn: fn, args: args };
     dbg.lastSent = Date.now();
     var runner = google.script.run.withSuccessHandler(render).withFailureHandler(onFail);
     runner[fn].apply(runner, args);
   }
 
+  // The sheet was busy (Initial Setup still finishing, a build's tab work): the same call again in 3 s,
+  // for up to about 3 minutes, with a note at the top (it used to end in "Lock timeout")
+  function waitBusy(v) {
+    busyTries++;
+    if (busyTries > 50 || !lastCall) { busyTries = 0; return onFail('The sheet stayed busy for a few minutes. Reload the page and try again.'); }
+    busy = true;
+    setButtons(false);
+    show('loading', false);
+    $('workingTopText').textContent = (v.notice && v.notice.message) || 'Waiting for the sheet…';
+    show('workingTop', true);
+    var c = lastCall;
+    setTimeout(function () {
+      var runner = google.script.run.withSuccessHandler(render).withFailureHandler(onFail);
+      runner[c.fn].apply(runner, c.args);
+    }, 3000);
+  }
+
   // --- polling: the sidebar can't be told about a paste, so it checks every 2s ---
   function schedule() {
     stopPolling();
-    if (paused || busy) return;
-    pollTimer = setTimeout(poll, POLL_MS);
+    if (paused || busy || asking) return;
+    pollTimer = setTimeout(poll, (currentManual || currentOverview) ? SLOW_POLL_MS : POLL_MS);
   }
   function stopPolling() { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } }
+  // A click: the check in flight (if any) is dropped, its reply will be ignored
+  function cancelPoll() {
+    stopPolling();
+    if (pollInFlight) { pollSeq++; pollInFlight = false; clog('check in flight dropped (a click)'); }
+  }
   function poll() {
-    if (paused || busy) { clog('poll skipped (paused=' + paused + ', busy=' + busy + ')'); return; }
-    busy = true;
+    if (paused || busy || asking || pollInFlight) { clog('poll skipped (paused=' + paused + ', busy=' + busy + ', asking=' + asking + ')'); return; }
+    pollInFlight = true;
+    var mySeq = ++pollSeq;
+    pollCount++;
+    var full = pollCount % 5 === 0; // every ~10 s: any tab shown again is hidden too
     dbg.polls++; dbg.lastSent = Date.now(); dbgStatus();
     google.script.run
       .withSuccessHandler(function (v) {
+        if (mySeq !== pollSeq) { clog('stale check reply ignored'); return; } // a click came after it was sent
+        pollInFlight = false;
         dbg.inRow = 0;
+        if (v && v.busy) { dbgStatus(); schedule(); return; } // the sheet is busy: look again later
         if (v && v.active && v.pending) {
           dbgReply(v, 'poll');
           clog('data found on the paste tab -> moving it');
-          working('Found your data. Moving it to Raw Data… (this can take up to a minute, please wait)');
+          working('Found your data. Moving it to Raw Data… (this can take up to a minute, please wait)',
+                  'Got your paste. Moving it to Raw Data… This can take up to a minute.');
           call('idm_processPaste');
           return;
         }
         // Still waiting after a cleared wrong paste: leave its message up (nothing else changed)
-        if (stickyError !== null && v && v.active && v.stepIndex === stickyError && !v.notice) {
-          busy = false; dbgReply(v, 'poll'); schedule(); return;
+        if (stickyError !== null && v && v.active && !v.overview && v.stepIndex === stickyError && !v.notice) {
+          dbgReply(v, 'poll'); schedule(); return;
+        }
+        // The start page, nothing changed: no redraw (it would flicker)
+        if (currentOverview && v && v.active && v.overview && JSON.stringify(v.start || []) === lastStartKey && !v.notice) {
+          dbgReply(v, 'poll'); schedule(); return;
         }
         render(v);
       })
       .withFailureHandler(function (e) {
-        busy = false;
+        if (mySeq !== pollSeq) return;
+        pollInFlight = false;
         dbg.fails++; dbg.inRow++;
         clog('POLL FAILED (' + dbg.inRow + ' in a row): ' + (e && e.message ? e.message : e));
         dbgStatus();
         if (dbg.inRow >= 3) { onFail(e); return; }  // stop retrying silently
         schedule();
       })
-      .idm_check();
+      .idm_check(full);
   }
 
   // --- buttons ---
-  function saveSiteClass() { working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
+  function saveSiteClass() { if (busy) return; hideExitAsk(); working('Saving Site / Class to Raw Data…'); call('idm_saveSiteClass'); }
   var lastView = null;
   function skip() {
     // The one required file, never loaded: say what skipping means (a new user may think "later")
@@ -535,8 +682,12 @@
     working('Skipping…'); call('idm_skip');
   }
   function exitMode() {
-    if (busy) return;
-    $('exitAskText').textContent = currentLists
+    if (busy) return; // a call you started is running (its buttons are off)
+    cancelPoll();     // a check's redraw used to close this panel again ("Finish did nothing", release check 2.16)
+    asking = true;
+    $('exitAskText').textContent = currentOverview
+      ? 'Nothing has been loaded yet in this round, so nothing is lost.'
+      : currentLists
       ? 'Your lists are saved one by one, so nothing is lost either way.'
       : currentManual
       ? 'Save & exit saves what you typed on the Site / Class tab to Raw Data. Exit without saving loses it.'
@@ -547,12 +698,14 @@
   function saveAndExit() { hideExitAsk(); working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function saveExitAndBuild() { hideExitAsk(); buildAfterExit = true; working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function reallyExit() { working('Bringing your tabs back…'); call('idm_exit'); }
-  function hideExitAsk() { show('exitAsk', false); }
+  function hideExitAsk() { show('exitAsk', false); if (asking) { asking = false; if (!busy) schedule(); } }
   function retry() {
     if ($('retryBtn').textContent === 'OK') {
       pendingUpload = null; stickyError = null; show('errorBox', false);
-      if (currentManual) return;  // Site / Class: just fix the tab and click Save again
-      paused = false; show('waiting', true); schedule(); return;
+      paused = false;
+      if (!currentManual && !currentLists) show('waiting', true);
+      if (!currentLists) schedule(); // Site / Class: fix the tab, the counts follow; then Save again
+      return;
     }
     working('Clearing the tab…'); call('idm_retry');
   }
@@ -569,27 +722,28 @@
     google.script.run.withFailureHandler(onFail).idm_build(); // opens the Build sidebar in place of this one
   }
   function nextSteps() {
+    // The new data / lists aren't in the sheets yet: say so before the checklist (release check 2.16)
+    if (lastDone && lastDone.anyImported) {
+      var what = lastDone.buildReason === 'lists' ? 'your new lists' : 'your new data';
+      if (confirm('Build your sheets first?\n\nThe sheets get ' + what + ' only when they are built.\n\nOK = build now.  Cancel = open the next steps without building (the checklist then says "Build your sheets again").')) return build();
+    }
     google.script.run.withFailureHandler(onFail).openGuideChecklist(); // the checklist in place of this sidebar
   }
 
-  // --- step 5: build first (Your Lists needs the Student List) ---
-  var BUILD_TEXT = 'Building your sheets first, so your lists can find your students. This can take a minute or two…';
+  // --- step 5: build first (Your Lists needs the Student List), with the shared progress bar ---
   function buildForLists() {
-    working(BUILD_TEXT);
-    pollBuild();
+    working('Building your sheets first, so your lists can find your students…');
+    show('waiting', false);
+    stopListsBar();
+    show('listsBuildBar', true);
+    listsBar = pcBar($('listsBuildBar'), { title: 'Building your sheets', hint: 'So your lists can find your students. This can take a minute or two.' });
+    listsFollow = pcFollowBuild(listsBar);
     call('idm_buildForLists');
   }
-  function stopBuildPoll() { if (buildPollTimer) { clearTimeout(buildPollTimer); buildPollTimer = null; } }
-  function pollBuild() {
-    stopBuildPoll();
-    buildPollTimer = setTimeout(function () {
-      google.script.run.withSuccessHandler(function (st) {
-        if (!buildPollTimer) return; // the build finished meanwhile
-        var steps = (st && st.buildSteps) || [], i = st ? st.buildStep : 0;
-        if (busy && steps[i]) $('waitingText').textContent = BUILD_TEXT + ' (step ' + (i + 1) + ' of ' + steps.length + ': ' + steps[i].label + ')';
-        if (busy) pollBuild();
-      }).withFailureHandler(function () { if (busy) pollBuild(); }).getSyncStatus();
-    }, 2500);
+  function stopListsBar() {
+    if (listsFollow) { listsFollow.stop(); listsFollow = null; }
+    if (listsBar) { listsBar.stop(); listsBar = null; show('listsBuildBar', false); }
+    if (!currentLists) show('listsBuildBar', false);
   }
 
   // --- step 5: Your Lists (Input Data.gs, part 2) ---
@@ -607,7 +761,7 @@
     }).join('');
   }
   function renderLists(lists) {
-    show('addListBtn', true); show('newListForm', false); show('finishListsBtn', true);
+    show('addListBtn', true); show('newListForm', false);
     listsById = {};
     (lists || []).forEach(function (l) { listsById[l.tabId] = l; });
     $('listItems').innerHTML = (lists || []).map(function (l, i) {
@@ -667,7 +821,7 @@
     working('Deleting…');
     google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); }).withFailureHandler(onFail).od_deleteList(tabId);
   }
-  function finishLists() { working('Finishing…'); call('idm_finishLists'); }
+  function finishLists() { if (busy) return; hideExitAsk(); working('Finishing…'); call('idm_finishLists'); }
 
   // --- upload ---
   $('fileInput').addEventListener('change', function () {
@@ -676,7 +830,7 @@
     if (!file) return;
     var name = file.name.toLowerCase();
     var reader = new FileReader();
-    working('Reading ' + file.name + '…');
+    working('Reading ' + file.name + '…', 'Got your file. Moving it to Raw Data… This can take up to a minute.');
 
     if (/\.(csv|txt)$/.test(name)) {
       reader.onload = function () {

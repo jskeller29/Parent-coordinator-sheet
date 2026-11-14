@@ -74,6 +74,12 @@ var IDM_STEPS = [
     col: 1, stampCell: 'A1', stampPrefix: 'ATS - DATE UPDATED: ', minMatch: 3,
     headers: ["School Year","DBN","Student ID","Last Name","First Name","Race","Gender","Age","IEP Flag","ELL Flag","504 Flag","NYSAA Eligible","Housing Status","Temporary Housing Flag","Economic Disadvantage Flag","Cohort Year","Grade","Official Class","Home Language","Guardian Name 1","Guardian Relationship 1","Guardian Phone Number 1","Guardian Email 1","Guardian Spoken Language 1","Guardian Written Language 1","Guardian Name 2","Guardian Relationship 2","Guardian Phone Number 2","Guardian Email 2","Guardian Spoken Language 2","Guardian Written Language 2"],
     numberCols: ["Student ID","Guardian Phone Number 1","Guardian Phone Number 2"],
+    // A row counts only with one of these filled (a row with only School Year / DBN is left out);
+    // studentCol: the "<n> students" part of the "completed!" message (release check 3.1: the count looked wrong)
+    keyCols: ["Student ID","Last Name","First Name"], studentCol: "Student ID",
+    // The start page (owner 2026-11-14, release check 2.16): what each file is for
+    uses: "The one file the tracker needs: every student with their guardians, phones, emails, languages and class. The Student List, Directory, Parents Divided and Phone Contacts are built from it.",
+    where: "TeachHub → Insight → Tools → Downloader → Guardian Contact Information",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
       "In the search bar, look up and open <b>Insight</b>.",
@@ -89,6 +95,9 @@ var IDM_STEPS = [
     col: 33, stampCell: 'AG1', stampPrefix: 'Parent Square - DATE UPDATED: ', minMatch: 2,
     headers: ["Name","Students","Email","Phone","Secondary Phone","Record Created","Registered?","SIS Synced"],
     numberCols: ["Phone","Secondary Phone"],
+    keyCols: ["Name","Students","Email","Phone"],
+    uses: "Which parents have joined Parent Square. Shows in Parents Divided, and the build report lists the new sign-ups.",
+    where: "ParentSquare → Admin → Data Assistant → Parents → Export CSV",
     howTo: [
       "Go to <b>ParentSquare</b>, sign in, and open <b>Admin</b>.",
       "Under <b>Data Assistant</b>, select <b>Parents</b>.",
@@ -102,6 +111,9 @@ var IDM_STEPS = [
     col: 42, stampCell: 'AP1', stampPrefix: 'NYCSA - DATE UPDATED: ', minMatch: 3,
     headers: ["Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name","Another Custodial NYCSA Account Exist","Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"],
     numberCols: ["Student ID","Guardian Home Number","Guardian Work Number","Guardian Cell Number"],
+    keyCols: ["Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name"], studentCol: "Student ID",
+    uses: "Families who don't have an NYC Schools Account yet, with their account creation codes. Shows in Parents Divided. A family that signs up leaves this list, and the next build report counts them as NYCSA sign-ups.",
+    where: "TeachHub → Family Access Management → \"Students with Non-NYCSA Account\" report",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
       "Open <b>Family Access Management</b>.",
@@ -112,6 +124,8 @@ var IDM_STEPS = [
   },
   {
     key: 'siteclass', tab: 'Site / Class', short: 'Site / Class', zone: 'Site / Class', required: false, manual: true,
+    uses: "The teacher and site for each class code. Shows in the Directory, the Student List and the Contact Log.",
+    where: "You type it in (one row per class code from your Student Data)",
     howTo: [
       "The <b>Site / Class</b> tab lists every class code from your Student Data.",
       "Type each class's <b>Teacher Name</b>.",
@@ -122,6 +136,8 @@ var IDM_STEPS = [
   },
   {
     key: 'lists', tab: 'Your Lists', short: 'Your Lists', zone: 'Your Lists', required: false, lists: true,
+    uses: "Your own lists (bus routes, PTA, trip forms…). After a build they show on the phone contacts and as Student List / Parents Divided columns.",
+    where: "Any spreadsheet or CSV you have",
     howTo: [
       "Any other list you get: bus routes, trip forms, after school, PTA…",
       "Each list gets its own tab. Upload the file (CSV or Excel) or paste the whole sheet there; the tool works out who each row is.",
@@ -154,15 +170,22 @@ function addInputDataModeMenuItem_(menu) {
  * call (idm_open) checks the same thing again.
  */
 function openInputDataMode() {
+  // Busy sheet (Initial Setup still finishing on a built copy, a build, another Input Data Mode call):
+  // this used to wait 20 s and end in "Exception: Lock timeout: another process was holding the lock
+  // for too long" (release check 3.1). Now it waits a few seconds at most, then opens the side panel
+  // anyway: the panel's first call (idm_open) does the same start, waiting and retrying by itself.
   const lock = LockService.getDocumentLock();
-  lock.waitLock(20000);
-  let started;
-  try {
-    started = idm_startOrResume_(SpreadsheetApp.getActiveSpreadsheet());
-  } finally {
-    lock.releaseLock();
+  let started = null;
+  if (lock.tryLock(5000)) {
+    try {
+      started = idm_startOrResume_(SpreadsheetApp.getActiveSpreadsheet());
+    } catch (e) {
+      console.warn("Input Data Mode start (menu run): " + e.message); // the side panel tries again
+    } finally {
+      lock.releaseLock();
+    }
   }
-  if (started.error) {
+  if (started && started.error) {
     SpreadsheetApp.getUi().alert('📥 Input Data Mode', started.error, SpreadsheetApp.getUi().ButtonSet.OK);
     return;
   }
@@ -194,7 +217,9 @@ function idm_startOrResume_(ss) {
     let active = ss.getActiveSheet();
     // Started from the 👋 Welcome tab (new copy): come back to the Contact Log, not to it
     if (active && active.getName() === WELCOME_TAB_NAME) active = ss.getSheetByName("Contact Log") || null;
-    state = { step: 0, tempId: null, hiddenIds: [], prevActiveId: active ? active.getSheetId() : null, results: {} };
+    // overview: the start page comes first (owner 2026-11-14, release check 2.16: what each file is
+    // for, where to get it, when it was last loaded); "Start" or a step in the bar leaves it
+    state = { step: 0, overview: true, tempId: null, hiddenIds: [], prevActiveId: active ? active.getSheetId() : null, results: {} };
     idm_saveState_(state);
     idm_ensureTempSheet_(ss, state);
     idm_hideOtherSheets_(ss, state);
@@ -213,9 +238,11 @@ function idm_startOrResume_(ss) {
 /**
  * The user is on the mode's tab and no other tab shows. Step 5 may keep its list tabs
  * open (od_openList shows them). Caller saves the state (hiddenIds may grow).
+ * leaveLists: back from a list's own sidebar (od_backToInputMode): to the Your Lists tab, the
+ * list tab is hidden again (release check 2.16: "Back to Input Data Mode" stayed on 🚌 Bus Routes).
  */
-function idm_focusTempTab_(ss, state, temp) {
-  const listIds = IDM_STEPS[state.step].lists ? idm_listTabIds_(ss) : [];
+function idm_focusTempTab_(ss, state, temp, leaveLists) {
+  const listIds = (IDM_STEPS[state.step].lists && !state.overview && !leaveLists) ? idm_listTabIds_(ss) : [];
   const active = ss.getActiveSheet();
   const onList = active && !active.isSheetHidden() && listIds.indexOf(active.getSheetId()) !== -1;
   if (!onList && (!active || active.getSheetId() !== temp.getSheetId())) temp.activate();
@@ -232,9 +259,17 @@ function idm_open() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const started = idm_startOrResume_(ss);
     if (started.error) return idm_view_(ss, null, { type: 'error', message: started.error });
+    // Back from a list's own sidebar (od_backToInputMode): to the Your Lists tab, not the list's tab
+    const props = PropertiesService.getDocumentProperties();
+    if (props.getProperty(IDM_BACK_FROM_LIST_KEY_)) {
+      props.deleteProperty(IDM_BACK_FROM_LIST_KEY_);
+      const temp = idm_sheetById_(ss, started.state.tempId);
+      if (temp) { idm_focusTempTab_(ss, started.state, temp, true); idm_saveState_(started.state); }
+    }
     return idm_view_(ss, started.state);
   });
 }
+var IDM_BACK_FROM_LIST_KEY_ = 'INPUT_DATA_MODE_BACK_FROM_LIST'; // set by od_backToInputMode, read once by idm_open
 
 /** Current step + "last updated" dates for the sidebar. */
 function idm_getState() {
@@ -245,30 +280,60 @@ function idm_getState() {
  * Polled every ~2s. Only LOOKS at the temp tab (fast); when there is data it
  * answers pending=true and the sidebar shows "moving…" and calls idm_processPaste.
  */
-function idm_check() {
+function idm_check(full) {
   return idm_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
     const temp = idm_ensureTempSheet_(ss, state);
-    // Paste steps: the user belongs on the paste tab. Anywhere else (a tab shown again by hand
-    // or by something else) = back to it, other tabs hidden again (one call when all is well)
-    if (!IDM_STEPS[state.step].manual && !IDM_STEPS[state.step].lists) {
+    const step = IDM_STEPS[state.step];
+    // Paste steps / Site / Class: the user belongs on the mode's tab. Anywhere else (a tab shown again
+    // by hand or by something else) = back to it, other tabs hidden again (one call when all is well).
+    // full (every ~10 s, from the sidebar): every tab is looked at, so a tab something else showed
+    // again is hidden too while the user stays on the mode's tab (release check 3.1: "the rest of the
+    // tabs" were showing during the mode).
+    if (state.overview || !step.lists) {
       const active = ss.getActiveSheet();
-      if (!active || active.getSheetId() !== temp.getSheetId()) {
-        idm_log_("active tab is " + (active ? active.getName() : "none") + ": back to the paste tab");
+      if (full || !active || active.getSheetId() !== temp.getSheetId()) {
+        idm_log_("active tab is " + (active ? active.getName() : "none") + (full ? " (full check)" : ": back to the mode's tab"));
         idm_focusTempTab_(ss, state, temp);
       }
     }
     idm_saveState_(state);
     if (IDM_DBG && typeof idm_debugSheets_ === "function") idm_debugSheets_(ss, state, temp); // z_InputDataDebug.gs
-    if (IDM_STEPS[state.step].manual || IDM_STEPS[state.step].lists) return idm_view_(ss, state);
+    if (state.overview || step.lists) return idm_view_(ss, state);
+    if (step.manual) {
+      const view = idm_view_(ss, state);
+      view.siteClass = idm_siteClassCounts_(temp); // "Save and go to Your Lists" when it's filled in (2.11)
+      return view;
+    }
     const hasData = idm_tempHasData_(temp);
     idm_log_("temp tab has data: " + hasData);
     const view = idm_view_(ss, state);
     view.pending = hasData;
+    // Seen at once (release check 2.9: "something saying the paste registered"): a toast on the sheet;
+    // the sidebar shows its own "moving" box
+    if (hasData) { try { ss.toast("Got your paste. Moving it to Raw Data now (up to a minute)…", "📥 " + step.short, 8); } catch (e) { /* message only */ } }
     return view;
   });
+}
+
+/**
+ * Site / Class tab: how many class codes, and how many have a teacher / a site (one read).
+ * The sidebar offers "Save and go to the next step" once every class has a teacher or every
+ * class has a site (owner 2026-11-14, release check 2.11).
+ */
+function idm_siteClassCounts_(sheet) {
+  const last = sheet.getLastRow();
+  const out = { classes: 0, teachers: 0, sites: 0 };
+  if (last < 2) return out;
+  sheet.getRange(2, 1, last - 1, 3).getDisplayValues().forEach(r => {
+    if (!String(r[0]).trim()) return;
+    out.classes++;
+    if (String(r[1]).trim()) out.teachers++;
+    if (String(r[2]).trim()) out.sites++;
+  });
+  return out;
 }
 
 /** Moves the pasted data on the temp tab to Raw Data (can take a while). */
@@ -277,6 +342,7 @@ function idm_processPaste() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state); // the start page is not a paste
     const temp = idm_ensureTempSheet_(ss, state);
     if (!idm_tempHasData_(temp)) return idm_view_(ss, state);
     return idm_processTemp_(ss, state, temp, false);
@@ -289,6 +355,7 @@ function idm_useAnyway() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state);
     const temp = idm_ensureTempSheet_(ss, state);
     return idm_processTemp_(ss, state, temp, true);
   });
@@ -300,6 +367,7 @@ function idm_retry() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state);
     const temp = idm_ensureTempSheet_(ss, state);
     idm_resetTempSheet_(temp);
     temp.activate();
@@ -308,12 +376,21 @@ function idm_retry() {
   });
 }
 
+/** "Got your file" at once on the sheet (release check 2.9), before the move (which can take a while). */
+function idm_toastGotFile_(ss, state) {
+  const step = IDM_STEPS[state.step];
+  if (state.overview || step.manual || step.lists) return;
+  try { ss.toast("Got your file. Moving it to Raw Data now (up to a minute)…", "📥 " + step.short, 8); } catch (e) { /* message only */ }
+}
+
 /** Uploaded CSV / TXT file (raw text, parsed here so every number stays exactly as written). */
 function idm_submitCsv(text, ignoreCutoff) {
   return idm_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state, { type: 'error', code: 'overview', fromUpload: true, message: "Pick a step first (click Start)." });
+    idm_toastGotFile_(ss, state);
     let rows;
     try {
       rows = idm_parseCsv_(text);
@@ -330,6 +407,8 @@ function idm_submitRows(rows, ignoreCutoff) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state, { type: 'error', code: 'overview', fromUpload: true, message: "Pick a step first (click Start)." });
+    idm_toastGotFile_(ss, state);
     rows = (rows || []).map(r => (r || []).map(c => (c === null || c === undefined) ? "" : c));
     return idm_processRows_(ss, state, rows, rows.map(r => r.map(c => String(c))), !!ignoreCutoff, true);
   });
@@ -341,6 +420,7 @@ function idm_skip() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
+    if (state.overview) return idm_view_(ss, state); // the start page has nothing to skip
     state.results[IDM_STEPS[state.step].key] = { skipped: true };
     return idm_advance_(ss, state, null);
   });
@@ -362,7 +442,9 @@ function idm_saveAndExit() {
     let result = null;
     IDM_CLOSING_ = true; // the step's "completed" message says no "Next:" (the mode is closing)
     try {
-      if (step.manual) {
+      if (state.overview) {
+        idm_log_("save & exit from the start page: nothing to save");
+      } else if (step.manual) {
         result = idm_saveSiteClass_(ss, state, true);
       } else if (step.lists) {
         idm_log_("save & exit: lists are saved one by one in their own sidebar");
@@ -381,7 +463,7 @@ function idm_saveAndExit() {
     const results = state.results;
     idm_cleanup_(ss, state, idm_anyImported_(results));
     return { active: false, finished: true, exited: true, notice: result ? result.notice : null,
-             anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
+             anyImported: idm_finalBuildNeeded_(state), buildReason: idm_buildNeededReason_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   });
 }
 
@@ -392,24 +474,29 @@ function idm_exit() {
     if (!state) return idm_view_(ss, null);
     const results = state.results;
     idm_cleanup_(ss, state, false);
-    return { active: false, finished: true, exited: true, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
+    return { active: false, finished: true, exited: true, anyImported: idm_finalBuildNeeded_(state), buildReason: idm_buildNeededReason_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   });
 }
 
-/** Progress bar click: jump to any step (back or forward). The temp tab is renamed and reset for it. */
+/**
+ * Progress bar click: jump to any step (back or forward), or "Start" on the start page (index 0).
+ * The temp tab is renamed and reset for it. index -1 = back to the start page.
+ */
 function idm_goToStep(index) {
   return idm_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
     index = Number(index);
-    if (!(index >= 0 && index < IDM_STEPS.length) || index === state.step) return idm_view_(ss, state);
-    idm_log_("jump from step " + state.step + " to " + index);
+    const toStart = index === -1;
+    if (!toStart && !(index >= 0 && index < IDM_STEPS.length)) return idm_view_(ss, state);
+    if (toStart ? state.overview : (index === state.step && !state.overview)) return idm_view_(ss, state); // already there
+    idm_log_("jump from " + (state.overview ? "the start page" : "step " + state.step) + " to " + (toStart ? "the start page" : index));
     const temp = idm_sheetById_(ss, state.tempId);
-    state.step = index;
+    state.overview = toStart;
+    if (!toStart) state.step = index;
     if (temp) {
-      idm_renameTab_(ss, temp, IDM_STEPS[index].tab);
-      idm_prepareTab_(ss, temp, IDM_STEPS[index]);
+      idm_prepareCurrent_(ss, state, temp);
       temp.activate();
     } else {
       state.tempId = null;
@@ -464,9 +551,24 @@ function idm_builtAlready_(state) {
   return !!(state.listsBuild && state.listsBuild.ok && !state.dataChanged && !state.listsChanged);
 }
 
+/**
+ * Why the sheets need a build at the end of the mode: 'data' (an export / Site / Class went in and no
+ * build has run since), 'lists' (a list was saved / deleted after step 5's build: its columns and
+ * phone-contact lines come with a build; release check 2.16, "Next steps said built, but the list
+ * wasn't"), or null. Lists that were only looked at need nothing.
+ */
+function idm_buildNeededReason_(state) {
+  const r = state.results || {};
+  const dataIn = IDM_STEPS.some(st => !st.lists && r[st.key] && (r[st.key].rows > 0 || r[st.key].saved));
+  const builtOk = !!(state.listsBuild && state.listsBuild.ok);
+  if (state.dataChanged || (dataIn && !builtOk)) return 'data';
+  if (state.listsChanged) return 'lists';
+  return null;
+}
+
 /** The end screen offers "Build sheets now": something came in, and the sheets don't have it yet. */
 function idm_finalBuildNeeded_(state) {
-  return idm_anyImported_(state.results) && !idm_builtAlready_(state);
+  return !!idm_buildNeededReason_(state);
 }
 
 /** The end screen's "Next steps" (the ✅ Getting Started checklist) while it still has steps to do. */
@@ -576,6 +678,10 @@ function idm_deleteLeftoverTab_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = idm_sheetById_(ss, Number(id));
   if (!sheet) { props.deleteProperty(IDM_PENDING_DELETE_KEY); return false; }
+  // Never the tab a running Input Data Mode uses (a new run reusing it, or two panels at once):
+  // deleting the tab someone is on breaks every later call ("Sheet 763596992 not found", release check 3.1)
+  const running = idm_loadState_();
+  if (running && running.tempId === sheet.getSheetId()) { props.deleteProperty(IDM_PENDING_DELETE_KEY); return false; }
   const active = ss.getActiveSheet();
   if (active && active.getSheetId() === sheet.getSheetId()) {
     // Still on it (the switch to Raw Data didn't take). Move off now; the next try deletes it.
@@ -668,9 +774,13 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   idm_writeSection_(raw, step, mapped.rows);
   idm_log_("Raw Data written");
 
-  state.results[step.key] = { rows: mapped.rows.length };
+  state.results[step.key] = { rows: mapped.rows.length, students: mapped.students };
   state.dataChanged = true; // step 5 builds first (idm_buildForLists)
-  return idm_advance_(ss, state, idm_doneNotice_(ss, state, step, mapped.rows.length, "row", "rows", "moved to Raw Data",
+  // "24 rows moved to Raw Data (18 students). 1 row with no student or guardian was left out."
+  const what = "moved to Raw Data" +
+    (mapped.students ? " (" + idm_countText_(mapped.students, "student", "students") + ")" : "") +
+    (mapped.dropped ? ". " + idm_countText_(mapped.dropped, "row", "rows") + " with no student or guardian " + (mapped.dropped === 1 ? "was" : "were") + " left out" : "");
+  return idm_advance_(ss, state, idm_doneNotice_(ss, state, step, mapped.rows.length, "row", "rows", what,
     "✅ " + step.zone + ": " + mapped.rows.length + " row(s) moved to Raw Data."));
 }
 
@@ -695,18 +805,31 @@ function idm_findHeader_(values) {
   return best;
 }
 
-/** Same column mapping as a full-export paste on Raw Data (cleanRawDataPasteZone_). */
+/**
+ * Same column mapping as a full-export paste on Raw Data (cleanRawDataPasteZone_). A row needs one of
+ * the step's keyCols (student / guardian name or ID; release check 3.1: a row with only the school's
+ * code / district was counted, so "25 rows" showed for 22 students); such rows are counted in dropped.
+ * students = how many different students (step.studentCol), for the "completed!" message.
+ */
 function idm_mapRows_(step, values, displays, headerRow) {
   const header = values[headerRow].map(idm_norm_);
   const indexMap = step.headers.map(h => header.indexOf(idm_norm_(h)));
-  const rows = [], disp = [];
+  const keyIdx = (step.keyCols || []).map(k => step.headers.indexOf(k)).filter(i => i !== -1 && indexMap[i] !== -1);
+  const studentIdx = step.studentCol ? step.headers.indexOf(step.studentCol) : -1;
+  const rows = [], disp = [], students = new Set();
+  let dropped = 0;
   for (let i = headerRow + 1; i < values.length; i++) {
     const row = indexMap.map(idx => (idx !== -1 && idx < values[i].length) ? values[i][idx] : "");
     if (row.every(c => String(c).trim() === "")) continue;
+    if (keyIdx.length && keyIdx.every(k => String(row[k]).trim() === "")) { dropped++; continue; }
     rows.push(row);
     disp.push(indexMap.map(idx => (idx !== -1 && displays[i] && idx < displays[i].length) ? String(displays[i][idx]) : ""));
+    if (studentIdx !== -1 && indexMap[studentIdx] !== -1) {
+      const id = String(row[studentIdx]).replace(/\D/g, "").replace(/^0+/, "");
+      if (id) students.add(id);
+    }
   }
-  return { rows: rows, displays: disp };
+  return { rows: rows, displays: disp, dropped: dropped, students: studentIdx !== -1 && indexMap[studentIdx] !== -1 ? students.size : 0 };
 }
 
 /**
@@ -821,6 +944,8 @@ function idm_fillSiteClassTab_(ss, sheet) {
 
   sheet.getRange(1, 1, 1, 3).setValues([["Class", "Teacher Name", "Site (Optional)"]])
     .setFontWeight("bold").setBackground("#d9ead3").setFontSize(11);
+  // The way back to the side panel, right of the table (never read: Save reads A:C only)
+  idm_styleHint_(sheet.getRange("E1").setValue(IDM_HINT));
   if (rows.length) sheet.getRange(2, 1, rows.length, 3).setValues(rows);
   sheet.getRange(2, 1, total, 1).setFontWeight("bold");
   sheet.getRange(1, 1, total + 1, 3).setBorder(true, true, true, true, true, true, "#cccccc", SpreadsheetApp.BorderStyle.SOLID);
@@ -957,17 +1082,17 @@ function idm_countText_(n, one, many) {
 /** Moves to the next step (new temp tab), or finishes. */
 function idm_advance_(ss, state, notice) {
   const oldTemp = idm_sheetById_(ss, state.tempId);
+  state.overview = false;
   state.step++;
   idm_log_("advance to step " + state.step);
   if (state.step >= IDM_STEPS.length) {
     const results = state.results;
     idm_cleanup_(ss, state, true);
-    return { active: false, finished: true, notice: notice, anyImported: idm_finalBuildNeeded_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
+    return { active: false, finished: true, notice: notice, anyImported: idm_finalBuildNeeded_(state), buildReason: idm_buildNeededReason_(state), builtAlready: idm_builtAlready_(state), guideNext: idm_guideNext_(ss), canBuild: idm_canBuild_(ss), summary: idm_summary_(results) };
   }
   if (oldTemp) {
     // Same tab, cleared and renamed for the next export (never deleted while the user is on it)
-    idm_renameTab_(ss, oldTemp, IDM_STEPS[state.step].tab);
-    idm_prepareTab_(ss, oldTemp, IDM_STEPS[state.step]);
+    idm_prepareCurrent_(ss, state, oldTemp);
     oldTemp.activate();
     idm_log_("temp tab reused as " + oldTemp.getName());
   } else {
@@ -986,15 +1111,75 @@ function idm_ensureTempSheet_(ss, state) {
     if (sheet.isSheetHidden()) sheet.showSheet();
     return sheet;
   }
-  const step = IDM_STEPS[state.step];
   sheet = ss.insertSheet(0);
-  idm_renameTab_(ss, sheet, step.tab);
   if (sheet.getMaxColumns() < 40) sheet.insertColumnsAfter(sheet.getMaxColumns(), 40 - sheet.getMaxColumns());
   sheet.setTabColor("#f1c232");
-  idm_prepareTab_(ss, sheet, step);
+  idm_prepareCurrent_(ss, state, sheet);
   sheet.activate();
   state.tempId = sheet.getSheetId();
   return sheet;
+}
+
+/** The mode's one tab, named and filled for where the user is: the start page or the current step. */
+function idm_prepareCurrent_(ss, state, sheet) {
+  if (state.overview) {
+    idm_renameTab_(ss, sheet, IDM_START_TAB);
+    idm_fillStartTab_(ss, sheet);
+  } else {
+    idm_renameTab_(ss, sheet, IDM_STEPS[state.step].tab);
+    idm_prepareTab_(ss, sheet, IDM_STEPS[state.step]);
+  }
+}
+
+/**
+ * The start page (owner 2026-11-14, release check 2.16: "a landing page, like the Welcome tab, before
+ * Student Data: where to get each file, what each is used for, when each was last updated"). The same
+ * list shows in the side panel (idm_view_ start). Never read as data (no paste step uses it).
+ */
+var IDM_START_TAB = 'Start Here';
+function idm_fillStartTab_(ss, sheet) {
+  idm_clearTab_(sheet);
+  const items = idm_startItems_(ss);
+  const rows = [
+    ["📥 Input Data Mode", "", "", "", ""],
+    ["Load your files one at a time. The side panel on the right walks you through them: click Start there, or click any step in its bar.", "", "", "", ""],
+    [IDM_HINT, "", "", "", ""],
+    ["", "", "", "", ""],
+    ["Data", "What it's used for", "Where to get it", "The file", "Last loaded"]
+  ];
+  items.forEach(it => rows.push([
+    it.name + (it.required ? " (needed)" : " (optional)"), it.uses, it.where,
+    String(it.fileHint || "").replace(/<[^>]+>/g, ""), it.last ? it.last.text + (it.last.days === null ? "" : " (" + idm_daysText_(it.last.days) + ")") : "Never"
+  ]));
+  sheet.getRange(1, 1, rows.length, 5).setValues(rows);
+  sheet.getRange(1, 1).setFontSize(16).setFontWeight("bold").setFontColor("#183e69");
+  sheet.getRange(2, 1).setFontSize(11);
+  idm_styleHint_(sheet.getRange(3, 1));
+  sheet.getRange(5, 1, 1, 5).setFontWeight("bold").setBackground("#183e69").setFontColor("#ffffff");
+  const body = sheet.getRange(6, 1, items.length, 5);
+  body.setWrap(true).setVerticalAlignment("top");
+  sheet.getRange(6, 1, items.length, 1).setFontWeight("bold");
+  sheet.getRange(5, 1, items.length + 1, 5).setBorder(true, true, true, true, true, true, "#d3d9e1", SpreadsheetApp.BorderStyle.SOLID);
+  [170, 380, 280, 230, 140].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  try { sheet.getRange(1, 1, rows.length, 5).setFontFamily("Montserrat"); } catch (e) { /* cosmetic */ }
+}
+
+/** The five data sets for the start page and the side panel: name, what for, where, file, last loaded. */
+function idm_startItems_(ss) {
+  const raw = idm_rawSheet_(ss);
+  return IDM_STEPS.map((st, i) => {
+    let last = null;
+    try { last = (raw || st.manual || st.lists) ? idm_lastUpdated_(raw, st) : null; } catch (e) { last = null; }
+    return { index: i, key: st.key, name: st.doneName || st.short, required: !!st.required, uses: st.uses || "",
+             where: st.where || "", fileHint: st.fileHint || "", last: last };
+  });
+}
+
+function idm_daysText_(d) { return d === 0 ? "today" : d === 1 ? "1 day ago" : d + " days ago"; }
+
+/** The "Closed the side panel?" line: on every Input Data Mode tab, easy to see (release check 2.16). */
+function idm_styleHint_(range) {
+  range.setFontColor("#183e69").setFontWeight("bold").setFontStyle("normal").setBackground("#e3e8ee").setWrap(false);
 }
 
 /** "Student Data", or "Student Data (2)" if the user already has a tab with that name. */
@@ -1028,13 +1213,14 @@ function idm_prepareTab_(ss, sheet, step) {
 function idm_fillListsTab_(ss, sheet) {
   idm_clearTab_(sheet);
   const lists = od_listSummaries_(ss);
-  const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [""],
+  const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [IDM_HINT],
                 ["List", "Tab", "By", "Rows", "Matched", "Need you", "Updated"]];
   lists.forEach(l => rows.push([l.name, l.tabName, l.by === "guardian" ? "guardian" : "student",
     l.stats ? l.stats.rows : "", l.stats ? l.stats.matched : "", l.stats ? l.stats.review : "", l.updated || ""]));
   const width = 7;
   sheet.getRange(1, 1, rows.length, width).setValues(rows.map(r => padRow_(r, width)));
   sheet.getRange("A1").setFontWeight("bold").setFontSize(14);
+  idm_styleHint_(sheet.getRange("A3"));
   sheet.getRange(4, 1, 1, width).setFontWeight("bold").setBackground("#d0e0e3");
   sheet.setColumnWidth(1, 160);
 }
@@ -1050,6 +1236,8 @@ function idm_clearTab_(sheet) {
   sheet.clear();
   try { sheet.showColumns(1, sheet.getMaxColumns()); } catch (e) { /* none hidden */ }
   try { sheet.setFrozenRows(0); } catch (e) { /* cosmetic */ }
+  // The start page's tall wrapped rows and wide columns don't carry over to the next step
+  try { sheet.setRowHeights(1, Math.min(sheet.getMaxRows(), 20), 21); sheet.setColumnWidths(1, 5, 100); } catch (e) { /* cosmetic */ }
 }
 
 function idm_resetTempSheet_(sheet) {
@@ -1057,7 +1245,7 @@ function idm_resetTempSheet_(sheet) {
   sheet.getRange("A1").setValue(IDM_PLACEHOLDER)
     .setBackground("#FFF2CC").setFontWeight("bold").setFontSize(14)
     .setNote("Paste anywhere on this tab — it doesn't have to be A1.");
-  sheet.getRange("A2").setValue(IDM_HINT).setFontColor("#8a94a3").setFontStyle("italic").setWrap(false);
+  idm_styleHint_(sheet.getRange("A2").setValue(IDM_HINT));
   sheet.setColumnWidth(1, 160);
 }
 
@@ -1072,20 +1260,28 @@ function idm_tempHasData_(sheet) {
 }
 
 /**
- * Hides every visible tab except the temp tab (and keepIds). At the START of the mode it
- * remembers which ones they were (the end shows them again); later (resume, a tab shown
- * again in the middle) it only hides: a tab that wasn't showing when the mode started
- * stays hidden at the end. The 👋 Welcome tab is never remembered: the end of the mode
- * shows it again only while the sheets aren't built.
+ * Hides every visible tab except the temp tab (and keepIds). At the START of the mode it remembers
+ * which ones they were (the end shows them again); later (resume, a tab shown again in the middle;
+ * onlyHide) it only hides: on a new copy only the 👋 Welcome tab may come back. A built sheet gets
+ * its everyday tabs back at the end anyway (idm_cleanup_, release check 3.1: after a broken run,
+ * "exiting didn't bring back tabs"). The Welcome tab, the Your Lists tabs and an earlier run's leftover
+ * tab are never remembered.
  */
 function idm_hideOtherSheets_(ss, state, keepIds, onlyHide) {
   const hidden = (state.hiddenIds || []).slice();
   keepIds = keepIds || [];
+  let skip = null; // the list tabs + an earlier run's leftover tab: read only if a tab is hidden
   ss.getSheets().forEach(s => {
     if (s.getSheetId() === state.tempId || s.isSheetHidden() || keepIds.indexOf(s.getSheetId()) !== -1) return;
     try {
       s.hideSheet();
-      if (!onlyHide && s.getName() !== WELCOME_TAB_NAME && hidden.indexOf(s.getSheetId()) === -1) hidden.push(s.getSheetId());
+      if (onlyHide || s.getName() === WELCOME_TAB_NAME || hidden.indexOf(s.getSheetId()) !== -1) return;
+      if (skip === null) {
+        skip = idm_listTabIds_(ss);
+        const leftover = Number(PropertiesService.getDocumentProperties().getProperty(IDM_PENDING_DELETE_KEY));
+        if (leftover) skip.push(leftover);
+      }
+      if (skip.indexOf(s.getSheetId()) === -1) hidden.push(s.getSheetId());
     } catch (e) { console.warn("Input Data Mode could not hide " + s.getName() + ": " + e.message); }
   });
   state.hiddenIds = hidden;
@@ -1107,6 +1303,15 @@ function idm_cleanup_(ss, state, goToRawData) {
     const s = idm_sheetById_(ss, id);
     if (s) { try { s.showSheet(); } catch (e) { console.warn(e.message); } }
   });
+  // A built sheet also gets its everyday tabs back (⚙️ Settings → Tabs), whatever the state remembered
+  // (release check 3.1: after a broken run, "exiting didn't bring back tabs")
+  let builtNow = false;
+  try { builtNow = studentListIsBuilt_(ss); } catch (e) { console.warn(e.message); }
+  if (builtNow) { try { showStartingTabs_(ss); } catch (e) { console.warn("Everyday tabs not shown: " + e.message); } }
+  // The sheets don't have this run's data / lists yet: ✅ Getting Started says "build again" until a
+  // build has run (release check 2.16; cleared at the end of every build, Build.gs)
+  const reason = idm_buildNeededReason_(state);
+  if (reason) { try { PropertiesService.getDocumentProperties().setProperty(BUILD_NEEDED_KEY_, reason); } catch (e) { console.warn(e.message); } }
   listIds.forEach(id => {
     const s = idm_sheetById_(ss, id);
     if (s && !s.isSheetHidden()) { try { s.hideSheet(); } catch (e) { console.warn("Could not hide " + s.getName() + ": " + e.message); } }
@@ -1141,6 +1346,9 @@ function idm_view_(ss, state, notice) {
   const temp = idm_sheetById_(ss, state.tempId);
   return {
     active: true,
+    // The start page (release check 2.16): its own view in the sidebar; the bar shows no current step
+    overview: !!state.overview,
+    start: state.overview ? idm_startItems_(ss) : undefined,
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists,
@@ -1160,7 +1368,7 @@ function idm_view_(ss, state, notice) {
     // Progress bar at the top of the sidebar
     progress: IDM_STEPS.map((st, i) => {
       const r = (state.results || {})[st.key];
-      return { label: st.short, current: i === state.step,
+      return { label: st.short, current: i === state.step && !state.overview,
                status: r ? ((r.rows || r.saved) ? 'done' : 'skipped') : 'todo' };
     }),
     notice: notice || null
@@ -1247,7 +1455,9 @@ function idm_withLock_(fn) {
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(20000)) {
     idm_log_("could not get the document lock in 20s");
-    result = idm_errorView_(new Error("The sheet is busy — try again in a moment."));
+    // Setup finishing, a build's tab work or another call: the sidebar waits and asks again by itself
+    // (release check 3.1 ended in "Lock timeout" right after Initial Setup)
+    result = { busy: true, active: true, notice: { type: 'busy', message: "Waiting for the sheet to finish what it is doing (setup or a build)…" } };
   } else {
     try {
       idm_log_("lock ok");
@@ -1267,15 +1477,24 @@ function idm_withLock_(fn) {
   return result;
 }
 
-/** A script error as a sidebar error (instead of a silent retry). */
+/**
+ * A script error as a sidebar error (instead of a silent retry). "Sheet 123 not found" means this
+ * browser tab's session lost a deleted tab: every later call fails the same way until the page is
+ * reloaded (release check 3.1 showed "Data 1 of 5: (unknown)"), so it says exactly that.
+ */
 function idm_errorView_(e) {
-  const notice = { type: 'error', code: 'exception', message: "❌ Script error: " + (e && e.message ? e.message : e), fromUpload: true };
+  const msg = String(e && e.message ? e.message : e);
+  const lost = /sheet\s+\S+\s+not found|not found.*sheet/i.test(msg);
+  const notice = lost
+    ? { type: 'error', code: 'reload', fromUpload: true,
+        message: "The sheet lost track of a tab that was deleted while it was open. Reload the page (Ctrl+R, on a Mac ⌘+R): Input Data Mode comes back where you were, and nothing you loaded is lost." }
+    : { type: 'error', code: 'exception', message: "❌ Script error: " + msg, fromUpload: true };
   try {
     return idm_view_(SpreadsheetApp.getActiveSpreadsheet(), idm_loadState_(), notice);
   } catch (e2) {
     idm_log_("idm_view_ also failed: " + e2.message);
-    return { active: true, stepIndex: 0, stepCount: IDM_STEPS.length,
-             step: { key: '', zone: '(unknown)', required: false, howTo: [] }, tabName: '?', lastUpdated: null, notice: notice };
+    return { active: true, broken: true, stepIndex: 0, stepCount: IDM_STEPS.length,
+             step: { key: '', zone: 'Reload the page', required: false, howTo: [] }, tabName: '?', lastUpdated: null, notice: notice };
   }
 }
 
@@ -3025,9 +3244,13 @@ function od_migrateLists_(oldSS, newSS) {
 
 /** Back to Input Data Mode's sidebar (when it is on), else just close. */
 function od_backToInputMode() {
-  PropertiesService.getDocumentProperties().deleteProperty(OD_WIZARD_KEY);
+  const props = PropertiesService.getDocumentProperties();
+  props.deleteProperty(OD_WIZARD_KEY);
   if (idm_loadState_()) {
-    openInputDataModeSidebar_(); // its first call (idm_open) puts the user back on the mode's tab
+    // its first call (idm_open) puts the user back on the Your Lists tab and hides the list's tab
+    // (release check 2.16: it stayed on "🚌 Bus Routes")
+    props.setProperty(IDM_BACK_FROM_LIST_KEY_, "1");
+    openInputDataModeSidebar_();
     return { reopened: true };
   }
   return { reopened: false };

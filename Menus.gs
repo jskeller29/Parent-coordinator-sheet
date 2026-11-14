@@ -741,8 +741,9 @@ function showGuideWelcome_(opts) {
     </style>
     <div class="note-dlg${opts.setup ? '' : ' hidden'}" id="setup">
       <h1>Setting up your tracker</h1>
-      <div style="display:flex;gap:10px;align-items:center"><div class="spinner"></div><p style="margin:0">Turning on the automatic updates and getting your tabs ready. This takes about 20 seconds.</p></div>
-      <p class="help" style="margin:0">Please keep this window open.</p>
+      <!-- the shared progress bar (Styles.html pcBar): each setup step as it happens (release check 2.3) -->
+      <div id="setupBar"><div style="display:flex;gap:10px;align-items:center"><div class="spinner"></div><p style="margin:0">Starting…</p></div></div>
+      <p class="help" style="margin:0" id="setupKeep">Please keep this window open. It usually takes 20 to 60 seconds.</p>
     </div>
     <div class="note-dlg hidden" id="setupErr">
       <h1>Setup didn't finish</h1>
@@ -794,10 +795,42 @@ function showGuideWelcome_(opts) {
       function show(id) {
         ['setup', 'setupErr', 'ask', 'fresh'].forEach(function (v) { document.getElementById(v).classList.toggle('hidden', v !== id); });
       }
+      // Setup's steps on the shared progress bar: zg_setupProgress every 1.5 s while zg_runSetup runs.
+      // After 90 s with no new step it says so (slow, or stuck: what to do), instead of a spinner forever.
+      var setupBar = null, setupPoll = null, setupT0 = 0, setupServerStart = null, lastStepAt = 0, lastChange = 0;
+      function followSetup() {
+        setupPoll = setTimeout(function () {
+          google.script.run.withSuccessHandler(function (p) {
+            if (!setupBar || !p) return;
+            // a step saved before this setup began (an earlier try) is not this one's
+            if (setupServerStart === null) setupServerStart = p.now - (Date.now() - setupT0) - 3000;
+            var fresh = p.at && p.at >= setupServerStart;
+            if (fresh) {
+              if (p.at !== lastStepAt) { lastStepAt = p.at; lastChange = Date.now(); }
+              setupBar.set(p.step, p.steps);
+            }
+            var quiet = Date.now() - (lastChange || setupT0); // how long since the last new step
+            document.getElementById('setupKeep').textContent = quiet > 90000
+              ? 'Still working: a big sheet can take a few minutes. If nothing changes for 3 minutes, close this window, reload the page and click 🚨 Initial Setup (Run Once) again (it picks up safely).'
+              : 'Please keep this window open. It usually takes 20 to 60 seconds.';
+            followSetup();
+          }).withFailureHandler(function () { followSetup(); }).zg_setupProgress();
+        }, 1500);
+      }
+      function stopSetupBar(ok, text) {
+        if (setupPoll) { clearTimeout(setupPoll); setupPoll = null; }
+        if (setupBar) { if (ok) setupBar.done(text); else setupBar.fail(text); setupBar = null; }
+      }
       function runSetup() {
         show('setup');
+        setupT0 = Date.now(); setupServerStart = null; lastStepAt = 0; lastChange = 0;
+        if (typeof pcBar === 'function') {
+          setupBar = pcBar(document.getElementById('setupBar'), { title: 'Setting up', waiting: 'Starting…', stepMs: 9000 });
+          followSetup();
+        }
         google.script.run
           .withSuccessHandler(function (r) {
+            stopSetupBar(true, 'Setup done');
             // An older upgrade copy: the server opened the Migration Wizard in place of this window
             if (r && r.migrate) return;
             fillLinks(r && r.links);
@@ -807,6 +840,7 @@ function showGuideWelcome_(opts) {
               .withFailureHandler(function () {}).zg_setupFinish();
           })
           .withFailureHandler(function (e) {
+            stopSetupBar(false, 'Setup stopped');
             document.getElementById('setupErrText').textContent = e.message;
             show('setupErr');
           })
@@ -984,7 +1018,11 @@ function zg_quickLinks_() {
  * does the repair, and the links are only buttons).
  */
 function zg_setupFinish() {
-  try { contactLogOpenRepair_(SpreadsheetApp.getActiveSpreadsheet()); } catch (e) { console.error(e); }
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  try { contactLogOpenRepair_(ss); } catch (e) { console.error(e); }
+  // A sheet that is already built (a copy of a tracker): its Sheet Lock warnings, here and not in the
+  // setup's locked part (runInitialSetupSteps_), so Input Data Mode never waits for them
+  try { if (studentListIsBuilt_(ss)) applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
   let links = null;
   try { links = zg_links_(); } catch (e) { console.warn("Setup window links: " + e.message); }
   return { links: links };
@@ -1026,10 +1064,9 @@ function zg_checklist_(ss) {
                 { action: "importOld", label: "Import last year's tracker" }],
       links: [{ label: "Video: how to download your data", url: links.downloadDataVideo },
               { label: "Guide: how to download your data", url: links.downloadDataDoc }] },
-    { id: "build", title: "Build your sheets", done: zg_isBuilt_(ss),
-      text: "Input Data Mode builds them for you before Your Lists (step 5). Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
-      buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
-      links: [{ label: "Guide: what Build Sheets does", url: links.buildDoc }] },
+    // Built, but newer data / lists came in after the last build (Core.gs BUILD_NEEDED_KEY_): not ticked,
+    // it says why (release check 2.16)
+    zg_buildStep_(ss, props, links),
     { id: "settings", title: "Check your settings", done: props.getProperty('ZG_SETTINGS_SEEN') === 'true',
       text: "Choose which tabs to show, when sheets rebuild, phone sync, and how the Contact Log behaves.",
       buttons: [{ action: "settings", label: "Open Settings" }],
@@ -1040,6 +1077,23 @@ function zg_checklist_(ss) {
       links: [{ label: "Guide: how to log a parent contact", url: links.contactLogDoc }] }
   ];
   return { steps: steps, doneCount: steps.filter(s => s.done).length, allDone: steps.every(s => s.done) };
+}
+
+/** Step 2 of the checklist: built (a student on the Student List) and nothing new waiting for a build. */
+function zg_buildStep_(ss, props, links) {
+  const built = zg_isBuilt_(ss);
+  const needed = built ? props.getProperty(BUILD_NEEDED_KEY_) : null;
+  const step = { id: "build", title: "Build your sheets", done: built && !needed,
+    text: "Input Data Mode builds them for you before Your Lists (step 5). Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
+    buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
+    links: [{ label: "Guide: what Build Sheets does", url: links.buildDoc }] };
+  if (needed) {
+    step.title = "Build your sheets again";
+    step.text = needed === "lists"
+      ? "You changed your lists after the last build. Build again so the lists show in the Student List, Parents Divided and the phone contacts."
+      : "You loaded new data after the last build. Build again so your sheets have it.";
+  }
+  return step;
 }
 
 /** Raw Data row 1 stamps ("ATS - DATE UPDATED: 11/04/26"; "00/00/00" = never loaded). */
@@ -1194,11 +1248,35 @@ function runInitialSetup_() {
   }
 }
 
+/**
+ * What the setup window's progress bar shows (owner 2026-11-14, release check 2.3: "be communicative
+ * about what it's loading, so they know if something went wrong or it's just slow"). runInitialSetupSteps_
+ * reports each one (reportSetupStep_); the window asks zg_setupProgress every 1.5 s while setup runs.
+ */
+var SETUP_STEPS_ = [
+  { label: "Turning on the automatic updates", detail: "The 10 PM rebuild, and the live updates while you type" },
+  { label: "Saving your settings", detail: "Phone sync starts off; you can turn it on in ⚙️ Settings" },
+  { label: "Making your 🚀 App Menu", detail: "The menu at the top of the screen changes to the getting-started menu" },
+  { label: "Getting your tabs ready", detail: "Which tabs and columns show" },
+  { label: "Finishing", detail: "The 👋 Welcome tab now says what to do next" }
+];
+function reportSetupStep_(index) {
+  try { CacheService.getScriptCache().put('SETUP_STEP', String(index) + "|" + Date.now(), 1800); } catch (e) { /* the bar only */ }
+}
+/** The setup window's poll: { step, at, now, steps } (at = when that step started; 0 = none yet). */
+function zg_setupProgress() {
+  const raw = String(CacheService.getScriptCache().get('SETUP_STEP') || "");
+  const parts = raw.split("|");
+  return { step: Number(parts[0]) || 0, at: Number(parts[1]) || 0, now: Date.now(), steps: SETUP_STEPS_ };
+}
+
 function runInitialSetupSteps_(ss, props) {
+  reportSetupStep_(0);
   setupAllInstallableTriggers(true);
 
   // ORIGINAL_SHEET_ID: this exact sheet's ID, so the Clone Detector knows this is the original!
   // (both in one call: every property call takes time, owner 2026-11-13 "setup is slow")
+  reportSetupStep_(1);
   props.setProperties({ SETUP_COMPLETE: 'true', ORIGINAL_SHEET_ID: SpreadsheetApp.getActiveSpreadsheet().getId() });
 
 // =======================================================
@@ -1239,8 +1317,10 @@ function runInitialSetupSteps_(ss, props) {
   // The new 🚀 App Menu right away (2026-11-13: was after the tabs / columns / locks below; it
   // only needs the properties above). Suppress onOpen's own auto-migrate open for this call so
   // the wizard isn't opened twice (the setup window opens it).
+  reportSetupStep_(2);
   IS_RUNNING_SETUP = true;
   try { onOpen(); } finally { IS_RUNNING_SETUP = false; }
+  reportSetupStep_(3);
 
   // =======================================================
   // WHICH TABS SHOW
@@ -1263,13 +1343,14 @@ function runInitialSetupSteps_(ss, props) {
   // Not on a new copy (owner 2026-11-13, setup speed): checking its ~20 warnings one call at a
   // time was the slowest part of setup, the first build applies them all anyway (end of
   // buildAllDerivedSheetsRun_; Input Data Mode's and Migration's builds too), and until then
-  // only the Welcome tab shows. A sheet that is already built still gets them here.
-  if (!newCopy) {
-    try { applySheetLocks_(ss); } catch (e) { console.error("Sheet lock skipped: " + e.message); }
-  }
+  // only the Welcome tab shows. A sheet that is already built gets them in the setup window's
+  // SECOND call (zg_setupFinish), outside the document lock (2026-11-14, release check 3.1: on a
+  // copy of a built tracker the new menu showed while this still ran, and 📥 Input Data Mode waited
+  // for it and failed with "Lock timeout"). A copy keeps its original's protections meanwhile.
 
   // Last, so it never says "You're set up" while setup is still running: the Welcome tab now
   // says what to do next (stays until the first build; every open brings the user back to it)
+  reportSetupStep_(4);
   if (newCopy) {
     try { welcomeTabAfterSetup_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
   }
@@ -1546,8 +1627,9 @@ function buildWelcomeTab_(ss, opts) {
     ["Allow access (the permissions above)",
      "\"Authorization required\": click OK, then choose your Google account. \"Google hasn't verified this app\": " +
      "click Advanced, then \"Go to … (unsafe)\" (Google shows this for tools made by a person instead of a company). " +
-     "On the list of permissions, tick Select all, then click Continue. If setup doesn't start after that, " +
-     "click 🚨 Initial Setup (Run Once) again."],
+     "On the list of permissions, tick Select all, then click Continue. If setup doesn't start after that, or Google says " +
+     "\"Script runInitialSetupWrapper experienced an error\", reload the page and click 🚨 Initial Setup (Run Once) again " +
+     "(with some accounts the first try after allowing access stops there)."],
     upgrade
       ? ["Bring over your old data",
          "When setup is done, the Migration Wizard opens to bring your data over from your old sheet. Your other tabs appear when it has finished."]
@@ -1560,7 +1642,7 @@ function buildWelcomeTab_(ss, opts) {
   // navy background, b = step number (column B), c = text (column C), style = how
   // it looks, link = c is a link. No merged cells: Sheets doesn't grow a merged row.
   const rows = [
-    { h: 20 },
+    WELCOME_MENU_NOTE_ROW_, // row 1: "Don't see 🚀 App Menu? Reload" (the title stays in C3)
     { h: 16, band: true },
     { h: 44, band: true, c: "Welcome to the PC Tracker", style: "title" },
     { band: true, c: "Your parent contacts, events and family directory in one place, with your PCAR filled in for you.", style: "subtitle" },
@@ -1610,7 +1692,7 @@ function welcomeDoneRows_(opts) {
      "Nothing is lost. 🚀 App Menu → ✅ Getting Started shows your checklist, and 📥 Input Data Mode picks up where you left off."]
   ];
   const rows = [
-    { h: 20 },
+    WELCOME_MENU_NOTE_ROW_, // row 1 (the title stays in C3: welcomeTabAfterSetup_ reads it there)
     { h: 16, band: true },
     { h: 44, band: true, c: WELCOME_DONE_TITLE_, style: "title" },
     { band: true, c: "Next: load your student data. Input Data Mode walks you through it, one file at a time.", style: "subtitle" },
@@ -1637,6 +1719,14 @@ function welcomeDoneRows_(opts) {
   rows.push({ h: 24 });
   return rows;
 }
+
+/**
+ * Row 1 of the Welcome tab, both versions (owner 2026-11-14, release check 3.2: "if I leave the browser
+ * tab, the App Menu never shows up; put something at the top saying to refresh"). Pale yellow, bold.
+ */
+var WELCOME_MENU_NOTE_ROW_ = { topband: true, style: "topnote",
+  c: "Don't see 🚀 App Menu at the top of the screen? Give it up to a minute, then reload the page (Ctrl+R, on a Mac ⌘+R). " +
+     "Switching to another browser tab while the sheet opens can stop the menu from appearing." };
 
 /** Writes the Welcome tab's rows (a new first tab, or into = that tab, cleared first). */
 function writeWelcomeTab_(ss, rows, into) {
@@ -1670,6 +1760,7 @@ function writeWelcomeTab_(ss, rows, into) {
     const row = i + 1;
     if (r.h) sh.setRowHeight(row, r.h);
     if (r.band) add("band", "A" + row + ":D" + row);
+    if (r.topband) add("topband", "A" + row + ":D" + row);
     if (r.style === "step") add("number", "B" + row);
     if (r.style === "divider") add("divider", "B" + row + ":C" + row);
     else if (r.style) add(r.style, "C" + row);
@@ -1684,6 +1775,8 @@ function writeWelcomeTab_(ss, rows, into) {
   });
   const look = function(style, apply) { if (byStyle[style]) apply(sh.getRangeList(byStyle[style])); };
   look("band", function(l) { l.setBackground(NAVY); });
+  look("topband", function(l) { l.setBackground("#fbf1dc"); });
+  look("topnote", function(l) { l.setFontWeight("bold").setFontColor("#7a5300").setVerticalAlignment("middle"); });
   look("title", function(l) { l.setFontSize(20).setFontWeight("bold").setFontColor("#ffffff").setVerticalAlignment("middle"); });
   look("subtitle", function(l) { l.setFontColor("#d5deea"); });
   look("label", function(l) { l.setFontSize(10).setFontWeight("bold").setFontColor(NAVY); });
@@ -3383,10 +3476,16 @@ function copyContactLogCellNotes_(oldLog, newLog, oldRowNums, headerMap, width) 
  * also says how to turn it off by hand (older trackers ignore the mark; no edit access = no mark).
  */
 function ma_markOldTracker(url) {
+  // This tracker's 👋 Welcome tab: the build in step 6 moved the user off it (it can't be deleted in that
+  // call), so it goes now (release check 3.3: "welcome tab still there at end")
+  try { deleteWelcomeTab_(SpreadsheetApp.getActiveSpreadsheet(), true); } catch (e) { console.warn("Welcome tab: " + e.message); }
   let oldSS;
-  try { oldSS = SpreadsheetApp.openByUrl(url); } catch (e) { return { url: url, name: "", marked: false }; }
-  const res = { url: url, name: "", marked: false };
+  try { oldSS = SpreadsheetApp.openByUrl(url); } catch (e) { return { url: url, name: "", marked: false, pausesItself: null }; }
+  const res = { url: url, name: "", marked: false, pausesItself: null };
   try { res.name = oldSS.getName(); res.url = oldSS.getUrl(); } catch (e) { /* the link as given */ }
+  // Does the old tracker have the code that pauses itself (Build.gs)? Then the manual Settings step isn't
+  // needed (owner 2026-11-14, release check 3.3: "identify if it is an older or a newer version")
+  try { res.pausesItself = trackerPausesItself_(oldSS); } catch (e) { res.pausesItself = null; }
   try {
     const here = SpreadsheetApp.getActiveSpreadsheet();
     oldSS.createDeveloperMetadataFinder().withKey(REPLACED_BY_MARK_).find().forEach(m => m.remove());
@@ -3441,6 +3540,12 @@ function ma_finish(url) {
     if (copied) { try { getStudentListSheet_(ss).clearContents(); } catch (err) { console.warn(err.message); } }
     throw e;
   }
+  // The 👋 Welcome tab: the user is off it now (the build moved them to the Contact Log); the wizard's
+  // next call (ma_markOldTracker) deletes it. Moved off here too, in case the build's own check missed it.
+  try {
+    const welcome = ss.getSheetByName(WELCOME_TAB_NAME);
+    if (welcome && !welcome.isSheetHidden()) { showStartingTabs_(ss); leaveWelcomeTab_(ss); }
+  } catch (e) { console.warn("Welcome tab: " + e.message); }
 
   // 💡 NEW: Instantly Unlock and Repaint the App Menu without requiring a refresh!
   PropertiesService.getDocumentProperties().setProperty('FULL_MENU_UNLOCKED', 'true');

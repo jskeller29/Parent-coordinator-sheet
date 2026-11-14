@@ -71,6 +71,8 @@
       <div id="buildSection">
         <div class="grp-head"><div class="eyebrow" id="buildHead">Build sheets</div><div class="time" id="buildTime"></div></div>
         <p class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and your Student Overrides.</p>
+        <!-- the shared progress bar (Styles.html pcBar), the same one every build shows -->
+        <div id="buildBar" style="margin-bottom:12px"></div>
         <ul class="cl" id="stepList"></ul>
         <div id="buildStatus" class="status">Waiting to start…</div>
       </div>
@@ -90,7 +92,9 @@
       <div id="controlPanel" class="control-panel">
         <button id="btnRestart" class="btn sec" onclick="triggerRestart()">Restart run</button>
         <button id="btnCancel" class="btn dgr" onclick="triggerCancel()">Cancel run</button>
-        <button id="btnStart" class="btn pri" style="display: none;" onclick="triggerRestart()">Start new build</button>
+        <!-- After a run (owner 2026-11-14: "Start new build" read like the thing to do next): Close first -->
+        <button id="btnClose" class="btn pri" style="display: none;" onclick="google.script.host.close()">Close</button>
+        <button id="btnStart" class="btn sec" style="display: none;" onclick="triggerRestart()">Build again</button>
       </div>
     </div>
 
@@ -174,7 +178,8 @@
       }
 
       function showBuildTime() {
-        if (!buildStartTime) { el('buildTime').textContent = ''; return; }
+        // the progress bar has its own clock: one clock at a time
+        if (!buildStartTime || buildBar || el('buildBar').firstChild) { el('buildTime').textContent = ''; return; }
         const end = buildEndTime || Date.now();
         el('buildTime').textContent = (buildEndTime ? 'done in ' : '') + fmtClock(end - buildStartTime);
       }
@@ -185,6 +190,14 @@
         showBuildTime();
         el('buildStatus').className = 'status ok';
         el('buildStatus').innerText = 'Sheets built';
+        if (buildBar) { buildBar.done('Sheets built'); buildBar = null; }
+      }
+
+      // The shared progress bar (Styles.html): made when a build starts, moved by every poll
+      let buildBar = null;
+      function barStep(index) {
+        if (!buildBar) buildBar = pcBar(el('buildBar'), { title: 'Building your sheets', steps: STEPS });
+        buildBar.set(index, STEPS);
       }
 
       function setSyncBar(progress, total, cls) {
@@ -198,35 +211,42 @@
         el('controlPanel').style.display = 'flex';
         el('btnRestart').style.display = running ? 'inline-flex' : 'none';
         el('btnCancel').style.display = running ? 'inline-flex' : 'none';
+        el('btnClose').style.display = running ? 'none' : 'inline-flex';
         el('btnStart').style.display = running ? 'none' : 'inline-flex';
-        el('btnStart').innerText = runMode === 'BUILD_ONLY' ? 'Start new build' : 'Start new run';
+        el('btnStart').innerText = runMode === 'BUILD_ONLY' ? 'Build again' : 'Run again';
       }
 
       window.onload = function() {
         renderStepList();
-
-        // Show the last build report if you reopen the sidebar
-        google.script.run.withSuccessHandler(data => {
-            if (data && (data.newStudents.length > 0 || data.discharged.length > 0 || data.nycsaUpgrades.length > 0 || data.psUpgrades.length > 0)) {
-                cachedBuildLogData = data;
-                if (lastPhase !== 'building') {
-                    showBuildReport();
-                    buildReportShown = true;
-                }
-            }
-        }).getBuildLogData();
+        // (The last build's report is no longer shown when the panel opens: the panel always starts a
+        // new run, and that old report then stayed as if it were the new one; release check 3.1,
+        // "still showed 2 new 1 left from a past build". The report is read when this run's build ends.)
 
         google.script.run.withSuccessHandler(mode => {
            runMode = mode;
            if (runMode === 'BUILD_ONLY') {
               el('syncSection').style.display = 'none';
-              google.script.run.withFailureHandler(onFailure).startBuildOnlyProcess();
+              startFreshBuild();
            } else {
               google.script.run.withFailureHandler(onFailure).startResilientSync();
+              poller = setInterval(pollServer, 1500);
            }
-           poller = setInterval(pollServer, 1500);
         }).getRunMode();
       };
+
+      // A build's state stays saved after it ends until a panel that watched it to the end clears it.
+      // A panel closed early left "done" behind, and the next Build Sheets Only then showed "done" at
+      // once with that older build's report (release check 3.1). So: clear it, then start, then watch.
+      function startFreshBuild() {
+        google.script.run
+          .withSuccessHandler(() => {
+            google.script.run.withFailureHandler(onFailure).startBuildOnlyProcess();
+            clearInterval(poller);
+            poller = setInterval(pollServer, 1500);
+          })
+          .withFailureHandler(onFailure)
+          .resetSyncStatus();
+      }
 
       function pollServer() {
         google.script.run.withSuccessHandler(updateUI).getSyncStatus();
@@ -250,10 +270,11 @@
         }
 
         if (state.phase === 'building') {
-          if (prevPhase !== 'building') { buildStartTime = Date.now(); buildEndTime = null; }
+          if (prevPhase !== 'building') { buildStartTime = Date.now(); buildEndTime = null; cachedBuildLogData = null; }
           let idx = Math.min(Math.max(Number(state.buildStep) || 0, 0), STEPS.length - 1);
           lastStepIndex = idx;
           setSteps(idx);
+          barStep(idx);
           showBuildTime();
           el('buildStatus').className = 'status';
           el('buildStatus').innerText = 'Building sheets…';
@@ -352,6 +373,7 @@
         if (state.phase === 'killed') {
           clearInterval(poller);
           const wasBuilding = prevPhase === 'building' || prevPhase === null;
+          if (buildBar) { buildBar.fail(state.notice ? 'Nothing to build yet' : (runMode === 'BUILD_ONLY' ? 'The build stopped' : 'Stopped')); buildBar = null; }
 
           // A crash is reported as 'killed' with the error attached; only a real Cancel has no error
           let cancelText = runMode === 'BUILD_ONLY' ? 'Build cancelled' : 'Sync cancelled';
@@ -394,6 +416,8 @@
         }
       }
 
+      // This run's report, read from the server once its build has ended (cachedBuildLogData is
+      // emptied when a build starts, so a report from an earlier build is never shown as this one's)
       function showBuildReport() {
         el('buildReport').innerHTML = `
           <div class="box rep" id="buildSummaryBox">
@@ -412,11 +436,13 @@
       }
 
       function renderBuildLinks(data) {
+          const when = data && data.builtAt ? new Date(data.builtAt) : null;
           el('buildReportLinks').innerHTML = `
               <a onclick="openBuildDetails('newStudents')">New students<b>${data.newStudents ? data.newStudents.length : 0}</b></a>
               <a onclick="openBuildDetails('discharged')">Discharged<b>${data.discharged ? data.discharged.length : 0}</b></a>
-              <a onclick="openBuildDetails('nycsaUpgrades')">NYCSA upgrades<b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b></a>
-              <a onclick="openBuildDetails('psUpgrades')">Parent Square upgrades<b>${data.psUpgrades ? data.psUpgrades.length : 0}</b></a>
+              <a onclick="openBuildDetails('nycsaUpgrades')">NYCSA sign-ups (left the NYCSA list)<b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b></a>
+              <a onclick="openBuildDetails('psUpgrades')">Parent Square sign-ups<b>${data.psUpgrades ? data.psUpgrades.length : 0}</b></a>
+              ${when ? `<div class="rhint" style="padding-bottom:7px">Compared with the build before this one. Built ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : ''}
           `;
       }
 
@@ -429,6 +455,8 @@
 
       function triggerRestart() {
         el('controlPanel').style.display = 'none';
+        if (buildBar) { buildBar.stop(); buildBar = null; }
+        el('buildBar').innerHTML = '';
         setSteps(-1);
         lastStepIndex = -1;
         lastPhase = null;
@@ -457,11 +485,10 @@
         buildReportShown = false;
 
         clearInterval(poller);
-        poller = setInterval(pollServer, 1500);
-
         if (runMode === 'BUILD_ONLY') {
-            google.script.run.startBuildOnlyProcess();
+            startFreshBuild();
         } else {
+            poller = setInterval(pollServer, 1500);
             google.script.run.RESTART_SYNC();
         }
       }
@@ -528,8 +555,8 @@
         let cssClass = "upgrade";
         if (type === 'newStudents') { titleStr = "New students"; cssClass = "created"; }
         if (type === 'discharged') { titleStr = "Discharged students"; cssClass = "deleted"; }
-        if (type === 'nycsaUpgrades') { titleStr = "NYCSA upgrades"; }
-        if (type === 'psUpgrades') { titleStr = "Parent Square upgrades"; }
+        if (type === 'nycsaUpgrades') { titleStr = "NYCSA sign-ups (no longer on the NYCSA list)"; }
+        if (type === 'psUpgrades') { titleStr = "Parent Square sign-ups"; }
         fillList(titleStr, arr, cssClass);
       }
 

@@ -127,6 +127,12 @@ function studentListIsBuilt_(ss) {
   return !!sheet && sheet.getLastRow() > studentListHeaderRow_(sheet);
 }
 
+// Doc property: the sheets don't have the newest data / lists yet ('data' | 'lists'). Set when Input
+// Data Mode ends without a build after something came in (Input Data.gs idm_cleanup_); cleared at the
+// end of every build (Build.gs). ✅ Getting Started's "Build your sheets" is not ticked while it is set
+// (release check 2.16: "Next steps said the build was done, but my list wasn't built").
+var BUILD_NEEDED_KEY_ = 'BUILD_NEEDED';
+
 /**
  * Where the autofill looks students up: the Backend STUDENT_LIST section (BX:CD,
  * the full Student List WITH the sibling-group rows, written by every build).
@@ -222,7 +228,11 @@ var BACKEND_BLOCKS = {
   // keepHeader: the header row is only written when it differs and never cleared (backendWriteBlock_ /
   // the resets). Added while BX:CD was a Sheets Table (dropped 2026-11-11: plain range, dropdowns read
   // Backend!$BX$3:$BX etc.); kept because it is harmless and saves a write per build.
-  STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true, keepHeader: true }
+  STUDENT_LIST: { col: 76, width: 7, title: "STUDENT LIST (WITH SIBLING GROUPS)", legacy: null, grow: true, keepHeader: true },
+  // Person Spoke With choices (2026-11-14, Edits.gs ensureSpokeWithChoices_): NOT a table. ONE formula in
+  // CF2 puts each Contact Log row n's guardians on Backend row n (CF:CO), so column D's dropdown can read
+  // 'Backend'!$CF2:$CO2. Never written by the backend* helpers; the build keeps the formula.
+  SPOKE_WITH: { col: 84, width: 10, title: "PERSON SPOKE WITH CHOICES (automatic: row n = Contact Log row n)", legacy: null, grow: true, formulaOnly: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)

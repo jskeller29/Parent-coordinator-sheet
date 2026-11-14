@@ -350,6 +350,20 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   values too (Followup Needed / No Followup Needed / Resolved; open = the grey-out rule's list, cl_isOpenFollowup_).
   Migration maps old values: Yes -> Followup Needed, Yes - Important -> Followup Needed - ASAP, No -> No Followup
   Needed (migrateFollowupValue_, Menus.gs).
+- Person Spoke With choices, BACKEND COPY (2026-11-14, release check 4.3 / 4.4 / 2.19; supersedes the R2 setup
+  below once column D reads it): the R2 formula's results filled R:AA on every log row, so Google refused "Delete
+  table row" ("You cannot insert or delete cells over an array formula"), deleting row 2 / inserting above it broke
+  it, and a second copy (#REF!) could appear. The SAME formula (spokeBackendFormula_, Edits.gs) now sits in Backend
+  CF2 (BACKEND_BLOCKS.SPOKE_WITH, CF:CO, formulaOnly: Backend row n = Contact Log row n; INDEX('Contact Log'!C:C, 2)
+  so Contact Log row changes never shift it). Column D's Table dropdown, BY HAND: `='Backend'!$CF2:$CO2` (DEPLOY.md
+  step 9). ensureSpokeWithChoices_ (every build): ensureSpokeChoicesOnBackend_ (formula written when missing /
+  changed / #REF!, title, Backend rows >= END + 300 so the array never runs out of rows), then spokeDropdownSource_
+  reads D2's rule ONCE (getDataValidation → getCriteriaValues()[0].getSheet()): Backend -> doc property
+  SPOKE_CHOICES_MODE = 'backend' and removeSpokeFormulasFromLog_ clears every SPLIT(…C:C…) formula in Contact Log
+  R2:R(END); Contact Log / no rule / unreadable -> 'contactlog' = the old R2 behaviour below
+  (ensureSpokeWithChoicesInLog_, return texts unchanged; extra copies in R3:R(END) removed at build time; the Backend
+  result only logged). restoreSpokeWithChoicesAfterRowChange_ returns at once in 'backend' mode (one property read,
+  no sheet call: no lag). Tests: tests/test_round2.js.
 - Person Spoke With choices (owner's request 2026-11-13; not yet tried on a real sheet): column D's dropdown lists only
   that row's student's guardians. Hidden helper columns R:AA of the Contact Log: the formula in R2
   (SPOKE_WITH_CHOICES_FORMULA, Core.gs, next to CL_COL_SPOKE_CHOICES / CL_SPOKE_CHOICES_WIDTH) splits each row's
@@ -492,6 +506,69 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 - Phone sync starts off + a trashed tracker skips its nightly (2026-11-14): re-paste Menus and Build on every sheet
   (master template too: new copies run its setup code); owner sheet also z_NewCopy (2 checklist texts).
+- Release check round 1 fixes (2026-11-14, later): re-paste Core, Build, Edits, Menus, Input Data (scripts) and Styles,
+  ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet (master template too); then DEPLOY.md step 9:
+  column D's dropdown = 'Backend'!$CF2:$CO2 and Build Sheets Only once more (it takes the old R2 formula out).
+
+RELEASE CHECK ROUND 1 FIXES (owner's report 2026-11-14, tests/test_round2.js; deploy: re-paste Core, Build, Edits, Menus,
+Input Data (scripts) and Styles, ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet, then DEPLOY.md
+step 9's new dropdown range + a build; Reset to Display Mode / Make Release Copies rewrites the template's Welcome tab):
+- THE ONE PROGRESS BAR (2.12 "the same progress bar any time a build runs"): Styles.html now has a <script> with
+  pcBar(el, { title, hint, waiting, stepMs }) -> { set(step, steps), done(text), fail(text), stop() } (creeps inside a
+  step, own clock) and pcFollowBuild(bar) (polls getSyncStatus every 2 s; ignores a step older than this build:
+  reportBuildStep_ stores "step|ms", getBuildProgress_ returns buildStepAt + now). Used by ProgressSidebar (Build /
+  Full Sync / Student Overrides, which open it), Input Data Mode's build before Your Lists, Migration step 6, the setup
+  window. Styles.html is included everywhere, so every page needs the new Styles.
+- BUILD PANEL (3.1 "still showed 2 new 1 left from a past build"): the panel no longer shows the last report on open;
+  BUILD_ONLY runs startFreshBuild (resetSyncStatus first, then startBuildOnlyProcess + polling): a panel closed before
+  its build ended left SYNC_UI_STATE 'done_build_only', and the next panel showed "done" at once with the older
+  report. A new build empties cachedBuildLogData. The report carries builtAt ("Compared with the build before this
+  one"), "NYCSA sign-ups (left the NYCSA list)". Done: Close (primary) + Build again (was "Start new build").
+- INPUT DATA MODE: (a) clicks are never dropped: the sidebar keeps the background check apart (pollInFlight / pollSeq);
+  a click drops the check in flight (cancelPoll in working) and its stale reply is ignored; before, goToStep / exitMode
+  returned while a check ran (NYCSA "needed two clicks", Finish "did nothing"). The "Leave Input Data Mode?" question
+  stops the checks (asking) — a check's redraw used to close it. (b) START PAGE: a new run starts with state.overview
+  (tab IDM_START_TAB "Start Here", idm_fillStartTab_: what each file is for (IDM_STEPS uses / where / fileHint), last
+  loaded, the hint); idm_view_ overview + start (idm_startItems_); sidebar #startView cards (click = that step),
+  footer "Start with Student Data" + Exit; idm_goToStep(0) leaves it, idm_goToStep(-1) goes back; paste endpoints do
+  nothing on it. Tests click Start (idm_goToStep(0)) after idm_open. (c) the "Closed the side panel?" hint on EVERY
+  mode tab (A2 paste tabs, E1 Site / Class, A3 Your Lists, A3 start page; idm_styleHint_ navy on light blue). (d) a
+  busy sheet: openInputDataMode tries the lock 5 s, then opens the sidebar anyway (no "Lock timeout"); idm_withLock_
+  busy = { busy: true } and the sidebar retries the same call every 3 s (waitBusy, up to ~2.5 min). (e) idm_check(full)
+  every 5th check re-hides any tab shown again even while the user stays on the mode's tab; on a BUILT sheet the end of
+  the mode also shows the settings' everyday tabs (showStartingTabs_) whatever the state remembered (a new copy still
+  gets only the Welcome tab back; mid-mode hides are still not remembered). (f) idm_deleteLeftoverTab_ never deletes
+  the running mode's tab; "Sheet <id> not found" = the page must be reloaded (idm_errorView_ code 'reload', the sidebar
+  says so for failed calls too). (g) counts: a row needs one of IDM_STEPS keyCols (rows with only school code /
+  district are left out and counted), "24 rows moved to Raw Data (17 students). 1 row with no student or guardian was
+  left out." (studentCol = distinct Student IDs). (h) "Got your paste / file" at once (toast + #workingTop box).
+  (i) Site / Class: idm_check reads the tab (idm_siteClassCounts_, every 3.5 s) -> "8 of 12 classes have a teacher";
+  when every class has a teacher OR a site the footer's Skip becomes "Save and go to Your Lists" (the card's Save then
+  hides). (j) Your Lists: ONE Finish ("Finish Input Data Mode" in the footer; the card's Finish and "Finish or exit"
+  are gone on that step). (k) od_backToInputMode sets INPUT_DATA_MODE_BACK_FROM_LIST; idm_open then puts the user on
+  the Your Lists tab and hides the list's tab. (l) BUILD NEEDED: idm_buildNeededReason_ ('data' | 'lists' | null;
+  lists only looked at = null) drives idm_finalBuildNeeded_ and the end screen's buildReason ("You changed your lists
+  after the sheets were built"); idm_cleanup_ sets doc property BUILD_NEEDED (Core.gs BUILD_NEEDED_KEY_), every build
+  clears it, and ✅ Getting Started step 2 (zg_buildStep_) is "Build your sheets again" (not ticked) while it is set;
+  the end screen's Next steps asks "Build your sheets first?".
+- INITIAL SETUP (2.3 / 3.1): SETUP_STEPS_ + reportSetupStep_ (cache SETUP_STEP "i|ms") + zg_setupProgress: the setup
+  window shows the steps on the bar, and after 90 s with no new step says what to do. On a BUILT sheet applySheetLocks_
+  moved from runInitialSetupSteps_ (under the document lock: the new full menu showed mid-setup and 📥 Input Data Mode
+  waited, "Lock timeout") to zg_setupFinish (the window's second call). Welcome tab row 1 (both versions,
+  WELCOME_MENU_NOTE_ROW_, pale yellow): "Don't see 🚀 App Menu? … reload" (3.2); step 3 adds what to do after
+  "Script runInitialSetupWrapper experienced an error" (reload, click again). C3 is still the title.
+- CONTACT LOG: edits / row deletes draw only the line ABOVE the END bar (the thin line under it replaced the lookup
+  box's thick top line, 4.4); every build redraws the box outline (redrawLookupBoxOutlineForBuild_). Person Spoke
+  With: see "BACKEND COPY" above.
+- MIGRATION (3.3): ma_markOldTracker first deletes this tracker's Welcome tab (ma_finish moved the user off it after
+  the build), and returns pausesItself (trackerPausesItself_, Build.gs: the old tracker's developer metadata
+  PC_TRACKER_CODE, which markTrackerCode_ adds at the end of every build, else its Backend A2 version date >=
+  TRACKER_PAUSE_CODE_SINCE_ 11/14/2026, else null). MigrationUI: marked + pausesItself -> "Your old tracker pauses
+  itself" (no Settings steps); false -> only the Settings steps ("an older version"); null -> both, as before.
+  Step 6 shows the bar.
+- Not changed, answered in the report: phone sync off on a new copy of a set-up tracker is on purpose (PHONE SYNC
+  STARTS OFF below). 6.1 "the other account's sheet showed the regular menus": the SHARED sheet is set up; its copy
+  shows 🚨 Initial Setup (the clone detector) — re-test asks which one.
 
 PHONE SYNC STARTS OFF (owner 2026-11-14, found while writing the release check): runInitialSetupSteps_ (Menus.gs)
 loads the Backend saved-settings block over the defaults, and every reset (resetToDisplayModeSteps_ ->
@@ -833,7 +910,8 @@ Backend tab (see Core.gs):
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
   BN:BQ Additional Information and BS:BV Your Lists setup (both Your Lists, Input Data.gs), BX:CD Student List (OSIS..Status incl.
-  the sibling-group rows; every build; read by the autofill). PLAIN RANGE, no Sheets Table (owner's choice 2026-11-11):
+  the sibling-group rows; every build; read by the autofill), CF:CO Person Spoke With choices (2026-11-14: ONE formula in CF2,
+  row n = Contact Log row n, no header row; column D's dropdown reads it; see "BACKEND COPY"). PLAIN RANGE, no Sheets Table (owner's choice 2026-11-11):
   the Contact Log's dropdowns read Backend!$BX$3:$BX (OSIS) / $BY$3:$BY (Student) / $BZ$3:$BZ (Guardian), open-ended, so
   every student is included. A Table was tried first and dropped: it had its header on row 3 (it took the first student
   "249004359 | Alexa Abbey ... | Column 6 | Column 7" as its column names), so every build wrote students into the Table

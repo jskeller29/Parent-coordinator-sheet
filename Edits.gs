@@ -55,7 +55,9 @@ function resyncNotesAfterRowDelete_(ss, sheet, knownEndRow) {
     // A row delete: END moved up; refresh its remembered row and its top/bottom border
     endRow = findEndRowInColumnE_(sheet);
     rememberEndRow_(sheet, endRow);
-    if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+    // Only the line ABOVE the END bar: the line under it is the lookup box's thick top line, and a thin
+    // one drawn there replaced it (release check 4.4: "the border above search is no longer thick")
+    if (endRow) sheet.getRange(endRow, 1, 1, CL_WIDTH).setBorder(true, null, null, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
     clDbg_("END is now row " + endRow + " (border redrawn)");
   }
 
@@ -312,7 +314,8 @@ function handleEdit_(e) {
   const finalEndRow = endRow ? (addedBlankRow ? endRow + 1 : endRow) : findEndRowInColumnE_(sheet);
   rememberEndRow_(sheet, finalEndRow);
   if (finalEndRow) {
-    sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, true, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+    // the line above the END bar only (under it is the lookup box's thick line; release check 4.4)
+    sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, null, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
 
     let maxRows = sheet.getMaxRows();
     if (maxRows >= finalEndRow) {
@@ -649,6 +652,17 @@ function lookupBoxGuardianCountFromSheet_(ss) {
   return last >= 2 ? lookupBoxGuardianCount_(sh.getRange(1, 1, last, 2).getDisplayValues()) : 0;
 }
 
+/**
+ * End of a build: the lookup box's thick outline drawn again (release check 4.4: after a row was
+ * inserted and deleted, a thin END bar line had replaced the thick line above the box; edits now draw
+ * only the line above the END bar). Same outline as every reset (drawContactLogLookupBoxOutline_).
+ */
+function redrawLookupBoxOutlineForBuild_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  const endRow = sheet ? findEndRowInColumnE_(sheet) : null;
+  return endRow ? drawContactLogLookupBoxOutline_(sheet, endRow) : false;
+}
+
 /** End of a build: guardian rows for the Parents Divided rows just built. */
 function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
   const sheet = ss.getSheetByName("Contact Log");
@@ -675,14 +689,115 @@ function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
  * R:AA hidden only when they aren't (fewer script writes after a user's delete / insert).
  * Returns "kept" / "unblocked" / "added" / "moved back" / "skipped: <why>". Called at the end of every build.
  */
+/**
+ * WHERE THE CHOICES LIVE (2026-11-14, release check 4.3 / 4.4 / 2.19). The formula's results used to
+ * fill Contact Log R:AA on every log row, and Google then refused "Delete table row" ("You cannot insert
+ * or delete cells over an array formula"); deleting row 2 took the formula, a row inserted above row 2
+ * pushed it down, and two copies (one #REF!) could end up there. Now the SAME formula also sits on the
+ * Backend (BACKEND_BLOCKS.SPOKE_WITH: CF2, results on Backend row n for Contact Log row n), where no
+ * Contact Log row change can touch it, and nothing runs on an edit. Column D's dropdown is set BY HAND in
+ * the Table: 'Backend'!$CF2:$CO2 (it was 'Contact Log'!$R2:$AA2). Every build:
+ *   - writes / keeps the Backend formula (ensureSpokeChoicesOnBackend_);
+ *   - reads D2's dropdown rule once (spokeDropdownSource_): it reads the Backend -> the old formula in
+ *     R:AA is taken out (that frees "Delete table row"); it reads R:AA (or can't be read) -> the old
+ *     formula is kept in R2 as before (ensureSpokeWithChoicesInLog_), with any extra copy removed.
+ * The answer is kept in doc property SPOKE_CHOICES_MODE, so a row delete / insert reads nothing more
+ * once the dropdown reads the Backend.
+ */
+var SPOKE_MODE_KEY_ = 'SPOKE_CHOICES_MODE'; // 'backend' | 'contactlog'
+
+function spokeBackendFormula_() {
+  return "=ARRAYFORMULA(IFERROR(SPLIT(INDEX('Contact Log'!C:C, 2):INDEX('Contact Log'!C:C, " +
+    "MATCH(TRUE, TRIM('Contact Log'!E:E)=\"END\", 0) - 1), \" and \", FALSE), \"\"))";
+}
+
+/** Which copy column D's dropdown reads: "backend", "contactlog", or "" (no rule, or it can't be read). */
+function spokeDropdownSource_(sheet) {
+  try {
+    const rule = sheet.getRange(2, CL_COL_SPOKE_WITH).getDataValidation();
+    if (!rule) return "";
+    const first = (rule.getCriteriaValues() || [])[0];
+    if (!first || typeof first.getSheet !== "function") return "";
+    const name = String(first.getSheet().getName()).trim();
+    if (name === BACKEND_SHEET_NAME) return "backend";
+    if (name === "Contact Log") return "contactlog";
+    return "";
+  } catch (e) {
+    console.warn("Person Spoke With dropdown not read: " + e.message);
+    return "";
+  }
+}
+
+/**
+ * The Backend copy: the formula in CF2 (written when missing or changed), the section title, and enough
+ * Backend rows for every Contact Log row (+300 to grow until the next build: an array that runs out of
+ * rows shows #REF! and every dropdown goes empty). Returns "kept" / "added" / "replaced" / "skipped: ...".
+ */
+function ensureSpokeChoicesOnBackend_(ss, endRow) {
+  const b = BACKEND_BLOCKS.SPOKE_WITH;
+  const sh = getBackendSheet_(ss);
+  backendBlockReady_(sh, b, true);
+  const need = Math.max(endRow || 0, 2) + 300;
+  if (sh.getMaxRows() < need) sh.insertRowsAfter(sh.getMaxRows(), need - sh.getMaxRows());
+  const cell = sh.getRange(2, b.col);
+  const want = spokeBackendFormula_();
+  const have = String(cell.getFormula() || "");
+  if (have === want && String(cell.getDisplayValue()).trim() !== "#REF!") return "kept";
+  if (have && have !== want && !/SPLIT\(/i.test(have)) return "skipped: Backend CF2 holds something else";
+  // The results area is this section's alone: anything left in it would block the list (#REF!)
+  sh.getRange(2, b.col, sh.getMaxRows() - 1, b.width).clearContent();
+  cell.setFormula(want);
+  return have ? "replaced" : "added";
+}
+
+/** Takes the old formula out of Contact Log R (rows from..END): every cell whose formula splits column C. */
+function removeSpokeFormulasFromLog_(sheet, endRow, fromRow) {
+  fromRow = fromRow || 2;
+  if (!endRow || endRow < fromRow || sheet.getMaxColumns() < CL_COL_SPOKE_CHOICES) return 0;
+  const f = sheet.getRange(fromRow, CL_COL_SPOKE_CHOICES, endRow - fromRow + 1, 1).getFormulas();
+  let n = 0;
+  f.forEach((r, i) => {
+    const text = String(r[0] || "");
+    if (/SPLIT\(/i.test(text) && /C:C/i.test(text)) { sheet.getRange(fromRow + i, CL_COL_SPOKE_CHOICES).clearContent(); n++; }
+  });
+  return n;
+}
+
 function ensureSpokeWithChoices_(ss, light) {
   const sheet = ss.getSheetByName("Contact Log");
   if (!sheet) return "skipped: no Contact Log";
+  const props = PropertiesService.getDocumentProperties();
+  if (light) {
+    // A row delete / insert: the Backend copy needs nothing (no lag); the old copy only while D reads it
+    if (props.getProperty(SPOKE_MODE_KEY_) === "backend") return "backend: nothing to do";
+    return ensureSpokeWithChoicesInLog_(ss, sheet, true);
+  }
+  const endRow = findEndRowInColumnE_(sheet);
+  let backend;
+  try { backend = ensureSpokeChoicesOnBackend_(ss, endRow); }
+  catch (e) { backend = "not written (" + e.message + ")"; console.warn("Person Spoke With choices (Backend): " + e.message); }
+  const mode = spokeDropdownSource_(sheet) === "backend" ? "backend" : "contactlog";
+  if (props.getProperty(SPOKE_MODE_KEY_) !== mode) props.setProperty(SPOKE_MODE_KEY_, mode);
+  if (mode === "backend") {
+    const removed = removeSpokeFormulasFromLog_(sheet, endRow);
+    return "Backend " + backend + (removed ? "; the old formula in Contact Log R taken out (" + removed + ")" : "");
+  }
+  console.log("Person Spoke With choices: Backend copy " + backend);
+  return ensureSpokeWithChoicesInLog_(ss, sheet, false);
+}
+
+/** The old place (column D's dropdown still reads 'Contact Log'!$R2:$AA2): the formula in R2, as before. */
+function ensureSpokeWithChoicesInLog_(ss, sheet, light) {
   const col = CL_COL_SPOKE_CHOICES, width = CL_SPOKE_CHOICES_WIDTH, lastCol = col + width - 1;
   const maxCols = sheet.getMaxColumns();
   const anchor = maxCols >= col ? sheet.getRange(2, col) : null;
   const formula = anchor ? String(anchor.getFormula() || "") : "";
-  if (formula && String(anchor.getDisplayValue()).trim() !== "#REF!") return "kept";
+  if (formula && String(anchor.getDisplayValue()).trim() !== "#REF!") {
+    if (light) return "kept";
+    // A second copy further down (release check 2.19: "two arrayformulas, one with #REF!"): only R2's stays
+    const extra = removeSpokeFormulasFromLog_(sheet, findEndRowInColumnE_(sheet), 3);
+    return extra ? "kept (" + extra + " extra copy removed)" : "kept";
+  }
 
   const endRow = findEndRowInColumnE_(sheet);
   if (!endRow || endRow < 3) return "skipped: no log rows above END";
@@ -724,7 +839,10 @@ function ensureSpokeWithChoices_(ss, light) {
         return "skipped: R:AA hold data";
       }
       sheet.getRange(row, col).clearContent(); // its one-row-too-low list goes with it
-      return write(text, "moved back");
+      const how = write(text, "moved back");
+      // any other copy further down goes too (only one may list the names)
+      if (!light) { const extra = removeSpokeFormulasFromLog_(sheet, endRow, row + 1); if (extra) return how + " (" + extra + " extra copy removed)"; }
+      return how;
     }
   }
 
@@ -744,6 +862,8 @@ function ensureSpokeWithChoices_(ss, light) {
  * over anything typed into R:AA; only the formula is written). Returns what happened.
  */
 function restoreSpokeWithChoicesAfterRowChange_(ss, sheet) {
+  // Column D reads the Backend copy (set by hand; the last build saw it): a row change can't touch it
+  if (PropertiesService.getDocumentProperties().getProperty(SPOKE_MODE_KEY_) === "backend") return "backend: nothing to do";
   let formula;
   try { formula = sheet.getRange(2, CL_COL_SPOKE_CHOICES).getFormula(); }
   catch (e) { return "skipped: no column R yet (the next build adds R:AA)"; } // a tab narrower than R

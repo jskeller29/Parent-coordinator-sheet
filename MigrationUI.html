@@ -67,15 +67,29 @@
       <div class="step pending" id="step-4"><span class="spinner"></span><span class="status-icon">○</span> Copy notes, events, send-outs, student changes and your lists</div>
       <div class="step pending" id="step-5"><span class="spinner"></span><span class="status-icon">○</span> Match up the Contact Log <span class="count" id="count-5"></span></div>
       <div class="step pending" id="step-6"><span class="spinner"></span><span class="status-icon">○</span> Bring over the Student List history and rebuild the other tabs</div>
+      <!-- step 6's build on the shared progress bar (Styles.html; release check 2.12: the same bar every build) -->
+      <div id="buildBar6" style="display:none;margin-top:12px"></div>
     </div>
 
     <div class="notice warn" id="warnBox" style="display:none"><b>Some things didn't come over:</b><ul id="warnList"></ul></div>
+
+    <!-- The old tracker is a newer version (it has the pause code: ma_markOldTracker's pausesItself)
+         and was marked: nothing to do by hand (owner 2026-11-14, release check 3.3) -->
+    <div class="oldbox" id="oldPaused" style="display:none">
+      <h2>Done. Your old tracker pauses itself</h2>
+      <p>Your old tracker is a newer version, so it stops its 10 PM rebuild and its phone sync by itself. Nothing to change in its Settings.</p>
+      <p>The next time you open it, it asks "Keep this tracker paused?": click <b>Yes</b>.</p>
+      <div class="acts">
+        <a class="btn sec" id="oldLink2" target="_blank" rel="noopener" href="#">Open the old tracker</a>
+        <button class="btn pri" type="button" onclick="google.script.host.close()">Close</button>
+      </div>
+    </div>
 
     <div class="oldbox" id="oldNightly" style="display:none">
       <h2>Done. One last step: stop the old tracker's nightly rebuild</h2>
       <p>Your old tracker still rebuilds every night, and if phone sync is on there, it keeps sending its families to your Google Contacts.</p>
       <p id="oldMarked" style="display:none">If the old tracker is a newer version, it now pauses by itself. When you open it, it asks "Keep this tracker paused?": click <b>Yes</b>.</p>
-      <p>An older tracker doesn't ask. Turn it off in its Settings:</p>
+      <p id="oldOlder">An older tracker doesn't ask. Turn it off in its Settings:</p>
       <ol>
         <li>Open the old tracker (button below).</li>
         <li>Go to 🚀 App Menu → ⚙️ Settings.</li>
@@ -128,11 +142,15 @@
 
     // Done screen: how to stop the OLD tracker rebuilding (and syncing phones) every night
     function showOldNightly(res) {
-      const box = document.getElementById('oldNightly');
-      const link = document.getElementById('oldLink');
+      // A newer old tracker that got the mark: it pauses itself, no Settings steps (release check 3.3)
+      const paused = !!(res && res.marked && res.pausesItself === true);
+      const box = document.getElementById(paused ? 'oldPaused' : 'oldNightly');
+      const link = document.getElementById(paused ? 'oldLink2' : 'oldLink');
       link.href = (res && res.url) || url;
       link.textContent = 'Open ' + ((res && res.name) ? '"' + res.name + '"' : 'the old tracker');
-      document.getElementById('oldMarked').style.display = res && res.marked ? 'block' : 'none';
+      document.getElementById('oldMarked').style.display = res && res.marked && res.pausesItself !== false ? 'block' : 'none';
+      // An older tracker for sure (its version date is before the pause code): only the Settings steps
+      if (res && res.pausesItself === false) document.getElementById('oldOlder').textContent = 'Your old tracker is an older version, so it doesn\'t pause by itself. Turn it off in its Settings:';
       box.style.display = 'flex';
       btn.style.display = 'none';
       ['found', 'sheetUrl', 'pasteLabel'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
@@ -152,11 +170,27 @@
     const STEP_CALLS = ['ma_verify', 'ma_migrateSettings', 'ma_migrateRawData', 'ma_migrateSimpleSheets', 'ma_migrateContactLog', 'ma_finish'];
     let doneUpTo = 0, doneUrl = "", warnings = [];
 
+    // Step 6 rebuilds the tabs: the shared progress bar follows that build (getSyncStatus)
+    let bar6 = null, follow6 = null;
+    function startBuildBar() {
+      const el = document.getElementById('buildBar6');
+      el.style.display = 'block';
+      bar6 = pcBar(el, { title: 'Rebuilding your tabs', hint: 'This can take a minute or two. Keep this window open.' });
+      follow6 = pcFollowBuild(bar6);
+    }
+    function stopBuildBar(ok) {
+      if (follow6) follow6.stop();
+      if (bar6) { if (ok) bar6.done('Tabs rebuilt'); else bar6.fail('The rebuild stopped'); }
+      bar6 = null; follow6 = null;
+    }
+
     function runStep(n) {
       if (n > STEP_CALLS.length) return finished();
       setStep(n, 'running');
+      if (n === 6 && typeof pcBar === 'function') startBuildBar();
       google.script.run
         .withSuccessHandler(res => {
+          if (n === 6) stopBuildBar(true);
           if (n === 1 && (!res || !res.success)) { setStep(1, 'failed'); return showError(res ? res.error : "Could not open the old tracker."); }
           if (res && res.warnings) warnings = warnings.concat(res.warnings);
           if (n === 5 && res && typeof res.records === 'number') {
@@ -166,7 +200,7 @@
           doneUpTo = n; doneUrl = url;
           runStep(n + 1);
         })
-        .withFailureHandler(e => { setStep(n, 'failed'); showError(e && e.message ? e.message : String(e)); })
+        .withFailureHandler(e => { if (n === 6) stopBuildBar(false); setStep(n, 'failed'); showError(e && e.message ? e.message : String(e)); })
         [STEP_CALLS[n - 1]](url);
     }
 

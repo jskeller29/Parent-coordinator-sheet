@@ -240,7 +240,22 @@ function listsSheet() {
   g.htmlFromFile_ = () => ({ setTitle() { return this; }, setWidth() { return this; } });
   const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
   g.openInputDataMode();
-  assert.deepStrictEqual(vis(), ["Student Data"], 'started: only the Student Data tab');
+  // the start page first (release check 2.16): what each file is for, where to get it, last loaded
+  assert.deepStrictEqual(vis(), ["Start Here"], 'started: only the start page');
+  const sv = g.idm_getState();
+  assert(sv.overview && sv.start.length === 5 && sv.start[0].required && /Student List/.test(sv.start[0].uses), 'start page: the five kinds of data');
+  assert(sv.progress.every(p => !p.current), 'start page: no step is current in the bar');
+  assert.strictEqual(g.idm_check().pending, undefined, 'start page: never read as a paste');
+  assert.strictEqual(g.idm_processPaste().overview, true, 'start page: processPaste does nothing');
+  const startTab = ss.getSheetByName("Start Here");
+  assert.strictEqual(startTab.getRange(5, 1).getValue(), "Data", 'start tab: the table header');
+  assert(/App Menu → 📥 Input Data Mode/.test(startTab.getRange(3, 1).getValue()), 'start tab: the way back to the panel');
+  let gv = g.idm_goToStep(0); // "Start with Student Data"
+  assert(!gv.overview && gv.stepIndex === 0 && gv.progress[0].current, 'Start: step 1');
+  assert.deepStrictEqual(vis(), ["Student Data"], 'Start: only the Student Data tab');
+  gv = g.idm_goToStep(-1);
+  assert(gv.overview && vis()[0] === "Start Here", 'back to the start page (same tab, renamed)');
+  g.idm_goToStep(0);
   ss.getSheetByName("Contact Log").showSheet(); ss.getSheetByName("PCAR").showSheet();
   ss.getSheetByName("Contact Log").activate();
   g.openInputDataMode();
@@ -306,8 +321,11 @@ function listsSheet() {
   assert.deepStrictEqual(sidebars.slice(-1), ["InputDataSidebar"], '4. Input Data Mode sidebar');
   assert.deepStrictEqual(vis(), ["👋 Welcome"], '4. the pop-up call itself does not touch the tabs');
   // ...whose first call switches the tabs
-  const v = g.idm_open();
-  assert(v.active && v.stepIndex === 0, '4. step 1');
+  let v = g.idm_open();
+  assert(v.active && v.overview, '4. the start page first');
+  assert.deepStrictEqual(vis(), ["Start Here"], '4. only the start page tab');
+  v = g.idm_goToStep(0); // "Start with Student Data"
+  assert(v.active && v.stepIndex === 0 && !v.overview, '4. step 1');
   assert.deepStrictEqual(vis(), ["Student Data"], '4. only the Student Data tab');
   assert.strictEqual(ss.getActiveSheet().getName(), "Student Data", '4. on it');
   assert.strictEqual(g.idm_loadState_().prevActiveId, ss.getSheetByName("Contact Log").getSheetId(), '4. comes back to the Contact Log later, not the Welcome tab');
@@ -336,7 +354,8 @@ function listsSheet() {
   assert.strictEqual(imported.notice.type, 'imported', '6. imported: ' + JSON.stringify(imported.notice));
   // "make it more obvious it worked" (owner 2026-11-13): a banner for the next step + a toast
   assert.strictEqual(imported.notice.done.title, 'Student Data (ATS) completed!', '6. banner title');
-  assert(/^\d[\d,]* rows moved to Raw Data\. Next: Parent Square\.$/.test(imported.notice.done.sub), '6. banner text: ' + imported.notice.done.sub);
+  // the students too (release check 3.1: the count looked wrong)
+  assert.strictEqual(imported.notice.done.sub, '18 rows moved to Raw Data (18 students). Next: Parent Square.', '6. banner text: ' + imported.notice.done.sub);
   assert.strictEqual(imported.stepIndex, 1, '6. the banner comes with the Parent Square step');
   assert(/Student Data \(ATS\) completed/.test(toasted) && /Next: Parent Square/.test(toasted), '6. toast: ' + toasted);
 
@@ -367,6 +386,7 @@ function listsSheet() {
   g.onOpen({ source: ss });
   g.runInitialSetup_();
   g.idm_open();
+  g.idm_goToStep(0); // Start
   const vis = () => ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName());
   g.studentListIsBuilt_ = () => true;
   g.welcomeTabAfterBuild_(ss); // the build at step 5 ends
@@ -1025,12 +1045,18 @@ function listsSheet() {
     dp.setProperty = (k, v) => { singles.push(k); return one(k, v); };
     dp.setProperties = (o, d) => { batches.push(Object.keys(o)); return many(o, d); };
     g.runInitialSetup_();
-    return { g, locks, singles, batches };
+    const inSetup = locks;
+    g.zg_setupFinish(); // the setup window's second call
+    return { g, locks: inSetup, after: locks, singles, batches };
   };
 
   const fresh = setup(false);
-  assert.strictEqual(fresh.locks, 0, 'new copy: no Sheet Lock at setup (the first build does it)');
-  assert.strictEqual(setup(true).locks, 1, 'a built sheet: Sheet Lock at setup as before');
+  assert.strictEqual(fresh.after, 0, 'new copy: no Sheet Lock at setup (the first build does it)');
+  // A built sheet (2026-11-14, release check 3.1): not in the locked setup call any more (Input Data Mode
+  // waited for it and failed with "Lock timeout"), but in the window's second call
+  const built = setup(true);
+  assert.strictEqual(built.locks, 0, 'a built sheet: no Sheet Lock while setup holds the lock');
+  assert.strictEqual(built.after, 1, 'a built sheet: Sheet Lock in the window\'s second call');
 
   const p = fresh.g.__props;
   assert.strictEqual(p.SETUP_COMPLETE, 'true');

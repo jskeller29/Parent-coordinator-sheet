@@ -53,10 +53,15 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    📦 Make Release Copies then gives the Example and Blank copies the same look.
 9. Master template and your sheet: the **Person Spoke With** dropdown, once, by hand (a script can't
    change a Table's dropdown column). Contact Log → Person Spoke With column → Data validation →
-   **Dropdown (from a range)** `='Contact Log'!$R2:$AA2` (a 2 on BOTH ends, no `$` before them), Advanced options →
-   **Show a warning** (other people can still be typed). The build in step 3 already wrote the formula
-   in Contact Log **R2** and hid columns R:AA; leave R1 empty and Q blank. Schools' sheets: the same rule
-   by hand after their next build, or they get it with next year's copy of the template.
+   **Dropdown (from a range)** `='Backend'!$CF2:$CO2` (a 2 on BOTH ends, no `$` before them), Advanced options →
+   **Show a warning** (other people can still be typed). Then **🏗️ Build Sheets Only** once more.
+   The build in step 3 already wrote the list on the hidden Backend tab (CF2: row n = Contact Log row n).
+   The next build sees the dropdown reads the Backend and takes the old formula out of Contact Log **R2**:
+   that is what lets **Delete table row** work again, and deleting / inserting Contact Log rows can't
+   break the list any more (release check 4.3 / 4.4). **Changed 2026-11-14**: it was `='Contact Log'!$R2:$AA2`;
+   a sheet still set to that keeps working the old way (the build keeps R2) until you change it. Leave R1 empty
+   and Q blank. Schools' sheets: the same rule by hand after their next build, or they get it with next year's
+   copy of the template.
 
 ## 4. Test it on copies: the release checklist
 Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,

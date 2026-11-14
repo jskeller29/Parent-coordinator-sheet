@@ -24,13 +24,17 @@ const BUILD_STEPS = [
 
 function reportBuildStep_(index) {
   try {
-    CacheService.getScriptCache().put('BUILD_STEP', String(index), 21600);
+    // "step|when": the progress bar (Styles.html pcFollowBuild) ignores a step left from an earlier build
+    CacheService.getScriptCache().put('BUILD_STEP', String(index) + "|" + Date.now(), 21600);
   } catch (e) { console.warn("Build step not saved: " + e.message); }
 }
 
 function getBuildProgress_() {
-  const step = Number(CacheService.getScriptCache().get('BUILD_STEP'));
-  return { buildSteps: BUILD_STEPS, buildStep: isNaN(step) ? 0 : step };
+  const raw = String(CacheService.getScriptCache().get('BUILD_STEP') || "");
+  const parts = raw.split("|");
+  const step = Number(parts[0]);
+  const at = Number(parts[1]);
+  return { buildSteps: BUILD_STEPS, buildStep: raw === "" || isNaN(step) ? 0 : step, buildStepAt: isNaN(at) ? 0 : at, now: Date.now() };
 }
 
 /**
@@ -238,7 +242,8 @@ function buildAllDerivedSheetsRun_() {
     newStudents: newStudentsLog,
     discharged: dischargedLog,
     nycsaUpgrades: nycsaLog,
-    psUpgrades: psLog
+    psUpgrades: psLog,
+    builtAt: Date.now() // the Build sidebar says when (a report always belongs to the build that just ran)
   }), 21600);
 
   // Remember this build's Raw Data roster for the next comparison
@@ -259,6 +264,8 @@ function buildAllDerivedSheetsRun_() {
   // Contact Log lookup box: as many guardian rows as the student with the most guardians
   // needs (a 3rd+ guardian from New/Edit Student; Edits.gs). Never stops a build.
   try { syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided); } catch (e) { console.warn("Lookup box guardian rows skipped: " + e.message); }
+  // ...and its thick outline (a thin END bar line could cover its top line; release check 4.4)
+  try { redrawLookupBoxOutlineForBuild_(ss); } catch (e) { console.warn("Lookup box outline skipped: " + e.message); }
 
   // Person Spoke With choices (Contact Log R:AA, Edits.gs): put the formula back if Migration or a
   // deleted row 2 took it, or free its list if a pasted row blocks it. Never stops a build.
@@ -268,12 +275,17 @@ function buildAllDerivedSheetsRun_() {
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
   try { applySheetLocks_(ss); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
 
-  // A build finished: an old "last night's rebuild didn't finish" message is out of date now
+  // A build finished: an old "last night's rebuild didn't finish" message is out of date now, and the
+  // sheets have the newest data / lists (✅ Getting Started's "build again" goes; Core.gs BUILD_NEEDED_KEY_)
   try { PropertiesService.getDocumentProperties().deleteProperty(NIGHTLY_FAILED_KEY_); } catch (e) { /* message only */ }
+  try { PropertiesService.getDocumentProperties().deleteProperty(BUILD_NEEDED_KEY_); } catch (e) { /* message only */ }
 
   // A new copy's first build: its everyday tabs come out from behind the 👋 Welcome tab and the
   // Welcome tab goes (Menus.gs; at the END, so a build that fails half way leaves the guide there)
   try { welcomeTabAfterBuild_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
+
+  // "This tracker pauses itself when brought into a newer one" (read by the newer one's Migration)
+  markTrackerCode_(ss);
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
@@ -428,6 +440,31 @@ function activeReplacedMark_(ss) {
 }
 
 /** Nightly trigger: true = this tracker is replaced, skip the run (no rebuild, no phone sync). */
+/**
+ * Trackers on this code pause their own nightly once brought into a newer one (above, since 2026-11-13).
+ * Migration's done screen (ma_markOldTracker) asks the OLD tracker whether it has this code, to show the
+ * manual Settings step only when it is needed (owner 2026-11-14, release check 3.3): every build leaves
+ * this invisible mark (developer metadata; travels with copies); a tracker without it counts as new
+ * enough when its version date (Backend A2) is on / after TRACKER_PAUSE_CODE_SINCE_ (every release from
+ * then has the code). true / false, or null when neither can be read.
+ */
+var TRACKER_CODE_MARK_ = "PC_TRACKER_CODE";
+var TRACKER_PAUSE_CODE_SINCE_ = new Date(2026, 10, 14); // 11/14/2026
+function markTrackerCode_(ss) {
+  try {
+    if (ss.createDeveloperMetadataFinder().withKey(TRACKER_CODE_MARK_).find().length) return false;
+    ss.addDeveloperMetadata(TRACKER_CODE_MARK_, JSON.stringify({ pausesItself: true, since: "2026-11-14" }));
+    return true;
+  } catch (e) { console.warn("Tracker code mark not written: " + e.message); return false; }
+}
+function trackerPausesItself_(otherSs) {
+  try { if (otherSs.createDeveloperMetadataFinder().withKey(TRACKER_CODE_MARK_).find().length) return true; }
+  catch (e) { /* no access to its metadata: the date below */ }
+  const ms = trackerBuildDateMs_(otherSs);
+  if (isNaN(ms)) return null;
+  return ms >= TRACKER_PAUSE_CODE_SINCE_.getTime();
+}
+
 function nightlyPausedByReplacement_() {
   let mark = null;
   try { mark = activeReplacedMark_(SpreadsheetApp.getActiveSpreadsheet()); } catch (err) { /* no sheet: no mark */ }

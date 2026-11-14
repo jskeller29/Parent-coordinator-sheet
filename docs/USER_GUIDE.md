@@ -147,21 +147,29 @@ Below the steps, "This tab" explains the tab you are on, and after your first bu
 ### Step 5: Load your data
 
 Open 🚀 App Menu → 📥 Input Data Mode, or click Open Input Data Mode in the checklist.
-It takes you through each export in turn, then two optional steps: Site / Class (the
-teacher and site for each class) and Your Lists. Your other tabs are hidden while you
-work. If you close its panel by accident, the yellow tab still says how to bring it back:
+It starts on a Start Here page: what each kind of data is for, where to get it, and when
+you last loaded it. Click Start with Student Data, or any step. It takes you through each
+export in turn, then two optional steps: Site / Class (the teacher and site for each
+class) and Your Lists. Your other tabs are hidden while you work. If you close its panel
+by accident, every Input Data Mode tab says how to bring it back:
 🚀 App Menu → 📥 Input Data Mode. It picks up where you left off.
 
 For each export, either click Upload file and pick the file you downloaded, or open the
 file, select everything (Ctrl+A, Mac ⌘+A), copy it, and paste it anywhere on the
 temporary tab with Ctrl+Shift+V (Mac ⌘+Shift+V). The data moves into Raw Data on its
 own. When it is in, the top of the panel says so on the next step, for example "Student
-Data (ATS) completed!". If you pasted the wrong export, or Excel shortened the numbers (they show as
-7.19E+09), the tracker tells you and changes nothing. Skip keeps the old data for that
-export.
+Data (ATS) completed!" and "18 rows moved to Raw Data (18 students)". If you pasted the wrong
+export, or Excel shortened the numbers (they show as 7.19E+09), the tracker tells you and
+changes nothing. Skip keeps the old data for that export.
 
-Before the Your Lists step, Input Data Mode builds your sheets. Finish or exit ends it
-at any step. Save, exit and build my sheets saves what is on the tab, brings your tabs
+On Site / Class, the panel counts how many classes have a teacher or a site. Once every
+class has one, Save and go to Your Lists takes you on.
+
+Before the Your Lists step, Input Data Mode builds your sheets, with a progress bar. When
+you are done with your lists, click Finish Input Data Mode. If you changed a list after
+that build, it offers Build sheets now: your lists reach the Student List, Parents Divided
+and the phone contacts only with a build. Finish or exit ends Input Data Mode at any
+other step. Save, exit and build my sheets saves what is on the tab, brings your tabs
 back and builds.
 
 #### How to download your data

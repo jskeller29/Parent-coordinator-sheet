@@ -124,6 +124,22 @@
   .opacity-50 { opacity: .5; }
   .opacity-75 { opacity: .75; }
 
+  /* The one progress bar (owner 2026-11-14, release check 2.12: "the same progress bar every time a build
+     runs"): Build Sheets / Full Sync, Input Data Mode's build, Migration's last step, Student Overrides, setup.
+     Drawn by pcBar() below. */
+  .pbar { display: flex; flex-direction: column; gap: 5px; }
+  .pbar .pb-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
+  .pbar .pb-top b { font-weight: 600; }
+  .pbar .pb-top span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .pbar .pb-track { height: 9px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-radius: 999px; overflow: hidden; }
+  .pbar .pb-fill { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .6s ease; }
+  .pbar .pb-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .pbar .pb-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .pbar.done .pb-fill { background: var(--ok); }
+  .pbar.done .pb-label { color: var(--ok); }
+  .pbar.fail .pb-fill { background: var(--danger); }
+  .pbar.fail .pb-label { color: var(--danger); }
+
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #c9d0da; border-radius: 5px; border: 2px solid #ffffff; }
@@ -131,3 +147,71 @@
 
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } * { transition: none !important; } }
 </style>
+<script>
+  /**
+   * The shared progress bar (see .pbar above). var bar = pcBar(element, { title, hint, waiting, stepMs });
+   * bar.set(stepIndex, steps)  steps = [{ label, detail }] (the build's BUILD_STEPS, from getSyncStatus)
+   * bar.done(text) / bar.fail(text) / bar.stop()
+   * The fill creeps forward inside a step (never past the next one), so a long step never looks stuck,
+   * and the clock shows how long it has been running.
+   */
+  function pcBar(el, opts) {
+    opts = opts || {};
+    var s = { step: 0, steps: opts.steps || [], stepAt: Date.now(), t0: Date.now(), tEnd: 0, state: 'run', note: '' };
+    el.innerHTML = '<div class="pbar"><div class="pb-top"><b></b><span></span></div>' +
+      '<div class="pb-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i class="pb-fill"></i></div>' +
+      '<div class="pb-label"></div><div class="pb-sub"></div><div class="pb-sub pb-hint"></div></div>';
+    var root = el.firstChild, q = function (c) { return root.querySelector(c); };
+    q('.pb-top b').textContent = opts.title || 'Working';
+    function clock(ms) { var x = Math.max(0, Math.floor(ms / 1000)); return Math.floor(x / 60) + ':' + ('0' + (x % 60)).slice(-2); }
+    function draw() {
+      var n = Math.max(1, s.steps.length || opts.total || 1);
+      var i = Math.max(0, Math.min(s.step, n - 1));
+      var cur = s.steps[i] || {};
+      var inStep = Math.min(0.9, (Date.now() - s.stepAt) / (opts.stepMs || 8000));
+      var pct = s.state === 'done' ? 100 : Math.max(2, Math.round((i + inStep) / n * 100));
+      root.className = 'pbar' + (s.state === 'run' ? '' : ' ' + s.state);
+      q('.pb-fill').style.width = pct + '%';
+      q('.pb-track').setAttribute('aria-valuenow', String(pct));
+      q('.pb-top span').textContent = (s.state === 'done' ? 'done in ' : '') + clock((s.tEnd || Date.now()) - s.t0);
+      q('.pb-label').textContent = s.state !== 'run' ? (s.note || (s.state === 'done' ? 'Done' : 'Stopped'))
+        : cur.label ? 'Step ' + (i + 1) + ' of ' + n + ': ' + cur.label : (opts.waiting || 'Starting…');
+      var sub = q('.pb-sub'); sub.textContent = s.state === 'run' && cur.detail ? cur.detail : ''; sub.style.display = sub.textContent ? '' : 'none';
+      var hint = q('.pb-hint'); hint.textContent = s.state === 'run' && opts.hint ? opts.hint : ''; hint.style.display = hint.textContent ? '' : 'none';
+    }
+    var timer = setInterval(draw, 500);
+    draw();
+    return {
+      set: function (step, steps) {
+        if (steps && steps.length) s.steps = steps;
+        step = Number(step) || 0;
+        if (step !== s.step) { s.step = step; s.stepAt = Date.now(); }
+        draw();
+      },
+      done: function (text) { s.state = 'done'; s.note = text || ''; s.tEnd = Date.now(); clearInterval(timer); draw(); },
+      fail: function (text) { s.state = 'fail'; s.note = text || ''; s.tEnd = Date.now(); clearInterval(timer); draw(); },
+      stop: function () { clearInterval(timer); }
+    };
+  }
+
+  /**
+   * Follows a build that another call is running (Input Data Mode, Migration, Student Overrides): asks
+   * getSyncStatus every 2 s and moves the bar. Steps reported before this build started are ignored
+   * (the step of the LAST build stays in the cache). Returns { stop() }.
+   */
+  function pcFollowBuild(bar) {
+    var t0 = Date.now(), stopped = false, timer = null, serverStart = null;
+    function poll() {
+      if (stopped) return;
+      google.script.run.withSuccessHandler(function (st) {
+        if (stopped || !st) return;
+        if (serverStart === null && st.now) serverStart = st.now - (Date.now() - t0) - 3000; // this build began after this
+        var fresh = !st.buildStepAt || serverStart === null || st.buildStepAt >= serverStart;
+        bar.set(fresh ? st.buildStep : 0, st.buildSteps);
+        timer = setTimeout(poll, 2000);
+      }).withFailureHandler(function () { if (!stopped) timer = setTimeout(poll, 2500); }).getSyncStatus();
+    }
+    timer = setTimeout(poll, 700);
+    return { stop: function () { stopped = true; if (timer) clearTimeout(timer); } };
+  }
+</script>
