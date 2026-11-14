@@ -58,16 +58,18 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    in Contact Log **R2** and hid columns R:AA; leave R1 empty and Q blank. Schools' sheets: the same rule
    by hand after their next build, or they get it with next year's copy of the template.
 
-## 4. Test it on copies: tick the boxes in GitHub
-The checks are a GitHub checklist you tick with a click (github.com or the GitHub app): one issue per
-release, made from `.github/ISSUE_TEMPLATE/release-check.md`. The ticks save by themselves.
-- Start one: the repository's **Issues** tab → **New issue** → **Release check**. (GitHub only offers it
-  once Test-Version is merged into main; until then ask Claude to open one, or copy that file's text into a
-  new issue.)
-- Read its **Before you start** box first: phone sync and "bring over last year's tracker" on a test copy
-  can touch your real Google Contacts and pause your live sheet.
-- Something fails: write it as a comment on the issue (the step, what you saw, a screenshot, any red error
-  from Extensions → Apps Script → Executions). Claude can read the comments in a later session.
+## 4. Test it on copies: the release checklist
+Every test, step by step, with what you should see. Three ways to use the same list:
+- **The web checklist** (best): https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 (only you can open it). Mark each
+  check Works, Problem or Skip and write what you saw. It saves as you go, on any device. When you're done, tell
+  Claude "release check done": Claude reads your answers there. It can also copy the report or save it as a PDF.
+- **On paper:** `docs/release-check/PC_Tracker_Release_Check.pdf` (also a button on the web checklist).
+- **In GitHub:** Issues → New issue → **Release check** (offered once Test-Version is merged into main; until then ask
+  Claude to open one). Ticks save by themselves; write failures as comments.
+
+Read its **Before you start** part first: phone sync and "bring over last year's tracker" on a test copy can touch
+your real Google Contacts and pause your live sheet. The checks come from `docs/release-check/checks.js`
+(`node docs/release-check/build.js` remakes all three).
 
 ## 5. Going live (after the copy works)
 0. Pilot first: 1 or 2 friendly schools use it for a week or two (the checklist's last box).

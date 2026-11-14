@@ -1,0 +1,642 @@
+<title>PC Tracker Release Check</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- Made by docs/release-check/build.js from checks.js (it fills in the DATA line of the script below).
+     Edit checks.js or this template, run the build, then republish the page. Answers live in the
+     page's db (one document: checks/current). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+  /* Layout: one reading column; a slim sticky progress bar; stages in test order; each check a
+     ruled row with its result buttons, folding to one line once it works. The tracker's own
+     "District" look: navy, Source Sans 3 / Source Serif 4, thin lines, 3px corners. */
+  :root {
+    --bg: #ffffff; --surface: #f5f7fa; --ink: #1b2430; --muted: #566173; --faint: #8a94a3; --line: #d8dee6;
+    --accent: #183e69; --accent-ink: #ffffff; --accent-soft: #e5ebf2;
+    --ok: #2e6e48; --ok-soft: #e4f0e8; --bad: #a3312a; --bad-soft: #f8e7e5; --warn: #7a5300; --warn-soft: #fbf1dc;
+    --skip: #5f6976; --skip-soft: #eceff3;
+    --font: "Source Sans 3", "Segoe UI", Arial, sans-serif;
+    --font-head: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --radius: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f151c; --surface: #161e28; --ink: #e4e9f0; --muted: #a2adbb; --faint: #7a8696; --line: #2a3644;
+      --accent: #8fb5e6; --accent-ink: #0c1420; --accent-soft: #1c2a3b;
+      --ok: #7dc79b; --ok-soft: #16301f; --bad: #f19a90; --bad-soft: #3a1e1c; --warn: #e2b866; --warn-soft: #30270f;
+      --skip: #a9b2bf; --skip-soft: #212a35;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f151c; --surface: #161e28; --ink: #e4e9f0; --muted: #a2adbb; --faint: #7a8696; --line: #2a3644;
+    --accent: #8fb5e6; --accent-ink: #0c1420; --accent-soft: #1c2a3b;
+    --ok: #7dc79b; --ok-soft: #16301f; --bad: #f19a90; --bad-soft: #3a1e1c; --warn: #e2b866; --warn-soft: #30270f;
+    --skip: #a9b2bf; --skip-soft: #212a35;
+    color-scheme: dark;
+  }
+
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+  h1, h2, h3 { font-family: var(--font-head); font-weight: 600; margin: 0; line-height: 1.25; text-wrap: balance; }
+  a { color: var(--accent); }
+  button, input, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .wrap, .bar-in { max-width: 860px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+  /* sticky progress bar */
+  .bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+  .bar-in { display: flex; align-items: center; gap: 12px; padding-block: 8px; flex-wrap: wrap; }
+  .bar-title { font-weight: 700; font-size: 14px; }
+  .meter { flex: 1 1 140px; min-width: 100px; height: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; display: flex; }
+  .meter span { display: block; height: 100%; }
+  .meter .m-ok { background: var(--ok); } .meter .m-bad { background: var(--bad); } .meter .m-skip { background: var(--faint); }
+  .counts { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .counts b { color: var(--ink); }
+  .save { font-size: 12.5px; color: var(--faint); white-space: nowrap; }
+  .save.error { color: var(--bad); white-space: normal; }
+  .save.warn { color: var(--warn); white-space: normal; }
+
+  .btn { border: 1px solid var(--line); background: var(--bg); border-radius: var(--radius); padding: 6px 12px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .btn:hover { background: var(--surface); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.small { padding: 4px 10px; font-size: 13px; }
+  .btn:disabled { opacity: .55; cursor: default; }
+
+  /* intro */
+  .intro { padding-block: 28px 8px; display: grid; gap: 14px; }
+  .eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .intro h1 { font-size: clamp(28px, 5vw, 38px); }
+  .release-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .release-row label { font-weight: 600; font-size: 14px; }
+  .release-row input { border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--bg); min-width: 0; flex: 1 1 260px; max-width: 420px; }
+  .how { margin: 0; max-width: 66ch; color: var(--ink); }
+  .how-list { margin: 0; padding-left: 20px; max-width: 66ch; display: grid; gap: 4px; }
+  .links { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 14px; align-items: center; }
+  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 18px; border-top: 1px solid var(--line); padding-top: 12px; font-size: 14px; }
+  .toc a { text-decoration: none; display: flex; justify-content: space-between; gap: 8px; color: var(--ink); padding: 3px 0; border-bottom: 1px dotted var(--line); }
+  .toc a:hover { color: var(--accent); }
+  .toc .tc { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .toc .tc.has-bad { color: var(--bad); font-weight: 600; }
+  .toc .tc.all-done { color: var(--ok); font-weight: 600; }
+
+  /* stages */
+  .stage { padding-block: 26px 4px; scroll-margin-top: 64px; }
+  .stage-head { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 2px solid var(--ink); }
+  .stage-head h2 { font-size: 22px; display: flex; gap: 10px; align-items: baseline; }
+  .stage-head .snum { font-family: var(--font); font-weight: 700; font-size: 15px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stage-head p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .stage.safety { margin-top: 18px; padding: 18px 18px 6px; background: var(--warn-soft); border: 1px solid var(--warn); border-radius: var(--radius); }
+  .stage.safety .stage-head { border-bottom-color: var(--warn); }
+  .stage.safety .stage-head h2 { color: var(--warn); }
+
+  /* one check */
+  .check { border-bottom: 1px solid var(--line); padding-block: 14px; display: grid; gap: 10px; }
+  .check-head { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) auto; align-items: start; gap: 4px 10px; }
+  .num { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .check h3 { font-family: var(--font); font-size: 16.5px; font-weight: 700; padding-top: 1px; min-width: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .seg button { border: 0; background: var(--bg); padding: 5px 11px; font-size: 13.5px; font-weight: 600; cursor: pointer; color: var(--muted); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button:hover { background: var(--surface); color: var(--ink); }
+  .seg button[aria-pressed="true"][data-r="pass"] { background: var(--ok); color: #fff; }
+  .seg button[aria-pressed="true"][data-r="problem"] { background: var(--bad); color: #fff; }
+  .seg button[aria-pressed="true"][data-r="skip"] { background: var(--skip); color: var(--bg); }
+  .check-body { display: grid; gap: 10px; padding-left: calc(3.2em + 10px); }
+  .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .lbl { margin: 0 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .cols ol, .cols ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+  .see ul { list-style: none; padding-left: 0; }
+  .see li { padding-left: 18px; position: relative; }
+  .see li::before { content: "→"; position: absolute; left: 0; color: var(--accent); }
+  .why { margin: 0; font-size: 14px; color: var(--muted); }
+  .why b { color: var(--ink); }
+  .fields { display: flex; gap: 10px 16px; flex-wrap: wrap; align-items: flex-start; }
+  .timing { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .timing input { width: 5.5em; border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 8px; background: var(--bg); font-variant-numeric: tabular-nums; }
+  .note { flex: 1 1 320px; min-width: 0; display: grid; gap: 4px; }
+  .note label { font-size: 13px; color: var(--muted); }
+  .note textarea { width: 100%; box-sizing: border-box; min-height: 2.6em; resize: vertical; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 10px; background: var(--bg); line-height: 1.4; }
+  .check[data-status="problem"] { background: linear-gradient(90deg, var(--bad-soft), transparent 70%); }
+  .check[data-status="problem"] .note textarea { border-color: var(--bad); }
+  .check[data-status="problem"] .note label { color: var(--bad); font-weight: 600; }
+  .check.folded .check-body { display: none; }
+  .check.folded h3 { color: var(--muted); font-weight: 600; }
+  .fold { justify-self: start; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 13px; font-weight: 600; margin-left: calc(3.2em + 10px); }
+  .fold[hidden] { display: none !important; }
+
+  /* report */
+  .report { margin-block: 34px 48px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); display: grid; gap: 14px; }
+  .report h2 { font-size: 22px; }
+  .sum { display: flex; gap: 8px 20px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+  .sum span { font-size: 14px; color: var(--muted); }
+  .sum b { font-size: 20px; color: var(--ink); margin-right: 4px; }
+  .sum .s-bad b { color: var(--bad); } .sum .s-ok b { color: var(--ok); }
+  .plist { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 8px; }
+  .plist li { border-left: 3px solid var(--bad); padding: 4px 0 4px 10px; background: var(--bg); }
+  .plist a { font-weight: 600; text-decoration: none; }
+  .plist .pn { display: block; color: var(--muted); font-size: 14px; white-space: pre-wrap; }
+  .empty { margin: 0; color: var(--muted); font-size: 14px; }
+  .report textarea { width: 100%; box-sizing: border-box; min-height: 5em; resize: vertical; border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 10px; background: var(--bg); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .msg { font-size: 13.5px; color: var(--muted); }
+  .msg.error { color: var(--bad); }
+  .confirm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border: 1px solid var(--bad); border-radius: var(--radius); background: var(--bad-soft); }
+  .confirm span { font-weight: 600; color: var(--bad); }
+  .copybox { width: 100%; min-height: 12em; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .tell { margin: 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--bg); }
+
+  @media (max-width: 640px) {
+    .check-head { grid-template-columns: 2.6em minmax(0, 1fr); }
+    .seg { grid-column: 1 / -1; justify-self: start; }
+    .check-body { padding-left: 0; }
+    .fold { margin-left: 0; }
+    .cols { grid-template-columns: minmax(0, 1fr); }
+    .save { white-space: normal; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .meter span { transition: width .3s ease; }
+  }
+</style>
+
+<header class="bar">
+  <div class="bar-in">
+    <span class="bar-title">Release check</span>
+    <div class="meter" aria-hidden="true"><span class="m-ok" id="mOk"></span><span class="m-bad" id="mBad"></span><span class="m-skip" id="mSkip"></span></div>
+    <span class="counts" id="counts"></span>
+    <span class="save" id="saveState" role="status">Loading your answers…</span>
+    <button class="btn small" id="copyTop" type="button">Copy report</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <p class="eyebrow">PC Tracker · before a version goes to schools</p>
+    <h1>Release check</h1>
+    <div class="release-row">
+      <label for="release">Version being tested</label>
+      <input id="release" type="text" autocomplete="off">
+    </div>
+    <ol class="how-list">
+      <li>Go through the stages in order, on copies of the tracker, never on your live sheet.</li>
+      <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
+      <li>Your answers save as you go, on any device that opens this page.</li>
+      <li>When you're done, tell Claude <b>"release check done"</b>: Claude reads your answers here. You can also copy the report or save it as a PDF at the bottom.</li>
+    </ol>
+    <div class="links">
+      <a href="https://github.com/jskeller29/Parent-coordinator-sheet/blob/Test-Version/DEPLOY.md" target="_blank" rel="noopener">DEPLOY.md (putting files on a copy)</a>
+      <a href="https://github.com/jskeller29/Parent-coordinator-sheet/tree/Test-Version/test-data" target="_blank" rel="noopener">Test files (test-data)</a>
+      <button class="btn small" id="printable" type="button" hidden>Download the printable checklist (PDF)</button>
+    </div>
+    <nav class="toc" id="toc" aria-label="Stages"></nav>
+  </section>
+
+  <div id="stages"></div>
+
+  <section class="report" id="report">
+    <h2>Your report</h2>
+    <div class="sum" id="sum"></div>
+    <div>
+      <p class="lbl">Problems</p>
+      <ul class="plist" id="plist"></ul>
+    </div>
+    <div>
+      <label class="lbl" for="otherNotes">Anything else to tell Claude</label>
+      <textarea id="otherNotes" placeholder="Ideas, things that felt slow or confusing, questions…"></textarea>
+    </div>
+    <p class="tell">Done? Tell Claude <b>"release check done"</b>. Claude reads your answers from this page. Or copy the report and paste it in the chat.</p>
+    <div class="actions">
+      <button class="btn primary" id="copyReport" type="button">Copy report</button>
+      <button class="btn" id="pdfReport" type="button" hidden>Save the report as a PDF</button>
+      <button class="btn" id="startOver" type="button">Start over…</button>
+      <span class="msg" id="reportMsg" role="status"></span>
+    </div>
+    <div class="confirm" id="confirmClear" hidden>
+      <span>Clear every answer and note?</span>
+      <button class="btn small" id="clearYes" type="button">Yes, clear them</button>
+      <button class="btn small" id="clearNo" type="button">Keep them</button>
+    </div>
+    <textarea class="copybox" id="copybox" hidden aria-label="Report text"></textarea>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var DATA = __CHECKS_DATA__;
+  var LABEL = { pass: "Works", problem: "Problem", skip: "Skipped" };
+  var LS_KEY = "pc-release-check-v1";
+  var DOC_PATH = "checks/current";
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- the checks, numbered in order ----------
+  var ORDER = [];
+  DATA.stages.forEach(function (st, si) {
+    st.checks.forEach(function (c, ci) { ORDER.push({ stage: st, si: si, check: c, num: si + "." + (ci + 1) }); });
+  });
+  var BY_ID = {};
+  ORDER.forEach(function (o) { BY_ID[o.check.id] = o; });
+
+  var state = { release: DATA.release, notes: "", results: {} };
+  function res(id) { return state.results[id] || (state.results[id] = { status: "", note: "", seconds: null }); }
+
+  // ---------- building the page (once) ----------
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function list(tag, items) { var l = el(tag); items.forEach(function (t) { l.appendChild(el("li", null, t)); }); return l; }
+
+  function buildPage() {
+    var host = $("stages"), toc = $("toc");
+    DATA.stages.forEach(function (st, si) {
+      var sec = el("section", "stage" + (st.safety ? " safety" : ""));
+      sec.id = "stage-" + st.id;
+      var head = el("div", "stage-head");
+      var h = el("h2");
+      if (!st.safety) h.appendChild(el("span", "snum", String(si)));
+      h.appendChild(document.createTextNode(st.title));
+      head.appendChild(h);
+      head.appendChild(el("p", null, st.where));
+      sec.appendChild(head);
+      st.checks.forEach(function (c) { sec.appendChild(buildCheck(BY_ID[c.id])); });
+      host.appendChild(sec);
+
+      var a = el("a"); a.href = "#stage-" + st.id;
+      a.appendChild(el("span", null, (st.safety ? "" : si + ". ") + st.title));
+      var tc = el("span", "tc"); tc.id = "tc-" + st.id; a.appendChild(tc);
+      toc.appendChild(a);
+    });
+  }
+
+  function buildCheck(o) {
+    var c = o.check, art = el("article", "check");
+    art.id = "c-" + c.id; art.dataset.id = c.id; art.dataset.status = "";
+    var head = el("div", "check-head");
+    head.appendChild(el("span", "num", o.num));
+    head.appendChild(el("h3", null, c.title));
+    var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
+    ["pass", "problem", "skip"].forEach(function (r) {
+      var b = el("button", null, r === "skip" ? "Skip" : LABEL[r]);
+      b.type = "button"; b.dataset.r = r; b.setAttribute("aria-pressed", "false");
+      seg.appendChild(b);
+    });
+    head.appendChild(seg);
+    art.appendChild(head);
+
+    var body = el("div", "check-body");
+    var cols = el("div", "cols");
+    var d1 = el("div", "do"); d1.appendChild(el("p", "lbl", "Do")); d1.appendChild(list("ol", c.do));
+    var d2 = el("div", "see"); d2.appendChild(el("p", "lbl", "You should see")); d2.appendChild(list("ul", c.see));
+    cols.appendChild(d1); cols.appendChild(d2); body.appendChild(cols);
+    if (c.why) { var w = el("p", "why"); w.appendChild(el("b", null, "Why: ")); w.appendChild(document.createTextNode(c.why)); body.appendChild(w); }
+    var fields = el("div", "fields");
+    if (c.timing) {
+      var t = el("label", "timing"); t.htmlFor = "t-" + c.id;
+      t.appendChild(document.createTextNode(c.timing));
+      var ti = el("input"); ti.type = "number"; ti.min = "0"; ti.step = "1"; ti.inputMode = "numeric"; ti.id = "t-" + c.id; ti.dataset.id = c.id;
+      t.appendChild(ti); fields.appendChild(t);
+    }
+    var n = el("div", "note");
+    var nl = el("label", null, "Notes"); nl.htmlFor = "n-" + c.id;
+    var ta = el("textarea"); ta.id = "n-" + c.id; ta.dataset.id = c.id; ta.rows = 1;
+    ta.placeholder = "What did you see? Needed for a Problem.";
+    n.appendChild(nl); n.appendChild(ta); fields.appendChild(n);
+    body.appendChild(fields);
+    art.appendChild(body);
+
+    var fold = el("button", "fold", "Show the steps"); fold.type = "button"; fold.hidden = true; fold.dataset.fold = c.id;
+    art.appendChild(fold);
+    return art;
+  }
+
+  // ---------- painting from state ----------
+  var opened = {}; // folded checks the viewer opened again (this visit only)
+  function paint(id) {
+    var art = $("c-" + id); if (!art) return;
+    var r = res(id), st = r.status || "";
+    art.dataset.status = st;
+    Array.prototype.forEach.call(art.querySelectorAll(".seg button"), function (b) { b.setAttribute("aria-pressed", String(b.dataset.r === st)); });
+    var folded = (st === "pass" || st === "skip") && !opened[id];
+    art.classList.toggle("folded", folded);
+    var fold = art.querySelector(".fold");
+    fold.hidden = !(st === "pass" || st === "skip");
+    fold.textContent = folded ? "Show the steps" + (r.note ? " and your note" : "") : "Fold it away";
+    var ta = $("n-" + id);
+    if (ta && document.activeElement !== ta && ta.value !== (r.note || "")) ta.value = r.note || "";
+    var ti = $("t-" + id);
+    if (ti && document.activeElement !== ti) { var v = r.seconds == null ? "" : String(r.seconds); if (ti.value !== v) ti.value = v; }
+  }
+
+  function counts() {
+    var c = { pass: 0, problem: 0, skip: 0, total: ORDER.length };
+    ORDER.forEach(function (o) { var s = (state.results[o.check.id] || {}).status; if (c[s] != null) c[s]++; });
+    c.done = c.pass + c.problem + c.skip;
+    return c;
+  }
+
+  function paintSummary() {
+    var c = counts(), pct = function (n) { return (100 * n / c.total) + "%"; };
+    $("mOk").style.width = pct(c.pass); $("mBad").style.width = pct(c.problem); $("mSkip").style.width = pct(c.skip);
+    $("counts").innerHTML = "";
+    var b = el("b", null, String(c.done)); $("counts").appendChild(b);
+    $("counts").appendChild(document.createTextNode(" of " + c.total + " done" + (c.problem ? " · " + c.problem + (c.problem === 1 ? " problem" : " problems") : "")));
+
+    DATA.stages.forEach(function (st) {
+      var done = 0, bad = 0;
+      st.checks.forEach(function (k) { var s = (state.results[k.id] || {}).status; if (s) done++; if (s === "problem") bad++; });
+      var tc = $("tc-" + st.id);
+      tc.textContent = bad ? bad + (bad === 1 ? " problem" : " problems") : done + " / " + st.checks.length;
+      tc.className = "tc" + (bad ? " has-bad" : (done === st.checks.length ? " all-done" : ""));
+    });
+
+    var sum = $("sum"); sum.innerHTML = "";
+    [["s-ok", c.pass, "worked"], ["s-bad", c.problem, c.problem === 1 ? "problem" : "problems"], ["", c.skip, "skipped"], ["", c.total - c.done, "not done yet"]].forEach(function (x) {
+      var s = el("span", x[0]); s.appendChild(el("b", null, String(x[1]))); s.appendChild(document.createTextNode(x[2])); sum.appendChild(s);
+    });
+
+    var pl = $("plist"); pl.innerHTML = "";
+    var probs = ORDER.filter(function (o) { return (state.results[o.check.id] || {}).status === "problem"; });
+    if (!probs.length) { var e = el("li"); e.style.borderLeftColor = "var(--line)"; e.appendChild(el("span", "pn", "None so far.")); pl.appendChild(e); }
+    probs.forEach(function (o) {
+      var li = el("li"), a = el("a", null, o.num + " " + o.check.title); a.href = "#c-" + o.check.id;
+      li.appendChild(a);
+      li.appendChild(el("span", "pn", state.results[o.check.id].note ? state.results[o.check.id].note : "No note yet: write what you saw."));
+      pl.appendChild(li);
+    });
+  }
+
+  function paintMeta() {
+    var r = $("release"), n = $("otherNotes");
+    if (document.activeElement !== r && r.value !== (state.release || "")) r.value = state.release || "";
+    if (document.activeElement !== n && n.value !== (state.notes || "")) n.value = state.notes || "";
+  }
+
+  function paintAll() { ORDER.forEach(function (o) { paint(o.check.id); }); paintSummary(); paintMeta(); }
+
+  // ---------- saving ----------
+  var mode = "loading", db = null, docRef = null, docExists = false;
+  var dirty = {}, metaDirty = false, timer = null, saving = false, again = false;
+  function setSave(text, kind) { var s = $("saveState"); s.textContent = text; s.className = "save" + (kind ? " " + kind : ""); }
+  function entry(id) { var r = res(id); return { status: r.status || "", note: r.note || "", seconds: r.seconds == null ? null : r.seconds, at: new Date().toISOString() }; }
+  function fullDoc() {
+    var out = { release: state.release || "", notes: state.notes || "", results: {}, updatedAt: new Date().toISOString() };
+    Object.keys(state.results).forEach(function (id) { if (BY_ID[id]) out.results[id] = entry(id); });
+    return out;
+  }
+  function queue(id, delay) {
+    if (id) dirty[id] = true; else metaDirty = true;
+    clearTimeout(timer);
+    timer = setTimeout(flush, delay);
+    if (mode !== "loading") setSave("Saving…");
+  }
+  function saveLocal() {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ release: state.release, notes: state.notes, results: state.results })); setSave("Saved in this browser only"); }
+    catch (e) { setSave("Not saved: this browser blocks saving here. Copy the report before you leave.", "warn"); }
+  }
+  function flush() {
+    clearTimeout(timer);
+    if (mode === "local") { dirty = {}; metaDirty = false; saveLocal(); return; }
+    if (mode !== "db") return; // the first answer from the store sends what is waiting
+    if (saving) { again = true; return; }
+    var ids = Object.keys(dirty), meta = metaDirty;
+    if (!ids.length && !meta) return;
+    dirty = {}; metaDirty = false; saving = true;
+    var job;
+    if (!docExists) job = docRef.set(fullDoc()).then(function () { docExists = true; });
+    else {
+      var patch = { updatedAt: new Date().toISOString() };
+      if (ids.length) { patch.results = {}; ids.forEach(function (id) { patch.results[id] = entry(id); }); }
+      if (meta) { patch.release = state.release || ""; patch.notes = state.notes || ""; }
+      job = docRef.update(patch);
+    }
+    job.then(function () { setSave("Saved"); }, function (e) {
+      ids.forEach(function (id) { dirty[id] = true; }); if (meta) metaDirty = true;
+      if (e && e.code === "invalid_argument" && docExists) { docExists = false; again = true; return; } // gone: write it whole
+      setSave("Not saved" + (e && e.message ? " (" + e.message + ")" : "") + ". Your answers stay on this screen; change anything to try again.", "error");
+    }).then(function () {
+      saving = false;
+      if (again) { again = false; if (Object.keys(dirty).length || metaDirty) setTimeout(flush, 400); }
+    });
+  }
+
+  function takeRemote(d) {
+    var r = (d && d.results) || {};
+    ORDER.forEach(function (o) {
+      var id = o.check.id;
+      if (dirty[id]) return; // this screen has a newer change on its way
+      var x = r[id] || {};
+      state.results[id] = { status: x.status || "", note: x.note || "", seconds: x.seconds == null ? null : x.seconds };
+    });
+    if (!metaDirty) {
+      if (d && typeof d.release === "string" && d.release) state.release = d.release;
+      state.notes = d && typeof d.notes === "string" ? d.notes : state.notes;
+    }
+    paintAll();
+  }
+
+  function startLocal(why) {
+    mode = "local";
+    try { var raw = localStorage.getItem(LS_KEY); if (raw) { var d = JSON.parse(raw); takeRemote(d); } } catch (e) {}
+    setSave(why || "Saved in this browser only");
+    if (Object.keys(dirty).length || metaDirty) flush();
+  }
+
+  function startDb() {
+    var loadTimer = setTimeout(function () {
+      if (mode === "loading") setSave("Can't reach your saved answers yet. Keep going: they save once the connection is back.", "warn");
+    }, 10000);
+    var claude = window.claude;
+    if (!claude || typeof claude.use !== "function") { clearTimeout(loadTimer); startLocal(); return; }
+    claude.use("db").then(function (store) {
+      if (!store) { clearTimeout(loadTimer); startLocal(); return; }
+      db = store; docRef = db.doc(DOC_PATH);
+      docRef.onSnapshot(function (snap) {
+        if (!snap.metadata.fromCache) clearTimeout(loadTimer);
+        docExists = snap.exists;
+        takeRemote(snap.exists ? snap.data() : null);
+        if (mode !== "db") { mode = "db"; setSave(snap.exists ? "Saved" : "Ready: answers save as you go"); }
+        if (Object.keys(dirty).length || metaDirty) flush();
+      }, function (e) {
+        clearTimeout(loadTimer);
+        startLocal("Can't save here any more (" + (e && e.code ? e.code : "error") + "): answers now save in this browser only.");
+      });
+    }, function () { clearTimeout(loadTimer); startLocal(); });
+  }
+
+  // ---------- the viewer's actions ----------
+  document.addEventListener("click", function (ev) {
+    var b = ev.target.closest(".seg button");
+    if (b) {
+      var id = b.closest(".check").dataset.id, r = res(id);
+      r.status = r.status === b.dataset.r ? "" : b.dataset.r;
+      if (r.status === "problem") opened[id] = true;
+      paint(id); paintSummary(); queue(id, 250);
+      if (r.status === "problem") { var ta = $("n-" + id); if (ta && !ta.value) ta.focus(); }
+      return;
+    }
+    var f = ev.target.closest(".fold");
+    if (f) { var fid = f.dataset.fold; opened[fid] = !opened[fid]; paint(fid); }
+  });
+  document.addEventListener("input", function (ev) {
+    var t = ev.target, id = t.dataset && t.dataset.id;
+    if (t.tagName === "TEXTAREA" && id) { res(id).note = t.value; paintSummary(); queue(id, 900); }
+    else if (t.type === "number" && id) { res(id).seconds = t.value === "" ? null : Math.max(0, Math.round(Number(t.value))); queue(id, 900); }
+    else if (t.id === "release") { state.release = t.value; queue(null, 900); }
+    else if (t.id === "otherNotes") { state.notes = t.value; queue(null, 900); }
+  });
+  document.addEventListener("focusout", function (ev) { if (ev.target.matches("textarea, input")) flush(); });
+
+  // ---------- the report ----------
+  function reportText() {
+    var c = counts(), now = new Date(), lines = [];
+    lines.push(DATA.title + ": " + (state.release || DATA.release));
+    lines.push("Report of " + now.toLocaleString());
+    lines.push("Done " + c.done + " of " + c.total + " · Works " + c.pass + " · Problems " + c.problem + " · Skipped " + c.skip + " · Not done yet " + (c.total - c.done));
+    function section(title, rows) { if (!rows.length) return; lines.push(""); lines.push(title); rows.forEach(function (x) { lines.push(x); }); }
+    function rowsWith(pred, withNote) {
+      var out = [];
+      ORDER.forEach(function (o) {
+        var r = state.results[o.check.id] || {};
+        if (!pred(r)) return;
+        out.push(o.num + " " + o.check.title);
+        if (withNote && r.note) r.note.split("\n").forEach(function (l) { out.push("    " + l); });
+      });
+      return out;
+    }
+    section("PROBLEMS", rowsWith(function (r) { return r.status === "problem"; }, true));
+    var times = [];
+    ORDER.forEach(function (o) { var r = state.results[o.check.id] || {}; if (o.check.timing && r.seconds != null) times.push(o.num + " " + o.check.timing + ": " + r.seconds + " s"); });
+    section("TIMINGS", times);
+    section("NOTES ON CHECKS THAT WORKED OR WERE SKIPPED", rowsWith(function (r) { return (r.status === "pass" || r.status === "skip") && r.note; }, true));
+    section("SKIPPED", rowsWith(function (r) { return r.status === "skip"; }, false));
+    section("NOT DONE YET", rowsWith(function (r) { return !r.status; }, false));
+    if (state.notes) { lines.push(""); lines.push("OTHER NOTES"); state.notes.split("\n").forEach(function (l) { lines.push("    " + l); }); }
+    return lines.join("\n");
+  }
+
+  function copyReport(btn) {
+    var text = reportText(), box = $("copybox");
+    var done = function () { var old = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = old; }, 1600); box.hidden = true; };
+    var fallback = function () {
+      box.hidden = false; box.value = text; box.focus(); box.select();
+      $("reportMsg").textContent = "Copying isn't allowed here: the report is selected below, press Ctrl+C (Mac: Cmd+C).";
+      $("report").scrollIntoView({ block: "start" });
+    };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+  }
+  $("copyTop").addEventListener("click", function () { copyReport($("copyTop")); });
+  $("copyReport").addEventListener("click", function () { copyReport($("copyReport")); });
+
+  // Start over: asked on the page itself
+  $("startOver").addEventListener("click", function () { $("confirmClear").hidden = false; $("startOver").disabled = true; });
+  $("clearNo").addEventListener("click", function () { $("confirmClear").hidden = true; $("startOver").disabled = false; });
+  $("clearYes").addEventListener("click", function () {
+    $("confirmClear").hidden = true; $("startOver").disabled = false;
+    state.results = {}; state.notes = ""; opened = {};
+    ORDER.forEach(function (o) { dirty[o.check.id] = true; }); metaDirty = true;
+    paintAll(); flush();
+    $("reportMsg").textContent = "Cleared. Every check is back to not done.";
+  });
+
+  // ---------- downloads: the report as a PDF, and the printable checklist ----------
+  var downloads = null;
+  function loadJsPdf() {
+    return new Promise(function (ok, fail) {
+      if (window.jspdf && window.jspdf.jsPDF) return ok(window.jspdf.jsPDF);
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = function () { window.jspdf && window.jspdf.jsPDF ? ok(window.jspdf.jsPDF) : fail(new Error("PDF maker missing")); };
+      s.onerror = function () { fail(new Error("the PDF maker didn't load")); };
+      document.head.appendChild(s);
+    });
+  }
+  // The PDF's built-in fonts have no emoji or arrows: keep the words, drop the pictures
+  function pdfText(s) {
+    return String(s == null ? "" : s)
+      .replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\u2026/g, "...")
+      .replace(/[\u2192\u21D2]/g, "->").replace(/[\u2013\u2014]/g, "-").replace(/\u00A0/g, " ")
+      .replace(/\p{Extended_Pictographic}/gu, "").replace(/[\uFE0F\u200D\u20E3]/g, "")
+      .replace(/[^\t\n\r\x20-\x7E\xA0-\xFF]/g, "")
+      .replace(/[ \t]{2,}/g, " ").replace(/^ +| +$/gm, "");
+  }
+  function makePdf(JsPDF) {
+    var doc = new JsPDF({ unit: "pt", format: "letter" });
+    var M = 54, W = 612 - 2 * M, H = 792, y = M;
+    function line(text, o) {
+      o = o || {};
+      var size = o.size || 10;
+      doc.setFont("helvetica", o.bold ? "bold" : "normal"); doc.setFontSize(size);
+      var c = o.color || [27, 36, 48]; doc.setTextColor(c[0], c[1], c[2]);
+      doc.splitTextToSize(pdfText(text), W - (o.indent || 0)).forEach(function (l) {
+        if (y + size > H - M) { doc.addPage(); y = M; }
+        doc.text(l, M + (o.indent || 0), y + size); y += size * 1.32;
+      });
+      y += o.after == null ? 2 : o.after;
+    }
+    var c = counts();
+    line(DATA.title, { size: 18, bold: true, color: [24, 62, 105], after: 2 });
+    line(state.release || DATA.release, { size: 12, after: 2 });
+    line("Report of " + new Date().toLocaleString(), { size: 9, color: [86, 97, 115], after: 8 });
+    line("Done " + c.done + " of " + c.total + "   Works " + c.pass + "   Problems " + c.problem + "   Skipped " + c.skip + "   Not done yet " + (c.total - c.done), { size: 11, bold: true, after: 10 });
+    function head(t) { y += 6; line(t, { size: 12, bold: true, color: [24, 62, 105], after: 4 }); }
+    var probs = ORDER.filter(function (o) { return (state.results[o.check.id] || {}).status === "problem"; });
+    head("Problems");
+    if (!probs.length) line("None.", { color: [86, 97, 115] });
+    probs.forEach(function (o) { line(o.num + "  " + o.check.title, { bold: true }); line(state.results[o.check.id].note || "(no note)", { indent: 18, after: 6 }); });
+    var times = ORDER.filter(function (o) { var r = state.results[o.check.id] || {}; return o.check.timing && r.seconds != null; });
+    if (times.length) { head("Timings"); times.forEach(function (o) { line(o.num + "  " + o.check.timing + ": " + state.results[o.check.id].seconds + " s"); }); }
+    if (state.notes) { head("Other notes"); line(state.notes); }
+    head("Every check");
+    DATA.stages.forEach(function (st, si) {
+      y += 4; line((st.safety ? "" : si + ". ") + st.title, { bold: true, after: 2 });
+      st.checks.forEach(function (k) {
+        var o = BY_ID[k.id], r = state.results[k.id] || {};
+        line(o.num + "  [" + (r.status ? LABEL[r.status] : "not done") + "]  " + k.title, { indent: 10, color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
+        if (r.note) line(r.note, { indent: 28, size: 9, color: [86, 97, 115], after: 0 });
+      });
+    });
+    var pages = doc.getNumberOfPages();
+    for (var p = 1; p <= pages; p++) { doc.setPage(p); doc.setFontSize(8); doc.setTextColor(138, 148, 163); doc.text("Page " + p + " of " + pages, 612 - M, H - 24, { align: "right" }); }
+    return doc.output("blob");
+  }
+  function saveFile(name, data) {
+    var msg = $("reportMsg");
+    return downloads.save({ filename: name, data: data }).then(function (r) {
+      msg.className = "msg"; msg.textContent = r && r.status === "delivered" ? "Sent." : "Saved: " + name;
+    }, function (e) {
+      if (e && e.code === "declined") { msg.className = "msg"; msg.textContent = ""; return; }
+      msg.className = "msg error";
+      msg.textContent = e && e.code === "rate_limited" ? "A save is already waiting for your answer." : "Couldn't save the file here (" + (e && e.code ? e.code : "error") + "). Copy the report instead.";
+    });
+  }
+  $("pdfReport").addEventListener("click", function () {
+    var btn = $("pdfReport"); btn.disabled = true; $("reportMsg").className = "msg"; $("reportMsg").textContent = "Making the PDF…";
+    loadJsPdf().then(function (J) {
+      var d = new Date(), stamp = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      return saveFile("PC Tracker release check report " + stamp + ".pdf", makePdf(J));
+    }).catch(function (e) { $("reportMsg").className = "msg error"; $("reportMsg").textContent = "Couldn't make the PDF (" + e.message + "). Copy the report instead."; })
+      .then(function () { btn.disabled = false; });
+  });
+  $("printable").addEventListener("click", function () {
+    var btn = $("printable"); btn.disabled = true;
+    fetch("release-check-printable.pdf").then(function (r) { if (!r.ok) throw new Error("not found"); return r.blob(); })
+      .then(function (b) { return saveFile("PC Tracker release checklist (printable).pdf", b); })
+      .catch(function () { $("reportMsg").className = "msg error"; $("reportMsg").textContent = "The printable PDF isn't here; it is also in the repository: docs/release-check."; })
+      .then(function () { btn.disabled = false; });
+  });
+  function startDownloads() {
+    var claude = window.claude;
+    if (!claude || typeof claude.use !== "function") return;
+    claude.use("downloads").then(function (d) {
+      if (!d) return;
+      downloads = d; $("pdfReport").hidden = false; $("printable").hidden = false;
+    }, function () {});
+  }
+
+  // ---------- start ----------
+  buildPage();
+  state.release = DATA.release;
+  paintAll();
+  startDb();
+  startDownloads();
+})();
+</script>

@@ -990,16 +990,23 @@ Workflow:
   README.md there says what each file should show; tests/test_testdata.js checks those counts.
 - DEPLOY.md (repo root): the owner's one-page checklist (files to delete, the files each copy should have, manifests,
   after-deploy steps, going live). Keep it in step when files are added / renamed.
-- RELEASE CHECK (owner's request 2026-11-14, "a UI in GitHub to go through and do checks", not in Google Sheets): the
-  tests to do on copies before a version goes to schools are ONE GitHub issue per release, made from
-  .github/ISSUE_TEMPLATE/release-check.md (tick boxes on github.com / the GitHub app; failures go in its comments, read
-  them with the GitHub tools). DEPLOY.md section 4 only points to it: ADD NEW CHECKS TO THE TEMPLATE (stages: before you
-  start = safety for test copies, 1 copies, 2 new school, 3 returning school, 4 real data, 5 phone sync, 6 someone
-  else, 7 release copies, 8 before schools incl. a pilot). GitHub offers the template under New issue only from the
-  default branch (main); until the merge, open the issue with the GitHub tools from the file's text (front matter
-  removed, Claude Code footer added). The first one: issue #21 "Release check: Test-Version (November 2026)".
-- Push every change to Test-Version (not main) unless the owner says otherwise for that change. main only gets
-  changes when the owner asks for it (e.g. merging Test-Version once it has been tested on a copy of the sheet).
+- RELEASE CHECK (owner's request 2026-11-14: "a UI to go through and do checks", "make it look good", a PDF, a report
+  for Claude; NOT in Google Sheets): the tests to do on copies before a version goes to schools. ONE SOURCE:
+  docs/release-check/checks.js (stages; each check: id, title, do[], see[], optional why / timing). NEVER change a
+  check's id once used (saved answers are kept under it); add new checks THERE. `node docs/release-check/build.js`
+  makes from it: (1) docs/release-check/release-check.html (from page.template.html: the web checklist), (2)
+  docs/release-check/PC_Tracker_Release_Check.pdf (printable, Playwright), (3) .github/ISSUE_TEMPLATE/release-check.md
+  (the GitHub issue version). After a build, republish the web page: Artifact publish of
+  docs/release-check/release-check.html with files {"release-check-printable.pdf": "docs/release-check/PC_Tracker_Release_Check.pdf"}
+  (keeps the URL https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1 when published from this file path in the same
+  session; from another session pass that url; capabilities db + downloads are kept when omitted). The page:
+  "District" look, Works / Problem / Skip + notes + seconds per check, progress bar, report section; saves to its db
+  doc checks/current = { release, notes, updatedAt, results: { <check id>: { status pass|problem|skip|"", note,
+  seconds, at } } } (localStorage only when db is unavailable); Copy report (text), Save the report as a PDF (jsPDF
+  2.5.1 from cdnjs, emoji / arrows stripped for its fonts), Download the printable checklist (the supporting file),
+  Start over (asked on the page). The page cannot print (the frame blocks it). When the owner says "release check
+  done": ArtifactData get collection "checks" doc_id "current" on that url and report problems first. The GitHub issue
+  (first one: #21) is the alternative; GitHub offers the template under New issue only from the default branch (main).
 - OTHER CLAUDE SESSIONS (owner's request 2026-11-12): two sessions pushing to Test-Version at once collide. At the
   start of every task AND right before every push: (1) list the owner's sessions (claude-code-remote list_sessions,
   mine: true) and (2) git fetch origin Test-Version and look at commits not in this checkout (their
