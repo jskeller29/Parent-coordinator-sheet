@@ -85,6 +85,11 @@ function makeSheet(ss, name) {
     },
     activate: () => { s._hidden = false; ss._active = p; return p; },
     getMaxRows: () => s._maxRows, getMaxColumns: () => s._maxCols,
+    // hidden columns (logged like any other call, so tests can count hideColumns)
+    _hiddenCols: new Set(),
+    hideColumns: (...a) => { for (let i = 0; i < (a[1] || 1); i++) s._hiddenCols.add(a[0] + i); s._logSheet('hideColumns', a); return p; },
+    showColumns: (...a) => { for (let i = 0; i < (a[1] || 1); i++) s._hiddenCols.delete(a[0] + i); s._logSheet('showColumns', a); return p; },
+    isColumnHiddenByUser: c => s._hiddenCols.has(c),
     insertRowsAfter: (a, n) => { s._maxRows += n; return p; }, insertColumnsAfter: (a, n) => { s._maxCols += n; return p; },
     deleteRows: (a, n) => { s._maxRows -= n; return p; },
     deleteColumns: (a, n) => { // the cells to the right move left, like Sheets

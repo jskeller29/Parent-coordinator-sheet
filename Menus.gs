@@ -379,8 +379,8 @@ function buildMenus_(realOpen) {
     // New copy: the 👋 Welcome tab is the only tab shown until Initial Setup has run
     try { showWelcomeTabOnly_(ss); } catch (e) { console.error("Welcome tab: " + e.message); }
 
-    // No Contact Log filter rebuild before setup (only the Welcome tab shows; setup's own
-    // menu redraw makes it, see below)
+    // No Contact Log filter rebuild before setup (only the Welcome tab shows; the setup
+    // window's second call makes it, zg_setupFinish)
     return;
   }
 

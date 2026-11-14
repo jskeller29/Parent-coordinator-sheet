@@ -26,17 +26,18 @@ function installedOnEdit(e) {
  * Combined Contact Tracking (and the search bar) until the next build.
  */
 function installedOnChange(e) {
-  if (!e || e.changeType !== "REMOVE_ROW") return;
-  return runAction_("Row deleted", () => clDbgRun_("Row(s) deleted", () => {
+  if (!e || (e.changeType !== "REMOVE_ROW" && e.changeType !== "INSERT_ROW")) return;
+  const removed = e.changeType === "REMOVE_ROW";
+  return runAction_(removed ? "Row deleted" : "Row inserted", () => clDbgRun_(removed ? "Row(s) deleted" : "Row(s) inserted", () => {
     const ss = e.source || SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getActiveSheet();
     clDbg_("active tab: " + (sheet ? sheet.getName() : "?"));
     if (!sheet || sheet.getName().trim() !== "Contact Log") return;
-    // Row 2 holds the Person Spoke With formula: put it back now if that row went (own try/catch,
-    // so it never stops the notes below)
-    try { clDbg_("Person Spoke With formula (R2): " + restoreSpokeWithChoicesAfterDelete_(ss, sheet)); }
+    // Row 2 holds the Person Spoke With formula: deleting row 2 takes it, a row inserted above row 2
+    // pushes it down. Put it back now (own try/catch, so it never stops the notes below)
+    try { clDbg_("Person Spoke With formula (R2): " + restoreSpokeWithChoicesAfterRowChange_(ss, sheet)); }
     catch (err) { console.warn("Person Spoke With formula not checked: " + err.message); }
-    resyncNotesAfterRowDelete_(ss, sheet);
+    if (removed) resyncNotesAfterRowDelete_(ss, sheet); // an inserted (empty) row changes no notes
   }));
 }
 
@@ -663,11 +664,18 @@ function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
  * - R2 has a formula (this one, or one changed by hand) -> kept. If it shows #REF! (its list is
  *   blocked, e.g. a whole row was copied and pasted, which pastes the names as plain text), the rest
  *   of R2:AA(END-1) is cleared so it can list again: those cells only ever hold the formula's list.
+ * - no formula, but a row was inserted ABOVE row 2 (2026-11-14): Sheets pushed the formula down
+ *   (R3, R4 ...), where it lists each row's names one row too low (its list starts at C2), so every
+ *   dropdown showed the row above's guardians, and the check below took its own names for typed
+ *   data. It is moved back to R2 (its own text, so one changed by hand stays as it was), when the
+ *   inserted rows' R:AA are empty.
  * - no formula -> written, only when R2:AA(END-1) is empty (never over a school's own data there);
  *   then R:AA are hidden.
- * Returns "kept" / "unblocked" / "added" / "skipped: <why>". Called at the end of every build.
+ * light (a row change, restoreSpokeWithChoicesAfterRowChange_): only the formula is written, and
+ * R:AA hidden only when they aren't (fewer script writes after a user's delete / insert).
+ * Returns "kept" / "unblocked" / "added" / "moved back" / "skipped: <why>". Called at the end of every build.
  */
-function ensureSpokeWithChoices_(ss) {
+function ensureSpokeWithChoices_(ss, light) {
   const sheet = ss.getSheetByName("Contact Log");
   if (!sheet) return "skipped: no Contact Log";
   const col = CL_COL_SPOKE_CHOICES, width = CL_SPOKE_CHOICES_WIDTH, lastCol = col + width - 1;
@@ -689,31 +697,58 @@ function ensureSpokeWithChoices_(ss) {
   }
 
   const have = Math.min(maxCols, lastCol) - col + 1; // the part of R:AA the tab already has
-  if (have > 0 && sheet.getRange(2, col, rows, have).getValues().some(r => r.some(v => v !== "" && v !== null))) {
+  const hasData = (r, n) => n > 0 && have > 0 &&
+    sheet.getRange(r, col, n, have).getValues().some(row => row.some(v => v !== "" && v !== null));
+  const write = (text, how) => {
+    growCols();
+    const cell = sheet.getRange(2, col).setFormula(text);
+    if (!light) {
+      cell.setNote("Person Spoke With choices: one guardian per cell for column D's dropdown " +
+                   "('Contact Log'!$R2:$AA2). Hidden on purpose; every build puts this formula back if it goes missing.");
+      sheet.hideColumns(col, width);
+    } else if (!sheet.isColumnHiddenByUser(col)) {
+      sheet.hideColumns(col, width);
+    }
+    return how;
+  };
+
+  // Pushed down by rows inserted above row 2? (R3 .. R(END): a formula that splits column C)
+  if (maxCols >= col) {
+    const below = sheet.getRange(3, col, endRow - 2, 1).getFormulas();
+    for (let i = 0; i < below.length; i++) {
+      const text = String(below[i][0] || "");
+      if (!/SPLIT\(/i.test(text) || !/C:C/i.test(text)) continue;
+      const row = 3 + i;
+      if (hasData(2, row - 2)) { // something typed into the inserted rows' R:AA: leave it all
+        console.warn("Person Spoke With formula found in R" + row + ", not moved: R2:AA" + (row - 1) + " already holds data");
+        return "skipped: R:AA hold data";
+      }
+      sheet.getRange(row, col).clearContent(); // its one-row-too-low list goes with it
+      return write(text, "moved back");
+    }
+  }
+
+  if (hasData(2, rows)) {
     console.warn("Person Spoke With choices not added: Contact Log R2:AA" + (endRow - 1) + " already holds data");
     return "skipped: R:AA hold data";
   }
-  growCols();
-  sheet.getRange(2, col).setFormula(SPOKE_WITH_CHOICES_FORMULA)
-    .setNote("Person Spoke With choices: one guardian per cell for column D's dropdown " +
-             "('Contact Log'!$R2:$AA2). Hidden on purpose; every build puts this formula back if it goes missing.");
-  sheet.hideColumns(col, width);
-  return "added";
+  return write(SPOKE_WITH_CHOICES_FORMULA, "added");
 }
 
 /**
- * After Contact Log rows are deleted (owner's request 2026-11-14): the Person Spoke With formula
- * lives only in R2, so deleting row 2 takes it with it and every row's dropdown goes empty until
- * the next build. The change event doesn't say which row went, so this reads R2 (one call, the
- * only cost on a normal delete); no formula there = row 2 went -> ensureSpokeWithChoices_ puts it
- * back now (with its checks: never over anything typed into R:AA). Returns what happened.
+ * After rows are deleted from / inserted into the Contact Log (owner's request 2026-11-14, "only row
+ * 2"): the Person Spoke With formula lives only in R2. Deleting row 2 takes it with it (every row's
+ * dropdown goes empty); a row inserted above row 2 pushes it down (every dropdown one row off). The
+ * change event doesn't say which row, so this reads R2 (one call, the only cost on any other delete /
+ * insert); no formula there -> ensureSpokeWithChoices_(ss, light) puts it back now (same checks: never
+ * over anything typed into R:AA; only the formula is written). Returns what happened.
  */
-function restoreSpokeWithChoicesAfterDelete_(ss, sheet) {
+function restoreSpokeWithChoicesAfterRowChange_(ss, sheet) {
   let formula;
   try { formula = sheet.getRange(2, CL_COL_SPOKE_CHOICES).getFormula(); }
   catch (e) { return "skipped: no column R yet (the next build adds R:AA)"; } // a tab narrower than R
   if (formula) return "kept"; // row 2 is still there
-  return ensureSpokeWithChoices_(ss);
+  return ensureSpokeWithChoices_(ss, true);
 }
 
 /**

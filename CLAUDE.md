@@ -84,7 +84,9 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   "<step> completed!" (owner 2026-11-13, "make it more obvious it uploaded"): idm_doneNotice_ (called before
   idm_advance_ by the section write and the Site / Class save) adds notice.done = { kind 'ok', title "<doneName or
   short> completed!" (ats doneName "Student Data (ATS)"), sub "1,234 rows moved to Raw Data. Next: Parent Square." }
-  and toasts the same on the sheet (6 s). The sidebar shows it as a green banner at the TOP of the next step
+  and toasts the same on the sheet (6 s); while "Save and exit" saves the step on the way out (IDM_CLOSING_, set in
+  idm_saveAndExit) the text names no next step (it said "Next: Parent Square" as the mode closed; fixed 2026-11-14).
+  The sidebar shows it as a green banner at the TOP of the next step
   (#justDone; scrolls up; kept while that step shows, across polls; gone when the step changes). Site / Class with
   nothing typed: done.kind 'info' (grey "Site / Class: nothing saved"). The old list under Option 1 stays.
   Never deletes the tab the user is on (Apps Script then throws "Sheet <id> not found" on every later call): the one
@@ -129,7 +131,8 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
 - Your Lists (Input Data.gs part 2 + YourListsSidebar.html; was Z#OwnData.gs; owner's request 2026-11-05): your own lists (bus
   routes, PTA, trip forms) matched to students or guardians; reached only from Input Data Mode step 5 (no menu item).
   One tab per list "<icon> <name>" (icon = setup.icon, default 📥 OD_DEFAULT_ICON; owner 2026-11-13: picked in step 5's
-  "Add another list" form or by clicking the icon on a list's card: 24 offered + any typed emoji; od_cleanIcon_ = one
+  "Add another list" form or by clicking the icon on a list's card: 24 offered + any typed emoji (box takes 16
+  characters, like the server: 8 cut emoji made of several parts); od_cleanIcon_ = one
   emoji / symbol, no letters, digits, spaces or tab-name characters; od_tabNameFor_; od_createList(name, icon),
   od_renameList(tabId, name, icon) (icon left out = kept; od_saveList's rename keeps it too); lists are found by tab
   ID, never by the icon; the row-1 band keeps "📥 OWN DATA") (rows 1-3 = OWN DATA band / status / column chips, header row 4 after a paste, data from
@@ -362,10 +365,16 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   try/catch): R2 has a formula -> kept (one changed by hand too) unless it shows #REF! (a pasted whole row put plain
   names in R:AA) -> S2:AA2 + R3:AA(END-1) cleared ("unblocked"); no formula -> written + R:AA hidden + a cell note, only
   when R2:AA(END-1) is empty (a school's own data there = "skipped", warned). Needed because deleting row 2 deletes it
-  (and older Migration code cleared rows 2+ in every column). A ROW DELETE puts it back at once (owner 2026-11-14, "only
-  row 2"): installedOnChange -> restoreSpokeWithChoicesAfterDelete_ (Edits.gs, own try/catch before the notes resync)
-  reads only R2 (one call per Contact Log row delete; the change event doesn't say which row went); no formula there =
-  row 2 went -> ensureSpokeWithChoices_ (same checks, never over typed R:AA data); a #REF! is left to the build. Since 2026-11-13 ma_migrateContactLog clears / writes /
+  (and older Migration code cleared rows 2+ in every column). A ROW DELETE or INSERT puts it back at once (owner
+  2026-11-14, "only row 2"): installedOnChange (REMOVE_ROW and INSERT_ROW) -> restoreSpokeWithChoicesAfterRowChange_
+  (Edits.gs, own try/catch before the notes resync, which runs on deletes only) reads only R2 (one call per Contact Log
+  row delete / insert; the change event doesn't say which row); no formula there -> ensureSpokeWithChoices_(ss, light):
+  only the formula is written (no note; R:AA re-hidden only when not hidden: fewer script writes = fewer Ctrl+Z
+  presses); a #REF! is left to the build. A row INSERTED ABOVE ROW 2 pushes the formula down (R3...), where it lists
+  each row's names one row too low (its list starts at C2) and the old check took its names for typed data: when R2 has
+  no formula, ensureSpokeWithChoices_ (build and row changes) looks in R3:R(END) for a formula with SPLIT( and C:C and
+  moves it back to R2 with its own text (a hand-changed one stays), unless the inserted rows' R:AA hold data
+  ("moved back"; review fix 2026-11-14). Since 2026-11-13 ma_migrateContactLog clears / writes /
   formats only A:Q (logWidth, never R:AA) and ends with ensureSpokeWithChoices_ itself (the dropdown was empty
   after a migration). Code must never write into Contact
   Log R:AA rows 2+ or put anything in R1. Owner's sheet: Old Master Table-only students keep their old guardian text
@@ -477,6 +486,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   (scripts) and InputDataSidebar (HTML) on every sheet. User Guide: 3 small text changes (Input Data Mode paragraph,
   "Your own lists", the tabs table); apply them to the Google Doc by hand.
 - Person Spoke With formula back when row 2 is deleted (2026-11-14): re-paste Edits on every sheet.
+- Review fixes (2026-11-14, later): re-paste Edits, Input Data (scripts) and InputDataSidebar (HTML) on every sheet
+  (Menus only has a comment change).
 - Pointer toast sooner + Welcome step 1 "up to a minute" (2026-11-13): re-paste Menus on every sheet; then Reset to
   Display Mode on the master template (or Make Release Copies), which rewrites its Welcome tab with the new text.
 
@@ -554,7 +565,7 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
   the tabs are switched, so it shows sooner), the owner menus and showWelcomeTabOnly_ (the Welcome tab's ID read once,
   not once per tab). Welcome step 1 (buildWelcomeTab_) says the first open can take up to a minute, then reload (as
   the User Guide's Part 1 says); applyQBlackTextFilter_
-  (the Contact Log filter, re-made on every open) is NOT run before setup (setup's own onOpen() makes it) and runs
+  (the Contact Log filter, re-made on every open) is NOT run before setup (the setup window's zg_setupFinish makes it) and runs
   AFTER the menus on a set-up sheet (it was the first thing, so every open's menus waited for it).
   Later the same day (owner: "for some users the App Menu takes long"): on a set-up sheet the menus come first, then
   the Welcome tab "next steps" (welcomeTabAfterSetup_, was before the menus); the Contact Log filter re-make + END

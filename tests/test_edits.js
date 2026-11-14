@@ -185,13 +185,80 @@ function sheetWithSiblings() {
     g.installedOnChange(del);
     assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'another tab: the Contact Log is not touched');
     log.activate();
-    g.installedOnChange({ changeType: "INSERT_ROW", source: ss });
-    assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'not a delete: nothing');
+    g.installedOnChange({ changeType: "INSERT_COLUMN", source: ss });
+    assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'not a row delete / insert: nothing');
     log._set(3, 20, "my own note");                      // something typed into R:AA
     g.installedOnChange(del);
     assert.strictEqual(log.getRange(2, 18).getFormula(), "", 'never written over what is typed in R:AA');
     assert.strictEqual(log.getRange(3, 20).getValue(), "my own note");
-    assert.strictEqual(g.restoreSpokeWithChoicesAfterDelete_(ss, log), "skipped: R:AA hold data");
+    assert.strictEqual(g.restoreSpokeWithChoicesAfterRowChange_(ss, log), "skipped: R:AA hold data");
+  }
+
+  // After a user's row delete only the formula is written (owner 2026-11-14: fewer script writes =
+  // fewer Ctrl+Z presses); R:AA hidden again only when they aren't
+  {
+    const { ss, g, log, calls } = fresh();
+    g.ensureSpokeWithChoices_(ss);                        // as after a build: formula + note + hidden
+    const n = fn => calls(fn).length;
+    const before = { f: n("setFormula"), note: n("setNote"), hide: n("hideColumns") };
+    log.activate();
+    log._set(2, 18, "");                                  // row 2 deleted
+    g.installedOnChange({ changeType: "REMOVE_ROW", source: ss });
+    assert.strictEqual(n("setFormula"), before.f + 1, 'the formula written');
+    assert.strictEqual(n("setNote"), before.note, 'no note written');
+    assert.strictEqual(n("hideColumns"), before.hide, 'R:AA still hidden: not hidden again');
+    log.showColumns(18, 10);                              // someone showed R:AA by hand
+    log._set(2, 18, "");
+    g.installedOnChange({ changeType: "REMOVE_ROW", source: ss });
+    assert.strictEqual(n("hideColumns"), before.hide + 1, 'shown by hand: hidden again');
+  }
+
+  // A row inserted ABOVE row 2 pushes the formula down to R3, where it lists each row's names one row
+  // too low (every dropdown showed the row above's guardians) and the build took its names for typed
+  // data: moved back to R2, right away on the insert and by the build (owner 2026-11-14)
+  {
+    const pushedDown = (text) => {
+      const t = fresh();
+      // after the insert: 2 = the new blank row, 3 = Addams, 4 = Simpson, 5 = blank, 6 = END
+      t.log._put([["", "", "", "", ""], ["", "", "Morticia Addams and Gomez Addams", "", "111111111"],
+                  ["", "", "Marge Simpson", "", "222222222"], ["", "", "", "", ""], ["", "", "", "", "END"]], 2, 1);
+      t.log.getRange(3, 18).setFormula(text);             // the pushed-down formula (its list isn't modeled)
+      return t;
+    };
+    const F = fresh().g.__get("SPOKE_WITH_CHOICES_FORMULA");
+    { // on the insert itself
+      const { ss, g, log } = pushedDown(F);
+      log.activate();
+      g.installedOnChange({ changeType: "INSERT_ROW", source: ss });
+      assert.strictEqual(log.getRange(2, 18).getFormula(), F, 'back in R2 right away');
+      assert.strictEqual(log.getRange(3, 18).getFormula(), "", 'gone from R3');
+    }
+    { // the build fixes it too (e.g. the insert happened before this update)
+      const { ss, g, log } = pushedDown(F);
+      assert.strictEqual(g.ensureSpokeWithChoices_(ss), "moved back");
+      assert.strictEqual(log.getRange(2, 18).getFormula(), F);
+    }
+    { // a formula changed by hand keeps its own text
+      const mine = '=ARRAYFORMULA(IFERROR(SPLIT(SUBSTITUTE(INDEX(C:C, 2):INDEX(C:C, 4), " & ", " and "), " and ", FALSE), ""))';
+      const { ss, g, log } = pushedDown(mine);
+      assert.strictEqual(g.ensureSpokeWithChoices_(ss), "moved back");
+      assert.strictEqual(log.getRange(2, 18).getFormula(), mine, 'its own text, not the standard one');
+    }
+    { // something typed into the inserted row's R:AA: nothing is moved or written over
+      const { ss, g, log } = pushedDown(F);
+      log._set(2, 19, "typed here");
+      assert.strictEqual(g.ensureSpokeWithChoices_(ss), "skipped: R:AA hold data");
+      assert.strictEqual(log.getRange(3, 18).getFormula(), F, 'left where it is');
+      assert.strictEqual(log.getRange(2, 19).getValue(), "typed here");
+    }
+    { // an insert anywhere else: R2 still has it, nothing written
+      const { ss, g, log, calls } = fresh();
+      g.ensureSpokeWithChoices_(ss);
+      const writes = calls("setFormula").length;
+      log.activate();
+      g.installedOnChange({ changeType: "INSERT_ROW", source: ss });
+      assert.strictEqual(calls("setFormula").length, writes, 'nothing written');
+    }
   }
   console.log("Contact Log: Person Spoke With choices: ok");
 }

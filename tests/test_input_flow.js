@@ -87,6 +87,29 @@ const tabEmpty = t => t.getLastRow() === 2 && t.getLastColumn() === 1 && t.getRa
   console.log("wrong paste cleared, Use it anyway from kept rows: ok");
 }
 
+// ---------------------------------------------------------------- "Save and exit" with a paste waiting (2026-11-14)
+// The step is saved on the way out: its "completed" toast must not say "Next: Parent Square" (the mode is closing)
+{
+  const { ss, g } = newSheet();
+  const temp = startMode(ss, g, 0);
+  temp._put(asPasted(csv("1 - Student Data (ATS).csv")), 4, 2);
+  const toasts = [];
+  const t0 = ss.toast;
+  ss.toast = (m, t) => { toasts.push(t + ' | ' + m); return t0 && t0.call(ss, m, t); };
+  const r = g.idm_saveAndExit();
+  ss.toast = t0;
+  assert(r.exited, 'exited');
+  assert(toasts.some(t => /Student Data \(ATS\) completed/.test(t)), 'the step still says it went in: ' + JSON.stringify(toasts));
+  assert(!toasts.some(t => /Next:/.test(t)), 'no "Next:" while the mode closes: ' + JSON.stringify(toasts));
+  assert.strictEqual(g.__get("IDM_CLOSING_"), false, 'flag reset');
+  // and the normal way (no exit) still names the next step
+  const n = newSheet();
+  const t2 = startMode(n.ss, n.g, 0);
+  t2._put(asPasted(csv("1 - Student Data (ATS).csv")), 4, 2);
+  assert(/Next: Parent Square/.test(n.g.idm_processPaste().notice.done.sub), 'next step named when the mode goes on');
+  console.log("Save and exit: the completed message names no next step: ok");
+}
+
 // ---------------------------------------------------------------- Your Lists: the tab's icon (owner 2026-11-13)
 {
   const { ss, g } = newSheet();

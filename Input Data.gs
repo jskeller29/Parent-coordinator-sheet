@@ -360,14 +360,19 @@ function idm_saveAndExit() {
     const step = IDM_STEPS[state.step];
     const temp = idm_sheetById_(ss, state.tempId);
     let result = null;
-    if (step.manual) {
-      result = idm_saveSiteClass_(ss, state, true);
-    } else if (step.lists) {
-      idm_log_("save & exit: lists are saved one by one in their own sidebar");
-    } else if (temp && idm_tempHasData_(temp)) {
-      result = idm_processTemp_(ss, state, temp, false);
-    } else {
-      idm_log_("save & exit: nothing waiting on the tab");
+    IDM_CLOSING_ = true; // the step's "completed" message says no "Next:" (the mode is closing)
+    try {
+      if (step.manual) {
+        result = idm_saveSiteClass_(ss, state, true);
+      } else if (step.lists) {
+        idm_log_("save & exit: lists are saved one by one in their own sidebar");
+      } else if (temp && idm_tempHasData_(temp)) {
+        result = idm_processTemp_(ss, state, temp, false);
+      } else {
+        idm_log_("save & exit: nothing waiting on the tab");
+      }
+    } finally {
+      IDM_CLOSING_ = false;
     }
     if (result && result.notice && result.notice.type === 'error') return result; // stay, show the problem
     if (result && result.finished) { result.exited = true; return result; }       // that was the last step
@@ -935,9 +940,10 @@ function idm_saveSiteClass_(ss, state, fromExit) {
  * Parent Square."), and the same as a toast on the sheet (a paste is done on the tab, so the
  * user may be looking there). Call it before idm_advance_ (state.step is still this step).
  */
+var IDM_CLOSING_ = false; // true while "Save and exit" saves this step on the way out (idm_saveAndExit)
 function idm_doneNotice_(ss, state, step, count, one, many, what, message) {
   const name = step.doneName || step.short;
-  const next = IDM_STEPS[state.step + 1];
+  const next = IDM_CLOSING_ ? null : IDM_STEPS[state.step + 1]; // closing: there is no next step
   const sub = idm_countText_(count, one, many) + " " + what + "." + (next ? " Next: " + next.short + "." : "");
   try { ss.toast(sub, "✅ " + name + " completed", 6); } catch (e) { console.warn("Toast: " + e.message); } // the banner says it too
   return { type: 'imported', message: message, done: { kind: 'ok', title: name + " completed!", sub: sub } };

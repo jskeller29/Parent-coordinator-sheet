@@ -157,7 +157,7 @@
         <input id="newListName" type="text" maxlength="60" placeholder="e.g. Bus Routes" onkeydown="if (event.key === 'Enter') createList()">
         <div class="muted">Icon for its tab</div>
         <div class="icons" id="newListIcons"></div>
-        <div class="icon-other">Or type any emoji: <input id="newListIconOther" type="text" maxlength="8" oninput="newIconTyped(this.value)"></div>
+        <div class="icon-other">Or type any emoji: <input id="newListIconOther" type="text" maxlength="16" oninput="newIconTyped(this.value)"></div>
         <div class="row" style="margin-top:0"><button class="primary" id="createListBtn" onclick="createList()">Make the tab &amp; add the list</button><button onclick="show('newListForm', false); show('addListBtn', true)">Cancel</button></div>
       </div>
       <button class="addlist" id="addListBtn" onclick="showNewList()">Add another list</button>
@@ -624,7 +624,7 @@
         '<button onclick="listCall(\'od_openList\',' + l.tabId + ')">' + (l.ready ? 'Edit setup' : 'Finish setup') + '</button></div>' +
         '<div class="iconpick hidden" id="ip' + l.tabId + '"><div class="muted">Pick an icon for its tab</div><div class="icons">' +
         iconButtons(icon, 'pickListIcon(' + l.tabId + ', ') + '</div>' +
-        '<div class="icon-other">Or type any emoji: <input type="text" maxlength="8" id="ipo' + l.tabId + '"><button type="button" onclick="typedListIcon(' + l.tabId + ')">Use it</button></div></div></div>';
+        '<div class="icon-other">Or type any emoji: <input type="text" maxlength="16" id="ipo' + l.tabId + '"><button type="button" onclick="typedListIcon(' + l.tabId + ')">Use it</button></div></div></div>';
     }).join('');
   }
   function toggleIconPick(tabId) { var el = $('ip' + tabId); if (el) el.classList.toggle('hidden'); }
