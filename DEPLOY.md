@@ -58,14 +58,16 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    The build in step 3 already wrote the list on the hidden Backend tab (CF2: row n = Contact Log row n).
    The next build sees the dropdown reads the Backend and takes the old formula out of Contact Log **R2**:
    that is what lets **Delete table row** work again, and deleting / inserting Contact Log rows can't
-   break the list any more (release check 4.3 / 4.4). **Changed 2026-11-14**: it was `='Contact Log'!$R2:$AA2`;
-   a sheet still set to that keeps working the old way (the build keeps R2) until you change it. Leave R1 empty
-   and Q blank. Schools' sheets: the same rule by hand after their next build, or they get it with next year's
-   copy of the template.
+   break the list any more (release check 4.3 / 4.4). The same build takes out any checkboxes after column P
+   and deletes the empty columns after it, so the Contact Log ends at **P** again (2026-11-15: older builds
+   added Q:AA with copies of P's checkboxes). **Changed 2026-11-14**: it was `='Contact Log'!$R2:$AA2`;
+   a sheet still set to that keeps working the old way (the build keeps R2 and R:AA; only checkboxes after P
+   go) until you change it. Leave R1 empty. Schools' sheets: the same rule by hand after their next build, or
+   they get it with next year's copy of the template; until then their build adds no columns after P.
 
 ## 4. Test it on copies: the release checklist
 Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,
-test with fake data (the main test), a short check with your real data, then the release steps. Do the 48
+test with fake data (the main test), a short check with your real data, then the release steps. Do the 50
 **essentials** before any school gets a version; the 27 checks marked Optional can wait. Three ways to use the same
 list:
 - **The web checklist** (best), **round 2** (2026-11-14): https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc (only you can

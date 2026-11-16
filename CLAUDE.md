@@ -358,12 +358,27 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   so Contact Log row changes never shift it). Column D's Table dropdown, BY HAND: `='Backend'!$CF2:$CO2` (DEPLOY.md
   step 9). ensureSpokeWithChoices_ (every build): ensureSpokeChoicesOnBackend_ (formula written when missing /
   changed / #REF!, title, Backend rows >= END + 300 so the array never runs out of rows), then spokeDropdownSource_
-  reads D2's rule ONCE (getDataValidation → getCriteriaValues()[0].getSheet()): Backend -> doc property
-  SPOKE_CHOICES_MODE = 'backend' and removeSpokeFormulasFromLog_ clears every SPLIT(…C:C…) formula in Contact Log
-  R2:R(END); Contact Log / no rule / unreadable -> 'contactlog' = the old R2 behaviour below
-  (ensureSpokeWithChoicesInLog_, return texts unchanged; extra copies in R3:R(END) removed at build time; the Backend
-  result only logged). restoreSpokeWithChoicesAfterRowChange_ returns at once in 'backend' mode (one property read,
-  no sheet call: no lag). Tests: tests/test_round2.js.
+  reads column D's rule ONCE (the first rule on D2:D51, getDataValidations → getCriteriaValues()[0].getSheet()) into
+  doc property SPOKE_CHOICES_MODE: 'backend' / 'none' (a rule that reads no list: typed items, another tab) ->
+  removeSpokeFormulasFromLog_ clears every SPLIT(…C:C…) formula in Contact Log R2:R(END) (+ R2's own note);
+  'contactlog' (reads R:AA) / 'unknown' (NO rule seen, a range rule that can't be read, a failed read: a Table keeps a
+  Dropdown column's rule with the Table and whether a script always sees it is untested) -> the old R2 behaviour
+  below (ensureSpokeWithChoicesInLog_, return texts unchanged; extra copies in R3:R(END) removed at build time; the
+  Backend result only logged). restoreSpokeWithChoicesAfterRowChange_ returns at once in 'backend' / 'none' mode (one
+  property read, no sheet call: no lag). Tests: tests/test_round2.js.
+  CONTACT LOG ENDS AT P (owner 2026-11-15, "checkboxes in Q+ on build when P should be the last column"): the old
+  place's growCols (insertColumnsAfter up to AA on a tab that ends at P) ran whenever D wasn't seen reading the
+  Backend, and Google gives new columns the rules + look of the column on their left (P = the row checkboxes), so
+  Q:AA filled with checkboxes. Now (1) columns are added ONLY in 'contactlog' (canGrow), then cleared of rules and
+  format (clearDataValidations().clearFormat()); 'unknown' never adds one ("skipped: the Contact Log ends before R
+  (no column is added)"); (2) tidyContactLogAfterP_ (every build, after the step above, own try/catch): every
+  CHECKBOX rule after P goes (one clearDataValidations when every rule there is a checkbox, else per column run) with
+  its TRUE / FALSE where no formula is; in 'backend' / 'none' only, the empty columns at the right end are deleted
+  (empty = no value, formula, note except R2's own, merge, other rule; a used column keeps every column on its left),
+  so the tab ends at P. NEVER deleted in 'contactlog' / 'unknown': a rule reading R:AA would be left pointing at
+  nothing. Once the tab ends at P: one call (getMaxColumns) per build. The test fake (tests/lib/fakesheet.js) now
+  copies the left column's rules on insertColumnsAfter, keeps notes and shifts rules / notes / formulas / merges on
+  deleteColumns.
 - Person Spoke With choices (owner's request 2026-11-13; not yet tried on a real sheet): column D's dropdown lists only
   that row's student's guardians. Hidden helper columns R:AA of the Contact Log: the formula in R2
   (SPOKE_WITH_CHOICES_FORMULA, Core.gs, next to CL_COL_SPOKE_CHOICES / CL_SPOKE_CHOICES_WIDTH) splits each row's
@@ -509,6 +524,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Release check round 1 fixes (2026-11-14, later): re-paste Core, Build, Edits, Menus, Input Data (scripts) and Styles,
   ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet (master template too); then DEPLOY.md step 9:
   column D's dropdown = 'Backend'!$CF2:$CO2 and Build Sheets Only once more (it takes the old R2 formula out).
+- Contact Log ends at P (2026-11-15): re-paste Edits (Core only has a comment change) on every sheet (master
+  template too); with column D on the Backend (step 9), the next Build Sheets Only takes the checkboxes after P out
+  and deletes the empty columns Q:AA.
 
 RELEASE CHECK ROUND 1 FIXES (owner's report 2026-11-14, tests/test_round2.js; deploy: re-paste Core, Build, Edits, Menus,
 Input Data (scripts) and Styles, ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet, then DEPLOY.md

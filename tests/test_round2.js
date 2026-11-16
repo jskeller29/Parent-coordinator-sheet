@@ -341,6 +341,7 @@ function spokeSheet() {
 {
   // The dropdown still reads the old place (R:AA): the R2 formula is kept; the Backend copy is written too
   const { g, log, backend } = spokeSheet();
+  log._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [log.getRange(2, 18, 1, 10), true] });
   let r = g.ensureSpokeWithChoices_(g.SpreadsheetApp.getActiveSpreadsheet());
   assert.strictEqual(r, "added", 'the old place answers as before: ' + r);
   assert.strictEqual(log.getRange("R2").getFormula(), g.__get("SPOKE_WITH_CHOICES_FORMULA"), 'old place: R2');
@@ -376,6 +377,158 @@ function spokeSheet() {
   // the next build: kept as it is
   assert(/^Backend kept/.test(g.ensureSpokeWithChoices_(ss)));
   console.log("Person Spoke With (dropdown on the Backend): old formula out, row changes cost nothing: ok");
+}
+
+// ---------------------------------------------------------------- the Contact Log ends at P (owner 2026-11-15)
+// "Checkboxes in Q+ on build when P should be the last column": the build gave the old Person Spoke With
+// place (R:AA) its columns with insertColumnsAfter, and Google copies the left column's rules into new
+// columns (P = the row checkboxes; the fake does the same). Now no column is added unless column D reads
+// R:AA, a checkbox after P is taken out, and the empty columns after P go when nothing reads R:AA.
+{
+  const CHECKBOX = { getCriteriaType: () => "CHECKBOX", getCriteriaValues: () => [] };
+  const LIST = { getCriteriaType: () => "VALUE_IN_LIST", getCriteriaValues: () => [["Mom", "Dad"], true] };
+  const afterP = sh => Array.from(sh._dv.keys()).filter(k => Number(k.split(",")[1]) > 16);
+  const boxesAfterP = sh => afterP(sh).filter(k => sh._dv.get(k) === CHECKBOX).length;
+  // A:P like the template (P = checkboxes on the log rows 2-4, END on row 5); cols = the tab's width
+  const logAtP = (cols, d) => {
+    const t = spokeSheet();
+    t.log._maxCols = cols || 16;
+    for (let r = 2; r <= 4; r++) t.log._dv.set(r + ",16", CHECKBOX);
+    if (d === "backend") t.log._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [t.backend.getRange(2, 84, 1, 10), true] });
+    if (d === "contactlog") t.log._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [t.log.getRange(2, 18, 1, 10), true] });
+    if (d === "unknown") t.log._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [null, true] });
+    t.calls = fn => t.ss._log.filter(x => x.tab === "Contact Log" && x.fn === fn);
+    return t;
+  };
+  // the owner's sheet now: the build added Q:AA (checkboxes copied from P), R2 holds the old formula + note
+  const leftovers = t => {
+    for (let r = 2; r <= 4; r++) for (let c = 17; c <= 27; c++) t.log._dv.set(r + "," + c, CHECKBOX);
+    t.log._set(3, 17, false); t.log._set(4, 17, true);   // Q: unticked / ticked boxes
+    t.log.getRange(2, 18).setFormula(t.g.__get("SPOKE_WITH_CHOICES_FORMULA")).setNote("Person Spoke With choices: one guardian per cell");
+    t.log._hiddenCols.add(18);
+  };
+
+  { // 1. the owner's case: A:P, column D's rule not seen -> nothing added at all (was: Q:AA with checkboxes)
+    const { ss, g, log, calls } = logAtP(16);
+    const r = g.ensureSpokeWithChoices_(ss);
+    assert.strictEqual(r, "skipped: the Contact Log ends before R (no column is added)");
+    assert.strictEqual(log.getMaxColumns(), 16, 'the tab still ends at P');
+    assert.strictEqual(calls("insertColumnsAfter").length, 0, 'no column added');
+    assert.strictEqual(boxesAfterP(log), 0, 'no checkbox after P');
+    assert.strictEqual(g.__props.SPOKE_CHOICES_MODE, "unknown", 'no rule seen: never counts as "nothing reads R:AA"');
+    // a row delete / insert: one read (R2, which Sheets refuses on a tab that ends at P), nothing added
+    let reads = 0; const gr = log.getRange;
+    log.getRange = function (a, b) { reads++; if (typeof a === "number" && b > log.getMaxColumns()) throw new Error("out of bounds"); return gr.apply(log, arguments); };
+    assert.strictEqual(g.restoreSpokeWithChoicesAfterRowChange_(ss, log), "skipped: no column R");
+    assert.strictEqual(reads, 1, 'one sheet call on a row change');
+    log.getRange = gr;
+    // and the next build: nothing written to the Contact Log
+    const before = ss._log.length;
+    g.ensureSpokeWithChoices_(ss);
+    assert.strictEqual(ss._log.filter((x, i) => i >= before && x.tab === "Contact Log").length, 0, 'nothing written to the Contact Log');
+    // D reads the Backend: the same, and a row change reads nothing at all
+    const b = logAtP(16, "backend");
+    assert(/^Backend added$/.test(b.g.ensureSpokeWithChoices_(b.ss)));
+    assert.strictEqual(b.log.getMaxColumns(), 16);
+    assert.strictEqual(b.g.restoreSpokeWithChoicesAfterRowChange_(b.ss, b.log), "backend: nothing to do");
+  }
+  { // 2. leftovers on the owner's sheet: D reads the Backend -> formula, note, checkboxes and Q:AA go
+    const t = logAtP(27, "backend"); leftovers(t);
+    const r = t.g.ensureSpokeWithChoices_(t.ss);
+    assert(/the old formula in Contact Log R taken out \(1\)/.test(r), r);
+    assert(/33 checkboxes after P taken out/.test(r), r);
+    assert(/empty columns Q:AA deleted \(the tab ends at P\)/.test(r), r);
+    assert.strictEqual(t.log.getMaxColumns(), 16, 'P is the last column again');
+    assert.strictEqual(afterP(t.log).length, 0, 'no rule after P');
+    for (let r2 = 2; r2 <= 4; r2++) assert.strictEqual(t.log._dv.get(r2 + ",16"), CHECKBOX, "P's own checkboxes stay (row " + r2 + ")");
+    assert.strictEqual(t.calls("clearDataValidations").length, 1, 'one call for every checkbox after P');
+    // the next build: nothing more to do
+    const again = t.g.ensureSpokeWithChoices_(t.ss);
+    assert(/^Backend kept$/.test(again), again);
+  }
+  { // 3. same leftovers, column D's dropdown is a list of typed items (reads no list): the same clean-up
+    const t = logAtP(27); leftovers(t); t.log._dv.set("2,4", LIST);
+    const r = t.g.ensureSpokeWithChoices_(t.ss);
+    assert(/^column D's dropdown reads no list/.test(r) && /taken out \(1\)/.test(r) && /Q:AA deleted/.test(r), r);
+    assert.strictEqual(t.log.getMaxColumns(), 16);
+    assert.strictEqual(t.g.restoreSpokeWithChoicesAfterRowChange_(t.ss, t.log), "none: nothing to do");
+    // no rule seen at all: the checkboxes go, the old place and its columns stay (a rule the script
+    // can't see may read them: deleting them would leave it pointing at nothing)
+    const u = logAtP(27); leftovers(u);
+    assert.strictEqual(u.g.ensureSpokeWithChoices_(u.ss), "kept; 33 checkboxes after P taken out");
+    assert.strictEqual(u.log.getMaxColumns(), 27, 'nothing deleted');
+    assert.strictEqual(u.log.getRange(2, 18).getFormula(), u.g.__get("SPOKE_WITH_CHOICES_FORMULA"), 'R2 kept');
+  }
+  { // 4. a column after P that holds something stays, and so does every column on its left
+    const t = logAtP(27, "backend"); leftovers(t);
+    t.log._set(9, 20, "my own note");              // T9 (under END, say)
+    t.log._dv.set("8,19", LIST);                   // a dropdown of someone's own in S8
+    t.log.getRange(7, 15, 1, 3).merge();           // a merged cell O7:Q7 (a box drawn by hand)
+    const r = t.g.ensureSpokeWithChoices_(t.ss);
+    assert(/empty columns U:AA deleted \(the tab ends at T\)/.test(r), r);
+    assert.strictEqual(t.log.getMaxColumns(), 20, 'Q:T stay');
+    assert.strictEqual(t.log.getRange(9, 20).getValue(), "my own note", 'their text stays');
+    assert.strictEqual(t.log._dv.get("8,19"), LIST, 'their dropdown stays');
+    assert.strictEqual(boxesAfterP(t.log), 0, 'the checkboxes in Q:T are gone');
+    assert.strictEqual(t.log.getRange(3, 17).getValue() + "" + t.log.getRange(4, 17).getValue(), "", "the boxes' TRUE / FALSE went with them");
+    // only a merge: kept up to its last column
+    const m = logAtP(27, "backend"); leftovers(m);
+    m.log.getRange(7, 15, 1, 4).merge();           // O7:R7
+    assert(/empty columns S:AA deleted \(the tab ends at R\)/.test(m.g.ensureSpokeWithChoices_(m.ss)));
+    // someone's own note in a cell: kept (R2's own note is not)
+    const n = logAtP(27, "backend"); leftovers(n);
+    n.log.getRange(12, 22).setNote("mine");
+    assert(/empty columns W:AA deleted/.test(n.g.ensureSpokeWithChoices_(n.ss)));
+    assert.strictEqual(n.log.getRange(2, 18).getNote(), "", "R2's own note went with its formula");
+  }
+  { // 5. column D still reads R:AA: the old place stays (no column deleted); checkboxes there go,
+    //    the list's names stay
+    const t = logAtP(27, "contactlog"); leftovers(t);
+    t.log._set(2, 19, "Gomez Addams");             // a name the formula shows in S2 (on a checkbox cell)
+    const r = t.g.ensureSpokeWithChoices_(t.ss);
+    assert(/^kept; 33 checkboxes after P taken out$/.test(r), r);
+    assert.strictEqual(t.log.getMaxColumns(), 27, 'no column deleted');
+    assert.strictEqual(t.log.getRange(2, 18).getFormula(), t.g.__get("SPOKE_WITH_CHOICES_FORMULA"), 'R2 kept');
+    assert.strictEqual(t.log.getRange(2, 19).getValue(), "Gomez Addams", 'the list is not touched');
+    assert.strictEqual(boxesAfterP(t.log), 0);
+    // a tab at P with D on R:AA (the columns were deleted by hand): added again, plain (no P checkboxes)
+    const g2 = logAtP(16, "contactlog");
+    assert.strictEqual(g2.g.ensureSpokeWithChoices_(g2.ss), "added");
+    assert.strictEqual(g2.log.getMaxColumns(), 27, 'R:AA added for the list D reads');
+    assert.strictEqual(boxesAfterP(g2.log), 0, "the new columns don't get P's checkboxes");
+    assert(g2.calls("clearFormat").some(x => x.col === 17 && x.nc === 11), "nor P's look");
+  }
+  { // 6. a dropdown from a range that can't be read: the old place is kept as it is, nothing added or deleted
+    const t = logAtP(16, "unknown");
+    assert.strictEqual(t.g.ensureSpokeWithChoices_(t.ss), "skipped: the Contact Log ends before R (no column is added)");
+    assert.strictEqual(t.log.getMaxColumns(), 16);
+    const u = logAtP(27, "unknown"); leftovers(u);
+    assert(/^kept; 33 checkboxes after P taken out$/.test(u.g.ensureSpokeWithChoices_(u.ss)));
+    assert.strictEqual(u.log.getMaxColumns(), 27, 'no column deleted');
+    assert.strictEqual(u.g.__props.SPOKE_CHOICES_MODE, "unknown");
+    // a row delete there: R2 put back, never a column added
+    u.log._formulas.delete("2,18");
+    assert.strictEqual(u.g.restoreSpokeWithChoicesAfterRowChange_(u.ss, u.log), "added");
+    const v = logAtP(16, "unknown"); v.g.ensureSpokeWithChoices_(v.ss);
+    const gr = v.log.getRange; // like Sheets: a cell right of the last column can't be read
+    v.log.getRange = function (a, b) { if (typeof a === "number" && b > v.log.getMaxColumns()) throw new Error("out of bounds"); return gr.apply(v.log, arguments); };
+    assert.strictEqual(v.g.restoreSpokeWithChoicesAfterRowChange_(v.ss, v.log), "skipped: no column R");
+    assert.strictEqual(v.log.getMaxColumns(), 16, 'nothing added on a row change either');
+  }
+  { // 7. a dropdown of typed items (not from a range) reads no list: "none"; D3's rule counts when D2 has none
+    const t = logAtP(16); t.log._dv.set("2,4", LIST);
+    t.g.ensureSpokeWithChoices_(t.ss);
+    assert.strictEqual(t.g.__props.SPOKE_CHOICES_MODE, "none");
+    const d3 = logAtP(16); d3.log._dv.set("3,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [d3.backend.getRange(3, 84, 1, 10), true] });
+    d3.g.ensureSpokeWithChoices_(d3.ss);
+    assert.strictEqual(d3.g.__props.SPOKE_CHOICES_MODE, "backend", "a row pasted over row 2 doesn't hide D's rule");
+  }
+  // the build's code: no column is ever added to the Contact Log without the D check
+  const e = read('Edits.gs');
+  const grow = e.slice(e.indexOf('const growCols = () => {'));
+  assert(/if \(!canGrow \|\| maxCols >= lastCol\) return;/.test(grow.slice(0, 200)), 'growCols needs canGrow');
+  assert(/clearDataValidations\(\)\.clearFormat\(\)/.test(grow.slice(0, 700)), 'new columns: no rules, no look');
+  console.log("Contact Log ends at P: no columns added, checkboxes after P out, empty columns deleted: ok");
 }
 
 // ---------------------------------------------------------------- the END bar's line + the box outline (4.4)

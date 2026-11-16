@@ -279,6 +279,8 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   const hdr = ["Week", "Date", "Guardian", "Person Spoke With", "OSIS", "Student", "#", "Site", "Class", "Method 1", "Method 2", "Type", "Event Description", "Follow-up", "Additional Notes", "Hide"];
   const nl = here.getSheetByName("Contact Log");
   nl._put([hdr]); nl._set(10, 5, "END");
+  // column D's dropdown reads the old place (R:AA); one that reads the Backend: test_round2.js
+  nl._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [nl.getRange(2, 18, 1, 10), true] });
   nl.getRange(2, 18).setFormula(g.__get("SPOKE_WITH_CHOICES_FORMULA"));
   nl._set(2, 19, "spilled name"); // what the formula shows (Sheets keeps the formula in R2 only)
   const ol = old.getSheetByName("Contact Log");

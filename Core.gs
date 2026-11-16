@@ -25,11 +25,13 @@ const CL_COL_DIVIDER_NOTES = 13;    // M — divider line before Notes
 const CL_COL_FILTER_TOGGLE = 15;    // O — master hide-filter checkbox on the end bar row
 const CL_COL_DIVIDER_FOLLOWUP = 15; // O — divider line before Additional Notes
 const CL_COL_CHECKBOX = 16;         // P — row checkbox
-// R:AA (hidden) = the Person Spoke With choices (Edits.gs ensureSpokeWithChoices_): the formula in R2
-// splits each row's Guardian cell (C, "Morticia Addams and Gomez Addams") into one name per cell;
-// D's dropdown (set by hand in the Table) reads 'Contact Log'!$R2:$AA2, so each row lists its own
-// student's guardians. R1 stays EMPTY (Migration matches columns by their row-1 header, an empty one
-// is skipped; and row 1 takes no formula). Q stays blank so the Table does not grow into R.
+// R:AA (hidden) = the OLD place of the Person Spoke With choices (Edits.gs ensureSpokeWithChoices_): the
+// formula in R2 splits each row's Guardian cell (C, "Morticia Addams and Gomez Addams") into one name per
+// cell, for a column D dropdown that still reads 'Contact Log'!$R2:$AA2. Since 2026-11-14 the list sits on
+// the Backend (CF:CO) and D reads 'Backend'!$CF2:$CO2: the build then takes R2's formula out and the
+// Contact Log ends at P (owner 2026-11-15; columns are added only while D is seen reading R:AA). R1 stays
+// EMPTY (Migration matches columns by their row-1 header, an empty one is skipped; and row 1 takes no
+// formula). Q stays blank so the Table does not grow into R.
 const CL_COL_SPOKE_CHOICES = 18;    // R — first choices column
 const CL_SPOKE_CHOICES_WIDTH = 10;  // R:AA: up to 10 names (New/Edit Student holds 5 guardians; owner's room)
 const SPOKE_WITH_CHOICES_FORMULA =

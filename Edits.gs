@@ -703,28 +703,54 @@ function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
  *     formula is kept in R2 as before (ensureSpokeWithChoicesInLog_), with any extra copy removed.
  * The answer is kept in doc property SPOKE_CHOICES_MODE, so a row delete / insert reads nothing more
  * once the dropdown reads the Backend.
+ * COLUMNS AFTER P (owner 2026-11-15, "checkboxes in Q+ on build when P should be the last column"): the
+ * old place needs R:AA, and the build used to add them to a tab that ends at P whenever column D's rule
+ * didn't read the Backend (no rule seen too); Google gives new columns what the column on their left
+ * has (P: the row checkboxes), so Q:AA filled with checkboxes. Now columns are only added while column
+ * D is SEEN to read 'Contact Log'!R:AA ("contactlog"; and then without P's look or checkboxes), and
+ * every build tidies the columns after P (tidyContactLogAfterP_): a checkbox there is taken out, and
+ * when nothing reads R:AA for sure ("backend" / "none") the empty columns at the right end are deleted,
+ * so the tab ends at P again. Never deleted on "unknown" (a rule the script can't see could read R:AA:
+ * deleting them would leave that rule pointing at nothing).
  */
-var SPOKE_MODE_KEY_ = 'SPOKE_CHOICES_MODE'; // 'backend' | 'contactlog'
+var SPOKE_MODE_KEY_ = 'SPOKE_CHOICES_MODE'; // 'backend' | 'contactlog' | 'none' | 'unknown' (spokeDropdownSource_)
+var SPOKE_RULE_ROWS_ = 50;                    // log rows read to find column D's dropdown rule
+var SPOKE_NOTE_START_ = "Person Spoke With choices"; // the start of R2's cell note (the old place)
 
 function spokeBackendFormula_() {
   return "=ARRAYFORMULA(IFERROR(SPLIT(INDEX('Contact Log'!C:C, 2):INDEX('Contact Log'!C:C, " +
     "MATCH(TRUE, TRIM('Contact Log'!E:E)=\"END\", 0) - 1), \" and \", FALSE), \"\"))";
 }
 
-/** Which copy column D's dropdown reads: "backend", "contactlog", or "" (no rule, or it can't be read). */
-function spokeDropdownSource_(sheet) {
+/**
+ * Which copy column D's dropdown reads, from the first rule on D2:D(up to 50 log rows) (one call; a row
+ * pasted from elsewhere can leave D2 without one):
+ *   "backend"    'Backend'!$CF2:$CO2 (DEPLOY.md step 9);
+ *   "contactlog" the old 'Contact Log'!$R2:$AA2;
+ *   "none"       a rule that reads no list: a dropdown of typed items, a range on another tab;
+ *   "unknown"    no rule found, a dropdown from a range that can't be read, or the read failed. A Sheets
+ *                Table keeps a Dropdown column's rule with the Table, and whether a script always sees it
+ *                isn't known: so "no rule" never counts as "nothing reads R:AA". The old place is then
+ *                kept as it is (put back as before), but no column is added for it or deleted.
+ */
+function spokeDropdownSource_(sheet, endRow) {
   try {
-    const rule = sheet.getRange(2, CL_COL_SPOKE_WITH).getDataValidation();
-    if (!rule) return "";
+    const n = Math.max(1, Math.min(SPOKE_RULE_ROWS_, (endRow || 3) - 2));
+    const rule = sheet.getRange(2, CL_COL_SPOKE_WITH, n, 1).getDataValidations().map(r => r[0]).find(Boolean);
+    if (!rule) return "unknown";
     const first = (rule.getCriteriaValues() || [])[0];
-    if (!first || typeof first.getSheet !== "function") return "";
+    if (!first || typeof first.getSheet !== "function") {
+      const type = typeof rule.getCriteriaType === "function" ? rule.getCriteriaType() : "";
+      const fromRange = !type || type === SpreadsheetApp.DataValidationCriteria.VALUE_IN_RANGE || String(type) === "VALUE_IN_RANGE";
+      return fromRange ? "unknown" : "none";
+    }
     const name = String(first.getSheet().getName()).trim();
     if (name === BACKEND_SHEET_NAME) return "backend";
     if (name === "Contact Log") return "contactlog";
-    return "";
+    return "none";
   } catch (e) {
     console.warn("Person Spoke With dropdown not read: " + e.message);
-    return "";
+    return "unknown";
   }
 }
 
@@ -750,7 +776,10 @@ function ensureSpokeChoicesOnBackend_(ss, endRow) {
   return have ? "replaced" : "added";
 }
 
-/** Takes the old formula out of Contact Log R (rows from..END): every cell whose formula splits column C. */
+/**
+ * Takes the old formula out of Contact Log R (rows from..END): every cell whose formula splits column C.
+ * R2's own cell note (written with the formula, SPOKE_NOTE_START_) goes with it.
+ */
 function removeSpokeFormulasFromLog_(sheet, endRow, fromRow) {
   fromRow = fromRow || 2;
   if (!endRow || endRow < fromRow || sheet.getMaxColumns() < CL_COL_SPOKE_CHOICES) return 0;
@@ -758,7 +787,10 @@ function removeSpokeFormulasFromLog_(sheet, endRow, fromRow) {
   let n = 0;
   f.forEach((r, i) => {
     const text = String(r[0] || "");
-    if (/SPLIT\(/i.test(text) && /C:C/i.test(text)) { sheet.getRange(fromRow + i, CL_COL_SPOKE_CHOICES).clearContent(); n++; }
+    if (!/SPLIT\(/i.test(text) || !/C:C/i.test(text)) return;
+    const cell = sheet.getRange(fromRow + i, CL_COL_SPOKE_CHOICES).clearContent();
+    if (fromRow + i === 2 && String(cell.getNote() || "").indexOf(SPOKE_NOTE_START_) === 0) cell.clearNote();
+    n++;
   });
   return n;
 }
@@ -768,26 +800,123 @@ function ensureSpokeWithChoices_(ss, light) {
   if (!sheet) return "skipped: no Contact Log";
   const props = PropertiesService.getDocumentProperties();
   if (light) {
-    // A row delete / insert: the Backend copy needs nothing (no lag); the old copy only while D reads it
-    if (props.getProperty(SPOKE_MODE_KEY_) === "backend") return "backend: nothing to do";
-    return ensureSpokeWithChoicesInLog_(ss, sheet, true);
+    // A row delete / insert: the Backend copy needs nothing (no lag), nor a sheet whose column D reads no
+    // copy; the old copy only while D reads it (or the last build couldn't tell: then no column is added)
+    const stored = props.getProperty(SPOKE_MODE_KEY_);
+    if (stored === "backend" || stored === "none") return stored + ": nothing to do";
+    return ensureSpokeWithChoicesInLog_(ss, sheet, true, stored === "contactlog");
   }
   const endRow = findEndRowInColumnE_(sheet);
   let backend;
   try { backend = ensureSpokeChoicesOnBackend_(ss, endRow); }
   catch (e) { backend = "not written (" + e.message + ")"; console.warn("Person Spoke With choices (Backend): " + e.message); }
-  const mode = spokeDropdownSource_(sheet) === "backend" ? "backend" : "contactlog";
+  const mode = spokeDropdownSource_(sheet, endRow);
   if (props.getProperty(SPOKE_MODE_KEY_) !== mode) props.setProperty(SPOKE_MODE_KEY_, mode);
-  if (mode === "backend") {
+  let result;
+  if (mode === "backend" || mode === "none") {
+    // Nothing reads the old place (Contact Log R:AA) for sure: its formula goes (that frees "Delete table row")
     const removed = removeSpokeFormulasFromLog_(sheet, endRow);
-    return "Backend " + backend + (removed ? "; the old formula in Contact Log R taken out (" + removed + ")" : "");
+    if (removed) SpreadsheetApp.flush(); // its list leaves R:AA before the columns after P are read
+    result = (mode === "backend" ? "Backend " + backend : "column D's dropdown reads no list (Backend copy " + backend + ")") +
+      (removed ? "; the old formula in Contact Log R taken out (" + removed + ")" : "");
+  } else {
+    console.log("Person Spoke With choices: Backend copy " + backend);
+    result = ensureSpokeWithChoicesInLog_(ss, sheet, false, mode === "contactlog");
   }
-  console.log("Person Spoke With choices: Backend copy " + backend);
-  return ensureSpokeWithChoicesInLog_(ss, sheet, false);
+  // The columns after P: no checkboxes; the tab ends at P when nothing reads R:AA (owner 2026-11-15)
+  try {
+    const tidy = tidyContactLogAfterP_(sheet, mode === "backend" || mode === "none");
+    if (tidy) result += "; " + tidy;
+  } catch (e) { console.warn("Contact Log after P not tidied: " + e.message); }
+  // In the build's log (Apps Script → Executions): which dropdown the build saw in column D, what it did
+  console.log("Person Spoke With choices [column D reads: " + mode + "]: " + result);
+  return result;
 }
 
-/** The old place (column D's dropdown still reads 'Contact Log'!$R2:$AA2): the formula in R2, as before. */
-function ensureSpokeWithChoicesInLog_(ss, sheet, light) {
+/**
+ * The columns after P (owner 2026-11-15: "checkboxes in Q+ on build when P should be the last column"):
+ *   - a checkbox there is taken out (the rule, and its TRUE / FALSE where no formula is): the code never
+ *     puts one after P, Google copied P's into the columns the old place was given;
+ *   - trim (nothing reads R:AA): the empty columns at the right end are deleted, so the tab ends at P
+ *     (or right after the last column that holds something). Empty = no value, formula, note (R2's
+ *     own excepted), merged cell or other dropdown; a column with anything in it stays, and so does
+ *     every column on its left.
+ * One call (the column count) once the tab ends at P; when it doesn't, one read (the rules), a few more
+ * to trim. Returns what changed ("" = nothing).
+ */
+function tidyContactLogAfterP_(sheet, trim) {
+  const first = CL_WIDTH + 1; // Q
+  const maxCols = sheet.getMaxColumns();
+  if (maxCols < first) return "";
+  const n = maxCols - first + 1, maxRows = sheet.getMaxRows();
+  const area = sheet.getRange(1, first, maxRows, n);
+  const rules = area.getDataValidations();
+  const isBox = rule => {
+    if (!rule) return false;
+    try {
+      const t = rule.getCriteriaType();
+      return t === SpreadsheetApp.DataValidationCriteria.CHECKBOX || String(t) === "CHECKBOX";
+    } catch (e) { return false; }
+  };
+  let boxes = 0;
+  const box = rules.map(r => r.map(rule => { const b = isBox(rule); if (b) boxes++; return b; }));
+  if (!boxes && !trim) return "";
+
+  const vals = area.getValues(), forms = area.getFormulas();
+  const done = [];
+  // Clears runs of marked cells, one column at a time (one call per run)
+  const clearRuns = (marks, how) => {
+    for (let j = 0; j < n; j++) {
+      let start = -1;
+      for (let i = 0; i <= maxRows; i++) {
+        const on = i < maxRows && marks[i][j];
+        if (on && start < 0) start = i;
+        if (!on && start >= 0) {
+          const r = sheet.getRange(1 + start, first + j, i - start, 1);
+          if (how === "rules") r.clearDataValidations(); else r.clearContent();
+          start = -1;
+        }
+      }
+    }
+  };
+  if (boxes) {
+    // The rules: one call when every rule after P is a checkbox (the usual case), else run by run
+    const others = rules.some((r, i) => r.some((rule, j) => rule && !box[i][j]));
+    if (others) clearRuns(box, "rules"); else area.clearDataValidations();
+    // Their TRUE / FALSE (never a formula, never a list's names)
+    const values = box.map((r, i) => r.map((b, j) => b && typeof vals[i][j] === "boolean" && !forms[i][j]));
+    if (values.some(r => r.some(Boolean))) {
+      clearRuns(values, "values");
+      values.forEach((r, i) => r.forEach((v, j) => { if (v) vals[i][j] = ""; }));
+    }
+    done.push(boxes + (boxes === 1 ? " checkbox" : " checkboxes") + " after P taken out");
+  }
+  if (trim) {
+    const notes = area.getNotes();
+    let keep = first - 1; // the last column that stays (P at least)
+    for (let j = n - 1; j >= 0 && keep < first; j--) {
+      for (let i = 0; i < maxRows; i++) {
+        const v = vals[i][j], note = String(notes[i][j] || "");
+        if ((v !== "" && v !== null) || forms[i][j] || (rules[i][j] && !box[i][j]) ||
+            (note && note.indexOf(SPOKE_NOTE_START_) !== 0)) { keep = first + j; break; }
+      }
+    }
+    area.getMergedRanges().forEach(m => { keep = Math.max(keep, m.getLastColumn()); });
+    if (keep < maxCols) {
+      sheet.deleteColumns(keep + 1, maxCols - keep);
+      done.push("empty column" + (maxCols - keep === 1 ? " " : "s ") + columnLetter_(keep + 1) +
+        (maxCols - keep === 1 ? "" : ":" + columnLetter_(maxCols)) + " deleted (the tab ends at " + columnLetter_(keep) + ")");
+    }
+  }
+  return done.join("; ");
+}
+
+/**
+ * The old place (column D's dropdown still reads 'Contact Log'!$R2:$AA2): the formula in R2, as before.
+ * canGrow (D is known to read R:AA): a tab narrower than AA gets its columns, plain (no P look, no
+ * checkboxes). Without it no column is ever added (owner 2026-11-15: P is the Contact Log's last column).
+ */
+function ensureSpokeWithChoicesInLog_(ss, sheet, light, canGrow) {
   const col = CL_COL_SPOKE_CHOICES, width = CL_SPOKE_CHOICES_WIDTH, lastCol = col + width - 1;
   const maxCols = sheet.getMaxColumns();
   const anchor = maxCols >= col ? sheet.getRange(2, col) : null;
@@ -799,15 +928,24 @@ function ensureSpokeWithChoicesInLog_(ss, sheet, light) {
     return extra ? "kept (" + extra + " extra copy removed)" : "kept";
   }
 
+  if (maxCols < col && !canGrow) return "skipped: the Contact Log ends before R (no column is added)";
   const endRow = findEndRowInColumnE_(sheet);
   if (!endRow || endRow < 3) return "skipped: no log rows above END";
   const rows = endRow - 2; // rows 2 .. END-1
-  const growCols = () => { if (maxCols < lastCol) sheet.insertColumnsAfter(maxCols, lastCol - maxCols); };
+  const growCols = () => {
+    if (!canGrow || maxCols >= lastCol) return;
+    sheet.insertColumnsAfter(maxCols, lastCol - maxCols);
+    // Google gives new columns the look and the rules of the column on their left (P: the row
+    // checkboxes; owner 2026-11-15, "checkboxes in Q+"): these are plain helper columns
+    sheet.getRange(1, maxCols + 1, sheet.getMaxRows(), lastCol - maxCols).clearDataValidations().clearFormat();
+  };
+  const avail = () => Math.min(width, sheet.getMaxColumns() - col + 1); // R:AA, or the part the tab has
 
   if (formula) { // #REF!: something sits where the list goes (or the tab is too narrow for it)
     growCols();
-    if (width > 1) sheet.getRange(2, col + 1, 1, width - 1).clearContent();
-    if (rows > 1) sheet.getRange(3, col, rows - 1, width).clearContent();
+    const w = avail();
+    if (w > 1) sheet.getRange(2, col + 1, 1, w - 1).clearContent();
+    if (rows > 1) sheet.getRange(3, col, rows - 1, w).clearContent();
     return "unblocked";
   }
 
@@ -818,11 +956,11 @@ function ensureSpokeWithChoicesInLog_(ss, sheet, light) {
     growCols();
     const cell = sheet.getRange(2, col).setFormula(text);
     if (!light) {
-      cell.setNote("Person Spoke With choices: one guardian per cell for column D's dropdown " +
+      cell.setNote(SPOKE_NOTE_START_ + ": one guardian per cell for column D's dropdown " +
                    "('Contact Log'!$R2:$AA2). Hidden on purpose; every build puts this formula back if it goes missing.");
-      sheet.hideColumns(col, width);
+      sheet.hideColumns(col, avail());
     } else if (!sheet.isColumnHiddenByUser(col)) {
-      sheet.hideColumns(col, width);
+      sheet.hideColumns(col, avail());
     }
     return how;
   };
@@ -862,11 +1000,13 @@ function ensureSpokeWithChoicesInLog_(ss, sheet, light) {
  * over anything typed into R:AA; only the formula is written). Returns what happened.
  */
 function restoreSpokeWithChoicesAfterRowChange_(ss, sheet) {
-  // Column D reads the Backend copy (set by hand; the last build saw it): a row change can't touch it
-  if (PropertiesService.getDocumentProperties().getProperty(SPOKE_MODE_KEY_) === "backend") return "backend: nothing to do";
+  // Column D reads the Backend copy (set by hand; the last build saw it), or no copy at all: a row
+  // change can't touch it
+  const mode = PropertiesService.getDocumentProperties().getProperty(SPOKE_MODE_KEY_);
+  if (mode === "backend" || mode === "none") return mode + ": nothing to do";
   let formula;
   try { formula = sheet.getRange(2, CL_COL_SPOKE_CHOICES).getFormula(); }
-  catch (e) { return "skipped: no column R yet (the next build adds R:AA)"; } // a tab narrower than R
+  catch (e) { return "skipped: no column R"; } // a tab that ends before R (the Contact Log ends at P)
   if (formula) return "kept"; // row 2 is still there
   return ensureSpokeWithChoices_(ss, true);
 }

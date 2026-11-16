@@ -4,7 +4,8 @@
 // ignored, but written to ss._log ({ tab, row, col, nr, nc, fn, args }) so a test
 // can check what was painted. Kept: merges (merge / getMergedRanges), fills
 // (setBackground / getBackground), column widths, conditional format rules,
-// data validations (sheet._dv: "r,c" -> rule) and bandings (sheet._bandings).
+// data validations (sheet._dv: "r,c" -> rule), cell notes (sheet._notes) and bandings (sheet._bandings).
+// insertColumnsAfter at the right end copies the left column's rules, like Sheets.
 // Not a full SpreadsheetApp: add what a new test needs.
 
 function colNum(letters) { return letters.toUpperCase().split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0); }
@@ -37,6 +38,12 @@ function makeRange(sheet, row, col, nr, nc) {
     getBackground: () => sheet._bg.get(row + ',' + col) || '#ffffff',
     getDataValidations: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet._dv.get((row + i) + ',' + (col + j)) || null)),
     getDataValidation: () => sheet._dv.get(row + ',' + col) || null,
+    clearDataValidations: function () { log('clearDataValidations', arguments); each((a, b) => sheet._dv.delete(a + ',' + b)); return p; },
+    // cell notes (sheet._notes: "r,c" -> text)
+    getNote: () => sheet._notes.get(row + ',' + col) || "",
+    getNotes: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet._notes.get((row + i) + ',' + (col + j)) || "")),
+    setNote: function (t) { log('setNote', arguments); each((a, b) => { if (t) sheet._notes.set(a + ',' + b, String(t)); else sheet._notes.delete(a + ',' + b); }); return p; },
+    clearNote: function () { log('clearNote', arguments); each((a, b) => sheet._notes.delete(a + ',' + b)); return p; },
     getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => sheet._get(row + i, col + j))),
     getDisplayValues: () => r.getValues().map(rw => rw.map(v => v instanceof Date ? (v.getMonth() + 1) + '/' + v.getDate() + '/' + v.getFullYear() : String(v))),
     getValue: () => sheet._get(row, col),
@@ -64,7 +71,7 @@ function makeSheet(ss, name) {
   const cells = new Map(); // "r,c" -> value
   const s = {
     _name: name, _id: nextId++, _hidden: false, _maxRows: 1000, _maxCols: 26,
-    _log: ss._log, _merges: [], _bg: new Map(), _dv: new Map(), _widths: {}, _cf: [], _cfWrites: 0, _bandings: [],
+    _log: ss._log, _merges: [], _bg: new Map(), _dv: new Map(), _notes: new Map(), _widths: {}, _cf: [], _cfWrites: 0, _bandings: [],
     getColumnWidth: c => s._widths[c] || 100,
     setColumnWidth: (c, w) => { s._widths[c] = w; s._logSheet('setColumnWidth', [c, w]); return p; },
     getConditionalFormatRules: () => s._cf.slice(),
@@ -90,12 +97,32 @@ function makeSheet(ss, name) {
     hideColumns: (...a) => { for (let i = 0; i < (a[1] || 1); i++) s._hiddenCols.add(a[0] + i); s._logSheet('hideColumns', a); return p; },
     showColumns: (...a) => { for (let i = 0; i < (a[1] || 1); i++) s._hiddenCols.delete(a[0] + i); s._logSheet('showColumns', a); return p; },
     isColumnHiddenByUser: c => s._hiddenCols.has(c),
-    insertRowsAfter: (a, n) => { s._maxRows += n; return p; }, insertColumnsAfter: (a, n) => { s._maxCols += n; return p; },
+    insertRowsAfter: (a, n) => { s._maxRows += n; return p; },
+    insertColumnsAfter: (a, n) => {
+      // like Sheets: columns added at the right end get the rules of the column on their left
+      // (the Contact Log's P = checkboxes: "checkboxes in Q+", owner 2026-11-15)
+      if (a === s._maxCols) {
+        const add = [];
+        s._dv.forEach((rule, k) => { const [rr, cc] = k.split(',').map(Number); if (cc === a) for (let j = 1; j <= n; j++) add.push([rr + ',' + (a + j), rule]); });
+        add.forEach(([k, v]) => s._dv.set(k, v));
+      }
+      s._maxCols += n; s._logSheet('insertColumnsAfter', [a, n]); return p;
+    },
     deleteRows: (a, n) => { s._maxRows -= n; return p; },
-    deleteColumns: (a, n) => { // the cells to the right move left, like Sheets
-      const moved = new Map();
-      cells.forEach((v, k) => { const [rr, cc] = k.split(',').map(Number); if (cc < a) moved.set(k, v); else if (cc >= a + n) moved.set(rr + ',' + (cc - n), v); });
-      cells.clear(); moved.forEach((v, k) => cells.set(k, v));
+    deleteColumns: (a, n) => { // the cells to the right move left, like Sheets (values, formulas, rules, notes, fills)
+      const shift = m => {
+        const moved = new Map();
+        m.forEach((v, k) => { const [rr, cc] = k.split(',').map(Number); if (cc < a) moved.set(k, v); else if (cc >= a + n) moved.set(rr + ',' + (cc - n), v); });
+        m.clear(); moved.forEach((v, k) => m.set(k, v));
+      };
+      [cells, s._formulas, s._dv, s._notes, s._bg].forEach(shift);
+      const hidden = Array.from(s._hiddenCols); s._hiddenCols.clear();
+      hidden.forEach(c => { if (c < a) s._hiddenCols.add(c); else if (c >= a + n) s._hiddenCols.add(c - n); });
+      s._merges = s._merges.map(m => { // a merge right of the columns moves left; one across them shrinks
+        if (m.c >= a + n) return Object.assign({}, m, { c: m.c - n });
+        const gone = Math.max(0, Math.min(m.c + m.nc, a + n) - Math.max(m.c, a));
+        return Object.assign({}, m, { c: m.c < a ? m.c : a, nc: m.nc - gone });
+      }).filter(m => m.nc > 0);
       s._maxCols -= n; s._logSheet('deleteColumns', [a, n]); return p;
     },
     getLastRow: () => { let m = 0; cells.forEach((v, k) => { m = Math.max(m, Number(k.split(',')[0])); }); return m; },
@@ -188,7 +215,7 @@ function fakeSpreadsheetApp(ss) {
     WrapStrategy: { CLIP: 'CLIP', WRAP: 'WRAP', OVERFLOW: 'OVERFLOW' },
     BandingTheme: new Proxy({}, { get: (t, k) => String(k) }),
     BooleanCriteria: { TEXT_EQUAL_TO: 'TEXT_EQUAL_TO', CUSTOM_FORMULA: 'CUSTOM_FORMULA' },
-    DataValidationCriteria: { VALUE_IN_RANGE: 'VALUE_IN_RANGE', VALUE_IN_LIST: 'VALUE_IN_LIST' },
+    DataValidationCriteria: { VALUE_IN_RANGE: 'VALUE_IN_RANGE', VALUE_IN_LIST: 'VALUE_IN_LIST', CHECKBOX: 'CHECKBOX' },
     getUi: () => ui
   };
 }

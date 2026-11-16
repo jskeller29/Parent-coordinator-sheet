@@ -81,6 +81,9 @@ function sheetWithSiblings() {
               ["", "", "Marge Simpson", "", "222222222"],
               ["", "", "", "", ""],
               ["", "", "", "", "END"]], 1, 1); // END on row 5: log rows 2-4
+    // column D's dropdown reads this old place, 'Contact Log'!$R2:$AA2 (DEPLOY.md step 9 before
+    // 2026-11-14); without a rule nothing reads it and the build leaves R:AA alone (test_round2.js)
+    log._dv.set("2,4", { getCriteriaType: () => "VALUE_IN_RANGE", getCriteriaValues: () => [log.getRange(2, 18, 1, 10), true] });
     const calls = fn => ss._log.filter(x => x.tab === "Contact Log" && x.fn === fn);
     return { ss, g, log, calls };
   };
