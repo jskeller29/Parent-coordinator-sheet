@@ -316,7 +316,7 @@
     $('byGuardian').classList.toggle('on', setup.by === 'guardian');
     $('byHint').innerHTML = setup.by === 'student'
       ? 'Each row is one student. The values go on that student (and their guardians\' phone contacts) and become Student List columns.'
-      : 'Each row is one guardian. The values go on every child of that guardian (siblings too) and become Parents Divided columns.';
+      : 'Each row is one guardian. The values go on every child of that guardian (siblings too) and become Parents List columns.';
     var r = setup.roles, html = '';
     var simple = function (key, label, hint) {
       html += '<span class="k">' + label + '</span><select onchange="setRole(\'' + key + '\', this.value)">' + optionList(r[key] || 0, false) + '</select>';
@@ -371,7 +371,7 @@
 
   // ---------- step 2: variables ----------
   function renderStep2() {
-    var colWord = setup.by === 'guardian' ? 'Parents Divided' : 'Student List';
+    var colWord = setup.by === 'guardian' ? 'Parents List' : 'Student List';
     $('varCards').innerHTML = setup.vars.length ? setup.vars.map(function (v, i) {
       var c = view.columns[v.col - 1] || { samples: [] };
       var on = v.show || v.column;
@@ -399,7 +399,7 @@
       (blank ? '<div class="who" style="margin-top:3px">Blank cell</div>' + name + ': ' + esc(v.blank.text) : '') +
       (off ? '<div class="who" style="margin-top:3px">Not on the list</div>' + name + ': ' + esc(v.notOnList.text) : '');
   }
-  function colText(v, c) { return (setup.by === 'guardian' ? 'Parents Divided' : 'Student List') + ' column “' + esc(v.label || c.header) + '”'; }
+  function colText(v, c) { return (setup.by === 'guardian' ? 'Parents List' : 'Student List') + ' column “' + esc(v.label || c.header) + '”'; }
   /** Typing only updates the preview and the column name (a full re-render would take the focus away). */
   function refreshVar(i) {
     var v = setup.vars[i], c = view.columns[v.col - 1] || { samples: [] };
@@ -592,7 +592,7 @@
       }).join('');
     }
     if (anyCol) {
-      html += '<label class="f">In the ' + (setup.by === 'guardian' ? 'Parents Divided' : 'Student List') + '</label>' +
+      html += '<label class="f">In the ' + (setup.by === 'guardian' ? 'Parents List' : 'Student List') + '</label>' +
         seg('columns', [['each', 'A column per value'], ['one', 'One column for the list']]) +
         '<div class="muted" style="margin-top:4px" id="colHint"></div>';
     }
@@ -670,8 +670,8 @@
       (s.skipped ? ', ' + s.skipped + ' skipped' : '') + (s.review ? '. ' + s.review + ' still need you (open the list again any time).' : '.');
     // During Input Data Mode the build comes at its end (a build now would run with the other tabs hidden)
     $('doneHint').textContent = v.inputMode
-      ? 'The Student List / Parents Divided columns and the phone contacts get it at the next build: go back, finish Input Data Mode, then build.'
-      : 'Build the sheets so the Student List / Parents Divided columns and the phone contacts get it. Until then only the list\'s tab changed.';
+      ? 'The Student List / Parents List columns and the phone contacts get it at the next build: go back, finish Input Data Mode, then build.'
+      : 'Build the sheets so the Student List / Parents List columns and the phone contacts get it. Until then only the list\'s tab changed.';
     show('doneBackRow', !!v.inputMode); show('buildRow', !v.inputMode); show('leaveRow', !v.inputMode);
     $('leaveLink').textContent = v.inputMode ? '← Back to Input Data Mode' : 'Close';
   }

@@ -41,7 +41,7 @@ function startResilientSyncLocked_(cache) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   buildAllDerivedSheets();
   formatDirectoryAuto_(ss.getSheetByName("Directory"));
-  const psSheet = ss.getSheetByName("Parents Divided");
+  const psSheet = getParentsListSheet_(ss);
   if (psSheet) psSheet.hideSheet();
 
   const phoneSheet = ss.getSheetByName("Phone Contacts");

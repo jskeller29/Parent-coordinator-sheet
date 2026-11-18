@@ -15,7 +15,7 @@ Files (shared = every school's sheet):
 - Core.gs: Contact Log column constants, findEndRowInColumnE_, Student List lookup (getStudentListSheet_), Backend
   tab helpers, owner hook point (getOwnerHooks_, runAction_), small text / phone / OSIS / date helpers, SHEET_LOOK_
   (the tabs' colors and font, see SHEET LOOK).
-- Build.gs: buildAllDerivedSheets + everything it builds (Student List, Combined Contact Tracking, Parents Divided,
+- Build.gs: buildAllDerivedSheets + everything it builds (Student List, Combined Contact Tracking, Parents List,
   Directory, Phone Contacts), new / discharged student detection, the notes-line helpers, nightlyMasterSync, build
   sidebar endpoints. BUILD_STEPS + reportBuildStep_ drive the sidebar's "Building Sheets & Directory" checklist
   (cache key BUILD_STEP; getSyncStatus returns buildSteps / buildStep with the state).
@@ -139,7 +139,7 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   row 5, tool columns "✔ Matched" / "How" after one blank spacer column). Its setup = one row in the Backend OWN_LISTS
   section (Tab ID, List, Setup JSON, Updated; od_loadLists_ / od_saveLists_): by (student / guardian), roles (osis,
   student / guardian as {col} or {first, last}, phone, email, class), vars (label, show = Additional Information,
-  column = Student List / Parents Divided column, blank / notOnList = nothing | text), picks (row hash -> OSIS /
+  column = Student List / Parents List column, blank / notOnList = nothing | text), picks (row hash -> OSIS /
   guardian key / "skip"), headers, title, stats.
   - Paste: od_takePaste_ finds the header row (od_findHeaderRow_; title rows above it are remembered), moves it to
     row 4, data as plain text. A re-paste with the same headers keeps the setup (od_rolesByHeader_) and the picks.
@@ -180,7 +180,7 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     SIMPLE + ADVANCED (owner 2026-11-12): the step shows only One per line / One line, "Bold the names" and the
     preview (Matched rows from od_matchPreview's preview, ‹ › / Blank cell / Not on list); "Advanced options"
     (<details>, open by itself when one of them is not the default) has start, separator, names before values,
-    bold values, bold italic, order ↑↓, and the Student List / Parents Divided column choice.
+    bold values, bold italic, order ↑↓, and the Student List / Parents List column choice.
     Not built yet (second round): a "Sentence" layout ("Takes bus {Route} from {Stop}").
   - Sidebar: paste view polls od_wizardCheck every 2 s; 1 Columns (dropdowns 'Column C “OSIS”', "Two columns (first +
     last name)…", OSIS hint "5 of 6 filled cells are OSIS in your Student List"), 2 Variables (keep / name / blank /
@@ -191,7 +191,7 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   - Build: buildAllDerivedSheets calls od_buildOutputs_(ss, masterTable, guardianRows) right after
     addLastInteractionColumn_ (try/catch: an error only logs "Your Lists skipped"). It re-matches every
     ready list, rewrites the tool columns, returns studentCols (Student List columns after Last Interaction, siblings'
-    values joined " / ", addListColumns_) and guardianCols (Parents Divided, keyed OSIS|guardian name,
+    values joined " / ", addListColumns_) and guardianCols (Parents List, keyed OSIS|guardian name,
     addGuardianListColumns_), and rewrites the Backend ADDL_INFO section (OSIS, Student, Guardian, Additional
     Information; Guardian blank = the whole student). The not-on-list text goes to everyone not on the list.
   - Phone Contacts: readAdditionalInfo_ / additionalInfoText_ (Build.gs) add "\n\nAdditional Information:\n<lines>"
@@ -294,7 +294,7 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   loadFakeDataSteps_ throws unless ss is the active spreadsheet. buildMenus_ also adds the owner menus before
   Initial Setup (a copy's setup flag is not copied) and "Toggle Debug" (doc property OWNER_DEBUG_TOASTS). (Color Tabs was removed at the owner's request.)
 - All three resets call deleteLegacySheets_ (Regenerate.gs), which deletes EVERY tab not in KEEP_TABS_ (Raw Data /
-  RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Student List, Combined Contact Tracking, Parents Divided,
+  RAW Data, Contact Log, Notes, Events, PCAR, Send Out, Student List, Combined Contact Tracking, Parents List,
   Directory, Phone Contacts, Students Override Report, Backend), incl. Old Master Table / Old Phone Contacts, New
   Students (owner's choice: the owner's next build re-creates it) and the 📥 Your Lists tabs (resetDerivedSheets_ also
   clears the Backend ADDL_INFO / OWN_LISTS sections). It runs getBackendSheet_ first so old Version / Type List etc. tabs are migrated before they are deleted.
@@ -317,10 +317,10 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   was tried the same day and removed: the owner built the layout by hand). The box helpers (findContactLogLookupBox_,
   drawContactLogLookupBoxOutline_) are in Edits.gs (search bar section), since the build uses them too.
   Guardian rows (owner's request 2026-11-11): syncLookupBoxGuardianRows_ (Edits.gs) makes the guardian table as tall
-  as the student with the most guardians in Parents Divided needs (A = OSIS, B not blank, as the table's FILTER; at
+  as the student with the most guardians in Parents List needs (A = OSIS, B not blank, as the table's FILTER; at
   least 2, at most 10), so a 3rd-5th guardian from New/Edit Student does not spill into the small row (#REF!). Run at
   the end of every build (saving / deleting an override runs one; syncLookupBoxGuardianRowsForBuild_) and by every
-  reset (Parents Divided just emptied, so extra rows go). Guardian rows = header + 1 down to the small row(s) (<= 15 px)
+  reset (Parents List just emptied, so extra rows go). Guardian rows = header + 1 down to the small row(s) (<= 15 px)
   right above Communications (none found = not touched). Added rows go under the last guardian row: its height, no
   line between guardian rows, guardian 3 / 5 white, 4 cream #fff8ee (LOOKUP_BOX_ROW_COLORS_), the box's thick sides +
   thick line under the new last row. Extra rows are deleted when no student needs them (not if one holds a formula),
@@ -534,10 +534,14 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Core, Build, Edits, Menus, Input Data (scripts) and InputDataSidebar, ManageOverridesDialog, NewStudentDialog
   (pages) on every sheet (master template too); owner sheet also z_ContactLogDebug. Then 🏗️ Build Sheets Only once
   (Additional Notes become bullets in every student's notes). No new files, no new permissions.
+- Parents List rename + Select all + Back to the start (2026-11-18, later): re-paste Core, Build, Edits, Menus, Input Data,
+  Contacts Sync, Sheet Lock, Regenerate, Z#ContactLog (scripts) and InputDataSidebar, ManageOverridesDialog,
+  ProgressSidebar, SettingsDialog, YourListsSidebar (pages) on every sheet; owner sheet also z_MINE. The next build
+  renames the tab. User Guide Doc: "Parents Divided" -> "Parents List" by hand.
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):
-- BUILD REPORT SIGN-UPS (2.18): signupReport_ (Build.gs) compares the Parents Divided the last build wrote (read before
+- BUILD REPORT SIGN-UPS (2.18): signupReport_ (Build.gs) compares the Parents List the last build wrote (read before
   the build) with the new one by HEADER (student_id, Guardian output, Student, Parents Square, NYCSA), keyed
   OSIS|guardian name. Before, it read fixed columns 8 / 9, which since the Sibling column came in were Sibling /
   Parents Square (the "NYCSA" sign-ups were Parent Square changes; Parent Square never counted), keyed by name only
@@ -620,6 +624,14 @@ deploy: see the 2026-11-18 line under Deploying):
   version (the copies get its code; it never changes the sheet it runs on); stage s1's text and 1.4's why say so.
 - STUDENT INFO (owner's hand-typed lookup box formula, 2.19): no Backend column added; BP (Guardian) is blank for a
   student list's line. The reply gave a formula that FILTERs Backend BN:BQ for the OSIS and puts BP before each line.
+- PARENTS LIST (owner 2026-11-18, later: "change Parents Divided into Parents List everywhere"): every text and tab
+  name says Parents List; PARENTS_LIST_SHEET / LEGACY_PARENTS_LIST_SHEET + getParentsListSheet_ (Core.gs, like
+  getStudentListSheet_) rename an old "Parents Divided" tab on first use (the build's first read, deleteLegacySheets_,
+  the lookup box guardian count, Contacts Sync); Sheets updates formulas / dropdowns that point at a renamed tab.
+  KEEP_TABS_ and TAB_VISIBILITY list both names; the setting key stays parentsDivided, function names keep
+  "ParentsDivided"; Migration and Z#ContactLog also look for the old name in an older tracker.
+- Input Data Mode, later the same day: Select all / Unselect all (#footPick, pickAll) above Start on the start page;
+  the All done screen has "Back to the start" (backToStart -> idm_open = a new run on the start page).
 - The round 2 page got the re-tests ("Fixed, re-test" + the newest fixes first) and new checks 2.22 (pick what to
   update), 2.23 (parents to add at the end of Input Data Mode), 4.14 (the Student Overrides page), 4.15 (bullets),
   b-17, b-18; 1.x text for the owner's way. 54 essentials, 27 optional, 18 try-to-break-it.
@@ -1013,8 +1025,8 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   studentListHeaderRow_ (2026-11-12).
   Last Interaction (added 2026-11-05) = date of the newest Contact Log row (not hidden) or event for that student,
   with anyone (sibling rows: newest of the siblings), else "None logged". interactionsByOsis_ (Build.gs) is shared
-  with Parents Divided's per-guardian Last Interaction (moved word for word). Added after the owner's Old Master Table
-  hook, so every row is padded to the same width. Only a build / nightly updates it (like Parents Divided). The build
+  with Parents List's per-guardian Last Interaction (moved word for word). Added after the owner's Old Master Table
+  hook, so every row is padded to the same width. Only a build / nightly updates it (like Parents List). The build
   reads the Events tab once at step 1 (buildBackendEventLogData_) so the column sees today's events; step 2 writes
   those same rows to the Backend Event Log.
 
@@ -1079,7 +1091,7 @@ UI REFRESH (2026-11-04, on Test-Version, not yet tried on a sheet): owner's pick
 
 SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font the code paints on a tab):
 - Montserrat everywhere. Tabs you type in (Contact Log, Events, Notes, Send Out) = the Contact Log's brown header
-  (~#6b4e37) + cream rows; tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking,
+  (~#6b4e37) + cream rows; tabs the build makes (Student List, Parents List, Directory, Combined Contact Tracking,
   Phone Contacts, Students Override Report) = navy #183e69 (the dialogs' navy) + light grey #f3f5f8 rows; PCAR =
   a slightly darker brown (owner 2026-11-13, SHEET_LOOK_.pcar: titles #5b422f, This / Last Week dates #4a3627,
   section rows #efe3d3 with #5b422f text, own-dates cells #fff2cc; the owner may also set these by hand).
@@ -1101,7 +1113,7 @@ SHEET LOOK (owner's pick 2026-11-12; SHEET_LOOK_ in Core.gs = every color / font
   colors (formatDirectoryAuto_: SHEET_LOOK_.siteColors); Students Override Report (styleOverrideReport_, Menus.gs:
   navy header, Montserrat; its tab is cleared every rebuild); Raw Data (forceVibrantColors_, see Regenerate.gs).
   Your Lists headers after a table: styleLastInteractionHeader_ (Student List: every header from Last Interaction on)
-  and Parents Divided's after Last Interaction copy the header before them (styleHeadersLike_; a source with no fill
+  and Parents List's after Last Interaction copy the header before them (styleHeadersLike_; a source with no fill
   of its own gives no fill, never white).
 - 🐞 Debug → 🎨 Apply Sheet Style (ownerMenuApplySheetStyle, z_MINE.gs; owner's request "a button in debug to fix
   colors and fonts"): the hand-made parts, once, on the owner's sheet (Make Release Copies carries them on):
@@ -1135,7 +1147,7 @@ several presses. Don't bring it back without asking.
   blocked) on: row 1 of Contact Log / Notes / Send Out; Contact Log END bar row (except O, the FILTER? checkbox) and
   everything below it except the lookup box cells typed in (lookupBoxInputCells_: the OSIS box right of the "OSIS"
   label and the name switch one row up / two columns right; 2026-11-12, rangesAround_); row 2 (headers) of every Events table (EVENT_TABLE_HEADERS); PCAR except H2:I2; the whole built
-  tabs (Student List, Combined Contact Tracking, Parents Divided, Directory, Phone Contacts, Students Override Report,
+  tabs (Student List, Combined Contact Tracking, Parents List, Directory, Phone Contacts, Students Override Report,
   New Students). NOT on: Raw Data, Backend, owner-only tabs, Contact Log entry rows (incl. column A, so deleting one
   row never warns), Notes / Send Out rows 2+, Events row 1 and rows 3+.
 - applySheetLocks_ adds/refreshes them (only our tagged ones; unchanged ones kept, stale ones removed; never takes over

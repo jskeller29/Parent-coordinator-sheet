@@ -41,7 +41,7 @@ Contacts.
 | Kind of tab | Tabs | What you do there |
 |---|---|---|
 | Tabs you type in | Contact Log, Events, Notes, Send Out | Log calls, meetings and events. |
-| Tabs that fill themselves | Student List, Directory, Combined Contact Tracking, Parents Divided, Phone Contacts, PCAR | Read them. A build rewrites them, so don't type in them. |
+| Tabs that fill themselves | Student List, Directory, Combined Contact Tracking, Parents List, Phone Contacts, PCAR | Read them. A build rewrites them, so don't type in them. |
 | Data and settings | Raw Data, Backend | Raw Data holds your exports. Backend is hidden and holds the tracker's own settings. |
 
 ### Get your copy
@@ -171,7 +171,7 @@ Before the Your Lists step, Input Data Mode builds your sheets, with a progress 
 you are done with your lists, click Finish Input Data Mode. After the last step you
 ticked, the panel ends with two buttons: Build my sheets (when something new came in)
 and Done. If you changed a list after the build, Build my sheets is there too: your lists
-reach the Student List, Parents Divided and the phone contacts only with a build. Finish
+reach the Student List, Parents List and the phone contacts only with a build. Finish
 or exit ends Input Data Mode at any other step. Save, exit and build my sheets saves
 what is on the tab, brings your tabs back and builds.
 
@@ -225,7 +225,7 @@ then has four steps:
    say whether each row is a student or a guardian.
 2. Variables. Pick the other columns to keep (a route, a fee, a form status), name
    them, and choose where they show: on the phone contact under Additional Information,
-   and as a column in the Student List or Parents Divided.
+   and as a column in the Student List or Parents List.
 3. Match. It works out who each row is: by OSIS first, then name, then phone or email,
    then best guesses for nicknames and short names. You confirm the rows it isn't sure
    of. Check a few best guesses before you accept them all.
@@ -256,7 +256,7 @@ Overrides → 🗂️ Student Overrides.
 
 Use ✨ New / Edit Student to add a student who isn't in ATS yet, or to fix a name or a
 parent's phone. Your change shows in the Student List, Combined Contact Tracking,
-Parents Divided and Phone Contacts at the next build. The Directory always shows ATS
+Parents List and Phone Contacts at the next build. The Directory always shows ATS
 data only. An override removes itself once ATS has the same information.
 
 > [!IMPORTANT]
@@ -309,7 +309,7 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 | PCAR | Your PCAR counts, filled in from the other tabs. | Yes |
 | Directory | Each student's site, class and parents' phone and email, from ATS. | Yes |
 | Student List | One row per student: guardians, site, class, siblings, status, last interaction, and a column for each student list you keep. | No |
-| Parents Divided | One row per guardian, with Parent Square and NYCSA sign-up. Useful for mail merges. | No |
+| Parents List | One row per guardian, with Parent Square and NYCSA sign-up. Useful for mail merges. | No |
 | Phone Contacts | What the phone sync sends to Google Contacts. | No |
 | Notes | Notes you always want at the top of a student's history. | No |
 | Events | Attendance for events and workshops. | No |

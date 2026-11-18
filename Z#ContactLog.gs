@@ -77,7 +77,7 @@ function cl_getRoster() {
 
 /**
  * Everything the family panel shows for one OSIS: ParentSquare / NYCSA status
- * (from "Parents Divided", matched by header) and the contact history for the
+ * (from "Parents List", matched by header) and the contact history for the
  * family (from the Contact Log, structured).
  */
 function cl_getFamilyContext(osis) {
@@ -86,8 +86,8 @@ function cl_getFamilyContext(osis) {
   const out = { ps: "", nycsa: "", history: [] };
   if (!key) return out;
 
-  // --- ParentSquare / NYCSA from Parents Divided (header-matched) ---
-  const pd = ss.getSheetByName("Parents Divided");
+  // --- ParentSquare / NYCSA from Parents List (header-matched) ---
+  const pd = (ss.getSheetByName("Parents List") || ss.getSheetByName("Parents Divided"));
   if (pd && pd.getLastRow() > 1) {
     const data = pd.getDataRange().getValues();
     const head = data[0].map(h => String(h).toLowerCase());

@@ -22,6 +22,7 @@ module.exports = {
   // What changed since round 1, for the page's "Fixed since round 1" list (each links to its re-test)
   fixes: [
     // 11/18: from your notes of 11/17 (each is marked "Fixed, re-test" on its check)
+    { text: "11/18, later: \"Parents Divided\" is now \"Parents List\" everywhere (the tab is renamed by itself at the next build); Select all on the start page; Back to the start on the All done screen.", checks: ["s4-16", "s2-22", "s2-16"] },
     { text: "11/18, new (your idea): Input Data Mode asks what you want to update. Tick the data you have new files for; it goes through only those and ends with Build my sheets and Done.", checks: ["s2-05", "s2-22", "s2-16"] },
     { text: "11/18: no \"Not now\" in the welcome window (your note on 2.5).", checks: ["s2-05"] },
     { text: "11/18: a problem shows at the top of the panel, right under the bar of steps (2.9).", checks: ["s2-09"] },
@@ -220,7 +221,8 @@ module.exports = {
           see: ["Back lands on the \"Your Lists\" tab, not on the list's own tab.",
                 "The end screen has two buttons: \"Build my sheets\" (only if something changed after step 5's build; if you saved a list after it, it says the lists need a build) and \"Done\".",
                 "Next steps asks \"Build your sheets first?\"; after Cancel the checklist shows \"Build your sheets again\", not ticked.",
-                "The list tabs are hidden afterwards. Contact Log, Combined Contact Tracking, PCAR and Directory show; the Welcome tab is gone."],
+                "The list tabs are hidden afterwards. Contact Log, Combined Contact Tracking, PCAR and Directory show; the Welcome tab is gone.",
+                "The All done screen has Build my sheets, Done and Back to the start (Input Data Mode again, on its start page)."],
           fixed: "One Finish; Back lands on Your Lists; \"build again\" when a list changed after the build (end screen + checklist); a click is never ignored while the panel checks the tab, and the exit question stays open (round 1, 2.16)." },
         { id: "s2-17", optional: true, title: "Save and exit from Site / Class",
           do: ["🚀 App Menu → 📥 Input Data Mode → click Site / Class in the bar at the top.",
@@ -232,7 +234,7 @@ module.exports = {
           see: ["The build report shows 2 new students (Steve Rogers, Lucia Lopez) and 1 discharged (Tony Stark), and when it was built.",
                 "Build again right away: the report now says 0 new and 0 discharged (it is always the last build's own).",
                 "Your own Parent Square test: a parent whose \"Registered?\" goes from No to Yes (or a newly registered parent of a student already there) is a Parent Square sign-up. A guardian taken out of the NYCSA export is an NYCSA sign-up. Build again: both are 0."],
-          fixed: "11/18 (your note: Parent Square never counted, \"2 new NYCSA\" came back on the next build): the report read Parents Divided by column number, and since the Sibling column came in it took Sibling for Parent Square and Parent Square for NYCSA; it also matched parents by name only, so a parent of two children could count every time. Now by the column's name, per child. Round 1: never an older build's report." },
+          fixed: "11/18 (your note: Parent Square never counted, \"2 new NYCSA\" came back on the next build): the report read Parents List by column number, and since the Sibling column came in it took Sibling for Parent Square and Parent Square for NYCSA; it also matched parents by name only, so a parent of two children could count every time. Now by the column's name, per child. Round 1: never an older build's report." },
         { id: "s2-19", title: "Logging contacts",
           do: ["In the Contact Log, type a parent's name in the Guardian column of the empty row (try Morticia Addams), then Enter. Log 3 contacts."],
           see: ["The student, OSIS, date, # and follow-up fill in by themselves.",
@@ -257,7 +259,8 @@ module.exports = {
                "Upload \"2 - Parent Square.csv\". Then click NYCSA in the bar at the top, look, and click Finish or exit → Exit without saving."],
           see: ["The start page asks \"What do you want to update?\". Exports loaded more than a week ago are ticked and say \"Time to update\" (right after 2.8 to 2.10, nothing is: tick it yourself). Start says how many: \"Start (1 to update)\"; with nothing ticked it is grey.",
                 "Only Parent Square comes. After \"Parent Square completed!\" the panel ends right away (no NYCSA, Site / Class or Your Lists) with \"Build my sheets\" and \"Done\".",
-                "In the bar at the top, the steps you didn't tick are faint; clicking one still opens it."],
+                "In the bar at the top, the steps you didn't tick are faint; clicking one still opens it.",
+                "Select all, at the bottom above Start, ticks every card (then it says Unselect all)."],
           fixed: "New on 11/18 (your idea): \"click only the data you want to update\", then Build or Done." },
         { id: "s2-23", title: "Parents to add, at the end of Input Data Mode",
           do: ["📥 Input Data Mode → tick Parent Square and NYCSA → Start. Upload \"2b - Parent Square - a parent not in ATS.csv\", then \"3b - NYCSA - a third guardian.xlsx\" (new in the test files: download the zip again).",
@@ -360,7 +363,7 @@ module.exports = {
                 "The Student List has the list's column, with a navy header."] },
         { id: "s4-09", optional: true, title: "The sheet's look",
           do: ["Look over the tabs (the look came from 🎨 Apply Sheet Style on the TEST master)."],
-          see: ["Montserrat everywhere. Notes and Send Out brown like the Contact Log; Student List, Parents Divided, Directory and Combined navy.",
+          see: ["Montserrat everywhere. Notes and Send Out brown like the Contact Log; Student List, Parents List, Directory and Combined navy.",
                 "PCAR's boxes a darker brown with yellow date cells; no \"Column 9\" on the Student List; the tab is named \"Raw Data\" with its DATE UPDATED titles at the left."] },
         { id: "s4-10", optional: true, title: "Events and colors",
           do: ["📆 Events → 📋 New Event and add a parent. Log a Workshop row in the Contact Log, and type a Type in it."],
@@ -384,7 +387,7 @@ module.exports = {
                "Tick Abe Simpson (for Lisa) → Not new. Then \"Show them again\".",
                "Open the Person Spoke With dropdown on a contact row for Bart. Then Create the Override Report."],
           see: ["One page: Parents to add, Your changes, and at the bottom Create the Override Report and New / Edit Student. New / Edit Student has \"← Student Overrides\" at the bottom left, and Save brings you back to the page.",
-                "After Add: the Build panel runs; Bart's guardians are Homer, Marge and Abe in the Student List, Parents Divided, the phone contacts and the Person Spoke With list (not the Directory: it is ATS only). Lisa still has two.",
+                "After Add: the Build panel runs; Bart's guardians are Homer, Marge and Abe in the Student List, Parents List, the phone contacts and the Person Spoke With list (not the Directory: it is ATS only). Lisa still has two.",
                 "Your changes shows Bart as \"Added guardian · Parent Square\" (then Edited, after the Patty save), with Edit and Delete.",
                 "Not new hides Lisa's Abe (\"1 parent you marked not new is hidden\"); Show them again brings him back.",
                 "The report lists Abe as Guardian: [Not in ATS] → Added from: Parent Square."],
@@ -394,7 +397,14 @@ module.exports = {
                "Look at the Communications box under END (type Bart's OSIS), at Combined Contact Tracking, and (after 🏗️ Build Sheets Only) at Phone Contacts."],
           see: ["Under that contact's date line: two bullets \"• Needs the trip form\" and \"• Will call Friday\" (the dashes are left out), and no [ ] at the end of the line.",
                 "Older notes read the same way after the build."],
-          fixed: "New on 11/18 (your idea): the note was \"[...]\" at the end of the line." }
+          fixed: "New on 11/18 (your idea): the note was \"[...]\" at the end of the line." },
+        { id: "s4-16", title: "Parents List (was Parents Divided)",
+          do: ["On a copy that still has a \"Parents Divided\" tab: 🚀 App Menu → 🏗️ Build Sheets Only.",
+               "Look at the tab, ⚙️ Settings → Tabs & columns, and the lookup box's guardian table under END (type an OSIS)."],
+          see: ["The tab is now called \"Parents List\" (renamed, not a second tab); its columns and data are as before.",
+                "Settings lists \"Parents List\" and keeps your show / hide choice.",
+                "The lookup box still lists the guardians (Sheets changed its formula to the new name by itself)."],
+          fixed: "New on 11/18 (your request): the new name everywhere." }
       ]
     },
     {

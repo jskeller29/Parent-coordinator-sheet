@@ -75,7 +75,7 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   const cleared = Object.assign({}, ats, { notice: { type: 'error', code: 'wrongType', cleared: true, fromUpload: false,
     message: 'This looks like <b>Parent Square</b> data, but this step is <b>Student Data (ATS / Insight)</b>. Use the Student Data (ATS / Insight) export instead (or Skip to the Parent Square step).' } });
   await shoot('InputDataSidebar', { idm_getState: cleared, idm_check: ats }, 'idm_cleared');
-  const buildSteps = [{ label: 'Reading your data' }, { label: 'Student List' }, { label: 'Event Log' }, { label: 'Combined Contact Tracking' }, { label: 'Parents Divided' }, { label: 'Directory' }, { label: 'Phone Contacts' }, { label: 'Finishing up' }];
+  const buildSteps = [{ label: 'Reading your data' }, { label: 'Student List' }, { label: 'Event Log' }, { label: 'Combined Contact Tracking' }, { label: 'Parents List' }, { label: 'Directory' }, { label: 'Phone Contacts' }, { label: 'Finishing up' }];
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, lists, { needsBuild: true }), idm_buildForLists: '__HANG__', getSyncStatus: { phase: 'idle', buildSteps: buildSteps, buildStep: 1 } },
     'idm_lists_building', async p => { await p.waitForTimeout(3000); });
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, lists, { listsBuild: { ok: true, message: 'Sheets built, so your lists can find your students.' } }) }, 'idm_lists_built');

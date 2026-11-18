@@ -89,6 +89,23 @@ var STUDENT_LIST_SHEET = "Student List";
 var LEGACY_STUDENT_LIST_SHEET = "Master Table";
 var STUDENT_LIST_HEADER_ROW = 1; // the build writes the header here, students from the next row
 
+// PARENTS LIST tab (owner's request 2026-11-18: was "Parents Divided"). Like the Student List: every
+// lookup goes through getParentsListSheet_, which renames an old copy's "Parents Divided" tab the first
+// time. A rename keeps the tab's formulas, dropdowns and protections, and Sheets updates every formula
+// that points at it (the lookup box's guardian table). Function / setting names keep "parentsDivided".
+var PARENTS_LIST_SHEET = "Parents List";
+var LEGACY_PARENTS_LIST_SHEET = "Parents Divided";
+function getParentsListSheet_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(PARENTS_LIST_SHEET);
+  if (sheet) return sheet;
+  const legacy = ss.getSheetByName(LEGACY_PARENTS_LIST_SHEET);
+  if (!legacy) return null;
+  try { legacy.setName(PARENTS_LIST_SHEET); }
+  catch (e) { console.warn('Could not rename "Parents Divided" to "Parents List": ' + e.message); }
+  return legacy;
+}
+
 /**
  * The Student List tab, or null when the sheet has neither name. An old
  * "Master Table" tab is renamed to "Student List" the first time, so its
@@ -944,7 +961,7 @@ function bigCacheRemove_(cache, key) {
 // one-time 🐞 Debug → 🎨 Apply Sheet Style (z_MINE.gs).
 // - Tabs you type in (Contact Log, Events, Notes, Send Out): the Contact Log's
 //   brown header and cream rows. The Contact Log keeps its own hand-made look.
-// - Tabs the build makes (Student List, Parents Divided, Directory, Combined
+// - Tabs the build makes (Student List, Parents List, Directory, Combined
 //   Contact Tracking, Phone Contacts, Students Override Report): navy, the
 //   same navy as the pop-ups (Styles.html), the Welcome tab and the guide.
 // - PCAR: the brown theme, a little darker than the Contact Log (owner 2026-11-13).

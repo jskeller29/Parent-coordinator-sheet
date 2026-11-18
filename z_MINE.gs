@@ -29,7 +29,7 @@ function ownerHooks_() {
     buildPhoneContactsData: ownerBuildPhoneContactsData_,
     contactLogSiteColumn: 8,  // H holds the site on the owner's Contact Log too (K is Method 2; owner 2026-11-12)
     logNewStudents: ownerLogNewStudents_, // the "New Students" tab
-    montserratSheets: [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"], // New Students too (owner 2026-11-12)
+    montserratSheets: [STUDENT_LIST_SHEET, "Parents List", "Directory", "Combined Contact Tracking", "Phone Contacts", "New Students"], // New Students too (owner 2026-11-12)
 
     // --- Quick update (updateOsisDeltas_) ---
     updateOsisDeltas: ownerUpdateOsisDeltas_,
@@ -642,7 +642,7 @@ function ownerDebugToast_(message, title, seconds) {
 // - Montserrat on every tab. On the Contact Log: the header and entry rows (A:P above END;
 //   rows could show Roboto); the END bar and the lookup box keep their own fonts.
 // - Sheets Table colors: Notes and Send Out get the Contact Log's brown and cream,
-//   Student List / Parents Divided / Directory / Combined Contact Tracking navy and
+//   Student List / Parents List / Directory / Combined Contact Tracking navy and
 //   light grey. Needs the Sheets API: the "Sheets" service in App Scripts (Mine).Json
 //   (else the same calls go over the web; if Google refuses them, the report lists
 //   the tables to recolor by hand).
@@ -651,7 +651,7 @@ function ownerDebugToast_(message, title, seconds) {
 // - Phone Contacts' colors; PCAR's 3 boxes (a slightly darker brown, SHEET_LOOK_.pcar;
 //   the "own dates" box's 2 date cells as yellow input boxes; one label style; a missing
 //   section title is copied from the first box).
-// - Widths: Student List / Parents Divided fit their text (within limits), Send Out B.
+// - Widths: Student List / Parents List fit their text (within limits), Send Out B.
 // - Student List: the empty columns after the last header go ("Column 9"); Your Lists
 //   columns have a header, so they stay.
 // - Names: tab "RAW Data" -> "Raw Data", Send Out's table "Table1" -> "Send Out".
@@ -670,7 +670,7 @@ function ownerMenuApplySheetStyle() {
     "Puts one look on every tab of this sheet:\n\n" +
     "• Montserrat everywhere\n" +
     "• Tabs you type in (Events, Notes, Send Out): the Contact Log's brown headers and cream rows\n" +
-    "• Tabs the build makes (Student List, Parents Divided, Directory, Combined Contact Tracking, " +
+    "• Tabs the build makes (Student List, Parents List, Directory, Combined Contact Tracking, " +
     "Phone Contacts, Students Override Report): navy headers and light grey rows\n" +
     "• PCAR: a slightly darker brown\n\n" +
     "Your data is not changed and the Contact Log keeps its own look. Continue?",
@@ -722,12 +722,12 @@ function ownerApplySheetStyle_(ss) {
     console.warn("Apply Sheet Style, reading the tables: " + e.message);
   }
   const typing = ownerTypingColors_(ss, tables);
-  const builtTabs = [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking"];
+  const builtTabs = [STUDENT_LIST_SHEET, "Parents List", "Directory", "Combined Contact Tracking"];
   const typingTabs = ["Notes", "Send Out"];
 
   // 4. One font
   step("Fonts", () => {
-    const names = ["Raw Data", "Events", "Notes", "Send Out", "PCAR", STUDENT_LIST_SHEET, "Parents Divided", "Directory",
+    const names = ["Raw Data", "Events", "Notes", "Send Out", "PCAR", STUDENT_LIST_SHEET, "Parents List", "Directory",
       "Combined Contact Tracking", "Phone Contacts", "Students Override Report", "New Students"];
     const done = [];
     names.forEach(name => {
@@ -750,7 +750,7 @@ function ownerApplySheetStyle_(ss) {
   if (!tables) {
     rep.byHand.push("Table colors: Google didn't let the script change them (" + (tablesError || "no Sheets API") + "). " +
       "On each table, click ▾ next to its name → table color. Notes and Send Out: " + typing.header +
-      " (the Contact Log's brown) with cream " + typing.band2 + " rows. Student List, Parents Divided, Directory and " +
+      " (the Contact Log's brown) with cream " + typing.band2 + " rows. Student List, Parents List, Directory and " +
       "Combined Contact Tracking: navy " + L.built.header + " with light grey " + L.built.band + " rows.");
   } else {
     step("Table colors", () => {
@@ -791,7 +791,7 @@ function ownerApplySheetStyle_(ss) {
     typingTabs.concat(builtTabs).forEach(name => {
       const sh = tab(name);
       if (!sh || sh.getLastColumn() < 1) return;
-      const listCols = name === STUDENT_LIST_SHEET || name === "Parents Divided"; // Your Lists columns after the table
+      const listCols = name === STUDENT_LIST_SHEET || name === "Parents List"; // Your Lists columns after the table
       const span = ownerHeaderSpan_(sh, tables && tables[sh.getName()], listCols);
       sh.getRange(span.row, span.col, 1, span.num)
         .setBackground(typingTabs.indexOf(name) !== -1 ? typing.header : L.built.header)
@@ -902,7 +902,7 @@ function ownerSheetStyleReport_(rep) {
 var OWNER_STYLE_WIDTHS_ = {
   "Student List": { "OSIS": 100, "Student": 170, "Guardian": 250, "Site": 60, "Class": 110, "Sibling": 230,
     "Status": 100, "Last Interaction": 160 },
-  "Parents Divided": { "student_id": 110, "Guardian output": 180, "Student": 170, "Class / Site": 130,
+  "Parents List": { "student_id": 110, "Guardian output": 180, "Student": 170, "Class / Site": 130,
     "relationship": 115, "language": 105, "email": 250, "mobile": 130, "Sibling": 230, "Parents Square": 135,
     "NYCSA": 90, "Last Interaction": 160 }
 };

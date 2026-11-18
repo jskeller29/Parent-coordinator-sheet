@@ -78,7 +78,7 @@ var IDM_STEPS = [
     // studentCol: the "<n> students" part of the "completed!" message (release check 3.1: the count looked wrong)
     keyCols: ["Student ID","Last Name","First Name"], studentCol: "Student ID",
     // The start page (owner 2026-11-14, release check 2.16): what each file is for
-    uses: "The one file the tracker needs: every student with their guardians, phones, emails, languages and class. The Student List, Directory, Parents Divided and Phone Contacts are built from it.",
+    uses: "The one file the tracker needs: every student with their guardians, phones, emails, languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
     where: "TeachHub → Insight → Tools → Downloader → Guardian Contact Information",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
@@ -96,7 +96,7 @@ var IDM_STEPS = [
     headers: ["Name","Students","Email","Phone","Secondary Phone","Record Created","Registered?","SIS Synced"],
     numberCols: ["Phone","Secondary Phone"],
     keyCols: ["Name","Students","Email","Phone"],
-    uses: "Which parents have joined Parent Square. Shows in Parents Divided, and the build report lists the new sign-ups.",
+    uses: "Which parents have joined Parent Square. Shows in Parents List, and the build report lists the new sign-ups.",
     where: "ParentSquare → Admin → Data Assistant → Parents → Export CSV",
     howTo: [
       "Go to <b>ParentSquare</b>, sign in, and open <b>Admin</b>.",
@@ -112,7 +112,7 @@ var IDM_STEPS = [
     headers: ["Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name","Another Primary NYCSA Account Exist","Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"],
     numberCols: ["Student ID","Guardian Home Number","Guardian Work Number","Guardian Cell Number"],
     keyCols: ["Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name"], studentCol: "Student ID",
-    uses: "Families who don't have an NYC Schools Account yet, with their account creation codes. Shows in Parents Divided. A family that signs up leaves this list, and the next build report counts them as NYCSA sign-ups.",
+    uses: "Families who don't have an NYC Schools Account yet, with their account creation codes. Shows in Parents List. A family that signs up leaves this list, and the next build report counts them as NYCSA sign-ups.",
     where: "TeachHub → Family Access Management → \"Students with Non-NYCSA Account\" report",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
@@ -136,12 +136,12 @@ var IDM_STEPS = [
   },
   {
     key: 'lists', tab: 'Your Lists', short: 'Your Lists', zone: 'Your Lists', required: false, lists: true,
-    uses: "Your own lists (bus routes, PTA, trip forms…). After a build they show on the phone contacts and as Student List / Parents Divided columns.",
+    uses: "Your own lists (bus routes, PTA, trip forms…). After a build they show on the phone contacts and as Student List / Parents List columns.",
     where: "Any spreadsheet or CSV you have",
     howTo: [
       "Any other list you get: bus routes, trip forms, after school, PTA…",
       "Each list gets its own tab. Upload the file (CSV or Excel) or paste the whole sheet there; the tool works out who each row is.",
-      "What you keep shows on the phone contacts (Additional Information) and as a column in the Student List or Parents Divided after the next build."
+      "What you keep shows on the phone contacts (Additional Information) and as a column in the Student List or Parents List after the next build."
     ]
   }
 ];
@@ -1620,7 +1620,7 @@ function idm_errorView_(e) {
 //   - the Backend tab's ADDITIONAL INFORMATION section (OSIS / Student /
 //     Guardian / lines), which the phone contacts show as "Additional
 //     Information:" above Communications (readAdditionalInfo_, Build.gs);
-//   - the Student List (student lists) or Parents Divided (guardian lists),
+//   - the Student List (student lists) or Parents List (guardian lists),
 //     one column per variable.
 // Everyone on a list gets it (owner's pick "A"); Combined Contact Tracking is
 // not changed.
@@ -2574,7 +2574,7 @@ function od_stats_(results) {
 // ======================================================================
 // VIEW (step 4 of the setup sidebar; owner's request 2026-11-12): how a list's
 // kept values read on the phone contact (Additional Information) and in the
-// Student List / Parents Divided. setup.view = { layout: "lines" (one "Name:
+// Student List / Parents List. setup.view = { layout: "lines" (one "Name:
 // value" line each, as before) | "oneLine" (one line: "List: v1, v2"), boldNames /
 // boldValues (character bold, boldText_ like the notes; italic = bold italic),
 // sep (comma / dot / bar / slash), namesBefore ("Route R12, Stop 5th"), start
@@ -2655,7 +2655,7 @@ function od_varValue_(v, row) {
  * Called by every build (buildAllDerivedSheets, in a try/catch), after the
  * Student List is built in memory. Matches every list, refreshes each list tab's
  * "✔ Matched" columns and bands, writes the Backend's Additional Information and
- * returns { studentCols, guardianCols } for the Student List / Parents Divided.
+ * returns { studentCols, guardianCols } for the Student List / Parents List.
  */
 function od_buildOutputs_(ss, masterTable, guardianRows) {
   const lists = od_loadLists_(ss);
@@ -3274,7 +3274,7 @@ function od_matchPreview(p) {
 
 /**
  * Save: the setup, your decisions ({ rowIndex: target | "skip" }), the "✔ Matched"
- * columns on the tab. The Student List / Parents Divided columns and the phone
+ * columns on the tab. The Student List / Parents List columns and the phone
  * contacts follow at the next build.
  */
 function od_saveList(p) {

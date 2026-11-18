@@ -41,7 +41,7 @@ const eq = (a, b, m) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a === u
   eq(g.signupReport_(noPs, after).ps, [], 'first Parent Square load: no sign-ups');
   // The old layout without the Sibling column (positions differ): still read by header
   const old = before.map(x => x.slice(0, 8).concat(x.slice(9)));
-  eq(g.signupReport_(old, after).nycsa, ["Marge Simpson (Student: Bart Simpson)"], 'older Parents Divided layout');
+  eq(g.signupReport_(old, after).nycsa, ["Marge Simpson (Student: Bart Simpson)"], 'older Parents List layout');
   const build = fs.readFileSync(path.join(ROOT, 'Build.gs'), 'utf8');
   assert(!/oldPdData\[i\]\[8\]|parentsDivided\[i\]\[8\]/.test(build), 'no fixed column numbers left in the report');
   console.log("build report sign-ups: ok");
@@ -407,4 +407,25 @@ function parentsSheet() {
   const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
   assert(!/>Not now</.test(menus) && !/zg_notNow/.test(menus), 'no "Not now" in the welcome window');
   console.log("Settings tick + no Not now: ok");
+}
+
+// ---------------------------------------------------------------- 2026-11-18 later: Parents List, Select all, Back to the start
+{
+  const ss = makeSpreadsheet(["Contact Log", "Parents Divided", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const old = ss.getSheetByName("Parents Divided");
+  assert.strictEqual(g.getParentsListSheet_(ss), old, 'the old tab is the one used');
+  assert.strictEqual(old.getName(), "Parents List", 'renamed on first use (formulas pointing at it follow in Sheets)');
+  assert.strictEqual(ss.getSheetByName("Parents Divided"), null, 'no second tab');
+  assert(g.KEEP_TABS_.indexOf("Parents List") !== -1 && g.KEEP_TABS_.indexOf("Parents Divided") !== -1, 'a reset keeps either name');
+  const tv = g.__get("TAB_VISIBILITY").find(t => t.key === 'parentsDivided');
+  eq(tv.sheets, ["Parents List", "Parents Divided"], 'Settings: same key, both names');
+  const code = fs.readdirSync(ROOT).filter(f => /\.(gs|html)$/.test(f)).map(f => fs.readFileSync(path.join(ROOT, f), 'utf8')).join("\n");
+  const left = (code.match(/getSheetByName\("Parents Divided"\)/g) || []).length;
+  assert.strictEqual(left, 2, 'the old name is looked up only as a fallback (an older tracker in Migration, Z#ContactLog)');
+  assert(!/writeSheet_\(ss, "Parents Divided"/.test(code), 'the build writes "Parents List"');
+  const sb = fs.readFileSync(path.join(ROOT, 'InputDataSidebar.html'), 'utf8');
+  assert(/id="pickAllBtn" onclick="pickAll\(\)">Select all</.test(sb) && /show\('footPick', mode === 'start'\)/.test(sb), 'start page: Select all at the bottom');
+  assert(/id="restartBtn" onclick="backToStart\(\)"/.test(sb) && /call\('idm_open'\); \/\/ starts a new run/.test(sb), 'All done: Back to the start');
+  console.log("Parents List rename, Select all, Back to the start: ok");
 }

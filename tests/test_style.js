@@ -166,7 +166,7 @@ const CL_BROWN = "#6a4d38";
 function styleTestSheet(opts) {
   opts = opts || {};
   const ss = makeSpreadsheet(["Contact Log", "RAW Data", "Events", "Send Out", "Notes", "PCAR", "Combined Contact Tracking",
-    "Directory", "Students Override Report", "Student List", "Parents Divided", "Phone Contacts", "Backend"]);
+    "Directory", "Students Override Report", "Student List", "Parents List", "Phone Contacts", "Backend"]);
   const t = n => ss.getSheetByName(n);
   t("Contact Log")._put([["", "Date", "Parent", "Person Spoke With", "OSIS"]], 1, 1);
   t("Contact Log")._set(5, 5, "END");
@@ -183,7 +183,7 @@ function styleTestSheet(opts) {
   sl._maxCols = opts.listColumn ? 10 : 9;
   sl._put([["OSIS", "Student", "Guardian", "Site", "Class", "Sibling", "Status", "Last Interaction", opts.listColumn ? "Bus Route" : "Column 9"],
     ["123456789", "Bart Simpson", "Homer Simpson", "15", "Y41: Tessa", "", "Current", "November 5, 2026", opts.listColumn ? "Route 7" : ""]], 1, 1);
-  t("Parents Divided")._put([["student_id", "Guardian output", "Student", "Class / Site", "relationship", "language", "email", "mobile",
+  t("Parents List")._put([["student_id", "Guardian output", "Student", "Class / Site", "relationship", "language", "email", "mobile",
     "Sibling", "Parents Square", "NYCSA", "Last Interaction"],
     ["123456789", "Homer Simpson", "Bart Simpson", "Y41 (Site: 15)", "Father", "English", "H@x.com", "(111) 111-1111", "", "Yes", "No", "None logged"]], 1, 1);
   t("Directory")._put([["Last Name", "First Name", "OSIS", "Site", "Class/ Teacher", "Parent Contact"], ["Simpson", "Bart", "123456789", "15", "Y41: Tessa", "Homer"]], 1, 1);
@@ -216,7 +216,7 @@ function fakeSheetsApi() {
     { properties: { title: "Notes" }, tables: [table("t1", "Notes", 5)] },
     { properties: { title: "Send Out" }, tables: [table("t2", "Table1", 8)] },
     { properties: { title: "Student List" }, tables: [table("t3", "Student List", 9)] }, // before "Column 9" went
-    { properties: { title: "Parents Divided" }, tables: [table("t4", "Parents Divided", 12)] },
+    { properties: { title: "Parents List" }, tables: [table("t4", "Parents List", 12)] },
     { properties: { title: "Directory" }, tables: [table("t5", "Directory", 6)] },
     { properties: { title: "Combined Contact Tracking" }, tables: [table("t6", "Contact Note Tracking", 4)] },
     { properties: { title: "Raw Data" } }, { properties: { title: "PCAR" } }
@@ -260,7 +260,7 @@ const hexOf = cs => "#" + ["red", "green", "blue"].map(k => ("0" + Math.round(cs
   // Header rows: the table's color with white bold text, over Send Out's old orange / coral
   [4, 5].forEach(c => assert.strictEqual(t("Send Out").getRange(1, c).getBackground(), CL_BROWN, "Send Out header " + c));
   [1, 5].forEach(c => assert.strictEqual(t("Notes").getRange(1, c).getBackground(), CL_BROWN, "Notes header " + c));
-  [[ "Student List", 8 ], ["Parents Divided", 12], ["Directory", 6], ["Combined Contact Tracking", 4]].forEach(([name, n]) => {
+  [[ "Student List", 8 ], ["Parents List", 12], ["Directory", 6], ["Combined Contact Tracking", 4]].forEach(([name, n]) => {
     for (let c = 1; c <= n; c++) assert.strictEqual(t(name).getRange(1, c).getBackground(), L.built.header, name + " header " + c);
     assert.strictEqual(t(name).getRange(1, n + 1).getBackground(), "#ffffff", name + ": nothing painted past the table");
   });

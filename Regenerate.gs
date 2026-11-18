@@ -191,7 +191,7 @@ RESET & HEADER FUNCTIONS
 // New Students, *Families, Transport call, Site Info, ...). Add a name here to keep a tab.
 var KEEP_TABS_ = [
   "Raw Data", "RAW Data", "Contact Log", "Notes", "Events", "PCAR", "Send Out",
-  "Student List", "Combined Contact Tracking", "Parents Divided", "Directory",
+  "Student List", "Combined Contact Tracking", "Parents List", "Parents Divided", "Directory",
   "Phone Contacts", "Students Override Report", "Backend"
 ];
 
@@ -202,6 +202,7 @@ function deleteLegacySheets_(ss) {
   getBackendSheet_(ss);
   // An older copy's "Master Table" becomes "Student List" first, so it is kept.
   getStudentListSheet_(ss);
+  getParentsListSheet_(ss); // an old "Parents Divided" tab is renamed, not deleted
 
   // A display-mode sheet shows only the 👋 Welcome tab, which goes below (a reset
   // makes a fresh one). Sheets can't delete the last visible tab: the default tabs first.
@@ -872,8 +873,8 @@ function resetContactLog_(ss) {
  *    which in the new layout would have deleted the Communications row),
  * 2. deletes every leftover "Parent Contact (COPY)" header row and the row under it (only when
  *    that row is blank or shows #REF!),
- * 3. makes the guardian table as tall as Parents Divided needs (syncLookupBoxGuardianRows_;
- *    a reset has just emptied Parents Divided, so extra guardian rows go and the next build
+ * 3. makes the guardian table as tall as Parents List needs (syncLookupBoxGuardianRows_;
+ *    a reset has just emptied Parents List, so extra guardian rows go and the next build
  *    adds back what it needs),
  * 4. redraws the box's thick black outline (drawContactLogLookupBoxOutline_).
  * (The box helpers are in Edits.gs, next to the search bar code: the build uses them too.)
@@ -1053,7 +1054,7 @@ function resetDerivedSheets_(ss) {
   // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
   backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW + 1); // header kept: BX:CD is the owner's Sheets Table
 
-  ["Phone Contacts", "Combined Contact Tracking", "Parents Divided","Students Override Report", "New Students"].forEach(name => {
+  ["Phone Contacts", "Combined Contact Tracking", "Parents List","Students Override Report", "New Students"].forEach(name => {
     const sheet = ss.getSheetByName(name);
     if (sheet && sheet.getLastRow() > 1) {
       sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();

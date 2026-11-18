@@ -143,7 +143,7 @@ var TAB_VISIBILITY = [
   { key: 'showRawData',        sheets: ["Raw Data", "RAW Data"],      def: false },
   { key: 'showMasterTable',    sheets: ["Student List", "Master Table"], def: false }, // was "Master Table" (renamed on first use)
   { key: 'phoneContacts',      sheets: ["Phone Contacts"],            def: false },
-  { key: 'parentsDivided',     sheets: ["Parents Divided"],           def: false },
+  { key: 'parentsDivided',     sheets: ["Parents List", "Parents Divided"], def: false }, // was "Parents Divided" (renamed on first use)
   { key: 'notesTab',           sheets: ["Notes"],                     def: false },
   { key: 'showEvents',         sheets: ["Events"],                    def: false },
   { key: 'sendOut',            sheets: ["Send Out"],                  def: false },
@@ -686,7 +686,7 @@ const ZG_TABS = [
     what: "One row per student with guardians, siblings, site, class and status. Rebuilt on every build, so don't type here." },
   { name: "Combined Contact Tracking", type: "built", settings: true,
     what: "Every student's notes in one place: Contact Log entries, events and Notes-tab notes, newest first." },
-  { name: "Parents Divided", type: "built", settings: true,
+  { name: "Parents List", type: "built", settings: true,
     what: "One row per guardian, with contact details and Parents Square / NYCSA sign-up." },
   { name: "Directory", type: "built", settings: true,
     what: "Your family directory, from ATS only: each student, OSIS, site, class and how to reach their parents." },
@@ -1077,7 +1077,7 @@ function zg_buildStep_(ss, props, links) {
   if (needed) {
     step.title = "Build your sheets again";
     step.text = needed === "lists"
-      ? "You changed your lists after the last build. Build again so the lists show in the Student List, Parents Divided and the phone contacts."
+      ? "You changed your lists after the last build. Build again so the lists show in the Student List, Parents List and the phone contacts."
       : "You loaded new data after the last build. Build again so your sheets have it.";
   }
   return step;
@@ -3308,7 +3308,7 @@ function ma_migrateSettings(url) {
   } else {
     // Smart inference (trackers without a saved-settings block): from the old tabs' visibility
     const pPhone = oldSS.getSheetByName("Phone Contacts");
-    const pDiv = oldSS.getSheetByName("Parents Divided");
+    const pDiv = oldSS.getSheetByName("Parents List") || oldSS.getSheetByName("Parents Divided"); // an older tracker
     if (pPhone) {
       const isPhoneEnabled = !pPhone.isSheetHidden();
       props.setProperty('phoneContacts', isPhoneEnabled.toString());

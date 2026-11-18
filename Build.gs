@@ -1,7 +1,7 @@
 // ======================================================================
 // FILE: Build.gs
 // PURPOSE: The full rebuild ("Build Sheets"): reads Raw Data once and writes the
-// Student List, Combined Contact Tracking, Parents Divided, Directory and Phone
+// Student List, Combined Contact Tracking, Parents List, Directory and Phone
 // Contacts tabs, plus the build report for the sidebar. (The owner's sheet also
 // keeps a "New Students" tab: see ownerLogNewStudents_ in z_MINE.gs.)
 // ======================================================================
@@ -16,7 +16,7 @@ const BUILD_STEPS = [
   { label: "Student List", detail: "One row per student: guardians, siblings, site, class and status" },
   { label: "Event Log", detail: "Splitting the Events tab into one row per student" },
   { label: "Combined Contact Tracking", detail: "Every student's dated notes from the Contact Log and Events" },
-  { label: "Parents Divided", detail: "One row per guardian with ParentSquare and NYCSA sign-up status" },
+  { label: "Parents List", detail: "One row per guardian with ParentSquare and NYCSA sign-up status" },
   { label: "Directory", detail: "The family directory, from Raw Data (ATS) only" },
   { label: "Phone Contacts", detail: "The contact list the Google Contacts sync sends to phones" },
   { label: "Finishing up", detail: "Showing/hiding the Site column, the new / discharged students report, fonts" }
@@ -70,9 +70,9 @@ function buildAllDerivedSheetsRun_() {
   // =========================================================
   // --- PRE-FETCH OLD DATA SNAPSHOT FOR REPORTS ---
   // =========================================================
-  // The Parents Divided the last build wrote: the report's Parent Square / NYCSA sign-ups compare it
+  // The Parents List the last build wrote: the report's Parent Square / NYCSA sign-ups compare it
   // with this build's (signupReport_)
-  const oldPdSheet = ss.getSheetByName("Parents Divided");
+  const oldPdSheet = getParentsListSheet_(ss); // renames an old "Parents Divided" tab first
   const oldPdData = oldPdSheet ? oldPdSheet.getDataRange().getValues() : [];
 
   // OSIS -> Status from the Student List before it is rewritten (build report; owner's New Students log)
@@ -101,7 +101,7 @@ function buildAllDerivedSheetsRun_() {
   masterTable = addLastInteractionColumn_(masterTable, contactLogData, freshEventData);
   // Your Lists (Input Data.gs): matches every list tab, writes the Backend's
   // Additional Information (read by the phone contacts) and returns the
-  // Student List / Parents Divided columns. A problem there never stops the build.
+  // Student List / Parents List columns. A problem there never stops the build.
   let listOutputs = null;
   try { listOutputs = od_buildOutputs_(ss, masterTable, guardianRows); }
   catch (e) { console.warn("Your Lists skipped: " + e.message); }
@@ -150,15 +150,15 @@ function buildAllDerivedSheetsRun_() {
   const combinedContactTracking = buildCombinedContactTrackingData_(ss, masterTable, contactLogData, eventLogData);
   writeSheet_(ss, "Combined Contact Tracking", combinedContactTracking);
 
-  reportBuildStep_(4); // Parents Divided
+  reportBuildStep_(4); // Parents List
   let parentsDivided = buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareIndex, nycsaIndex, studentMap, contactLogData, eventLogData);
   if (listOutputs) parentsDivided = addGuardianListColumns_(parentsDivided, listOutputs.guardianCols);
-  writeSheet_(ss, "Parents Divided", parentsDivided);
+  writeSheet_(ss, "Parents List", parentsDivided);
   // Your Lists columns (after Last Interaction): the look of the Last Interaction header
   const pdBase = parentsDivided[0].indexOf("Last Interaction") + 1;
   if (pdBase > 0 && parentsDivided[0].length > pdBase) {
-    styleHeadersLike_(ss.getSheetByName("Parents Divided"), 1, pdBase, pdBase + 1,
-      parentsDivided[0].length - pdBase, "Parents Divided list");
+    styleHeadersLike_(getParentsListSheet_(ss), 1, pdBase, pdBase + 1,
+      parentsDivided[0].length - pdBase, "Parents List list");
   }
 
   // Directory draws only from Raw Data: no New/Edit Student overrides, no discharged students
@@ -226,7 +226,7 @@ function buildAllDerivedSheetsRun_() {
 
   // Set Montserrat font ONCE at the very end instead of inside writeSheet_
   const fontSheets = owner ? owner.montserratSheets
-    : [STUDENT_LIST_SHEET, "Parents Divided", "Directory", "Combined Contact Tracking", "Phone Contacts"];
+    : [STUDENT_LIST_SHEET, "Parents List", "Directory", "Combined Contact Tracking", "Phone Contacts"];
   fontSheets.forEach(name => {
     const sh = ss.getSheetByName(name);
     if (sh) sh.getDataRange().setFontFamily("Montserrat");
@@ -1806,7 +1806,7 @@ function getNYCSAStatus_(currentGuardian, otherGuardian, index) {
    LAST INTERACTION
    One place that collects the dated interactions of every OSIS: Contact Log
    rows that aren't hidden (column P) plus Event Log rows, oldest first.
-   Parents Divided picks each guardian's newest one; the Student List picks
+   Parents List picks each guardian's newest one; the Student List picks
    each student's newest one with anyone.
 ========================= */
 function interactionsByOsis_(contactLogData, eventLogData) {
@@ -1864,7 +1864,7 @@ function interactionsByOsis_(contactLogData, eventLogData) {
  * Adds a "Last Interaction" column after the Student List's last column: the
  * date of the newest interaction with anyone for that student (a sibling-group
  * row "111, 222" uses the newest of its students), or "None logged". Same date
- * text and rules as the Parents Divided column, which is per guardian.
+ * text and rules as the Parents List column, which is per guardian.
  * Rows are padded to the header width first, so rows added by the owner's
  * Old Master Table hook line up.
  */
@@ -1920,7 +1920,7 @@ function styleHeadersLike_(sheet, row, srcCol, fromCol, numCols, what) {
 
 /**
  * The build report's sign-ups (owner 2026-11-17, release check 2.18: Parent Square sign-ups never
- * showed and "2 new NYCSA" came back on the next build). Every guardian row of the Parents Divided the
+ * showed and "2 new NYCSA" came back on the next build). Every guardian row of the Parents List the
  * last build wrote (oldPd) is compared with the same guardian's row now (newPd), matched by OSIS AND
  * guardian name (a parent of two children has a row per child, and two families can share a name).
  * The columns are found by their header: the report used to read fixed column numbers, and since the
@@ -2369,7 +2369,7 @@ function addListColumns_(masterTable, cols) {
 }
 
 /**
- * Parents Divided + one column per guardian-list variable.
+ * Parents List + one column per guardian-list variable.
  * cols: [{ header, byGuardian: Map("OSIS|lowercase guardian name" -> value) }].
  */
 function addGuardianListColumns_(parentsDivided, cols) {

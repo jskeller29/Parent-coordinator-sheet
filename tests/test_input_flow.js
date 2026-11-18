@@ -194,7 +194,7 @@ function listsSheet() {
   raw._put([["School Year", "DBN", "Student ID"], ["2025-2026", "75M094", 123456789]], 6, 1);
   const temp = startMode(ss, g, 4); // Your Lists step
   let builds = 0;
-  g.buildAllDerivedSheets = () => { builds++; ss.insertSheet("Parents Divided"); }; // a new tab shows + becomes active
+  g.buildAllDerivedSheets = () => { builds++; ss.insertSheet("Parents List"); }; // a new tab shows + becomes active
   g.formatDirectoryAuto_ = () => {};
   let v = g.idm_getState();
   assert.strictEqual(v.needsBuild, true, 'new sheet (Student List empty): build first');
@@ -202,9 +202,9 @@ function listsSheet() {
   assert.strictEqual(builds, 1, 'built once');
   assert(v.listsBuild && v.listsBuild.ok, 'build ok');
   assert.strictEqual(v.needsBuild, false, 'not again');
-  assert(ss.getSheetByName("Parents Divided").isSheetHidden(), 'the tab the build made is hidden again');
+  assert(ss.getSheetByName("Parents List").isSheetHidden(), 'the tab the build made is hidden again');
   assert.strictEqual(ss.getActiveSheet().getSheetId(), temp.getSheetId(), 'back on the temp tab');
-  assert(g.idm_loadState_().hiddenIds.indexOf(ss.getSheetByName("Parents Divided").getSheetId()) !== -1, 'shown again at the end');
+  assert(g.idm_loadState_().hiddenIds.indexOf(ss.getSheetByName("Parents List").getSheetId()) !== -1, 'shown again at the end');
   assert.deepStrictEqual(ss.getSheets().filter(s => !s.isSheetHidden()).map(s => s.getName()), [temp.getName()], 'only the temp tab shows');
   assert.strictEqual(g.idm_getState().needsBuild, false, 'still not needed');
 

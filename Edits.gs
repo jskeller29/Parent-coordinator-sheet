@@ -657,7 +657,7 @@ function findContactLogLookupBox_(sheet, endRow) {
 }
 
 /**
- * The most guardians any one student has in Parents Divided data (header row first; A = OSIS,
+ * The most guardians any one student has in Parents List data (header row first; A = OSIS,
  * B = guardian name), counted the way the guardian table's FILTER picks them (B not blank).
  */
 function lookupBoxGuardianCount_(parentsDivided) {
@@ -673,9 +673,9 @@ function lookupBoxGuardianCount_(parentsDivided) {
   return max;
 }
 
-/** Same, read from the Parents Divided tab (0 when it is missing or empty). */
+/** Same, read from the Parents List tab (0 when it is missing or empty). */
 function lookupBoxGuardianCountFromSheet_(ss) {
-  const sh = ss ? ss.getSheetByName("Parents Divided") : null;
+  const sh = ss ? getParentsListSheet_(ss) : null;
   const last = sh ? sh.getLastRow() : 0;
   return last >= 2 ? lookupBoxGuardianCount_(sh.getRange(1, 1, last, 2).getDisplayValues()) : 0;
 }
@@ -691,7 +691,7 @@ function redrawLookupBoxOutlineForBuild_(ss) {
   return endRow ? drawContactLogLookupBoxOutline_(sheet, endRow) : false;
 }
 
-/** End of a build: guardian rows for the Parents Divided rows just built. */
+/** End of a build: guardian rows for the Parents List rows just built. */
 function syncLookupBoxGuardianRowsForBuild_(ss, parentsDivided) {
   const sheet = ss.getSheetByName("Contact Log");
   const endRow = sheet ? findEndRowInColumnE_(sheet) : null;

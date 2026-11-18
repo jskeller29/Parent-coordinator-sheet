@@ -31,7 +31,7 @@ var SHEET_LOCK_TAG = "🔒 Sheet Lock";
 var SHEET_LOCK_OFF_KEY = "SHEET_LOCK_OFF";
 
 // Tabs the build writes (whole tab warned)
-var SHEET_LOCK_BUILT_TABS = ["Student List", "Combined Contact Tracking", "Parents Divided", "Directory",
+var SHEET_LOCK_BUILT_TABS = ["Student List", "Combined Contact Tracking", "Parents List", "Directory",
   "Phone Contacts", "Students Override Report", "New Students"];
 // Typed tabs whose row 1 is warned (Contact Log also gets its END bar)
 var SHEET_LOCK_HEADER_TABS = ["Contact Log", "Notes", "Send Out"];

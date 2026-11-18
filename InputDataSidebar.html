@@ -46,8 +46,8 @@
     .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 1px solid var(--line); padding: 10px 14px; }
     .footer > .row button { flex: 1; }
     /* Site / Class: "Save and go to …" on its own line above Skip, still in the footer (owner 2026-11-17, 2.11) */
-    #footTop { margin: 0 0 8px; }
-    #footTop button { width: 100%; }
+    #footTop, #footPick { margin: 0 0 8px; }
+    #footTop button, #footPick button { width: 100%; }
     #exitAsk { background: var(--danger-soft); border: 1px solid #e9c3bf; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; color: var(--danger); }
     #exitAsk .row button { flex: 1 1 auto; font-size: 12.5px; padding: 0 8px; }
     a { color: var(--accent); cursor: pointer; font-weight: 600; font-size: 12.5px; }
@@ -235,11 +235,12 @@
       <div class="muted" style="margin-top:6px">Or later: 👤 Student Overrides → 🗂️ Student Overrides.</div>
     </div>
     <!-- Lists changed after step 5's build (release check 2.16): say why it needs another build -->
-    <div id="listsBuildHint" class="warnline hidden">You changed your lists after the sheets were built. Build again to put them in the Student List, Parents Divided and the phone contacts.</div>
+    <div id="listsBuildHint" class="warnline hidden">You changed your lists after the sheets were built. Build again to put them in the Student List, Parents List and the phone contacts.</div>
     <!-- Two ways out (owner 2026-11-17): build the sheets with the new data, or done for now -->
     <div class="row">
       <button class="primary" id="buildBtn" onclick="build()">Build my sheets</button>
       <button id="doneBtn" onclick="google.script.host.close()">Done</button>
+      <button id="restartBtn" onclick="backToStart()" title="Open Input Data Mode again, on its start page">Back to the start</button>
       <button id="nextStepsBtn" class="hidden" onclick="nextSteps()">Next steps</button>
     </div>
   </div>
@@ -270,6 +271,10 @@
       </div>
     </div>
     <!-- Site / Class: Save is always there, on its own line above Skip (owner 2026-11-17, release check 2.11) -->
+    <!-- Start page: tick every card at once (owner 2026-11-18) -->
+    <div class="row hidden" id="footPick">
+      <button id="pickAllBtn" onclick="pickAll()">Select all</button>
+    </div>
     <div class="row hidden" id="footTop">
       <button id="siteNextBtn" class="primary" onclick="saveSiteClass()">Save and go to Your Lists</button>
     </div>
@@ -477,6 +482,7 @@
     show('startBtn', mode === 'start');
     show('skipBtn', mode === 'paste' || mode === 'site');
     show('footTop', mode === 'site');      // Site / Class: "Save and go to …" above Skip, always there (2.11)
+    show('footPick', mode === 'start');    // start page: Select all
     show('finishBtn', mode === 'lists');   // the one Finish on Your Lists (there were two)
     show('exitBtn', mode !== 'lists');
     $('exitBtn').textContent = mode === 'start' ? 'Exit' : 'Finish or exit';
@@ -532,8 +538,18 @@
     Object.keys(startPicks || {}).forEach(function (k) { if (startPicks[k]) out.push(Number(k)); });
     return out.sort(function (a, b) { return a - b; });
   }
+  // Select all (or, when every card is ticked, none)
+  function pickAll() {
+    if (busy || !startPicks) return;
+    var all = startItemsCache.every(function (it) { return startPicks[it.index]; });
+    startItemsCache.forEach(function (it) { startPicks[it.index] = !all; });
+    renderStart({ start: startItemsCache });
+  }
   function updateStartBtn() {
     var n = pickedList().length;
+    var all = startItemsCache.length > 0 && n === startItemsCache.length;
+    $('pickAllBtn').textContent = all ? 'Unselect all' : 'Select all';
+    $('pickAllBtn').disabled = busy;
     $('startBtn').textContent = n ? 'Start (' + n + ' to update)' : 'Tick what to update';
     $('startBtn').disabled = busy || n === 0;
   }
@@ -631,13 +647,25 @@
     google.script.run.withSuccessHandler(showParentsToAdd).withFailureHandler(function () {}).idm_parentsToAddSummary();
   }
 
+  // "Back to the start" on the end screen (owner 2026-11-18): Input Data Mode again, on its start page
+  function backToStart() {
+    var b = $('restartBtn');
+    b.disabled = true; b.textContent = 'Opening…';
+    buildAfterExit = false; lastDone = null; startPicks = null; currentOverview = false;
+    show('doneView', false);
+    $('loading').innerHTML = '<div class="status"><div class="spinner"></div><div>Opening Input Data Mode…</div></div>';
+    show('loading', true);
+    b.disabled = false; b.textContent = 'Back to the start';
+    call('idm_open'); // starts a new run on the start page (the old tab is deleted first)
+  }
+
   function showParentsToAdd(r) {
     if (!r || !r.count || $('doneView').classList.contains('hidden')) return;
     $('parentsTitle').textContent = r.count === 1 ? '1 parent to add?' : r.count + ' parents to add?';
     var sample = r.sample || [], more = r.count - sample.length;
     $('parentsText').textContent = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents') +
       ' who aren\'t in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
-      '. Add the ones who are guardians, so they show in the Student List, Parents Divided, the phone contacts and the Person Spoke With list.';
+      '. Add the ones who are guardians, so they show in the Student List, Parents List, the phone contacts and the Person Spoke With list.';
     show('parentsCard', true);
   }
   function reviewParents() {
@@ -930,7 +958,7 @@
     google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); }).withFailureHandler(onFail).od_renameList(tabId, n.trim());
   }
   function deleteList(tabId, name) {
-    if (!confirm('Delete the list "' + name + '" and its tab? Its lines go away from the phone contacts and the Student List / Parents Divided at the next build.')) return;
+    if (!confirm('Delete the list "' + name + '" and its tab? Its lines go away from the phone contacts and the Student List / Parents List at the next build.')) return;
     working('Deleting…');
     google.script.run.withSuccessHandler(function (r) { if (r && r.error) return onFail(r.error); call('idm_getState'); }).withFailureHandler(onFail).od_deleteList(tabId);
   }
