@@ -154,6 +154,23 @@ function handleEdit_(e) {
 
   if (row < 2) return;
 
+  // ONE CONTACT LOG EDIT AT A TIME for the part that reads END and adds the new row (2026-11-18,
+  // release check 7.2: "the new row didn't have a checkbox"). Typing two cells of the empty row
+  // quickly starts two runs side by side: both saw the old END row, both added a blank row, and the
+  // first run's clean-up under END then took the checkbox off the other's new row. The second run
+  // now waits here until the first has added its row, so it finds END where it really is. Let go
+  // before the notes (they take the same lock for their own write); Google lets it go anyway when
+  // the run ends. No lock within 10 s: on as before.
+  const rowLock = LockService.getDocumentLock();
+  let rowLocked = false;
+  try { rowLocked = rowLock.tryLock(10000); } catch (err) { rowLocked = false; }
+  const releaseRowLock = () => {
+    if (!rowLocked) return;
+    rowLocked = false;
+    try { rowLock.releaseLock(); } catch (err) { /* let go when the run ends */ }
+  };
+  if (!rowLocked) clDbg_("another Contact Log edit held the row lock for 10 s: going on without it");
+
   // 1. Shifted End Row Finder (Now Col E / 5). ONE cache call brings back the
   // END row and the ghost typist's data; the END row is then checked with a
   // one-cell read (a full column E scan only when it moved).
@@ -165,6 +182,7 @@ function handleEdit_(e) {
   // The Master Toggle lives on the end bar row in Col O
   if (endRow && row === endRow && col === CL_COL_FILTER_TOGGLE) {
     toggleHideFilter_(sheet, endRow);
+    releaseRowLock();
     return; 
   }
   // ------------------------
@@ -172,6 +190,7 @@ function handleEdit_(e) {
   if (endRow && row >= endRow) {
     // An edit in the search bar below the END bar (e.g. looking up a student):
     // its formulas update by themselves
+    releaseRowLock();
     clDbg_("edit is in the search bar area (below END): its formulas update by themselves");
     return;
   }
@@ -179,10 +198,11 @@ function handleEdit_(e) {
   // =======================================================
   // CONTACT LOG GHOST TYPIST — PASTED COLUMN (fills every pasted row)
   // =======================================================
+  let pasteAddedRow = false; // the paste reached END and a blank row was added there
   if (numRows > 1 && (col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT)) {
     try {
       const pasteRows = endRow ? Math.min(numRows, endRow - row) : numRows;
-      if (pasteRows > 0) fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow, range.getNumColumns());
+      if (pasteRows > 0) pasteAddedRow = !!fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow, range.getNumColumns());
     } catch (err) {
       console.error(err);
       e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
@@ -295,8 +315,10 @@ function handleEdit_(e) {
     formatContactLogRows_(sheet, row, safeNumRows); // also the font (was: column D set to Roboto here)
   }
 
-  autoAddBlankRow_(sheet, row, endRow);
-  const addedBlankRow = !!(endRow && row === endRow - 1); // autoAddBlankRow_ added a row above END
+  // A row was added above END (by this edit, or by the paste above when it reached END: before
+  // 2026-11-18 the paste's row was missed, so END's clean-up cleared the new row's checkbox)
+  // (the paste's row first: a paste that started on the last row would otherwise get a second one)
+  const addedBlankRow = pasteAddedRow || autoAddBlankRow_(sheet, row, endRow);
   // (the week formula check, patchMissingFormulasInRow_, runs at the end of the
   // edit: its reads would hold up the clean-up and the notes)
 
@@ -317,14 +339,20 @@ function handleEdit_(e) {
     // the line above the END bar only (under it is the lookup box's thick line; release check 4.4)
     sheet.getRange(finalEndRow, 1, 1, CL_WIDTH).setBorder(true, null, null, null, null, null, "#000000", SpreadsheetApp.BorderStyle.SOLID);
 
-    let maxRows = sheet.getMaxRows();
-    if (maxRows >= finalEndRow) {
-      let rowsToClear = maxRows - finalEndRow + 1;
-      sheet.getRange(finalEndRow, CL_COL_CHECKBOX, rowsToClear, 1).clearDataValidations().clearContent();
+    // Checkboxes under END come only from a paste reaching down there. A one-cell edit never
+    // changes a row under END (the new row goes above it), so it skips this (one write less,
+    // and it can't clear a new row's checkbox when END moved meanwhile; 2026-11-18)
+    if (numRows > 1 || range.getNumColumns() > 1) {
+      let maxRows = sheet.getMaxRows();
+      if (maxRows >= finalEndRow) {
+        let rowsToClear = maxRows - finalEndRow + 1;
+        sheet.getRange(finalEndRow, CL_COL_CHECKBOX, rowsToClear, 1).clearDataValidations().clearContent();
+      }
     }
   }
 
   SpreadsheetApp.flush(); 
+  releaseRowLock(); // the new row and END are on the sheet: the next edit may go on
 
   clDbg_("row clean-up + END bar done");
 
@@ -1141,8 +1169,9 @@ var PENDING_OWNER_NOTES_ = null;
 // The Contact Log ghost typist needs Student List A5:C and Directory C:E on
 // every edit. Only a build writes those tabs, so the first edit reads them and
 // keeps a copy in the document cache for 6 hours; the next edits skip both
-// reads. Every build clears it (clearGhostTypistCache_). Too big for the cache
-// (> ~95 KB): read every time, as before.
+// reads. Every build clears it (clearGhostTypistCache_). A copy bigger than one
+// cache key (100 KB, a big school) is split over several keys (bigCachePut_,
+// Core.gs; 2026-11-18): before, it was read from the tabs on EVERY edit.
 // =========================================================
 const GHOST_CACHE_KEY_ = "GHOST_TYPIST_DATA";
 const GHOST_CACHE_SECONDS_ = 21600; // 6 hours (the most the cache keeps); every build clears it
@@ -1152,7 +1181,7 @@ function ghostTypistData_(ss, ghostRaw) {
   let cache = null;
   try {
     cache = CacheService.getDocumentCache();
-    const hit = ghostRaw !== undefined ? ghostRaw : (cache && cache.get(GHOST_CACHE_KEY_));
+    const hit = ghostRaw !== undefined ? ghostRaw : (cache && bigCacheGet_(cache.getAll(bigCacheKeys_(GHOST_CACHE_KEY_)), GHOST_CACHE_KEY_));
     if (hit) return JSON.parse(hit);
   } catch (err) { console.warn("Ghost typist cache not read: " + err.message); }
 
@@ -1163,8 +1192,7 @@ function ghostTypistData_(ss, ghostRaw) {
     dir: dLast > 0 ? dir.getRange(1, 3, dLast, 3).getValues() : []
   };
   try {
-    const json = JSON.stringify(data);
-    if (cache && json.length < 95000) cache.put(GHOST_CACHE_KEY_, json, GHOST_CACHE_SECONDS_);
+    if (cache) bigCachePut_(cache, GHOST_CACHE_KEY_, JSON.stringify(data), GHOST_CACHE_SECONDS_);
   } catch (err) { console.warn("Ghost typist cache not saved: " + err.message); }
   return data;
 }
@@ -1189,7 +1217,7 @@ function rememberEndRow_(sheet, endRow) {
 function contactLogPrefetch_(sheet, row) {
   const endKey = endRowCacheKey_(sheet);
   let got = {};
-  try { got = CacheService.getDocumentCache().getAll([endKey, GHOST_CACHE_KEY_]) || {}; } catch (err) { got = {}; }
+  try { got = CacheService.getDocumentCache().getAll([endKey].concat(bigCacheKeys_(GHOST_CACHE_KEY_))) || {}; } catch (err) { got = {}; }
 
   let endRow = null;
   const remembered = parseInt(got[endKey], 10);
@@ -1213,7 +1241,7 @@ function contactLogPrefetch_(sheet, row) {
     endRow = findEndRowInColumnE_(sheet);
     rememberEndRow_(sheet, endRow);
   }
-  return { endRow: endRow, endFromCache: endFromCache, rowVals: rowVals, ghostRaw: got[GHOST_CACHE_KEY_] || null };
+  return { endRow: endRow, endFromCache: endFromCache, rowVals: rowVals, ghostRaw: bigCacheGet_(got, GHOST_CACHE_KEY_) };
 }
 
 // =========================================================
@@ -1222,7 +1250,8 @@ function contactLogPrefetch_(sheet, row) {
 // Contact Log edit never changes those, but reading them cost ~1.5 s each on a
 // big sheet. So they are kept in the document cache for 6 hours; any
 // Event Log write (the backend* helpers in Core.gs), any Events / Notes edit
-// and every build clear it. Too big (> ~95 KB) or a Notes cell holding a date:
+// and every build clear it. A copy bigger than one cache key is split over
+// several (bigCachePut_, Core.gs; 2026-11-18). A Notes cell holding a date:
 // read every time, as before.
 // =========================================================
 const NOTES_SRC_EVENTS_KEY_ = "NOTES_SRC_EVENTS";
@@ -1231,36 +1260,39 @@ const NOTES_SRC_NOTES_KEY_ = "NOTES_SRC_NOTES";
 /** { eventData, nData }: Event Log (display values) and Notes tab (values), cached when possible. */
 function notesSourcesData_(ss) {
   let cache = null, got = {};
-  try { cache = CacheService.getDocumentCache(); got = cache.getAll([NOTES_SRC_EVENTS_KEY_, NOTES_SRC_NOTES_KEY_]) || {}; } catch (err) { got = {}; }
+  try {
+    cache = CacheService.getDocumentCache();
+    got = cache.getAll(bigCacheKeys_(NOTES_SRC_EVENTS_KEY_).concat(bigCacheKeys_(NOTES_SRC_NOTES_KEY_))) || {};
+  } catch (err) { got = {}; }
   const keep = (key, value) => {
     try {
-      const json = JSON.stringify(value);
-      if (cache && json.length < 95000) cache.put(key, json, 21600); // 6 hours; cleared on every change
+      if (cache) bigCachePut_(cache, key, JSON.stringify(value), 21600); // 6 hours; cleared on every change
     } catch (err) { /* read again next time */ }
   };
+  const cachedEvents = bigCacheGet_(got, NOTES_SRC_EVENTS_KEY_), cachedNotes = bigCacheGet_(got, NOTES_SRC_NOTES_KEY_);
 
   let eventData;
-  if (got[NOTES_SRC_EVENTS_KEY_]) eventData = JSON.parse(got[NOTES_SRC_EVENTS_KEY_]);
+  if (cachedEvents) eventData = JSON.parse(cachedEvents);
   else { eventData = backendReadBlock_(ss, "EVENT_LOG", true); keep(NOTES_SRC_EVENTS_KEY_, eventData); }
 
   let nData;
-  if (got[NOTES_SRC_NOTES_KEY_]) nData = JSON.parse(got[NOTES_SRC_NOTES_KEY_]);
+  if (cachedNotes) nData = JSON.parse(cachedNotes);
   else {
     const notesSheet = ss.getSheetByName("Notes");
     nData = notesSheet ? notesSheet.getDataRange().getValues() : null;
     // JSON would turn a date into different text, so only plain values are cached
     if (nData && !nData.some(r => r.some(v => v instanceof Date))) keep(NOTES_SRC_NOTES_KEY_, nData);
   }
-  clDbg_("notes sources: Event Log " + (got[NOTES_SRC_EVENTS_KEY_] ? "cached" : "read") + ", Notes tab " + (got[NOTES_SRC_NOTES_KEY_] ? "cached" : "read"));
+  clDbg_("notes sources: Event Log " + (cachedEvents ? "cached" : "read") + ", Notes tab " + (cachedNotes ? "cached" : "read"));
   return { eventData: eventData, nData: nData };
 }
 
 function clearNotesSourcesCache_() {
-  try { CacheService.getDocumentCache().removeAll([NOTES_SRC_EVENTS_KEY_, NOTES_SRC_NOTES_KEY_]); } catch (err) { console.warn("Notes sources cache not cleared: " + err.message); }
+  try { CacheService.getDocumentCache().removeAll(bigCacheKeys_(NOTES_SRC_EVENTS_KEY_).concat(bigCacheKeys_(NOTES_SRC_NOTES_KEY_))); } catch (err) { console.warn("Notes sources cache not cleared: " + err.message); }
 }
 
 function clearGhostTypistCache_() {
-  try { CacheService.getDocumentCache().remove(GHOST_CACHE_KEY_); } catch (err) { console.warn("Ghost typist cache not cleared: " + err.message); }
+  try { bigCacheRemove_(CacheService.getDocumentCache(), GHOST_CACHE_KEY_); } catch (err) { console.warn("Ghost typist cache not cleared: " + err.message); }
 }
 
 // =========================================================
@@ -1319,17 +1351,18 @@ function FIX_ALL_MISSING_FORMULAS_BATCH() {
   ss.toast("Week formulas restored and borders fixed!", "Success", 3);
 }
 
+/** Adds the empty row above END when editedRow was the last one. true = a row was added (END moved down one). */
 function autoAddBlankRow_(sheet, editedRow, endRow) {
-  if (editedRow === endRow - 1) {
-    sheet.insertRowAfter(editedRow);
-    formatContactLogRows_(sheet, editedRow + 1, 1);
-    sheet.getRange(editedRow + 1, CL_COL_CHECKBOX).setValue(false);
+  if (!endRow || editedRow !== endRow - 1) return false;
+  sheet.insertRowAfter(editedRow);
+  formatContactLogRows_(sheet, editedRow + 1, 1);
+  sheet.getRange(editedRow + 1, CL_COL_CHECKBOX).setValue(false);
 
-    // The end bar's black border sticks to the edited row's bottom edge when
-    // the new row is inserted above it. Strip its horizontal borders so only
-    // the dark brown end bar (re-drawn by the onEdit sweep) keeps a border.
-    sheet.getRange(editedRow, 1, 1, CL_WIDTH).setBorder(null, null, false, null, null, false);
-  }
+  // The end bar's black border sticks to the edited row's bottom edge when
+  // the new row is inserted above it. Strip its horizontal borders so only
+  // the dark brown end bar (re-drawn by the onEdit sweep) keeps a border.
+  sheet.getRange(editedRow, 1, 1, CL_WIDTH).setBorder(null, null, false, null, null, false);
+  return true;
 }
 
 /**
@@ -1566,9 +1599,10 @@ function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow, numCols
     patchMissingFormulasInRow_(sheet, f.row);
   });
   // Keep a blank row above the END bar when the paste reached it
-  autoAddBlankRow_(sheet, row + numRows - 1, endRow);
+  const added = autoAddBlankRow_(sheet, row + numRows - 1, endRow);
 
   toastGhostMisses_(ss, filledRows.length, missing);
+  return added; // END moved down one: the edit's END clean-up must know (it cleared the new row's checkbox)
 }
 
 /** Notes: fills OSIS / Guardian / Student for every pasted row; families already on the sheet are removed. */

@@ -80,6 +80,13 @@ write("2 - Parent Square", PS_H, ps)
 # 3. NYCSA ("Students with Non-NYCSA Account")
 write("3 - NYCSA (Students with Non-NYCSA Account)", NY_H, ny)
 
+# 2b / 3b. A parent your Student Data (ATS) doesn't have (👤 Student Overrides → Parents to add, 2026-11-18):
+# Abe Simpson in Parent Square for Bart and Lisa, Patty Bouvier as Bart's third guardian in NYCSA (ATS lists two)
+PS_EXTRA = ["Simpson, Abe", "Bart Simpson, Lisa Simpson", "ABE.SIMPSON@gmail.com", "(343) 434-3434", "", "Nov 12, 2026", "Yes", "No"]
+NY_EXTRA = ["M094", "75", "P.S. M094", "Y41", "6", "123456789", "BART", "SIMPSON", "PATTY", "BOUVIER", "No", "", "", "4545454545", "AUNT", "Custodial User", "B11111C9"]
+write("2b - Parent Square - a parent not in ATS", PS_H, ps + [PS_EXTRA])
+write("3b - NYCSA - a third guardian", NY_H, ny + [NY_EXTRA])
+
 # 4. Site / Class: paste over the "Site / Class" tab in Input Data Mode step 4 (columns A:C)
 site_class = [["Y11","Bam","276"],["Y12","","276"],["Y24","Lam","281"],["Y25","Sam","51"],["Y27","Rosa","51"],["Y28","Ortiz","281"],
               ["Y41","Tessa","15"],["Y42","Nina","15"],["Y50","","340"],["Y66","Carl","51"],["X30","Ham","188"],["X31","Lee","188"]]

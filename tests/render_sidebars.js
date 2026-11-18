@@ -109,5 +109,44 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   await shoot('YourListsSidebar', { od_getWizard: viewSetup, od_matchPreview: viewMatch }, 'yl_view', toView);
   await shoot('YourListsSidebar', { od_getWizard: Object.assign({}, viewSetup, { view: Object.assign({}, viewSetup.view, { layout: 'oneLine', sep: 'dot', columns: 'one' }) }), od_matchPreview: viewMatch },
     'yl_view_advanced', async p => { await toView(p); await p.click('.pvnav button:last-child'); await p.waitForTimeout(150); });
+  // 2026-11-18 (release check round 2 notes + ideas): pick what to update, Site / Class Save above Skip,
+  // a problem at the top, the end screen's Build / Done + parents to add, the Student Overrides main page
+  const startItems = ['Student Data (ATS)', 'Parent Square', 'NYCSA', 'Site / Class', 'Your Lists'].map((n, i) => ({ index: i, key: 'k' + i, name: n, required: i === 0,
+    uses: 'What it is for.', where: i < 3 ? 'TeachHub → …' : '', fileHint: i === 0 ? 'its name starts with <b>general_</b>' : '',
+    last: i === 3 ? null : { text: '10/0' + (i + 1) + '/26', days: 40 - i * 10 }, due: i < 2, picked: i < 2 }));
+  const start = { active: true, overview: true, stepIndex: 0, stepCount: 5, start: startItems, step: ats.step, tabName: 'Start Here', progress: progress(-1, {}), notice: null };
+  await shoot('InputDataSidebar', { idm_getState: start, idm_check: start }, 'idm_start_pick', async p => { await p.click('#startItems .si:nth-child(3)'); await p.waitForTimeout(150); });
+  const site = Object.assign({}, ats, { stepIndex: 3, step: { key: 'siteclass', zone: 'Site / Class', required: false, manual: true, lists: false, howTo: ['Type each class\'s <b>Teacher Name</b>.'] },
+    tabName: 'Site / Class', next: { index: 4, short: 'Your Lists' }, siteClass: { classes: 12, teachers: 8, sites: 5 },
+    progress: progress(3, {}).map((x, i) => Object.assign(x, { picked: i !== 1 })) });
+  await shoot('InputDataSidebar', { idm_getState: site, idm_check: site }, 'idm_site_footer');
+  const wrong = Object.assign({}, cleared, { stepIndex: 1, step: Object.assign({}, ats.step, { key: 'ps', zone: 'Parent Square', required: false }), progress: progress(1, {}) });
+  await shoot('InputDataSidebar', { idm_getState: wrong, idm_check: ps }, 'idm_error_top');
+  await shoot('InputDataSidebar', { idm_getState: listsIcons }, 'idm_icon_hover', async p => { await p.hover('#listItems .li button.ico'); await p.waitForTimeout(250); });
+  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, guideNext: false, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '— Parent Square: not loaded (old data kept)'] },
+    idm_deleteLeftoverTab: { deleted: true }, idm_parentsToAddSummary: { count: 4, sample: ['Abe Simpson (Bart Simpson)', 'Patty Bouvier (Bart Simpson)', 'Grandmama Addams (Wednesday Addams)'] } }, 'idm_done_parents', async p => { await p.waitForTimeout(400); });
+  const home = { toAdd: [
+      { key: 'a', name: 'Grandmama Addams', relationship: 'Grandmother', student: 'Wednesday Addams', cls: 'Y12', osis: '111222333', phone: '(777) 777-7777', email: '', sources: ['NYCSA'] },
+      { key: 'b', name: 'Abe Simpson', relationship: '', student: 'Bart Simpson', cls: 'Y41', osis: '123456789', phone: '(333) 333-3333', email: 'abe@x.org', sources: ['Parent Square', '👪 PTA'] },
+      { key: 'c', name: 'Patty Bouvier', relationship: 'Aunt', student: 'Bart Simpson', cls: 'Y41', osis: '123456789', phone: '(444) 444-4444', email: '', sources: ['NYCSA'] }],
+    skipped: 2, paused: false, error: '',
+    changes: [{ date: '11/18/2026', type: 'Added Guardian (NYCSA)', kind: 'added', source: 'NYCSA', osis: '567891234', lastName: 'Simpson', firstName: 'Lisa', classCode: 'Y25', guardians: ['Selma Bouvier'] },
+              { date: '11/02/2026', type: 'New Student', kind: 'new', source: '', osis: '998877665', lastName: 'Belcher', firstName: 'Tina', classCode: 'Y42', guardians: ['Bob Belcher'] },
+              { date: '10/28/2026', type: 'Edit Existing Student', kind: 'edit', source: '', osis: '678912345', lastName: 'Parker', firstName: 'Peter', classCode: 'Y11', guardians: [], hidden: true }] };
+  const dlg = await browser.newContext({ viewport: { width: 640, height: 680 }, deviceScaleFactor: 1 });
+  const shootDlg = async (file, resp, name, act) => {
+    const p = await dlg.newPage();
+    const errs = []; p.on('pageerror', e => errs.push(e.message));
+    await p.goto('file://' + page(file, runStub(resp)));
+    await p.waitForTimeout(500);
+    if (act) await act(p);
+    await p.screenshot({ path: dir + '/' + name + '.png' });
+    console.log(name, errs.length ? 'JS ERRORS: ' + errs.join(' | ') : 'ok');
+    await p.close();
+  };
+  await shootDlg('ManageOverridesDialog', { getOverridesHome: home }, 'ov_home', async p => { await p.click('#addList .card:nth-child(2) input'); await p.waitForTimeout(100); });
+  await shootDlg('ManageOverridesDialog', { getOverridesHome: home }, 'ov_home_changes', async p => { await p.evaluate(() => document.querySelector('.ov-body').scrollTo(0, 9999)); await p.waitForTimeout(100); });
+  await shootDlg('ManageOverridesDialog', { getOverridesHome: Object.assign({}, home, { toAdd: [], skipped: 0 }) }, 'ov_home_empty');
+  await shootDlg('NewStudentDialog', { getAllStudentsForEdit: [], getNewStudentPrefill: { osis: '', guardian: null, fromHome: true } }, 'ov_newstudent_back');
   await browser.close();
 })();

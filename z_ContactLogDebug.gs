@@ -86,7 +86,8 @@ function cld_state(anon) {
   add("Hidden notes included (disableHiddenNotes)", props.getProperty("disableHiddenNotes") === "true" ? "yes" : "no");
   add("Notes date range", (props.getProperty("notesStartDate") || "-") + " to " + (props.getProperty("notesEndDate") || "-"));
   timed("Triggers (this user)", () => ScriptApp.getProjectTriggers().map(t => t.getHandlerFunction() + ":" + t.getEventType()).join(", ") || "none");
-  add("Typist data cached", CacheService.getDocumentCache().get(GHOST_CACHE_KEY_) ? "yes" : "no");
+  const typistCached = bigCacheGet_(CacheService.getDocumentCache().getAll(bigCacheKeys_(GHOST_CACHE_KEY_)), GHOST_CACHE_KEY_);
+  add("Typist data cached", typistCached ? "yes (" + Math.round(typistCached.length / 1000) + " KB)" : "no");
 
   const sheet = ss.getSheetByName("Contact Log");
   if (!sheet) { add("Contact Log", "missing"); return { rows: out, ms: Date.now() - t0 }; }

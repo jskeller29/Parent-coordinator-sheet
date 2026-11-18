@@ -67,7 +67,7 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 
 ## 4. Test it on copies: the release checklist
 Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,
-test with fake data (the main test), a short check with your real data, then the release steps. Do the 50
+test with fake data (the main test), a short check with your real data, then the release steps. Do the 54
 **essentials** before any school gets a version; the 27 checks marked Optional can wait. Three ways to use the same
 list:
 - **The web checklist** (best), **round 2** (2026-11-14): https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc (only you can

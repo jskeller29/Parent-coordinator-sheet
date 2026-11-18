@@ -4,122 +4,259 @@
   <base target="_top">
   <?!= include_('Styles') ?>
   <style>
+    /* 👤 Student Overrides: the ONE main page (owner 2026-11-17; was "Manage Overrides"):
+       parents to add, your changes, the report, and New / Edit Student (which comes back here) */
     html, body { height: 100%; }
     body { display: flex; flex-direction: column; overflow: hidden; }
     .ov-body > * { flex-shrink: 0; }
-    .ov-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 20px 18px; display: flex; flex-direction: column; gap: 12px; }
-    #list { display: flex; flex-direction: column; gap: 10px; }
-    .ovc { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-    .ovc-top { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-    .ovc .nm { font-weight: 700; font-size: 15px; }
-    .ovc .meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
-    .ovc-bot { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-    .ovc .acts { display: flex; gap: 6px; }
-    .state { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 32px 0; color: var(--muted); font-size: 13.5px; }
-    .state.err { color: var(--danger); }
-    .empty { text-align: center; padding: 36px 16px; border: 1px dashed var(--line); border-radius: var(--radius); }
-    .empty p + p { margin-top: 4px; }
+    .ov-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+    .sec { display: flex; flex-direction: column; gap: 10px; }
+    .sec-h { display: flex; align-items: baseline; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .sec-h h2 { flex: 1; }
+    .count { font: 700 12px var(--font); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 1px 9px; }
+    .count.zero { color: var(--muted); background: var(--panel); }
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .card { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: flex; gap: 10px; align-items: flex-start; background: #ffffff; }
+    .card.on { border-color: var(--accent); background: #f7f9fb; }
+    .card input[type=checkbox] { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+    .card .main { flex: 1; min-width: 0; }
+    .card .top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .card .nm { font-weight: 700; font-size: 14.5px; }
+    .card .rel { font-weight: 400; color: var(--muted); font-size: 13px; }
+    .card .meta { font-size: 12.5px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+    .chip { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--panel); color: var(--muted); white-space: nowrap; }
+    .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+    .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .bar .sp { flex: 1; }
+    .state { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 26px 0; color: var(--muted); font-size: 13.5px; }
+    .empty { text-align: center; padding: 18px 16px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); font-size: 13px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="ov-body">
-    <p class="help" style="margin:0">View, edit or delete any manual student change. Deleting an entry puts the student's ATS data back.</p>
+    <p class="help" style="margin:0">Parents to add, the students you changed, and the report, all in one place. Changes go into your sheets at the next build.</p>
 
-    <div id="loading" class="state"><div class="spinner"></div>Loading your entries…</div>
+    <div id="msg" class="notice hidden" role="status"></div>
+    <div id="loading" class="state"><div class="spinner"></div>Looking through Parent Square, NYCSA and your lists…</div>
 
-    <div id="list"></div>
+    <!-- 1. Parents to add -->
+    <div class="sec hidden" id="addSec">
+      <div class="sec-h"><h2>Parents to add</h2><span class="count" id="addCount">0</span></div>
+      <p class="help" style="margin:0">Parent Square, NYCSA or one of your lists has these parents for a student, but your Student Data (ATS) doesn't. Add the ones who are the student's guardians: they show in the Student List, Parents Divided, the phone contacts and the Person Spoke With list (the Directory stays ATS only).</p>
+      <div class="notice warn" id="addWarn">Only add someone who may get information about the student. ATS has the school's official guardians.</div>
+      <div class="bar" id="addBarTop">
+        <button type="button" class="link" id="tickAllBtn" onclick="tickAll()">Tick all</button>
+      </div>
+      <div class="list" id="addList"></div>
+      <div class="bar" id="addBar">
+        <button type="button" class="btn pri sm" id="addBtn" onclick="addTicked()" disabled>Add the ticked parents</button>
+        <button type="button" class="btn sec sm" id="skipBtn" onclick="skipTicked()" disabled>Not new: don't offer again</button>
+      </div>
+      <div class="empty hidden" id="addEmpty">No parents to add: everyone Parent Square, NYCSA and your lists have is in your Student Data.</div>
+      <div class="hint hidden" id="skippedLine"><span id="skippedText"></span> <button type="button" class="link" onclick="unskip()">Show them again</button></div>
+    </div>
+
+    <!-- 2. Your changes -->
+    <div class="sec hidden" id="chgSec">
+      <div class="sec-h"><h2>Your changes</h2><span class="count" id="chgCount">0</span></div>
+      <p class="help" style="margin:0">Students you added or edited, and parents you added. Edit opens the student; Delete puts the student's ATS data back.</p>
+      <div class="list" id="chgList"></div>
+      <div class="empty hidden" id="chgEmpty">No changes yet. New / Edit Student (at the bottom) adds a student who isn't in ATS yet, or changes one who is.</div>
+    </div>
   </div>
 
   <div class="dfoot">
+    <button type="button" class="btn sec" id="reportBtn" onclick="makeReport()">Create the Override Report</button>
     <span class="sp"></span>
     <button type="button" class="btn sec" onclick="closeDialog()">Close</button>
+    <button type="button" class="btn pri" id="newBtn" onclick="openStudent('', null)">New / Edit Student</button>
   </div>
 
   <script>
-    window.onload = function() {
-       if (typeof google !== 'undefined' && google.script && google.script.run) {
-           google.script.run.withSuccessHandler(renderList)
-               .withFailureHandler((err) => { document.getElementById('list').innerHTML = '<div class="state err">Could not load the list: ' + err.message + '</div>'; })
-               .getOverridesList();
-       } else {
-           // Local test fallback
-           renderList([
-               {lastName: "Simpson", firstName: "Bart", osis: "123456789", classCode: "Y41", type: "Edit Existing Student", date: "05/12/2026"}
-           ]);
-       }
+    var home = null;       // the last getOverridesHome() reply
+    var ticked = {};       // parent key -> true
+    var busy = false;
+
+    function $(id) { return document.getElementById(id); }
+    function show(id, on) { $(id).classList.toggle('hidden', !on); }
+    function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    function run() { return google.script.run.withFailureHandler(onFail); }
+
+    window.onload = function () { load(); };
+
+    function load(note, kind) {
+      setBusy(true);
+      show('loading', true);
+      run().withSuccessHandler(function (h) { render(h); if (note) say(note, kind); }).getOverridesHome();
     }
 
-    function renderList(overrides) {
-        document.getElementById('loading').style.display = 'none';
-        const list = document.getElementById('list');
-        
-        if(overrides.length === 0) {
-            list.innerHTML = `
-            <div class="empty">
-                <p style="font-weight:600">No manual changes yet.</p>
-                <p class="help">Students you add or edit from the menu will show up here.</p>
-            </div>`;
-            return;
-        }
-
-        let html = '';
-        overrides.forEach(o => {
-            const pillClass = o.type.includes("New") ? "pill new" : "pill";
-
-            html += `
-            <div class="ovc">
-               <div class="ovc-top">
-                 <div>
-                   <div class="nm">${o.lastName}, ${o.firstName}</div>
-                   <div class="meta">OSIS ${o.osis} · Class ${o.classCode}</div>
-                 </div>
-                 <span class="${pillClass}">${o.type}</span>
-               </div>
-               <div class="ovc-bot">
-                 <span class="hint">Changed ${o.date}</span>
-                 <div class="acts">
-                   <button onclick="editOsis('${o.osis}')" class="btn sec sm">Edit</button>
-                   <button onclick="deleteOsis('${o.osis}', '${o.firstName}')" class="btn dgr sm">Delete</button>
-                 </div>
-               </div>
-            </div>`;
-        });
-        list.innerHTML = html;
+    function onFail(err) {
+      setBusy(false);
+      show('loading', false);
+      say('Something went wrong: ' + (err && err.message ? err.message : err), 'err');
     }
 
-    function editOsis(osis) {
-        document.getElementById('list').innerHTML = '<div class="state"><div class="spinner"></div>Opening the editor…</div>';
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-            // Tells the backend to save the OSIS, close this screen, and open the edit screen!
-            google.script.run.withSuccessHandler(() => google.script.host.close())
-                .withFailureHandler((err) => alert("Could not open the student: " + err.message))
-                .setPrefillAndOpenEdit(osis);
-        }
+    function say(text, kind) {
+      var m = $('msg');
+      m.className = 'notice' + (kind ? ' ' + kind : '');
+      m.textContent = text;
+      show('msg', !!text);
+      if (text) $('msg').scrollIntoView({ block: 'nearest' });
     }
 
-    function deleteOsis(osis, firstName) {
-        if(!confirm(`Are you sure you want to permanently delete the override for ${firstName}?\n\nIf they are a standard ATS student, their data will revert to the default ATS information.`)) return;
-        
-        document.getElementById('list').innerHTML = '<div class="state err"><div class="spinner"></div>Deleting the entry and rebuilding…</div>';
-        
-        if (typeof google !== 'undefined' && google.script && google.script.run) {
-            const refresh = () => {
-                document.getElementById('list').innerHTML = '<div class="state"><div class="spinner"></div>Refreshing…</div>';
-                google.script.run.withSuccessHandler(renderList)
-                    .withFailureHandler((err) => { document.getElementById('list').innerHTML = '<div class="state err">Could not load the list: ' + err.message + '</div>'; })
-                    .getOverridesList();
-            };
-            google.script.run.withSuccessHandler(refresh) // the list again, without the deleted one
-                .withFailureHandler((err) => { alert("The override could not be deleted: " + err.message); refresh(); })
-                .deleteOverride(osis);
-        }
+    function setBusy(on) {
+      busy = on;
+      ['addBtn', 'skipBtn', 'reportBtn', 'newBtn', 'tickAllBtn'].forEach(function (id) { $(id).disabled = on; });
+      Array.prototype.forEach.call(document.querySelectorAll('.card button, .card input'), function (b) { b.disabled = on; });
+      if (!on) updateBar();
     }
 
-    function closeDialog() {
-       if (typeof google !== 'undefined' && google.script && google.script.host) {
-          google.script.host.close();
-       }
+    function render(h) {
+      home = h || { toAdd: [], changes: [], skipped: 0 };
+      var keys = {};
+      (home.toAdd || []).forEach(function (p) { keys[p.key] = true; });
+      Object.keys(ticked).forEach(function (k) { if (!keys[k]) delete ticked[k]; }); // gone (added / skipped)
+      show('loading', false);
+      show('addSec', true); show('chgSec', true);
+      if (home.error) say('Parents to add could not be worked out: ' + home.error, 'err');
+      renderAdd();
+      renderChanges();
+      setBusy(false);
     }
+
+    // --- 1. Parents to add ---
+    function renderAdd() {
+      var list = home.toAdd || [];
+      $('addCount').textContent = list.length;
+      $('addCount').className = 'count' + (list.length ? '' : ' zero');
+      show('addWarn', list.length > 0); show('addBar', list.length > 0); show('addBarTop', list.length > 1);
+      show('addEmpty', list.length === 0);
+      show('skippedLine', home.skipped > 0);
+      $('skippedText').textContent = home.skipped === 1 ? '1 parent you marked "not new" is hidden.' : home.skipped + ' parents you marked "not new" are hidden.';
+      $('addList').innerHTML = list.map(function (p, i) {
+        var on = !!ticked[p.key];
+        var contact = [p.phone, p.email].filter(Boolean).join(' · ');
+        return '<label class="card' + (on ? ' on' : '') + '">' +
+          '<input type="checkbox" ' + (on ? 'checked ' : '') + 'onchange="tick(' + i + ', this.checked)" aria-label="Add ' + esc(p.name) + '">' +
+          '<div class="main"><div class="top"><div><span class="nm">' + esc(p.name) + '</span>' +
+          (p.relationship ? ' <span class="rel">' + esc(p.relationship) + '</span>' : '') + '</div>' +
+          '<div class="chips">' + (p.sources || []).map(function (s) { return '<span class="chip">' + esc(s) + '</span>'; }).join('') + '</div></div>' +
+          '<div class="meta">for <b>' + esc(p.student) + '</b>' + (p.cls ? ' · Class ' + esc(p.cls) : '') + ' · OSIS ' + esc(p.osis) + '</div>' +
+          (contact ? '<div class="meta">' + esc(contact) + '</div>' : '') +
+          '<div class="acts"><button type="button" class="link" onclick="event.preventDefault(); editFirst(' + i + ')">Check and edit before adding</button></div>' +
+          '</div></label>';
+      }).join('');
+      updateBar();
+    }
+    function tick(i, on) {
+      var p = (home.toAdd || [])[i];
+      if (!p) return;
+      if (on) ticked[p.key] = true; else delete ticked[p.key];
+      renderAdd();
+    }
+    function tickAll() {
+      var list = home.toAdd || [];
+      var all = list.every(function (p) { return ticked[p.key]; });
+      list.forEach(function (p) { if (all) delete ticked[p.key]; else ticked[p.key] = true; });
+      renderAdd();
+    }
+    function tickedKeys() { return Object.keys(ticked); }
+    function updateBar() {
+      var n = tickedKeys().length;
+      $('addBtn').textContent = n ? (n === 1 ? 'Add the 1 ticked parent' : 'Add the ' + n + ' ticked parents') : 'Add the ticked parents';
+      $('skipBtn').textContent = n ? 'Not new: don\'t offer ' + (n === 1 ? 'it' : 'them') + ' again' : 'Not new: don\'t offer again';
+      $('addBtn').disabled = busy || n === 0;
+      $('skipBtn').disabled = busy || n === 0;
+      var list = (home && home.toAdd) || [];
+      $('tickAllBtn').textContent = list.length && list.every(function (p) { return ticked[p.key]; }) ? 'Untick all' : 'Tick all';
+    }
+    function addTicked() {
+      var keys = tickedKeys();
+      if (!keys.length || busy) return;
+      setBusy(true);
+      say('Adding…');
+      run().withSuccessHandler(function (r) {
+        ticked = {};
+        render(r.home);
+        var text = r.added === 1 ? 'Added 1 parent.' : 'Added ' + r.added + ' parents.';
+        if (r.building) text += ' Your sheets are being rebuilt with them: the Build panel is on the right (it shows once you close this).';
+        else if (r.added) text += ' They show in your sheets after the next build.';
+        if (r.noRoom && r.noRoom.length) text += ' No room for ' + r.noRoom.join(', ') + ': a student has 5 guardians at most. Use Edit on that student to choose.';
+        say(text, r.noRoom && r.noRoom.length ? 'warn' : 'ok');
+      }).addParentsAsGuardians(keys);
+    }
+    function skipTicked() {
+      var keys = tickedKeys();
+      if (!keys.length || busy) return;
+      setBusy(true);
+      run().withSuccessHandler(function (h) {
+        ticked = {};
+        render(h);
+        say(keys.length === 1 ? 'OK: that parent won\'t be offered again.' : 'OK: those ' + keys.length + ' parents won\'t be offered again.', 'ok');
+      }).skipParentsToAdd(keys);
+    }
+    function unskip() {
+      if (busy) return;
+      setBusy(true);
+      run().withSuccessHandler(function (h) { render(h); say('Every parent you marked "not new" is back in the list.', 'ok'); }).unskipParentsToAdd();
+    }
+    function editFirst(i) {
+      var p = (home.toAdd || [])[i];
+      if (!p || busy) return;
+      openStudent(p.osis, { name: p.name, relationship: p.relationship, phone: p.phone, email: p.email });
+    }
+
+    // --- 2. Your changes ---
+    function renderChanges() {
+      var list = home.changes || [];
+      $('chgCount').textContent = list.length;
+      $('chgCount').className = 'count' + (list.length ? '' : ' zero');
+      show('chgEmpty', list.length === 0);
+      $('chgList').innerHTML = list.map(function (o, i) {
+        var pill = o.kind === 'added' ? '<span class="pill">Added guardian' + (o.source ? ' · ' + esc(o.source) : '') + '</span>'
+          : o.kind === 'new' ? '<span class="pill new">New student</span>' : '<span class="pill">Edited</span>';
+        var who = o.kind === 'added' && o.guardians && o.guardians.length ? '<div class="meta">Added: ' + esc(o.guardians.join(', ')) + '</div>' : '';
+        return '<div class="card"><div class="main">' +
+          '<div class="top"><div><span class="nm">' + esc(o.lastName) + ', ' + esc(o.firstName) + '</span></div><div class="chips">' + pill + '</div></div>' +
+          '<div class="meta">OSIS ' + esc(o.osis) + (o.classCode ? ' · Class ' + esc(o.classCode) : '') + ' · changed ' + esc(o.date) + (o.hidden ? ' · hidden from the report' : '') + '</div>' + who +
+          '<div class="acts"><button type="button" class="btn sec sm" onclick="editChange(' + i + ')">Edit</button>' +
+          '<button type="button" class="btn dgr sm" onclick="deleteChange(' + i + ')">Delete</button></div>' +
+          '</div></div>';
+      }).join('');
+    }
+    function editChange(i) {
+      var o = (home.changes || [])[i];
+      if (o && !busy) openStudent(o.osis, null);
+    }
+    function deleteChange(i) {
+      var o = (home.changes || [])[i];
+      if (!o || busy) return;
+      var what = o.kind === 'added' ? 'the parent(s) you added to ' + o.firstName + ' (' + (o.guardians || []).join(', ') + ')'
+        : o.kind === 'new' ? o.firstName + ' ' + o.lastName + ' (a student who isn\'t in ATS)'
+        : 'your changes to ' + o.firstName + ' ' + o.lastName;
+      if (!confirm('Delete ' + what + '?\n\nThe student\'s ATS data comes back at the next build.')) return;
+      setBusy(true);
+      say('Deleting…');
+      run().withSuccessHandler(function () { load('Deleted. Your sheets are rebuilt without it (the Build panel opens on the right unless rebuilds are paused in Settings).', 'ok'); })
+        .deleteOverride(o.osis);
+    }
+
+    // --- New / Edit Student (comes back here) and the report ---
+    function openStudent(osis, guardian) {
+      if (busy) return;
+      setBusy(true);
+      say('Opening New / Edit Student…');
+      run().openNewStudentFromHome(osis || '', guardian || null); // replaces this window
+    }
+    function makeReport() {
+      if (busy) return;
+      setBusy(true);
+      say('Making the Override Report…');
+      run().withSuccessHandler(function () { google.script.host.close(); }).buildOverrideReport(); // the report tab shows behind
+    }
+    function closeDialog() { google.script.host.close(); }
   </script>
 </body>
 </html>

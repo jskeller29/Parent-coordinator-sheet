@@ -530,6 +530,99 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Contact Log ends at P (2026-11-15): re-paste Edits (Core only has a comment change) on every sheet (master
   template too); with column D on the Backend (step 9), the next Build Sheets Only takes the checkboxes after P out
   and deletes the empty columns Q:AA.
+- Release check round 2 notes + the owner's 3 ideas (2026-11-18, see RELEASE CHECK ROUND 2 NOTES below): re-paste
+  Core, Build, Edits, Menus, Input Data (scripts) and InputDataSidebar, ManageOverridesDialog, NewStudentDialog
+  (pages) on every sheet (master template too); owner sheet also z_ContactLogDebug. Then 🏗️ Build Sheets Only once
+  (Additional Notes become bullets in every student's notes). No new files, no new permissions.
+
+RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
+deploy: see the 2026-11-18 line under Deploying):
+- BUILD REPORT SIGN-UPS (2.18): signupReport_ (Build.gs) compares the Parents Divided the last build wrote (read before
+  the build) with the new one by HEADER (student_id, Guardian output, Student, Parents Square, NYCSA), keyed
+  OSIS|guardian name. Before, it read fixed columns 8 / 9, which since the Sibling column came in were Sibling /
+  Parents Square (the "NYCSA" sign-ups were Parent Square changes; Parent Square never counted), keyed by name only
+  (a parent of two children could count on every build: "2 new NYCSA" again). NYCSA: old "No…" -> new "Yes…".
+  Parent Square: new "Yes" and old "No", or old "" while some old row had Yes / No (the first load lists nobody).
+- CONTACT LOG NEW ROW (7.2 "a new row had no checkbox"): handleEdit_ takes the DOCUMENT lock (tryLock 10 s) from before
+  contactLogPrefetch_ until the row clean-up's flush (releaseRowLock; the two early returns release it; the notes
+  lock by themselves after it). Two quick edits of the empty row ran side by side, both saw the old END, both added a
+  blank row, and the first one's sweep under END cleared the other's checkbox. autoAddBlankRow_ returns whether it
+  added a row; fillPastedContactLogRows_ returns that too (a paste that reached END left finalEndRow one row short,
+  so the sweep cleared the new row's checkbox; a paste starting on the last row got a second blank row). The P
+  sweep under END runs only for multi-cell edits (a one-cell edit never touches a row under END).
+- BIG CACHE (Core.gs bigCacheKeys_ / bigCachePut_ / bigCacheGet_ / bigCacheRemove_; 7.2 "slow"): a value over 90 KB is
+  split over KEY, KEY_1 .. KEY_7 (KEY = "\u0001<n>\u0001" + piece 1; one that fits is stored as before; a lost piece =
+  not cached). The ghost typist cache (GHOST_TYPIST_DATA) was skipped over ~95 KB, so a big school read the Backend
+  copy + Directory on EVERY edit; the notes sources (NOTES_SRC_EVENTS / NOTES_SRC_NOTES) the same. Readers getAll all
+  8 keys (contactLogPrefetch_ still ONE cache call); the clear functions remove every piece; z_ContactLogDebug shows
+  the size. The fake cache (tests/lib/load.js memStore) has no putAll: a test adds one.
+- ⚙️ SETTINGS: openSettingsDialog sets ZG_SETTINGS_SEEN (2.20: opened from the menu, "Check your settings" stayed unticked).
+- WELCOME WINDOW: no "Not now" after "Yes, start fresh" (2.5); zg_notNow removed.
+- INPUT DATA MODE:
+  - 2.9: #errorBox sits right under the title / #progress, OUTSIDE #stepView, so it shows on every view (showErrorTop;
+    onFail uses it; the start page's errors too) and scrolls to the top. The "Waiting…" spinner stays under the
+    upload / Site card.
+  - 2.11: Site / Class: #footTop (in the footer, above Skip) holds #siteNextBtn "Save and go to <next>" / "Save and
+    finish", ALWAYS (it used to replace Skip only once every class had a teacher or a site); the card's Save
+    (#saveSiteBtn) is gone. fitFooter() keeps the body's bottom padding = the footer's height + 24.
+  - 2.12 / 2.13 / 2.17: the Your Lists tab was drawn only by idm_prepareCurrent_ (entering step 5), so a list added or
+    saved in its own sidebar showed in the panel, not on the tab, until the step was entered again (not a build).
+    idm_refreshListsTab_ (idm_open when back from a list, idm_getState after rename / icon / delete) redraws it when
+    idm_listsTabRows_ differ from state.listsTabKey (set by idm_prepareCurrent_ / idm_fillListsTab_).
+  - 2.15: a list's icon shows "Edit" on hover (button.ico::after).
+  - PICK WHAT TO UPDATE (owner's idea): the start page's cards are tick boxes (sidebar startPicks; a click toggles; reset
+    from the server when the start page is entered); Start (n to update) -> idm_startPicked(indices, first) ->
+    state.picked (sorted) and the first ticked step (or `first`: a step clicked in the bar from the start page, added to
+    the picks). idm_nextStep_(state, from): with picks, the next ticked step with no result yet (one passed over by a
+    bar click comes back after the later ones); with no picks (older runs, tests calling idm_goToStep(0)) from + 1 as
+    before. Used by idm_advance_ (every step's finish, Skip, idm_finishLists), idm_doneNotice_ ("Next: …") and
+    idm_view_.next (Skip / Save labels). First ticks (idm_startItems_(ss, state) picked / due): this run's picks, else
+    all five when Student Data was never loaded, else the exports older than the data reminder setting (a week; 'off'
+    = 30 days) = due ("Time to update"); Site / Class and Your Lists are never pre-ticked. The bar shows unticked steps
+    faint (progress[].picked). End screen: "Build my sheets" (was "Build sheets now") + "Done" (was "Close"; primary
+    when nothing needs building) + Next steps.
+  - PARENTS TO ADD on the end screen: idm_parentsToAddSummary (count + 3 names; a separate call once the end screen
+    shows) -> a card, "Review and add them" opens 👤 Student Overrides.
+- STUDENT OVERRIDES MAIN PAGE (owner's idea; ManageOverridesDialog.html rewritten: same file and handler
+  openManageOverridesDialog, 640x680, title "Student Overrides"; menu "🗂️ Student Overrides (parents to add, changes,
+  report)" + "✨ New / Edit Student"; the "📄 Override Report" item is gone, it is a button on the page): getOverridesHome
+  = { toAdd, skipped, changes, paused, error }. Parents to add (tick, Add, Not new, "Check and edit before adding", Show
+  them again), Your changes (getOverridesList now adds kind new / edit / added, source, guardians, hidden; Edit /
+  Delete), footer Create the Override Report (closes the page) / Close / New / Edit Student. New / Edit Student:
+  "← Student Overrides" (backHome -> openManageOverridesDialog); its first call is getNewStudentPrefill() = { osis,
+  guardian, fromHome } (user properties PREFILL_OSIS / PREFILL_GUARDIAN / OVERRIDES_FROM_HOME, read once;
+  openNewStudentFromHome sets them; getPrefillOsis kept for older windows); a prefilled guardian goes in the next empty
+  slot; Save goes back to the page when it was opened from there.
+- PARENTS TO ADD (Menus.gs findParentsToAdd_(ss, all)): Raw Data read once; students = buildStudentMap_ (ATS + New
+  Student), their guardians = buildGuardianObjects_ (ATS + overrides + added). From NYCSA rows (OSIS + guardian first /
+  last, relationship, phones), Parent Square rows (parent name; the Students column names a student when the student's
+  first AND last name parts are in it), Your Lists with a guardian role (a guardian list's "none" row whose OSIS or
+  exact child name is ONE student; a student list's "ok" row whose guardian isn't theirs; od_index_ of the same
+  students). Known = namesMatch_ (any order, a 2+ part subset) or the same phone / email + a shared name part; one-word
+  names and the student's own name are never offered. Key = normalizeOsis_|sorted name parts (sources merge). "Not new"
+  = doc property PARENTS_TO_ADD_SKIPPED (JSON keys, oldest dropped past 8.5 KB); unskipParentsToAdd clears it.
+  addParentsAsGuardians(keys): per student, into its own New / Edit row when it has one (that row replaces the ATS
+  guardians), else ONE "Added Guardian (<sources>)" row (date, type, OSIS, ATS last / first, class, guardians in the
+  free slots; 5 at most, the rest reported as noRoom); then runBuildOnly unless rebuilds are paused. Test files 2b
+  (Abe Simpson for Bart and Lisa) and 3b (Patty Bouvier, Bart's third guardian); the standard files have nobody.
+- ADDED GUARDIAN OVERRIDES (Build.gs; Entry Type starts with "Added Guardian", isAddedGuardianType_): getOverrideData_
+  keeps them out of overrides.students (the student stays ATS) and marks their guardian list addToAts (with a New /
+  Edit row for the same student: merged into that list, guardianListHas_); buildGuardianObjects_ keeps the ATS
+  guardians for such a student and appends the added ones ATS doesn't have, only while the student is in ATS.
+  cleanRedundantOverrides deletes the row once ATS lists every guardian it added. getAllStudentsForEdit merges them into
+  the ATS student; buildOverrideReport shows "Guardian: [Not in ATS]" -> "... Added from: <sources>" (the ATS guardians
+  are not "removed"). The Directory is unchanged (ATS only). Migration copies the rows like every override.
+- ADDITIONAL NOTES AS BULLETS (owner's idea; contactLogNoteLine_ + additionalNoteBullets_, Build.gs): each non-empty
+  line of Contact Log O is "   • text" on its own line under the date line (was " [text]" at the end of it); a
+  leading -, –, —, •, * (repeated too) is dropped; a lone "-" is nothing. Every notes text changes once: build after
+  deploying (else the delete / clear check sees everyone as changed); the next contacts sync updates those notes once.
+- TEST COPIES (owner's note on 1.5): making them with Make Release Copies on the LIVE sheet is fine once it runs the new
+  version (the copies get its code; it never changes the sheet it runs on); stage s1's text and 1.4's why say so.
+- STUDENT INFO (owner's hand-typed lookup box formula, 2.19): no Backend column added; BP (Guardian) is blank for a
+  student list's line. The reply gave a formula that FILTERs Backend BN:BQ for the OSIS and puts BP before each line.
+- The round 2 page got the re-tests ("Fixed, re-test" + the newest fixes first) and new checks 2.22 (pick what to
+  update), 2.23 (parents to add at the end of Input Data Mode), 4.14 (the Student Overrides page), 4.15 (bullets),
+  b-17, b-18; 1.x text for the owner's way. 54 essentials, 27 optional, 18 try-to-break-it.
 
 RELEASE CHECK ROUND 1 FIXES (owner's report 2026-11-14, tests/test_round2.js; deploy: re-paste Core, Build, Edits, Menus,
 Input Data (scripts) and Styles, ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet, then DEPLOY.md
@@ -722,7 +815,7 @@ tests/test_input_flow.js "a new user, step by step", loaded WITHOUT z_ / Z# file
 - Getting Started: Welcome tab in ZG_TABS ("This tab"); "Hidden tabs" list only after the first build; the "Open this
   by itself" checkbox is now "Finish setup" (zg_finishSetup: ZG_AUTO_OPEN = off + alert "you can always open it:
   🚀 App Menu → ✅ Getting Started", sidebar closes; confirm when steps are left; hidden once all 4 are done).
-  zg_setAutoOpen kept for sidebars still open. "Not now" = zg_notNow (toast naming the next step).
+  zg_setAutoOpen kept for sidebars still open. (The welcome window's "Not now" was removed 2026-11-18.)
 - Clone detector also clears INPUT_DATA_MODE_STATE, INPUT_DATA_MODE_DELETE_TAB, ZG_AUTO_OPEN.
 - Clumsy-user pass (owner 2026-11-12, "do stupid things and make mistakes"): 🏗️ Build Sheets Only with no student data
   yet (Student List never built + no ATS rows) = a plain note in the Build sidebar (SYNC_UI_STATE killed + notice; the
@@ -1067,7 +1160,7 @@ Contact Log search bar (rows below END; its cells are formulas typed in the shee
      <= 60 rows below the edited row, ONE read (edited row .. END, B:N) checks END and gives the auto-fill its row
      values (preRowVals); else a one-cell END check (column E scanned only when END moved).
   2. Ghost typist from the cache (Student List OSIS / Student / Guardian from the Backend copy BX:BZ + Directory C:E, ghostTypistData_, key GHOST_TYPIST_DATA, 6 h,
-     skipped > 95 KB; cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
+     split over several keys when big (bigCachePut_, 2026-11-18; it was skipped > 95 KB); cleared by every build and the owner's reset menus, ownerClearEditCaches_ in z_MINE.gs). It
      writes only the cells it fills (C / E:F / H:I). Then autofillContactLogDefaults_ (B / G / N, fill-if-blank) and
      ONE flush paints both. The typist's OSIS is reused (typistOsis), not re-read.
   3. Row clean-up (borders, checkbox, blank row, END bar), writes only: END's row is known (checked at the start,
@@ -1143,7 +1236,9 @@ Workflow:
   deleted: true, the report lists them under YOUR OWN TESTS and RE-TESTS). checks.js: round, lastRound =
   round1-results.json (round 1's answers from the old page's db: shown on each check as "Last time"), fixes[] (the
   "Since round 1" list, each linking to its re-tests), check.fixed ("Fixed, re-test" chip + box), check.breakit / part 5
-  "Try to break it" (stage sb, b-01..b-16; its own Show view, never an essential; "Everything" = essentials + optional).
+  "Try to break it" (stage sb, b-01..b-18; its own Show view, never an essential; "Everything" = essentials + optional).
+  2026-11-18: the owner's 11/17 notes fixed on the same page (fixes[] newest first, "11/18" entries); new checks are
+  added at the END of their stage (2.22, 2.23, 4.14, 4.15) so every earlier number stays.
   Round 2's setup checks are 1.6 / 1.7 (s1r-1, s1r-2) at the END of stage s1, so every round 1 number stays the same.
   A later round: copy that round's db doc into roundN-results.json, point lastRound at it, bump round, publish the
   built page WITHOUT url (a new page). When the owner says "release check done", read checks/current on the round 2 url.
@@ -1165,7 +1260,8 @@ Workflow:
   redo this session's change on top of theirs, never overwrite them.
 
 Notes lines (Combined Contact Tracking, and Phone Contacts notes built from it):
-- Each line is "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻} note [follow-up]" (event: "... - {𝗘𝘃𝗲𝗻𝘁 - [𝗣𝗲𝗿𝘀𝗼𝗻]} |Event|"), no bullet.
+- Each entry is "𝘿𝙖𝙩𝙚 - {𝗠𝗲𝘁𝗵𝗼𝗱 - 𝗣𝗲𝗿𝘀𝗼𝗻} note", then one "   • …" line per line of Additional Notes (2026-11-18,
+  owner's idea; was " [follow-up]" at the end of the line) (event: "... - {𝗘𝘃𝗲𝗻𝘁 - [𝗣𝗲𝗿𝘀𝗼𝗻]} |Event|").
   Date = Sans-Serif Bold Italic (digits = sans bold), braces = Sans-Serif Bold, manual block label "𝙉𝙤𝙩𝙚𝙨:" (bold
   italic sans), all via boldText_ / noteLineHeader_ (Core.gs). Owner's pick 2026-11-05 (was the serif Mathematical
   Bold / Bold Italic set): sans-serif matches the sheet's Montserrat. Unicode bold is used because the search bar's

@@ -131,7 +131,7 @@ var IDM_STEPS = [
       "Type each class's <b>Teacher Name</b>.",
       "<b>Site</b> is optional: pick one from the dropdown or type a new one (it's added to the dropdown).",
       "Add a class that isn't listed by typing its code at the bottom of column A.",
-      "Click <b>✅ Save Site / Class</b> below when you're done."
+      "Click <b>Save</b> at the bottom of this panel when you're done."
     ]
   },
   {
@@ -266,14 +266,21 @@ function idm_open() {
       const temp = idm_sheetById_(ss, started.state.tempId);
       if (temp) { idm_focusTempTab_(ss, started.state, temp, true); idm_saveState_(started.state); }
     }
+    // The Your Lists tab shows a list added / saved in the list's own sidebar (release check 2.12 / 2.13)
+    if (idm_refreshListsTab_(ss, started.state)) idm_saveState_(started.state);
     return idm_view_(ss, started.state);
   });
 }
 var IDM_BACK_FROM_LIST_KEY_ = 'INPUT_DATA_MODE_BACK_FROM_LIST'; // set by od_backToInputMode, read once by idm_open
 
-/** Current step + "last updated" dates for the sidebar. */
+/** Current step + "last updated" dates for the sidebar (also after a list was renamed, got a new icon or was deleted). */
 function idm_getState() {
-  return idm_withLock_(() => idm_view_(SpreadsheetApp.getActiveSpreadsheet(), idm_loadState_()));
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (state && idm_refreshListsTab_(ss, state)) idm_saveState_(state);
+    return idm_view_(ss, state);
+  });
 }
 
 /**
@@ -487,24 +494,72 @@ function idm_goToStep(index) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const state = idm_loadState_();
     if (!state) return idm_view_(ss, null);
-    index = Number(index);
-    const toStart = index === -1;
-    if (!toStart && !(index >= 0 && index < IDM_STEPS.length)) return idm_view_(ss, state);
-    if (toStart ? state.overview : (index === state.step && !state.overview)) return idm_view_(ss, state); // already there
-    idm_log_("jump from " + (state.overview ? "the start page" : "step " + state.step) + " to " + (toStart ? "the start page" : index));
-    const temp = idm_sheetById_(ss, state.tempId);
-    state.overview = toStart;
-    if (!toStart) state.step = index;
-    if (temp) {
-      idm_prepareCurrent_(ss, state, temp);
-      temp.activate();
-    } else {
-      state.tempId = null;
-      idm_ensureTempSheet_(ss, state);
-    }
-    idm_saveState_(state);
-    return idm_view_(ss, state);
+    return idm_moveTo_(ss, state, Number(index));
   });
+}
+
+/** The mode's tab and state move to step index (-1 = the start page); the view. */
+function idm_moveTo_(ss, state, index) {
+  const toStart = index === -1;
+  if (!toStart && !(index >= 0 && index < IDM_STEPS.length)) return idm_view_(ss, state);
+  if (toStart ? state.overview : (index === state.step && !state.overview)) return idm_view_(ss, state); // already there
+  idm_log_("jump from " + (state.overview ? "the start page" : "step " + state.step) + " to " + (toStart ? "the start page" : index));
+  const temp = idm_sheetById_(ss, state.tempId);
+  state.overview = toStart;
+  if (!toStart) state.step = index;
+  if (temp) {
+    idm_prepareCurrent_(ss, state, temp);
+    temp.activate();
+  } else {
+    state.tempId = null;
+    idm_ensureTempSheet_(ss, state);
+  }
+  idm_saveState_(state);
+  return idm_view_(ss, state);
+}
+
+/**
+ * The start page's Start (owner 2026-11-17, release check round 2 idea: "click only the data you want
+ * to update"): the ticked steps (indexes) are this run's steps; the mode goes to the first one (or to
+ * first, a step clicked in the bar), and each finished / skipped step goes on to the next ticked one
+ * (idm_nextStep_). After the last one the mode ends with Build / Done.
+ */
+function idm_startPicked(indices, first) {
+  return idm_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const state = idm_loadState_();
+    if (!state) return idm_view_(ss, null);
+    const picked = [];
+    (Array.isArray(indices) ? indices : []).map(Number).forEach(i => {
+      if (i >= 0 && i < IDM_STEPS.length && picked.indexOf(i) === -1) picked.push(i);
+    });
+    first = (first === undefined || first === null) ? null : Number(first);
+    if (first !== null && first >= 0 && first < IDM_STEPS.length && picked.indexOf(first) === -1) picked.push(first);
+    if (!picked.length) return idm_view_(ss, state, { type: 'error', code: 'nothingPicked', fromUpload: true, message: "Tick at least one kind of data to update." });
+    picked.sort((a, b) => a - b);
+    state.picked = picked;
+    idm_log_("picked steps " + picked.join(", "));
+    return idm_moveTo_(ss, state, first !== null && first >= 0 ? first : picked[0]);
+  });
+}
+
+/** This run's steps: the ones ticked on the start page, or all of them (a run that didn't pick: as before). */
+function idm_pickedSteps_(state) {
+  const p = state && Array.isArray(state.picked) ? state.picked.filter(i => i >= 0 && i < IDM_STEPS.length) : [];
+  return p.length ? p.slice().sort((a, b) => a - b) : IDM_STEPS.map((st, i) => i);
+}
+
+/**
+ * Where to go after step `from` (null = the end): with ticked steps, the next ticked step that hasn't
+ * been done or skipped yet (one passed over by a click in the bar comes back after the later ones);
+ * without (an older run), simply the next step, as before.
+ */
+function idm_nextStep_(state, from) {
+  if (!state || !Array.isArray(state.picked) || !state.picked.length) return from + 1 < IDM_STEPS.length ? from + 1 : null;
+  const r = state.results || {};
+  const open = idm_pickedSteps_(state).filter(i => i !== from && !r[IDM_STEPS[i].key]);
+  const after = open.filter(i => i > from);
+  return after.length ? after[0] : (open.length ? open[0] : null);
 }
 
 /** Step 5 "Finish ✓": ends the mode (the lists themselves were saved one by one). */
@@ -566,7 +621,7 @@ function idm_buildNeededReason_(state) {
   return null;
 }
 
-/** The end screen offers "Build sheets now": something came in, and the sheets don't have it yet. */
+/** The end screen offers "Build my sheets": something came in, and the sheets don't have it yet. */
 function idm_finalBuildNeeded_(state) {
   return !!idm_buildNeededReason_(state);
 }
@@ -637,6 +692,22 @@ function idm_buildForLists() {
     idm_log_("build before Your Lists: " + (outcome.ok ? "ok" : outcome.message));
     return idm_view_(ss, state);
   });
+}
+
+/**
+ * The end screen (owner 2026-11-17: "ask if you want to add that parent at the end of Input Data Mode"):
+ * how many parents Parent Square / NYCSA / your lists have that your Student Data doesn't (Menus.gs
+ * findParentsToAdd_), and the first few names. The card's button opens 👤 Student Overrides, where
+ * they are added (or marked "not new"). Read only; never stops the end screen.
+ */
+function idm_parentsToAddSummary() {
+  try {
+    const found = findParentsToAdd_(SpreadsheetApp.getActiveSpreadsheet());
+    return { count: found.items.length, sample: found.items.slice(0, 3).map(it => it.name + " (" + it.student + ")") };
+  } catch (e) {
+    console.warn("Parents to add (end of Input Data Mode): " + e.message);
+    return { count: 0, sample: [] };
+  }
 }
 
 /** Brings the user back to the paste tab. */
@@ -1068,7 +1139,8 @@ function idm_saveSiteClass_(ss, state, fromExit) {
 var IDM_CLOSING_ = false; // true while "Save and exit" saves this step on the way out (idm_saveAndExit)
 function idm_doneNotice_(ss, state, step, count, one, many, what, message) {
   const name = step.doneName || step.short;
-  const next = IDM_CLOSING_ ? null : IDM_STEPS[state.step + 1]; // closing: there is no next step
+  const nextIndex = IDM_CLOSING_ ? null : idm_nextStep_(state, state.step); // closing: there is no next step
+  const next = nextIndex === null ? null : IDM_STEPS[nextIndex];
   const sub = idm_countText_(count, one, many) + " " + what + "." + (next ? " Next: " + next.short + "." : "");
   try { ss.toast(sub, "✅ " + name + " completed", 6); } catch (e) { console.warn("Toast: " + e.message); } // the banner says it too
   return { type: 'imported', message: message, done: { kind: 'ok', title: name + " completed!", sub: sub } };
@@ -1083,7 +1155,8 @@ function idm_countText_(n, one, many) {
 function idm_advance_(ss, state, notice) {
   const oldTemp = idm_sheetById_(ss, state.tempId);
   state.overview = false;
-  state.step++;
+  const next = idm_nextStep_(state, state.step); // the next ticked step (idea A, 2026-11-17)
+  state.step = next === null ? IDM_STEPS.length : next;
   idm_log_("advance to step " + state.step);
   if (state.step >= IDM_STEPS.length) {
     const results = state.results;
@@ -1127,7 +1200,8 @@ function idm_prepareCurrent_(ss, state, sheet) {
     idm_fillStartTab_(ss, sheet);
   } else {
     idm_renameTab_(ss, sheet, IDM_STEPS[state.step].tab);
-    idm_prepareTab_(ss, sheet, IDM_STEPS[state.step]);
+    if (IDM_STEPS[state.step].lists) state.listsTabKey = idm_fillListsTab_(ss, sheet); // what it shows (idm_refreshListsTab_)
+    else idm_prepareTab_(ss, sheet, IDM_STEPS[state.step]);
   }
 }
 
@@ -1142,14 +1216,14 @@ function idm_fillStartTab_(ss, sheet) {
   const items = idm_startItems_(ss);
   const rows = [
     ["📥 Input Data Mode", "", "", "", ""],
-    ["Load your files one at a time. The side panel on the right walks you through them: click Start there, or click any step in its bar.", "", "", "", ""],
+    ["Tick what you want to update in the side panel on the right, then click Start: it walks you through only those, one at a time.", "", "", "", ""],
     [IDM_HINT, "", "", "", ""],
     ["", "", "", "", ""],
     ["Data", "What it's used for", "Where to get it", "The file", "Last loaded"]
   ];
   items.forEach(it => rows.push([
     it.name + (it.required ? " (needed)" : " (optional)"), it.uses, it.where,
-    String(it.fileHint || "").replace(/<[^>]+>/g, ""), it.last ? it.last.text + (it.last.days === null ? "" : " (" + idm_daysText_(it.last.days) + ")") : "Never"
+    String(it.fileHint || "").replace(/<[^>]+>/g, ""), it.last ? it.last.text + (it.last.days === null ? "" : " (" + idm_daysText_(it.last.days) + ")") + (it.due ? ". Time to update" : "") : "Never"
   ]));
   sheet.getRange(1, 1, rows.length, 5).setValues(rows);
   sheet.getRange(1, 1).setFontSize(16).setFontWeight("bold").setFontColor("#183e69");
@@ -1164,15 +1238,27 @@ function idm_fillStartTab_(ss, sheet) {
   try { sheet.getRange(1, 1, rows.length, 5).setFontFamily("Montserrat"); } catch (e) { /* cosmetic */ }
 }
 
-/** The five data sets for the start page and the side panel: name, what for, where, file, last loaded. */
-function idm_startItems_(ss) {
+/**
+ * The five data sets for the start page and the side panel: name, what for, where, file, last loaded,
+ * due (an export older than the ⚙️ Settings data reminder, a week by default) and picked (ticked on the
+ * start page: what was ticked in this run, else a suggestion: everything on a new sheet, the exports
+ * that are due on a sheet that has data).
+ */
+function idm_startItems_(ss, state) {
   const raw = idm_rawSheet_(ss);
-  return IDM_STEPS.map((st, i) => {
+  let dueDays = 30;
+  try { const setting = getDataReminderSetting_(); if (DATA_REMINDER_DAYS[setting]) dueDays = DATA_REMINDER_DAYS[setting]; } catch (e) { /* a month */ }
+  const items = IDM_STEPS.map((st, i) => {
     let last = null;
     try { last = (raw || st.manual || st.lists) ? idm_lastUpdated_(raw, st) : null; } catch (e) { last = null; }
+    const due = !st.manual && !st.lists && !!(last && last.days !== null && last.days >= dueDays);
     return { index: i, key: st.key, name: st.doneName || st.short, required: !!st.required, uses: st.uses || "",
-             where: st.where || "", fileHint: st.fileHint || "", last: last };
+             where: st.where || "", fileHint: st.fileHint || "", last: last, due: due };
   });
+  const chosen = state && Array.isArray(state.picked) && state.picked.length ? state.picked : null;
+  const fresh = !items[0].last; // no Student Data yet: the whole walk
+  items.forEach(it => { it.picked = chosen ? chosen.indexOf(it.index) !== -1 : (fresh || it.due); });
+  return items;
 }
 
 function idm_daysText_(d) { return d === 0 ? "today" : d === 1 ? "1 day ago" : d + " days ago"; }
@@ -1209,20 +1295,44 @@ function idm_prepareTab_(ss, sheet, step) {
   else idm_resetTempSheet_(sheet);
 }
 
-/** Step 5's tab: just a list of your lists (they are opened from the sidebar). */
-function idm_fillListsTab_(ss, sheet) {
+/** Step 5's tab: just a list of your lists (they are opened from the sidebar). Returns what it shows (a key). */
+function idm_fillListsTab_(ss, sheet, rows) {
+  rows = rows || idm_listsTabRows_(od_listSummaries_(ss));
   idm_clearTab_(sheet);
-  const lists = od_listSummaries_(ss);
-  const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [IDM_HINT],
-                ["List", "Tab", "By", "Rows", "Matched", "Need you", "Updated"]];
-  lists.forEach(l => rows.push([l.name, l.tabName, l.by === "guardian" ? "guardian" : "student",
-    l.stats ? l.stats.rows : "", l.stats ? l.stats.matched : "", l.stats ? l.stats.review : "", l.updated || ""]));
   const width = 7;
   sheet.getRange(1, 1, rows.length, width).setValues(rows.map(r => padRow_(r, width)));
   sheet.getRange("A1").setFontWeight("bold").setFontSize(14);
   idm_styleHint_(sheet.getRange("A3"));
   sheet.getRange(4, 1, 1, width).setFontWeight("bold").setBackground("#d0e0e3");
   sheet.setColumnWidth(1, 160);
+  return JSON.stringify(rows);
+}
+
+/** The Your Lists tab's rows: title, help, the hint, the header, one row per list. */
+function idm_listsTabRows_(lists) {
+  const rows = [["Your Lists"], ["Add a list or open one in the sidebar. Each list has its own tab."], [IDM_HINT],
+                ["List", "Tab", "By", "Rows", "Matched", "Need you", "Updated"]];
+  lists.forEach(l => rows.push([l.name, l.tabName, l.by === "guardian" ? "guardian" : "student",
+    l.stats ? l.stats.rows : "", l.stats ? l.stats.matched : "", l.stats ? l.stats.review : "", l.updated || ""]));
+  return rows;
+}
+
+/**
+ * On the Your Lists step: the tab is drawn again when what it shows changed (owner 2026-11-17, release
+ * check 2.12 / 2.13: a list added or saved in its own sidebar showed in the side panel but not on the
+ * "Your Lists" tab, until the step was opened again). Called when the panel comes back from a list
+ * (idm_open) and after a rename / new icon / delete (idm_getState). true = drawn (caller saves state).
+ */
+function idm_refreshListsTab_(ss, state) {
+  if (!state || state.overview || !IDM_STEPS[state.step] || !IDM_STEPS[state.step].lists) return false;
+  const temp = idm_sheetById_(ss, state.tempId);
+  if (!temp) return false;
+  const rows = idm_listsTabRows_(od_listSummaries_(ss));
+  const key = JSON.stringify(rows);
+  if (key === state.listsTabKey) return false;
+  state.listsTabKey = idm_fillListsTab_(ss, temp, rows);
+  idm_log_("Your Lists tab drawn again (" + (rows.length - 4) + " list(s))");
+  return true;
 }
 
 /**
@@ -1348,7 +1458,9 @@ function idm_view_(ss, state, notice) {
     active: true,
     // The start page (release check 2.16): its own view in the sidebar; the bar shows no current step
     overview: !!state.overview,
-    start: state.overview ? idm_startItems_(ss) : undefined,
+    start: state.overview ? idm_startItems_(ss, state) : undefined,
+    // Where finishing / skipping this step goes (the next ticked step; null = the end of the mode)
+    next: (() => { const n = state.overview ? null : idm_nextStep_(state, state.step); return n === null ? null : { index: n, short: IDM_STEPS[n].short }; })(),
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists,
@@ -1369,6 +1481,7 @@ function idm_view_(ss, state, notice) {
     progress: IDM_STEPS.map((st, i) => {
       const r = (state.results || {})[st.key];
       return { label: st.short, current: i === state.step && !state.overview,
+               picked: idm_pickedSteps_(state).indexOf(i) !== -1, // not ticked: shown faint, still clickable
                status: r ? ((r.rows || r.saved) ? 'done' : 'skipped') : 'todo' };
     }),
     notice: notice || null

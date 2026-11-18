@@ -880,6 +880,62 @@ function noteLineHeader_(dateText, braceText) {
 }
 
 // ======================================================================
+// BIG CACHE VALUES (2026-11-18, release check 7.2: "the Contact Log is slow")
+// Google's cache keeps at most 100 KB per key, so on a big sheet the ghost typist's
+// Student List / Directory copy (and the notes sources) never fit and every edit read
+// the tabs again. A value bigger than one piece is now split over up to
+// BIG_CACHE_PIECES_ keys: KEY holds "\u0001<n>\u0001" + the first piece, KEY_1 ..
+// KEY_<n-1> the rest. A value that fits in one piece is stored exactly as before.
+// Read with ONE getAll of bigCacheKeys_(KEY); a missing piece = not cached.
+// ======================================================================
+var BIG_CACHE_PIECE_ = 90000;
+var BIG_CACHE_PIECES_ = 8;
+
+/** KEY, KEY_1 .. KEY_7: every key a big value can use (for one getAll / removeAll). */
+function bigCacheKeys_(key) {
+  const keys = [key];
+  for (let i = 1; i < BIG_CACHE_PIECES_; i++) keys.push(key + "_" + i);
+  return keys;
+}
+
+/** Stores text under key (split when needed). false when it is too big even in pieces. */
+function bigCachePut_(cache, key, text, seconds) {
+  text = String(text);
+  if (text.length <= BIG_CACHE_PIECE_) { cache.put(key, text, seconds); return true; }
+  const n = Math.ceil(text.length / BIG_CACHE_PIECE_);
+  if (n > BIG_CACHE_PIECES_) return false;
+  const values = {};
+  for (let i = 0; i < n; i++) {
+    const piece = text.slice(i * BIG_CACHE_PIECE_, (i + 1) * BIG_CACHE_PIECE_);
+    values[i ? key + "_" + i : key] = i ? piece : "\u0001" + n + "\u0001" + piece;
+  }
+  cache.putAll(values, seconds);
+  return true;
+}
+
+/** The text stored under key, from got = cache.getAll(bigCacheKeys_(key)); null when any piece is missing. */
+function bigCacheGet_(got, key) {
+  const first = got ? got[key] : null;
+  if (!first) return null;
+  if (first.charAt(0) !== "\u0001") return first;
+  const end = first.indexOf("\u0001", 1);
+  const n = parseInt(first.slice(1, end), 10);
+  if (!(n > 1) || end < 0) return null;
+  let text = first.slice(end + 1);
+  for (let i = 1; i < n; i++) {
+    const piece = got[key + "_" + i];
+    if (!piece) return null; // a piece was dropped by the cache: read the tabs again
+    text += piece;
+  }
+  return text;
+}
+
+/** Forgets key and all its pieces. */
+function bigCacheRemove_(cache, key) {
+  cache.removeAll(bigCacheKeys_(key));
+}
+
+// ======================================================================
 // SHEET LOOK (owner's pick 2026-11-12)
 // One font and two header colors for the tabs, so every piece of code that
 // paints a tab uses the same values: the Events tables (Edits.gs), Raw Data

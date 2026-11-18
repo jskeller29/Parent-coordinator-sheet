@@ -60,7 +60,17 @@ function makeRange(sheet, row, col, nr, nc) {
     setValue: v => { sheet._set(row, col, v); return p; },
     clearContent: () => { log('clearContent', []); for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) sheet._set(row + i, col + j, ""); return p; },
     clear: () => r.clearContent(),
-    setRichTextValue: v => { sheet._set(row, col, v && v.text !== undefined ? v.text : ""); return p; }
+    setRichTextValue: v => { sheet._set(row, col, v && v.text !== undefined ? v.text : ""); return p; },
+    // deleteCells(ROWS): the cells under the range, in its columns only, move up (the Backend's sections)
+    deleteCells: dim => {
+      log('deleteCells', [dim]);
+      if (dim !== 'ROWS') throw new Error("fake sheet: deleteCells only knows ROWS");
+      const last = sheet.getLastRow();
+      for (let c = col; c < col + nc; c++) {
+        for (let rr = row; rr <= last; rr++) sheet._set(rr, c, rr + nr <= last ? sheet._get(rr + nr, c) : "");
+      }
+      return p;
+    }
   };
   const p = new Proxy(r, { get(t, k) { return (k in t) ? t[k] : (typeof k === 'string' ? function () { log(k, arguments); return p; } : undefined); } });
   return p;
@@ -211,6 +221,7 @@ function fakeSpreadsheetApp(ss) {
     getActiveSpreadsheet: () => ss, flush() {}, newRichTextValue: builder, newTextStyle: builder, newDataValidation: builder,
     newConditionalFormatRule,
     BorderStyle: { SOLID: 'SOLID', SOLID_MEDIUM: 'SOLID_MEDIUM', SOLID_THICK: 'SOLID_THICK' },
+    Dimension: { ROWS: 'ROWS', COLUMNS: 'COLUMNS' },
     CopyPasteType: { PASTE_FORMAT: 'PASTE_FORMAT', PASTE_DATA_VALIDATION: 'PASTE_DATA_VALIDATION', PASTE_NORMAL: 'PASTE_NORMAL' },
     WrapStrategy: { CLIP: 'CLIP', WRAP: 'WRAP', OVERFLOW: 'OVERFLOW' },
     BandingTheme: new Proxy({}, { get: (t, k) => String(k) }),

@@ -27,6 +27,7 @@
     #progress .pstep:hover:not(:disabled) { color: var(--accent); background: none; }
     #progress .pstep.current { color: var(--accent); font-weight: 700; border-bottom-color: var(--accent); }
     #progress .pstep.done { color: var(--ok); }
+    #progress .pstep.off { color: var(--line); font-weight: 500; } /* not ticked on the start page (still clickable) */
     #progress .parrow { color: var(--line); font-size: 10px; padding: 0 0 7px; }
     .mk { display: inline-block; width: 14px; font-weight: 700; }
     .mk.yes { color: var(--ok); } .mk.skip, .mk.none { color: var(--faint); }
@@ -44,6 +45,9 @@
     .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
     .footer { position: fixed; left: 0; right: 0; bottom: 0; background: #ffffff; border-top: 1px solid var(--line); padding: 10px 14px; }
     .footer > .row button { flex: 1; }
+    /* Site / Class: "Save and go to …" on its own line above Skip, still in the footer (owner 2026-11-17, 2.11) */
+    #footTop { margin: 0 0 8px; }
+    #footTop button { width: 100%; }
     #exitAsk { background: var(--danger-soft); border: 1px solid #e9c3bf; border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; color: var(--danger); }
     #exitAsk .row button { flex: 1 1 auto; font-size: 12.5px; padding: 0 8px; }
     a { color: var(--accent); cursor: pointer; font-weight: 600; font-size: 12.5px; }
@@ -75,7 +79,13 @@
     @keyframes jdIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
     @media (prefers-reduced-motion: reduce) { .jdone { animation: none; } }
     /* Step 5: the icon on a list's tab (owner 2026-11-13) */
-    .li .top button.ico { font-size: 17px; height: 28px; width: 32px; padding: 0; border: 1px solid var(--line); background: #ffffff; color: var(--ink); }
+    .li .top button.ico { font-size: 17px; height: 28px; width: 32px; padding: 0; border: 1px solid var(--line); background: #ffffff; color: var(--ink); position: relative; }
+    /* "Edit" when the mouse is on the icon (owner 2026-11-17, release check 2.15) */
+    .li .top button.ico::after { content: "Edit"; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); margin-top: 3px;
+      background: var(--ink); color: #ffffff; font: 600 10.5px var(--font); padding: 1px 6px; border-radius: 3px; white-space: nowrap;
+      opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 5; }
+    .li .top button.ico:hover::after, .li .top button.ico:focus-visible::after { opacity: 1; }
+    .li .top button.ico:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
     .icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 6px 0 4px; }
     .icons button { height: 30px; padding: 0; font-size: 17px; border: 1px solid transparent; background: transparent; }
     .icons button:hover:not(:disabled) { background: var(--panel); border-color: var(--line); }
@@ -85,14 +95,21 @@
     .icon-other button { height: 28px; font-size: 12px; }
     .iconpick { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
     /* Start page: one card per kind of data (click one to go to it) */
-    .si { width: 100%; height: auto; display: block; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; margin: 8px 0 0; background: #ffffff; color: var(--ink); font: 400 12.5px var(--font); cursor: pointer; }
+    .si { width: 100%; height: auto; display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; margin: 8px 0 0; background: #ffffff; color: var(--ink); font: 400 12.5px var(--font); cursor: pointer; }
     .si:hover:not(:disabled) { border-color: var(--accent); background: var(--panel); }
+    /* Ticked = this run updates it (owner 2026-11-17: "click only the data you want to update") */
+    .si.on { border-color: var(--accent); background: var(--accent-soft); }
+    .si .si-box { flex: none; width: 18px; height: 18px; margin-top: 1px; border: 1.5px solid var(--faint); border-radius: 3px; background: #ffffff;
+      display: flex; align-items: center; justify-content: center; font: 700 12px var(--font); color: #ffffff; }
+    .si.on .si-box { background: var(--accent); border-color: var(--accent); }
+    .si .si-main { flex: 1; min-width: 0; }
+    .si .si-due { color: var(--warn); font-weight: 700; }
     .si .si-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
     .si .si-top b { font-size: 13.5px; }
     .si .si-when { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
     .si .si-when.old { color: var(--warn); }
-    .si .si-uses { margin-top: 3px; line-height: 1.4; }
-    .si .si-where { margin-top: 3px; color: var(--muted); line-height: 1.35; }
+    .si .si-uses { display: block; margin-top: 3px; line-height: 1.4; }
+    .si .si-where { display: block; margin-top: 3px; color: var(--muted); line-height: 1.35; }
     .footer > .row #startBtn { flex: 2; }
     /* Debug panel: only shown when z_InputDataDebug.gs is installed (the replies then carry .debug) */
     #debug { margin-top: 16px; border: 1px dashed var(--warn); border-radius: var(--radius); padding: 8px 10px; background: var(--warn-soft); font-size: 11.5px; }
@@ -111,10 +128,20 @@
   <!-- "Got it, moving your data…" at the TOP while a paste / upload moves (release check 2.9) -->
   <div id="workingTop" class="status hidden" role="status" aria-live="polite"><div class="spinner"></div><div id="workingTopText"></div></div>
 
+  <!-- Any problem shows HERE, right under the title and the bar of steps (owner 2026-11-17, release check
+       2.9: it was under the upload card, out of sight) -->
+  <div id="errorBox" class="error hidden" role="alert">
+    <div id="errorText"></div>
+    <div class="row">
+      <button id="retryBtn" onclick="retry()">Clear and try again</button>
+      <button id="anywayBtn" class="hidden" onclick="useAnyway()">Use it anyway</button>
+    </div>
+  </div>
+
   <!-- START PAGE (owner 2026-11-14, release check 2.16): what each file is for, where to get it, last loaded -->
   <div id="startView" class="hidden">
-    <h3>Before you start</h3>
-    <div class="muted">Five kinds of data, one at a time. Only Student Data is needed; the rest are optional. The same list is on the "Start Here" tab.</div>
+    <h3>What do you want to update?</h3>
+    <div class="muted">Tick the data you have new files for, then click Start: the panel walks you through only those. Only Student Data is needed; the rest are optional. The same list is on the "Start Here" tab.</div>
     <div id="startItems"></div>
     <div class="muted" style="margin-top:8px">Closed this panel by mistake? 🚀 App Menu → 📥 Input Data Mode brings it back, on the same step.</div>
   </div>
@@ -166,8 +193,7 @@
       <!-- "8 of 12 classes have a teacher" (idm_check reads the tab; release check 2.11) -->
       <div id="siteCount" class="done-line hidden" style="margin-top:6px"></div>
       <div class="row">
-        <button class="primary" id="saveSiteBtn" onclick="saveSiteClass()">Save and go to Your Lists</button>
-        <a onclick="call('idm_goToTempSheet')" style="align-self:center">Go to the tab</a>
+        <a onclick="call('idm_goToTempSheet')">Go to the tab</a>
       </div>
     </div>
 
@@ -192,14 +218,6 @@
     </div>
 
     <div id="waiting" class="status"><div class="spinner"></div><div id="waitingText">Waiting for your paste or upload…</div></div>
-
-    <div id="errorBox" class="error hidden">
-      <div id="errorText"></div>
-      <div class="row">
-        <button id="retryBtn" onclick="retry()">Clear and try again</button>
-        <button id="anywayBtn" class="hidden" onclick="useAnyway()">Use it anyway</button>
-      </div>
-    </div>
   </div>
 
   <!-- FINISHED -->
@@ -208,12 +226,21 @@
     <div id="doneNotice" class="ok hidden"></div>
     <div class="card"><div id="summary"></div></div>
     <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span><span id="builtHint" class="hidden"> Your sheets are already built with the new data.</span></div>
+    <!-- Parents Parent Square / NYCSA / your lists have that your Student Data doesn't (owner 2026-11-17):
+         asked here, added on 👤 Student Overrides -->
+    <div id="parentsCard" class="card hidden">
+      <b id="parentsTitle">Parents to add</b>
+      <div class="muted" id="parentsText" style="margin-top:3px"></div>
+      <div class="row"><button id="parentsBtn" onclick="reviewParents()">Review and add them</button></div>
+      <div class="muted" style="margin-top:6px">Or later: 👤 Student Overrides → 🗂️ Student Overrides.</div>
+    </div>
     <!-- Lists changed after step 5's build (release check 2.16): say why it needs another build -->
     <div id="listsBuildHint" class="warnline hidden">You changed your lists after the sheets were built. Build again to put them in the Student List, Parents Divided and the phone contacts.</div>
+    <!-- Two ways out (owner 2026-11-17): build the sheets with the new data, or done for now -->
     <div class="row">
-      <button class="primary" id="buildBtn" onclick="build()">Build sheets now</button>
+      <button class="primary" id="buildBtn" onclick="build()">Build my sheets</button>
+      <button id="doneBtn" onclick="google.script.host.close()">Done</button>
       <button id="nextStepsBtn" class="hidden" onclick="nextSteps()">Next steps</button>
-      <button onclick="google.script.host.close()">Close</button>
     </div>
   </div>
 
@@ -242,11 +269,13 @@
         <button onclick="hideExitAsk()">Cancel</button>
       </div>
     </div>
+    <!-- Site / Class: Save is always there, on its own line above Skip (owner 2026-11-17, release check 2.11) -->
+    <div class="row hidden" id="footTop">
+      <button id="siteNextBtn" class="primary" onclick="saveSiteClass()">Save and go to Your Lists</button>
+    </div>
     <div class="row" style="margin:0">
-      <button id="startBtn" class="primary hidden" onclick="goToStep(0)">Start with Student Data</button>
+      <button id="startBtn" class="primary hidden" onclick="startPicked()">Start</button>
       <button id="skipBtn" onclick="skip()">Skip</button>
-      <!-- Site / Class filled in (every class has a teacher or a site): saving is the way on (2.11) -->
-      <button id="siteNextBtn" class="primary hidden" onclick="saveSiteClass()">Save and go to Your Lists</button>
       <button id="finishBtn" class="primary hidden" onclick="finishLists()">Finish Input Data Mode</button>
       <button id="exitBtn" class="danger" onclick="exitMode()">Finish or exit</button>
     </div>
@@ -280,6 +309,8 @@
   var lastCall = null;       // { fn, args }: asked again while the sheet is busy (setup / a build)
   var busyTries = 0;
   var lastDone = null;       // the end screen's reply (Next steps asks to build first when needed)
+  var startPicks = null;     // start page: step index -> ticked (owner 2026-11-17: "click only the data you want to update")
+  var startItemsCache = [];  // the start page's items as last drawn
 
   function $(id) { return document.getElementById(id); }
 
@@ -327,7 +358,7 @@
     if (!v || !v.active || v.broken) {
       if (v && v.finished) return renderDone(v);
       stopListsBar();
-      show('stepView', false); show('startView', false); show('progress', false); show('footer', false);
+      show('stepView', false); show('startView', false); show('progress', false); show('footer', false); show('errorBox', false);
       $('loading').innerHTML = '<div>' + (v && v.notice && v.notice.type === 'error'
         ? esc(plainText(v.notice.message))
         : 'Input Data Mode is not on. Open 🚀 App Menu → 📥 Input Data Mode to start.') + '</div>';
@@ -335,6 +366,7 @@
       return;
     }
     lastView = v;
+    var wasOverview = currentOverview;
     currentOverview = !!v.overview;
     show('doneView', false); show('footer', true);
     if (!asking) show('exitAsk', false);
@@ -342,13 +374,18 @@
     buildAfterExit = false; // still in the mode (e.g. the save found a problem): no build
     renderProgress(v.progress || []);
     if (currentOverview) {
-      // The start page (release check 2.16): no paste to look for; a slow check keeps the tabs hidden
+      // The start page (release check 2.16): no paste to look for; a slow check keeps the tabs hidden.
+      // Arriving on it (first open, or back from a step): the ticks come from the server again
+      if (!wasOverview) startPicks = null;
       stopListsBar(); justDone = null; renderJustDone(false);
       show('stepView', false); show('startView', true);
       renderStart(v);
       setFooter('start');
       currentManual = false; currentLists = false; paused = false; stickyError = null;
+      if (v.notice && v.notice.type === 'error') showErrorTop(plainText(v.notice.message), 'OK');
+      else show('errorBox', false);
       setButtons(true);
+      updateStartBtn();
       schedule();
       return;
     }
@@ -383,17 +420,16 @@
     if (listsBar && lb) { if (lb.ok) listsBar.done('Sheets built'); else listsBar.fail('The sheets were not built'); listsBar = null; if (listsFollow) { listsFollow.stop(); listsFollow = null; } }
     $('listsBuildNote').className = lb ? (lb.ok ? 'done-line' : 'warnline') : 'hidden';
     $('listsBuildNote').innerHTML = lb ? (lb.ok ? '<span class="mk yes">✓</span>' : '') + esc(plainText(lb.message)) : '';
-    // The "Reading… / Moving data…" spinner and any error sit right under Option 1
-    // (Upload), so they are not pushed out of sight below the long paste steps;
-    // on the Site / Class step they sit under that card instead.
-    // (the message first: after a cleared wrong paste the "Waiting…" line shows under it)
+    // The "Reading… / Moving data…" spinner sits right under Option 1 (Upload), so it is not pushed
+    // out of sight below the long paste steps; on the Site / Class step under that card instead.
+    // A problem shows at the TOP, under the title and the bar (owner 2026-11-17, release check 2.9).
     var anchor = manual ? $('siteCard') : $('uploadCard');
-    anchor.parentNode.insertBefore($('errorBox'), anchor.nextSibling);
-    $('errorBox').parentNode.insertBefore($('waiting'), $('errorBox').nextSibling);
+    anchor.parentNode.insertBefore($('waiting'), anchor.nextSibling);
     $('howToTitle').textContent = (manual || listsStep) ? 'What to do' : 'Where to get it';
     $('siteTabName').textContent = '"' + v.tabName + '"';
-    $('skipBtn').textContent = (v.stepIndex + 1 < v.stepCount) ? 'Skip' : 'Skip (don\'t save) and finish';
-    // Site / Class: "Save and go to Your Lists" once every class has a teacher or a site (release check 2.11)
+    // Where finishing / skipping goes: the next ticked step, or the end (v.next null)
+    $('skipBtn').textContent = v.next ? 'Skip' : 'Skip (don\'t save) and finish';
+    $('siteNextBtn').textContent = v.next ? 'Save and go to ' + v.next.short : 'Save and finish';
     var siteReady = manual ? renderSiteCount(v.siteClass) : false;
     setFooter(listsStep ? 'lists' : manual ? 'site' : 'paste', siteReady);
 
@@ -418,6 +454,7 @@
       $('retryBtn').textContent = (n.fromUpload || n.cleared) ? 'OK' : 'Clear and try again';
       show('anywayBtn', !!n.canUseAnyway);
       show('errorBox', true);
+      window.scrollTo(0, 0); // the message is at the top (release check 2.9)
       show('waiting', !!n.cleared);
       if (n.cleared) $('waitingText').textContent = 'Waiting for your paste or upload…';
     } else {
@@ -436,14 +473,21 @@
   }
 
   // The buttons at the bottom for where you are: one way on at each place (release check 2.11 / 2.16)
-  function setFooter(mode, siteReady) {
+  function setFooter(mode) {
     show('startBtn', mode === 'start');
-    show('skipBtn', mode === 'paste' || (mode === 'site' && !siteReady));
-    show('siteNextBtn', mode === 'site' && !!siteReady);
-    show('saveSiteBtn', !(mode === 'site' && siteReady)); // one "Save and go" at a time (the card's, or the footer's when filled in)
+    show('skipBtn', mode === 'paste' || mode === 'site');
+    show('footTop', mode === 'site');      // Site / Class: "Save and go to …" above Skip, always there (2.11)
     show('finishBtn', mode === 'lists');   // the one Finish on Your Lists (there were two)
     show('exitBtn', mode !== 'lists');
     $('exitBtn').textContent = mode === 'start' ? 'Exit' : 'Finish or exit';
+    fitFooter();
+  }
+
+  // The page keeps room at the bottom for the footer, which grows with the Save line and the exit question
+  function fitFooter() {
+    var f = $('footer');
+    var h = (f && !f.classList.contains('hidden')) ? f.offsetHeight : 0;
+    document.body.style.paddingBottom = Math.max(130, h + 24) + 'px';
   }
 
   // "8 of 12 classes have a teacher · 5 have a site": true when every class has a teacher or a site
@@ -456,19 +500,56 @@
     return ready;
   }
 
-  // The start page: one card per kind of data; a card goes to its step
+  // The start page: one card per kind of data; a click ticks it (or unticks it). Start goes through the
+  // ticked ones only (owner 2026-11-17). First ticks: the server's (what this run picked, else everything
+  // on a new sheet / the exports that are due).
   function renderStart(v) {
     var items = v.start || [];
     lastStartKey = JSON.stringify(items);
+    startItemsCache = items;
+    if (!startPicks) { startPicks = {}; items.forEach(function (it) { startPicks[it.index] = !!it.picked; }); }
     $('startItems').innerHTML = items.map(function (it) {
+      var on = !!startPicks[it.index];
       var last = it.last ? ('Last loaded ' + it.last.text + (it.last.days === null ? '' : ' (' + daysText(it.last.days) + ')')) : 'Never loaded';
-      var old = it.last && it.last.days !== null && it.last.days > 30;
-      return '<button type="button" class="si" onclick="goToStep(' + it.index + ')" title="Go to this step">' +
-        '<div class="si-top"><b>' + (it.index + 1) + '. ' + esc(it.name) + '</b><span class="si-when' + (old ? ' old' : '') + '">' + esc(last) + '</span></div>' +
-        '<div class="si-uses">' + (it.required ? '<b>Needed.</b> ' : '') + esc(it.uses) + '</div>' +
-        (it.where ? '<div class="si-where">Where: ' + esc(it.where) + (it.fileHint ? '. The file: ' + it.fileHint + '.' : '') + '</div>' : '') +
-        '</button>';
+      return '<button type="button" class="si' + (on ? ' on' : '') + '" onclick="togglePick(' + it.index + ')" aria-pressed="' + on + '"' +
+        ' title="' + (on ? 'Ticked: click to leave it out this time' : 'Click to update this one') + '">' +
+        '<span class="si-box" aria-hidden="true">' + (on ? '✓' : '') + '</span><span class="si-main">' +
+        '<span class="si-top"><b>' + (it.index + 1) + '. ' + esc(it.name) + '</b><span class="si-when' + (it.due ? ' old' : '') + '">' + esc(last) + '</span></span>' +
+        (it.due ? '<span class="si-uses si-due">Time to update</span>' : '') +
+        '<span class="si-uses">' + (it.required ? '<b>Needed.</b> ' : '') + esc(it.uses) + '</span>' +
+        (it.where ? '<span class="si-where">Where: ' + esc(it.where) + (it.fileHint ? '. The file: ' + it.fileHint + '.' : '') + '</span>' : '') +
+        '</span></button>';
     }).join('');
+    updateStartBtn();
+  }
+  function togglePick(i) {
+    if (busy || !startPicks) return;
+    startPicks[i] = !startPicks[i];
+    renderStart({ start: startItemsCache });
+  }
+  function pickedList() {
+    var out = [];
+    Object.keys(startPicks || {}).forEach(function (k) { if (startPicks[k]) out.push(Number(k)); });
+    return out.sort(function (a, b) { return a - b; });
+  }
+  function updateStartBtn() {
+    var n = pickedList().length;
+    $('startBtn').textContent = n ? 'Start (' + n + ' to update)' : 'Tick what to update';
+    $('startBtn').disabled = busy || n === 0;
+  }
+  // Start, or a step clicked in the bar while on the start page (first): the ticked steps (+ that one)
+  function startPicked(first) {
+    if (busy) return;
+    var picks = pickedList();
+    if (first !== undefined && first !== null && picks.indexOf(first) === -1) picks.push(first);
+    if (!picks.length) return;
+    // Student Data never loaded and left out: nothing can be built without it
+    var ats = startItemsCache[0];
+    if (ats && ats.required && !ats.last && picks.indexOf(0) === -1 &&
+        !confirm('Student Data is the one file the tracker needs: your sheets can\'t be built without it.\n\nGo on without it?')) return;
+    hideExitAsk();
+    working('Starting…');
+    call('idm_startPicked', picks, (first === undefined || first === null) ? null : first);
   }
 
   function renderJustDone(fresh) {
@@ -484,9 +565,10 @@
   function renderProgress(steps) {
     var icons = { done: '✓ ', skipped: '– ', todo: '' };
     $('progress').innerHTML = steps.map(function (p, i) {
+      var off = p.picked === false && !p.current && p.status === 'todo'; // not ticked for this round
       return (i ? '<span class="parrow">→</span>' : '') +
-        '<button class="pstep' + (p.current ? ' current' : '') + (p.status === 'done' ? ' done' : '') +
-        '" onclick="goToStep(' + i + ')" title="' + (p.current ? 'You are here' : 'Go to this step') + '">' +
+        '<button class="pstep' + (p.current ? ' current' : '') + (p.status === 'done' ? ' done' : '') + (off ? ' off' : '') +
+        '" onclick="goToStep(' + i + ')" title="' + (p.current ? 'You are here' : off ? 'Not ticked this time: click to do it anyway' : 'Go to this step') + '">' +
         icons[p.status] + p.label + '</button>';
     }).join('');
     show('progress', steps.length > 0);
@@ -494,6 +576,7 @@
 
   function goToStep(i) {
     if (busy) return; // a call you started is still running (its buttons are off)
+    if (currentOverview && i >= 0) return startPicked(i); // from the start page: the ticked steps + this one
     hideExitAsk();
     working(i === -1 ? 'Back to the start page…' : 'Switching step…');
     call('idm_goToStep', i);
@@ -520,6 +603,8 @@
     $('doneTitle').textContent = v.exited ? 'Input Data Mode closed' : 'All done';
     if (v.notice && v.notice.message) { $('doneNotice').textContent = plainText(v.notice.message); show('doneNotice', true); }
     show('buildBtn', !!v.anyImported); show('buildHint', !!v.anyImported); show('builtHint', !v.anyImported && !!v.builtAlready);
+    show('errorBox', false);
+    $('doneBtn').classList.toggle('primary', !v.anyImported && !v.guideNext); // nothing to build: Done is the way out
     if (askedBuild && !v.builtAlready && !v.canBuild && !(v.notice && v.notice.message)) { $('doneNotice').textContent = 'There is no Student Data in Raw Data yet, so there was nothing to build.'; show('doneNotice', true); }
     if (askedBuild && v.builtAlready) { $('doneNotice').textContent = 'Your sheets are already up to date, so no build was needed.'; show('doneNotice', true); }
     // The Getting Started checklist (settings, first contact ...): the main button when no build is needed
@@ -541,6 +626,26 @@
     }
     setTimeout(deleteTab, 1500);
     $('summary').innerHTML = (v.summary || []).map(statusLine).join('');
+    // Parents in Parent Square / NYCSA / your lists that your Student Data doesn't have: ask (owner 2026-11-17)
+    show('parentsCard', false);
+    google.script.run.withSuccessHandler(showParentsToAdd).withFailureHandler(function () {}).idm_parentsToAddSummary();
+  }
+
+  function showParentsToAdd(r) {
+    if (!r || !r.count || $('doneView').classList.contains('hidden')) return;
+    $('parentsTitle').textContent = r.count === 1 ? '1 parent to add?' : r.count + ' parents to add?';
+    var sample = r.sample || [], more = r.count - sample.length;
+    $('parentsText').textContent = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents') +
+      ' who aren\'t in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
+      '. Add the ones who are guardians, so they show in the Student List, Parents Divided, the phone contacts and the Person Spoke With list.';
+    show('parentsCard', true);
+  }
+  function reviewParents() {
+    $('parentsBtn').disabled = true; $('parentsBtn').textContent = 'Opening…';
+    google.script.run
+      .withSuccessHandler(function () { $('parentsBtn').disabled = false; $('parentsBtn').textContent = 'Review and add them'; })
+      .withFailureHandler(function (e) { $('parentsBtn').disabled = false; $('parentsBtn').textContent = 'Review and add them'; alert('Could not open Student Overrides: ' + (e && e.message ? e.message : e)); })
+      .openManageOverridesDialog();
   }
 
   // The server's lines start with a status emoji (✅ / ⏭️ / —); here they get a plain marker
@@ -557,7 +662,7 @@
   function daysText(d) { return d === 0 ? 'today' : d === 1 ? '1 day ago' : d + ' days ago'; }
 
   function setButtons(on) {
-    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'saveSiteBtn', 'addListBtn', 'createListBtn', 'startBtn', 'siteNextBtn', 'finishBtn'].forEach(function (id) { $(id).disabled = !on; });
+    ['skipBtn', 'exitBtn', 'uploadBtn', 'retryBtn', 'anywayBtn', 'addListBtn', 'createListBtn', 'startBtn', 'siteNextBtn', 'finishBtn'].forEach(function (id) { $(id).disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#startItems button'), function (b) { b.disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#listItems button'), function (b) { b.disabled = !on; });
     Array.prototype.forEach.call(document.querySelectorAll('#progress .pstep'), function (b) { b.disabled = !on; });
@@ -584,11 +689,17 @@
     paused = true;
     // "Sheet 123 not found": this page's session can't recover by itself (release check 3.1)
     if (/sheet\s+\S+\s+not found/i.test(msg)) msg = RELOAD_TEXT;
-    $('errorText').textContent = plainText(msg);
-    $('retryBtn').textContent = 'OK';
+    showErrorTop(plainText(msg), 'OK');
+    show('waiting', false);
+  }
+
+  // A message in the box at the top (under the title and the bar), seen on any page of the panel
+  function showErrorTop(text, buttonText) {
+    $('errorText').textContent = text;
+    $('retryBtn').textContent = buttonText || 'OK';
     show('anywayBtn', false);
     show('errorBox', true);
-    show('waiting', false);
+    window.scrollTo(0, 0);
   }
 
   function call(fn) {
@@ -694,15 +805,17 @@
       : 'Everything already moved to Raw Data is saved. Saving also moves anything pasted on the tab that hasn\'t moved yet.';
     $('exitBuildBtn').disabled = !canBuildNow; show('exitBuildNote', !canBuildNow);
     show('exitAsk', true);
+    fitFooter();
   }
   function saveAndExit() { hideExitAsk(); working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function saveExitAndBuild() { hideExitAsk(); buildAfterExit = true; working('Saving and bringing your tabs back…'); call('idm_saveAndExit'); }
   function reallyExit() { working('Bringing your tabs back…'); call('idm_exit'); }
-  function hideExitAsk() { show('exitAsk', false); if (asking) { asking = false; if (!busy) schedule(); } }
+  function hideExitAsk() { show('exitAsk', false); fitFooter(); if (asking) { asking = false; if (!busy) schedule(); } }
   function retry() {
     if ($('retryBtn').textContent === 'OK') {
       pendingUpload = null; stickyError = null; show('errorBox', false);
       paused = false;
+      if (currentOverview) { schedule(); return; }
       if (!currentManual && !currentLists) show('waiting', true);
       if (!currentLists) schedule(); // Site / Class: fix the tab, the counts follow; then Save again
       return;
@@ -769,7 +882,7 @@
       if (!l.ready) chips = '<span class="chip warn">setup not finished</span>';
       else if (st) chips = '<span class="chip">' + st.matched + ' matched</span>' + (st.review ? '<span class="chip warn">' + st.review + ' to review</span>' : '') + (st.skipped ? '<span class="chip grey">' + st.skipped + ' skipped</span>' : '');
       var icon = l.icon || DEFAULT_ICON;
-      return '<div class="li"><div class="top"><button class="ico" title="Change the icon on its tab" onclick="toggleIconPick(' + l.tabId + ')">' + esc(icon) + '</button><span class="nm">' + esc(l.name) + '</span>' +
+      return '<div class="li"><div class="top"><button class="ico" title="Edit the icon on its tab" aria-label="Edit the icon on its tab" onclick="toggleIconPick(' + l.tabId + ')">' + esc(icon) + '</button><span class="nm">' + esc(l.name) + '</span>' +
         '<button title="Rename this list" onclick="renameList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Rename</button>' +
         '<button class="del" title="Delete this list and its tab" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Delete</button></div>' +
         '<div class="meta">by ' + (l.by === 'guardian' ? 'guardian' : 'student') + (st ? ' · ' + st.rows + ' rows' : '') + (l.updated ? ' · updated ' + esc(l.updated) : '') + '</div>' +

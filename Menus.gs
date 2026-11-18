@@ -452,11 +452,11 @@ function buildMenus_(realOpen) {
     
     menu.addToUi();
 
-    // --- NEW: STUDENT OVERRIDES MENU --- 
+    // --- STUDENT OVERRIDES MENU ---
+    // One main page (owner 2026-11-17): parents to add, your changes, the report, New / Edit Student
     ui.createMenu('👤 Student Overrides') 
+    .addItem('🗂️ Student Overrides (parents to add, changes, report)', 'openManageOverridesDialog') 
     .addItem('✨ New / Edit Student', 'openNewStudentDialog') 
-    .addItem('🗂️ Manage Overrides', 'openManageOverridesDialog') 
-    .addItem('📄 Override Report', 'buildOverrideReport')
     .addToUi();
 
     // 2. The Events Menu
@@ -785,8 +785,9 @@ function showGuideWelcome_(opts) {
         ${link(links.downloadDataVideo, "Watch the video")}
         ${link(links.example, "See an example tracker")}
       </div>
+      <!-- No "Not now" (owner 2026-11-17, release check 2.5): loading the data is the next step either way;
+           closing the window leaves the Welcome tab and ✅ Getting Started saying so -->
       <div class="foot">
-        <button type="button" class="btn sec" onclick="notNow()">Not now</button>
         <button type="button" class="btn pri" id="goBtn" onclick="go()">Start Input Data Mode</button>
       </div>
       <p class="help" style="margin:0">Your checklist is on the right. Closed something by accident? Everything is in 🚀 App Menu, and the 👋 Welcome tab shows what to do next.</p>
@@ -861,11 +862,6 @@ function showGuideWelcome_(opts) {
           a.className = 'btn sec'; a.href = shownLinks[x[0]]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = x[1];
           box.appendChild(a);
         });
-      }
-      function notNow() {
-        // a toast saying where to pick up again, then close
-        google.script.run.withSuccessHandler(function () { google.script.host.close(); })
-          .withFailureHandler(function () { google.script.host.close(); }).zg_notNow();
       }
       ${opts.setup ? 'runSetup();' : ''}
       function fresh() {
@@ -955,8 +951,7 @@ function zg_action(name) {
       runBuildOnly();
       return true;
     case "settings":
-      PropertiesService.getDocumentProperties().setProperty('ZG_SETTINGS_SEEN', 'true');
-      openSettingsDialog();
+      openSettingsDialog(); // ticks "Check your settings" (any way it is opened)
       return true;
     case "contactLog": {
       const sheet = ss.getSheetByName("Contact Log");
@@ -1026,14 +1021,6 @@ function zg_setupFinish() {
   let links = null;
   try { links = zg_links_(); } catch (e) { console.warn("Setup window links: " + e.message); }
   return { links: links };
-}
-
-/** Welcome window "Not now": where to pick up again. */
-function zg_notNow() {
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    "Whenever you're ready: 🚀 App Menu → 📥 Input Data Mode. The 👋 Welcome tab and ✅ Getting Started show the next steps.",
-    "👋 Next step", 20);
-  return true;
 }
 
 /** "Open this by itself when the sheet opens" (kept for older sidebars still open). */
@@ -1823,6 +1810,9 @@ function onEdit(e) {
 // ⚙️ SETTINGS BACKEND LOGIC (was Settings Backend.gs)
 // ==========================================
 function openSettingsDialog() {
+  // ✅ Getting Started step 3 "Check your settings" ticks however Settings is opened (owner 2026-11-17,
+  // release check 2.20: opened from the menu before the checklist, it stayed unticked)
+  try { PropertiesService.getDocumentProperties().setProperty('ZG_SETTINGS_SEEN', 'true'); } catch (e) { console.warn(e.message); }
   const html = htmlFromFile_('SettingsDialog')
       .setTitle('Dashboard Settings')
       .setWidth(780)
@@ -2243,12 +2233,18 @@ function openNewStudentDialog() {
   SpreadsheetApp.getUi().showModalDialog(html, 'New / Edit Student');
 }
 
+/**
+ * 👤 Student Overrides' ONE main page (owner 2026-11-17, release check round 2 idea; was "Manage
+ * Overrides"): parents to add (Parent Square / NYCSA / your lists have them, your Student Data
+ * doesn't), your student changes (Edit / Delete), the Override Report, and New / Edit Student, which
+ * comes back here (its "← Student Overrides" button, and after Save when it was opened from here).
+ */
 function openManageOverridesDialog() {
   const html = htmlFromFile_('ManageOverridesDialog')
-      .setTitle('Manage Student Overrides')
-      .setWidth(500)
-      .setHeight(650);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Manage Overrides');
+      .setTitle('Student Overrides')
+      .setWidth(640)
+      .setHeight(680);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Student Overrides');
 }
 
 /**
@@ -2411,6 +2407,14 @@ function getAllStudentsForEdit() {
 
       // Keep the current Raw Data class (matches buildStudentMap_); fall back to the override's
       const rawBase = studentMap.get(osis);
+      // An "Added Guardian" row (Parents to add): its guardians join the ATS student's (the student
+      // itself still comes from ATS); saving the form then makes it a normal Edit row
+      if (isAddedGuardianType_(r[1]) && rawBase) {
+        guardians.forEach(g => {
+          if (!rawBase.guardians.some(x => sameNameExactly_(nameTokens_(x.name), nameTokens_(g.name)))) rawBase.guardians.push(g);
+        });
+        continue;
+      }
       studentMap.set(osis, {
         osis: osis,
         lastName: toText_(r[3]),
@@ -2445,13 +2449,22 @@ function getOverridesList() {
        dateStr = Utilities.formatDate(dateStr, Session.getScriptTimeZone(), "MM/dd/yyyy");
     }
 
+    const type = toText_(r[1]);
+    const added = isAddedGuardianType_(type);
+    const guardians = [];
+    for (let g = 0; g < 5; g++) { const name = toText_(r[10 + g * 6]); if (name) guardians.push(name); }
     list.push({
       date: dateStr,
-      type: toText_(r[1]),
+      type: type,
       osis: osis,
       lastName: toText_(r[3]),
       firstName: toText_(r[4]),
-      classCode: toText_(r[8])
+      classCode: toText_(r[8]),
+      // the main page's cards (2026-11-18): what kind of change, where an added parent came from, who
+      kind: added ? "added" : (type.indexOf("New") !== -1 ? "new" : "edit"),
+      source: added ? ((type.match(/\((.*)\)\s*$/) || [])[1] || "") : "",
+      guardians: guardians,
+      hidden: String(r[41]).trim().toLowerCase() === "true"
     });
   }
   return list.reverse();
@@ -2474,7 +2487,7 @@ function deleteOverride(osis) {
 
     if (!isPaused) {
       // Build is ON: open the build progress sidebar (same as the menu build).
-      // The Manage Overrides dialog stays open and refreshes its list, so the
+      // The Student Overrides page stays open and refreshes its list, so the
       // sidebar runs behind it and is visible once that dialog is closed.
       runBuildOnly();
     } else {
@@ -2489,11 +2502,286 @@ function setPrefillAndOpenEdit(osis) {
   openNewStudentDialog();
 }
 
+/** Kept for a New / Edit Student window opened before 2026-11-18 (it asked for the OSIS only). */
 function getPrefillOsis() {
   const props = PropertiesService.getUserProperties();
   const osis = props.getProperty('PREFILL_OSIS');
   props.deleteProperty('PREFILL_OSIS');
   return osis || "";
+}
+
+/**
+ * The main page opens New / Edit Student (owner 2026-11-17: "button to New / Edit Student and from
+ * there allow back and forth"): osis = that student's form ("Edit" on a change, "Edit first" on a parent
+ * to add), guardian = a parent to add, put in the student's next empty guardian slot, ready to check and
+ * Save. Saving there comes back to the main page.
+ */
+function openNewStudentFromHome(osis, guardian) {
+  const up = PropertiesService.getUserProperties();
+  up.setProperty('OVERRIDES_FROM_HOME', '1');
+  if (osis) up.setProperty('PREFILL_OSIS', String(osis)); else up.deleteProperty('PREFILL_OSIS');
+  if (guardian && guardian.name) {
+    up.setProperty('PREFILL_GUARDIAN', JSON.stringify({ name: toText_(guardian.name), relationship: toText_(guardian.relationship),
+      phone: toText_(guardian.phone), email: toText_(guardian.email) }));
+  } else up.deleteProperty('PREFILL_GUARDIAN');
+  openNewStudentDialog();
+}
+
+/** New / Edit Student's first call: { osis, guardian, fromHome } (each read once). */
+function getNewStudentPrefill() {
+  const up = PropertiesService.getUserProperties();
+  const osis = up.getProperty('PREFILL_OSIS') || "";
+  let guardian = null;
+  try { guardian = JSON.parse(up.getProperty('PREFILL_GUARDIAN') || "null"); } catch (e) { guardian = null; }
+  const fromHome = up.getProperty('OVERRIDES_FROM_HOME') === '1';
+  ['PREFILL_OSIS', 'PREFILL_GUARDIAN', 'OVERRIDES_FROM_HOME'].forEach(k => up.deleteProperty(k));
+  return { osis: osis, guardian: guardian, fromHome: fromHome };
+}
+
+// ======================================================================
+// PARENTS TO ADD (owner 2026-11-17, release check round 2 idea)
+// A parent that Parent Square, NYCSA or one of Your Lists has for a student, who isn't one of that
+// student's guardians in your Student Data (ATS + 👤 Student Overrides): ATS lists 2 guardians, so a
+// third one, a stepparent or a grandparent the school added in Parent Square shows up here. Shown on the
+// 👤 Student Overrides page and offered at the end of 📥 Input Data Mode. Nothing is added by itself:
+// "Add" writes an "Added Guardian (<where from>)" row in New / Edit Student, which the build adds ON
+// TOP of the ATS guardians (getOverrideData_, Build.gs; once ATS lists them too the row goes away,
+// cleanRedundantOverrides). "Not new" hides one for good (document property PARENTS_TO_ADD_SKIPPED).
+// Known = the same name (any order; ATS "Maria Del Carmen Lopez" = "Maria Lopez"), or the same phone /
+// email and a shared name part. A first name alone is never offered.
+// ======================================================================
+var PARENTS_SKIPPED_KEY_ = "PARENTS_TO_ADD_SKIPPED";
+
+/** OSIS + name parts (sorted): the same parent of the same student from any source. */
+function parentsToAddKey_(osis, tokens) {
+  return normalizeOsis_(osis) + "|" + tokens.slice().sort().join(" ");
+}
+
+/** "Simpson, Homer" / "HOMER SIMPSON" -> "Homer Simpson". */
+function parentDisplayName_(raw) {
+  let s = toText_(raw).replace(/\s+/g, " ");
+  const i = s.indexOf(",");
+  if (i > 0) s = (s.slice(i + 1) + " " + s.slice(0, i)).trim();
+  return properCase_(s);
+}
+
+function parentsSkipped_() {
+  try { return JSON.parse(PropertiesService.getDocumentProperties().getProperty(PARENTS_SKIPPED_KEY_) || "[]") || []; }
+  catch (e) { return []; }
+}
+
+/**
+ * { items, skipped }: items = the parents to add, one per student + person, sorted by student:
+ * { key, osis, student, studentFirst, studentLast, cls, name, relationship, phone, email, sources }.
+ * skipped = how many were left out because "Not new" was clicked for them (all: true = keep them in).
+ */
+function findParentsToAdd_(ss, all) {
+  const out = { items: [], skipped: 0 };
+  const raw = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
+  if (!raw || raw.getLastRow() < 7) return out;
+  const rawData = raw.getDataRange().getValues();
+  const overrides = getOverrideData_(ss);
+  const studentMap = buildStudentMap_(rawData, overrides.students);
+  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+  const guardiansOf = groupGuardiansByStudent_(guardianRows);
+
+  // The students: by OSIS, and by the last part of their name (Parent Square names students, no OSIS)
+  const rawNames = new Map(); // OSIS -> [last, first] as ATS has them
+  for (let i = 6; i < rawData.length; i++) {
+    if (isRealStudentId_(rawData[i][2])) rawNames.set(normalizeOsis_(rawData[i][2]), [toText_(rawData[i][3]), toText_(rawData[i][4])]);
+  }
+  const students = new Map(), byLast = new Map();
+  studentMap.forEach((st, id) => {
+    const tokens = nameTokens_(st.student);
+    const key = normalizeOsis_(id);
+    const names = rawNames.get(key) || [tokens.slice(1).join(" "), tokens[0] || ""];
+    const info = { id: id, name: st.student, cls: st.classCode || "", tokens: tokens, last: properCase_(names[0]), first: properCase_(names[1]) };
+    students.set(key, info);
+    if (tokens.length >= 2) {
+      const last = tokens[tokens.length - 1];
+      if (!byLast.has(last)) byLast.set(last, []);
+      byLast.get(last).push(info);
+    }
+  });
+
+  const items = new Map();
+  const consider = (st, rawName, info, source) => {
+    const tokens = nameTokens_(rawName);
+    if (tokens.length < 2) return;                        // a first name alone can't be added safely
+    if (sameNameExactly_(tokens, st.tokens)) return;      // the student's own account
+    const phones = (info.phones || []).map(normalizePhoneForMatch_).filter(Boolean);
+    const email = normalizeEmail_(info.email);
+    const known = (guardiansOf.get(st.id) || []).some(g => {
+      const gt = nameTokens_(g.guardianOutput);
+      if (namesMatch_(gt, tokens)) return true;
+      const sameContact = (phones.length && phones.indexOf(normalizePhoneForMatch_(g.mobile)) !== -1) ||
+                          (email && email === normalizeEmail_(g.email));
+      return !!sameContact && shareNameToken_(gt, tokens);
+    });
+    if (known) return;
+    const key = parentsToAddKey_(st.id, tokens);
+    let item = items.get(key);
+    if (!item) {
+      item = { key: key, osis: st.id, student: st.name, studentFirst: st.first, studentLast: st.last, cls: st.cls,
+               name: parentDisplayName_(rawName), relationship: "", phone: "", email: "", sources: [] };
+      items.set(key, item);
+    }
+    if (!item.relationship && info.relationship) item.relationship = properCase_(info.relationship);
+    if (!item.phone && phones.length) item.phone = formatPhone_(phones[0]) || phones[0];
+    if (!item.email && email) item.email = toText_(info.email);
+    if (item.sources.indexOf(source) === -1) item.sources.push(source);
+  };
+
+  for (let i = 6; i < rawData.length; i++) {
+    const r = rawData[i];
+    // NYCSA (AP:BF): the student's OSIS and the guardian's first / last name
+    const nyStudent = students.get(normalizeOsis_(r[46]));
+    const nyName = (toText_(r[49]) + " " + toText_(r[50])).trim();
+    if (nyStudent && nyName) consider(nyStudent, nyName, { relationship: toText_(r[55]), phones: [r[54], r[52], r[53]], email: "" }, "NYCSA");
+    // Parent Square (AG:AN): the parent's name and the names of their students
+    const psName = toText_(r[32]);
+    const psStudents = nameTokens_(r[33]);
+    if (psName && psStudents.length && psName.toLowerCase() !== "name") {
+      const set = new Set(psStudents), seen = new Set();
+      psStudents.forEach(t => (byLast.get(t) || []).forEach(st => {
+        if (seen.has(st.id)) return;
+        seen.add(st.id);
+        if (set.has(st.tokens[0]) && set.has(st.tokens[st.tokens.length - 1])) {
+          consider(st, psName, { relationship: "", phones: [r[35], r[36]], email: toText_(r[34]) }, "Parent Square");
+        }
+      }));
+    }
+  }
+
+  // Your Lists with a guardian column: a guardian list's row not matched to a guardian but naming a
+  // student (OSIS or the child's exact name), or a student list's matched row whose guardian isn't theirs
+  try {
+    const lists = od_loadLists_(ss).filter(l => l.sheet && l.setup && l.setup.ready && l.setup.roles && l.setup.roles.guardian);
+    if (lists.length) {
+      const studentRows = [];
+      studentMap.forEach((st, id) => studentRows.push([id, st.student, "", "", st.classCode || ""]));
+      const idx = od_index_(studentRows, guardianRows);
+      lists.forEach(list => {
+        try {
+          const table = od_readTable_(list.sheet, list.setup);
+          const label = od_listIcon_(list) + " " + list.name;
+          od_matchAll_(list.setup, table.rows, idx).forEach(res => {
+            const c = res.cells;
+            if (!c || !c.guardian) return;
+            let st = null;
+            if (list.setup.by === "guardian") {
+              if (res.status !== "none") return; // matched to a guardian, or waiting for your pick
+              if (c.osis) st = idx.byOsis.get(normalizeOsis_(c.osis)) || null;
+              if (!st && c.name) { const m = idx.byNameKey.get(od_tokenKey_(c.name.tokens)) || []; if (m.length === 1) st = m[0]; }
+            } else if (res.status === "ok") {
+              st = idx.byOsis.get(res.target) || null;
+            }
+            const info = st ? students.get(st.key) : null;
+            if (info) consider(info, c.guardian.raw, { relationship: "", phones: [c.phone], email: c.email }, label);
+          });
+        } catch (e) { console.warn("Parents to add: list \"" + list.name + "\" skipped: " + e.message); }
+      });
+    }
+  } catch (e) { console.warn("Parents to add: your lists skipped: " + e.message); }
+
+  const skipped = new Set(all ? [] : parentsSkipped_());
+  const lastOf = it => { const t = nameTokens_(it.student); return t.length ? t[t.length - 1] : ""; };
+  items.forEach(it => { if (skipped.has(it.key)) out.skipped++; else out.items.push(it); });
+  out.items.sort((a, b) => compareNatural_(lastOf(a), lastOf(b)) || compareNatural_(a.student, b.student) || compareNatural_(a.name, b.name));
+  return out;
+}
+
+/** The main page: parents to add, your changes, whether builds are paused. */
+function getOverridesHome() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let found = { items: [], skipped: 0 }, error = "";
+  try { found = findParentsToAdd_(ss); }
+  catch (e) { console.warn("Parents to add: " + e.message); error = e.message; }
+  const settings = getSettings();
+  return { toAdd: found.items, skipped: found.skipped, changes: getOverridesList(), error: error,
+           paused: settings.disableRebuilds === true || settings.disableRebuilds === 'true' };
+}
+
+/**
+ * "Add" on the main page: each ticked parent goes into the student's New / Edit Student row: an
+ * "Added Guardian (<where from>)" row (the build adds them to the ATS guardians), or the student's
+ * own New / Edit row when there is one (it replaces the ATS guardians, so they go in there). 5
+ * guardians per student at most. Then the sheets are rebuilt, like every other override change.
+ */
+function addParentsAsGuardians(keys) {
+  keys = (Array.isArray(keys) ? keys : []).map(String);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const picked = findParentsToAdd_(ss, true).items.filter(it => keys.indexOf(it.key) !== -1);
+  if (!picked.length) return { added: 0, noRoom: [], building: false, home: getOverridesHome() };
+
+  const data = backendReadBlock_(ss, "OVERRIDES");
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+  const byStudent = new Map();
+  picked.forEach(it => {
+    const k = normalizeOsis_(it.osis);
+    if (!byStudent.has(k)) byStudent.set(k, []);
+    byStudent.get(k).push(it);
+  });
+  const updates = [], appends = [], noRoom = [];
+  let added = 0;
+  byStudent.forEach((list, k) => {
+    let at = -1; // the student's own row in New / Edit Student (the last one)
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (isRealStudentId_(data[i][2]) && normalizeOsis_(data[i][2]) === k) { at = i; break; }
+    }
+    const row = at >= 1 ? padRow_(data[at].slice(), 42) : new Array(42).fill("");
+    if (at < 1) {
+      const it = list[0];
+      row[2] = it.osis; row[3] = it.studentLast; row[4] = it.studentFirst; row[8] = it.cls; row[41] = false;
+    }
+    const sources = [];
+    list.forEach(it => {
+      let slot = -1;
+      for (let g = 0; g < 5; g++) { if (!toText_(row[10 + g * 6])) { slot = g; break; } }
+      if (slot === -1) { noRoom.push(it.name + " (" + it.student + ")"); return; }
+      const b = 10 + slot * 6;
+      row[b] = it.name; row[b + 1] = it.relationship; row[b + 2] = it.phone; row[b + 3] = it.email;
+      it.sources.forEach(src => { if (sources.indexOf(src) === -1) sources.push(src); });
+      added++;
+    });
+    if (!sources.length) return; // no room for any of them
+    if (at < 1 || isAddedGuardianType_(row[1])) {
+      const before = at >= 1 ? ((String(row[1]).match(/\((.*)\)\s*$/) || [])[1] || "").split(",").map(x => x.trim()).filter(Boolean) : [];
+      sources.forEach(src => { if (before.indexOf(src) === -1) before.push(src); });
+      row[1] = ADDED_GUARDIAN_TYPE_ + " (" + before.join(", ") + ")";
+    }
+    row[0] = today;
+    if (at >= 1) updates.push({ at: at, row: row }); else appends.push(row);
+  });
+  updates.forEach(u => backendBlockRange_(ss, "OVERRIDES", u.at, 0, 1, 42).setValues([u.row]));
+  backendAppendRows_(ss, "OVERRIDES", appends);
+  SpreadsheetApp.flush();
+
+  const settings = getSettings();
+  const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
+  if (added && !paused) runBuildOnly(); // the Build panel opens on the right, as for every override change
+  else if (added) ss.toast("Saved. Your sheets get the new parents at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  return { added: added, noRoom: noRoom, building: !!(added && !paused), home: getOverridesHome() };
+}
+
+/** "Not new" on the main page: these parents aren't offered again. */
+function skipParentsToAdd(keys) {
+  const list = parentsSkipped_();
+  (Array.isArray(keys) ? keys : []).map(String).forEach(k => {
+    const i = list.indexOf(k);
+    if (i !== -1) list.splice(i, 1);
+    list.push(k);
+  });
+  // A document property holds about 9 KB: the oldest "not new" ones go first
+  while (list.length && JSON.stringify(list).length > 8500) list.shift();
+  PropertiesService.getDocumentProperties().setProperty(PARENTS_SKIPPED_KEY_, JSON.stringify(list));
+  return getOverridesHome();
+}
+
+/** "Show the ones you skipped": every "Not new" is offered again. */
+function unskipParentsToAdd() {
+  PropertiesService.getDocumentProperties().deleteProperty(PARENTS_SKIPPED_KEY_);
+  return getOverridesHome();
 }
 
 /**
@@ -2583,6 +2871,21 @@ function buildOverrideReport() {
 
     const newStudentName = `${String(oRow[4] || "").trim()} ${String(oRow[3] || "").trim()}`.trim();
     const newGuardians = extractGuardians(oRow, 10, 5);
+
+    // --- CASE A2: PARENTS ADDED FROM PARENT SQUARE / NYCSA / A LIST (on top of the ATS guardians) ---
+    if (isAddedGuardianType_(oRow[1])) {
+      if (!rawMap.has(osis) || !newGuardians.length) return; // the student left ATS: nothing to show
+      const from = (String(oRow[1]).match(/\((.*)\)\s*$/) || [])[1] || "";
+      const newInfoString = newGuardians.map(ng => formatFullParent(ng) + (from ? `\n  Added from: ${from}` : "")).join("\n\n");
+      const rtv = SpreadsheetApp.newRichTextValue().setText(newInfoString);
+      newGuardians.forEach(ng => {
+        const startIdx = newInfoString.indexOf(`Guardian: ${ng.name}`);
+        if (startIdx !== -1) rtv.setTextStyle(startIdx + 10, startIdx + 10 + ng.name.length, boldStyle);
+      });
+      reportOutput.push([osis, newGuardians.map(() => "Guardian: [Not in ATS]").join("\n\n"), newInfoString]);
+      richTextNewInfo.push([rtv.build()]);
+      return;
+    }
 
     // --- CASE A: BRAND NEW STUDENT ---
     if (!rawMap.has(osis)) {

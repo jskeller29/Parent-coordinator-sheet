@@ -29,7 +29,9 @@ const exportsExpected = [
   ["1b - Student Data (ATS) - next month (2 new, 1 left).csv", "ats", 19, false],
   ["1c - Student Data (ATS) - BROKEN numbers cut off.csv", "ats", 18, true],
   ["2 - Parent Square.csv", "ps", 28, false],
-  ["3 - NYCSA (Students with Non-NYCSA Account).csv", "nycsa", 25, false]
+  ["3 - NYCSA (Students with Non-NYCSA Account).csv", "nycsa", 25, false],
+  ["2b - Parent Square - a parent not in ATS.csv", "ps", 29, false],
+  ["3b - NYCSA - a third guardian.csv", "nycsa", 26, false]
 ];
 exportsExpected.forEach(([file, key, n, cut]) => {
   const rows = csv(file);

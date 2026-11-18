@@ -70,14 +70,10 @@ function buildAllDerivedSheetsRun_() {
   // =========================================================
   // --- PRE-FETCH OLD DATA SNAPSHOT FOR REPORTS ---
   // =========================================================
-  const oldPdMap = new Map();
+  // The Parents Divided the last build wrote: the report's Parent Square / NYCSA sign-ups compare it
+  // with this build's (signupReport_)
   const oldPdSheet = ss.getSheetByName("Parents Divided");
-  if (oldPdSheet) {
-    const oldPdData = oldPdSheet.getDataRange().getValues();
-    for (let i = 1; i < oldPdData.length; i++) {
-      oldPdMap.set(String(oldPdData[i][1]).trim(), { ps: oldPdData[i][8], nycsa: oldPdData[i][9] });
-    }
-  }
+  const oldPdData = oldPdSheet ? oldPdSheet.getDataRange().getValues() : [];
 
   // OSIS -> Status from the Student List before it is rewritten (build report; owner's New Students log)
   const oldMasterStatusMap = owner ? owner.readMasterStatusSnapshot(ss) : readMasterStatusSnapshot_(ss);
@@ -213,30 +209,9 @@ function buildAllDerivedSheetsRun_() {
   // --- GENERATE BUILD REPORT ---
   // =========================================================
   const { newStudents: newStudentsLog, discharged: dischargedLog } = atsChangeReportLines_(masterTable, atsChanges);
-  const nycsaLog = [];
-  const psLog = [];
-
-  if (oldPdMap.size > 0) {
-    for (let i = 1; i < parentsDivided.length; i++) {
-      const gName = String(parentsDivided[i][1]).trim();
-      const student = parentsDivided[i][2];
-      const newPs = String(parentsDivided[i][8]).trim();
-      const newNycsa = String(parentsDivided[i][9]).trim();
-
-      if (oldPdMap.has(gName)) {
-        const old = oldPdMap.get(gName);
-        const oldPs = String(old.ps).trim();
-        const oldNycsa = String(old.nycsa).trim();
-
-        if (oldNycsa.startsWith("No") && (newNycsa.startsWith("Yes") || newNycsa === "Yes/Unknown")) {
-          nycsaLog.push(`${gName} (Student: ${student})`);
-        }
-        if (oldPs === "No" && newPs === "Yes") {
-          psLog.push(`${gName} (Student: ${student})`);
-        }
-      }
-    }
-  }
+  const signups = signupReport_(oldPdData, parentsDivided);
+  const nycsaLog = signups.nycsa;
+  const psLog = signups.ps;
 
   CacheService.getScriptCache().put('BUILD_REPORT_LOGS', JSON.stringify({
     newStudents: newStudentsLog,
@@ -660,6 +635,18 @@ function cleanRedundantOverrides() {
 
     if (!rawMap.has(osis)) continue; 
 
+    // An added guardian (Parents to add) ATS now lists for this student: the row goes once ATS has
+    // every guardian it added (until then it stays; the build already leaves out the ones ATS has)
+    if (isAddedGuardianType_(oRow[1])) {
+      const atsNames = extractGuardians(rawMap.get(osis), 19, 2).map(g => nameTokens_(g.name));
+      const addedNames = extractGuardians(oRow, 10, 5).map(g => nameTokens_(g.name));
+      if (addedNames.every(t => atsNames.some(a => namesMatch_(a, t)))) {
+        backendDeleteRows_(ss, "OVERRIDES", [i]);
+        deletedOsisList.push(osis);
+      }
+      continue;
+    }
+
     // "New Student" rows exist only until ATS has the student; once they're in Raw Data, drop them
     if (String(oRow[1]).trim() === "New Student") {
       backendDeleteRows_(ss, "OVERRIDES", [i]);
@@ -717,6 +704,10 @@ function cleanRedundantOverrides() {
 function getOverrideData_(ss) {
   const overrideStudents = new Map();
   const overrideGuardians = new Map();
+  // "Added Guardian" rows (👤 Student Overrides → Parents to add, 2026-11-18): guardians found in Parent
+  // Square / NYCSA / a list, added ON TOP of the student's ATS guardians (the ATS ones stay live, so a
+  // new phone in next month's ATS still comes in). Their list is marked addToAts for buildGuardianObjects_.
+  const added = new Map();
 
   // New/Edit Student section of the Backend tab (index 0 = header row)
   const data = backendReadBlock_(ss, "OVERRIDES");
@@ -725,12 +716,13 @@ function getOverrideData_(ss) {
     const r = data[i];
     const id = toText_(r[2]);
     if (!isRealStudentId_(id)) continue;
+    const isAdded = isAddedGuardianType_(r[1]);
     
     const lastName = toText_(r[3]);
     const firstName = toText_(r[4]);
     const classCode = toText_(r[8]).toUpperCase();
     
-    overrideStudents.set(id, {
+    if (!isAdded) overrideStudents.set(id, {
       student: properCase_(`${firstName} ${lastName}`.trim()),
       classCode: classCode,
       site: "",
@@ -754,10 +746,35 @@ function getOverrideData_(ss) {
         if (gInfo) guardianList.push(gInfo);
       }
     }
-    overrideGuardians.set(id, guardianList);
+    if (isAdded) added.set(id, (added.get(id) || []).concat(guardianList));
+    else overrideGuardians.set(id, guardianList);
   }
 
+  // A student with a New / Edit row too: its own guardian list + the added ones (same name once)
+  added.forEach((list, id) => {
+    if (overrideGuardians.has(id)) {
+      const full = overrideGuardians.get(id);
+      list.forEach(g => { if (!guardianListHas_(full, g)) full.push(g); });
+    } else {
+      const extra = list.slice();
+      extra.addToAts = true; // ATS guardians + these (buildGuardianObjects_)
+      overrideGuardians.set(id, extra);
+    }
+  });
+
   return { students: overrideStudents, guardians: overrideGuardians };
+}
+
+/** Entry Type of an added-guardian row: "Added Guardian (NYCSA)", "Added Guardian (Parent Square, 🚌 Bus Routes)". */
+var ADDED_GUARDIAN_TYPE_ = "Added Guardian";
+function isAddedGuardianType_(type) {
+  return toText_(type).indexOf(ADDED_GUARDIAN_TYPE_) === 0;
+}
+
+/** A guardian with the same name (any order, accents / punctuation ignored) is already in list. */
+function guardianListHas_(list, g) {
+  const t = nameTokens_(g.guardianOutput);
+  return list.some(x => sameNameExactly_(nameTokens_(x.guardianOutput), t));
 }
 
 /* =========================
@@ -820,23 +837,30 @@ function buildStudentMap_(rawData, overrideStudents) {
 ========================= */
 function buildGuardianObjects_(rawData, overrideGuardians) {
   const out = [];
+  const atsById = new Map(); // ATS guardians of the students that also have added guardians
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
     const id = toText_(r[2]);
     if (!isRealStudentId_(id)) continue;
 
-    if (overrideGuardians.has(id)) continue;
+    const own = overrideGuardians.get(id);
+    if (own && !own.addToAts) continue; // a New / Edit Student row replaces the ATS guardians
 
     const g1 = buildGuardianObject_(id, r[19], r[20], r[23], r[24], r[22], r[21]);
     if (g1) out.push(g1);
 
     const g2 = buildGuardianObject_(id, r[25], r[26], r[29], r[30], r[28], r[27]);
     if (g2) out.push(g2);
+    if (own) atsById.set(id, [g1, g2].filter(Boolean));
   }
 
-  for (const guardianList of overrideGuardians.values()) {
-    out.push(...guardianList);
+  for (const [id, guardianList] of overrideGuardians) {
+    if (!guardianList.addToAts) { out.push(...guardianList); continue; }
+    // Added guardians: only for a student still in ATS, and not when ATS has them now (same name)
+    const ats = atsById.get(id);
+    if (!ats) continue;
+    guardianList.forEach(g => { if (!guardianListHas_(ats, g)) out.push(g); });
   }
 
   return out;
@@ -1424,7 +1448,8 @@ function contactLogNoteLine_(row, disableHiddenNotes) {
   const pVal = toText_(row[12]); // Event Description (was "Notes")
   const rVal = toText_(row[14]); // Additional Notes (was "Followup Notes")
 
-  if (pVal === "" && rVal === "") return null;
+  const bullets = additionalNoteBullets_(rVal);
+  if (pVal === "" && !bullets.length) return null;
 
   const methodLabel = nVal !== "" ? nVal : mVal;
   const dateText = formatDateFull_(dateVal);
@@ -1433,10 +1458,29 @@ function contactLogNoteLine_(row, disableHiddenNotes) {
   // (Person Spoke With) reads "{Method}", never "{Method - }" (and a blank
   // method reads "{Person}", never "{ - Person}").
   const braceText = [methodLabel, eVal].map(v => String(v).trim()).filter(v => v !== "").join(" - ");
-  let line = `${noteLineHeader_(dateText, braceText)} ${pVal}`;
-  if (rVal !== "") line += ` [${rVal}]`;
+  let line = noteLineHeader_(dateText, braceText) + (pVal !== "" ? " " + pVal : "");
+  // Additional Notes: bullets under the date line (owner 2026-11-17; was " [note]" at the end of the line)
+  if (bullets.length) line += "\n" + bullets.join("\n");
 
   return { dateObj: dateObj, text: line.trim() };
+}
+
+/**
+ * Additional Notes (Contact Log column O) as bullet lines under the date line (owner 2026-11-17,
+ * release check round 2: "instead of [ ] a bullet point under the date"). Every line of the cell is
+ * one bullet; a "-" (or •, *, –) typed at the start of a line is dropped, so
+ *   - test
+ *   - test 1
+ * reads as two bullets. Empty lines are left out. Used by the build and the quick notes update
+ * (both through contactLogNoteLine_), so Combined Contact Tracking, the search bar's Communications
+ * box, Phone Contacts and Google Contacts all read the same.
+ */
+var NOTE_BULLET_ = "   • ";
+function additionalNoteBullets_(text) {
+  return String(text == null ? "" : text).split(/\r?\n/)
+    .map(line => line.trim().replace(/^(?:[-–—•*]\s*)+/, "").trim())
+    .filter(line => line !== "")
+    .map(line => NOTE_BULLET_ + line);
 }
 
 /**
@@ -1872,6 +1916,48 @@ function styleHeadersLike_(sheet, row, srcCol, fromCol, numCols, what) {
       .setFontWeight(src.getFontWeight())
       .setHorizontalAlignment(src.getHorizontalAlignment());
   } catch (e) { console.warn(what + " header not styled: " + e.message); }
+}
+
+/**
+ * The build report's sign-ups (owner 2026-11-17, release check 2.18: Parent Square sign-ups never
+ * showed and "2 new NYCSA" came back on the next build). Every guardian row of the Parents Divided the
+ * last build wrote (oldPd) is compared with the same guardian's row now (newPd), matched by OSIS AND
+ * guardian name (a parent of two children has a row per child, and two families can share a name).
+ * The columns are found by their header: the report used to read fixed column numbers, and since the
+ * Sibling column came in it read Sibling as "Parents Square" and Parents Square as "NYCSA".
+ *   NYCSA: was on the NYCSA list ("No …" = no account yet), now isn't ("Yes…"): signed up.
+ *   Parent Square: now registered ("Yes") and was "No" (not registered), or wasn't in Parent Square
+ *   at all while Parent Square data was already loaded (the first load lists nobody).
+ * Returns { nycsa: [...], ps: [...] } of "Guardian (Student: name)".
+ */
+function signupReport_(oldPd, newPd) {
+  const out = { nycsa: [], ps: [] };
+  if (!oldPd || oldPd.length < 2 || !newPd || newPd.length < 2) return out;
+  const cols = header => {
+    const h = header.map(x => String(x).trim().toLowerCase());
+    return { id: h.indexOf("student_id"), name: h.indexOf("guardian output"), student: h.indexOf("student"),
+             ps: h.indexOf("parents square"), nycsa: h.indexOf("nycsa") };
+  };
+  const oc = cols(oldPd[0]), nc = cols(newPd[0]);
+  if (oc.id < 0 || oc.name < 0 || nc.id < 0 || nc.name < 0) return out;
+  const key = (row, c) => normalizeOsis_(row[c.id]) + "|" + String(row[c.name]).trim().toLowerCase().replace(/\s+/g, " ");
+  const cell = (row, i) => i < 0 ? "" : String(row[i] === null || row[i] === undefined ? "" : row[i]).trim();
+  const old = new Map();
+  let psLoadedBefore = false;
+  for (let i = 1; i < oldPd.length; i++) {
+    const ps = cell(oldPd[i], oc.ps);
+    if (ps === "Yes" || ps === "No") psLoadedBefore = true;
+    old.set(key(oldPd[i], oc), { ps: ps, nycsa: cell(oldPd[i], oc.nycsa) });
+  }
+  for (let i = 1; i < newPd.length; i++) {
+    const before = old.get(key(newPd[i], nc));
+    if (!before) continue; // a new student's guardians are not sign-ups
+    const label = `${cell(newPd[i], nc.name)} (Student: ${cell(newPd[i], nc.student)})`;
+    const nycsa = cell(newPd[i], nc.nycsa), ps = cell(newPd[i], nc.ps);
+    if (oc.nycsa >= 0 && nc.nycsa >= 0 && before.nycsa.startsWith("No") && nycsa.startsWith("Yes")) out.nycsa.push(label);
+    if (oc.ps >= 0 && nc.ps >= 0 && ps === "Yes" && (before.ps === "No" || (before.ps === "" && psLoadedBefore))) out.ps.push(label);
+  }
+  return out;
 }
 
 /* =========================

@@ -147,12 +147,14 @@ Below the steps, "This tab" explains the tab you are on, and after your first bu
 ### Step 5: Load your data
 
 Open 🚀 App Menu → 📥 Input Data Mode, or click Open Input Data Mode in the checklist.
-It starts on a Start Here page: what each kind of data is for, where to get it, and when
-you last loaded it. Click Start with Student Data, or any step. It takes you through each
-export in turn, then two optional steps: Site / Class (the teacher and site for each
-class) and Your Lists. Your other tabs are hidden while you work. If you close its panel
-by accident, every Input Data Mode tab says how to bring it back:
-🚀 App Menu → 📥 Input Data Mode. It picks up where you left off.
+It starts by asking what you want to update: one card for each kind of data, with what it
+is for, where to get it and when you last loaded it. Tick the ones you have new files for
+(the first time, all five are ticked; later, the exports that are more than a week old),
+then click Start. It takes you through only those, one at a time: the exports, then the
+two optional steps Site / Class (the teacher and site for each class) and Your Lists.
+Your other tabs are hidden while you work. If you close its panel by accident, every
+Input Data Mode tab says how to bring it back: 🚀 App Menu → 📥 Input Data Mode. It picks
+up where you left off.
 
 For each export, either click Upload file and pick the file you downloaded, or open the
 file, select everything (Ctrl+A, Mac ⌘+A), copy it, and paste it anywhere on the
@@ -162,15 +164,20 @@ Data (ATS) completed!" and "18 rows moved to Raw Data (18 students)". If you pas
 export, or Excel shortened the numbers (they show as 7.19E+09), the tracker tells you and
 changes nothing. Skip keeps the old data for that export.
 
-On Site / Class, the panel counts how many classes have a teacher or a site. Once every
-class has one, Save and go to Your Lists takes you on.
+On Site / Class, the panel counts how many classes have a teacher or a site. Save, at the
+bottom of the panel above Skip, saves them to Raw Data and takes you to the next step.
 
 Before the Your Lists step, Input Data Mode builds your sheets, with a progress bar. When
-you are done with your lists, click Finish Input Data Mode. If you changed a list after
-that build, it offers Build sheets now: your lists reach the Student List, Parents Divided
-and the phone contacts only with a build. Finish or exit ends Input Data Mode at any
-other step. Save, exit and build my sheets saves what is on the tab, brings your tabs
-back and builds.
+you are done with your lists, click Finish Input Data Mode. After the last step you
+ticked, the panel ends with two buttons: Build my sheets (when something new came in)
+and Done. If you changed a list after the build, Build my sheets is there too: your lists
+reach the Student List, Parents Divided and the phone contacts only with a build. Finish
+or exit ends Input Data Mode at any other step. Save, exit and build my sheets saves
+what is on the tab, brings your tabs back and builds.
+
+If Parent Square, NYCSA or one of your lists has a parent who isn't in your Student Data
+(ATS lists only two guardians), the end of Input Data Mode asks whether to add them.
+Review and add them opens 👤 Student Overrides (below).
 
 #### How to download your data
 
@@ -234,11 +241,27 @@ version and only the new rows need you. A list with an OSIS column matches best.
 
 #### Fixing a student's details
 
-ATS can lag behind real enrollment. To add a student who isn't in ATS yet, or to fix a
-name or a parent's phone, use 👤 Student Overrides → ✨ New / Edit Student. Your change
-shows in the Student List, Combined Contact Tracking, Parents Divided and Phone
-Contacts at the next build. The Directory always shows ATS data only. An override
-removes itself once ATS has the same information.
+ATS can lag behind real enrollment. Everything about it is on one page: 👤 Student
+Overrides → 🗂️ Student Overrides.
+
+- Parents to add: parents Parent Square, NYCSA or your lists have for a student who
+  aren't one of the student's guardians in ATS, with where each one came from. Tick the
+  ones who are guardians and click Add, or Not new to stop seeing one. Check and edit
+  before adding opens the student with that parent filled in. An added parent joins the
+  ATS guardians, so a new phone in next month's ATS still comes in.
+- Your changes: every student you added or edited and every parent you added, with Edit
+  and Delete.
+- Create the Override Report, and New / Edit Student, at the bottom. New / Edit Student
+  has a "← Student Overrides" button back to the page.
+
+Use ✨ New / Edit Student to add a student who isn't in ATS yet, or to fix a name or a
+parent's phone. Your change shows in the Student List, Combined Contact Tracking,
+Parents Divided and Phone Contacts at the next build. The Directory always shows ATS
+data only. An override removes itself once ATS has the same information.
+
+> [!IMPORTANT]
+> Only add someone who may get information about the student. ATS has the school's
+> official guardians.
 
 ### Step 6: Build the sheets
 
@@ -274,9 +297,8 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 
 | 👤 Student Overrides item | What it does |
 |---|---|
+| 🗂️ Student Overrides | One page: parents to add (from Parent Square, NYCSA and your lists), your changes with Edit and Delete, and the Override Report (a tab comparing ATS with your changes). |
 | ✨ New / Edit Student | Add a student who isn't in ATS, or correct a name, phone, email, language, grade or up to five guardians. You can also give a student a status label or hide them from the report. |
-| 🗂️ Manage Overrides | Lists your changes. Edit or delete any of them. |
-| 📄 Override Report | A tab comparing ATS with your changes. |
 
 ### The tabs
 
@@ -315,7 +337,7 @@ Log every call, email, meeting and walk-in here, one row each.
 | Type | Your own topic list (Attendance, Behavior …). Turn it on in Settings; edit the choices in the Backend tab, column BL. |
 | Event Description | What you talked about. |
 | Follow-up | No Followup Needed, Followup Needed, Followup Needed - ASAP, Followed up / Resolved, Skipped / Newer Interaction, or Waiting for Response. Fills in No Followup Needed if blank. |
-| Additional Notes | What happens next. |
+| Additional Notes | What happens next. Each line shows as a bullet under the date in the student's notes; start a new line (Alt+Enter, Mac ⌥+Enter) for another bullet. A "-" at the start of a line is left out. |
 | Hide | Tick it to leave the row out of Combined Contact Tracking and the phone contacts. It still counts for the PCAR. |
 
 A few things happen on their own:

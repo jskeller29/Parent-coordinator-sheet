@@ -22,6 +22,8 @@ on the step's tab.
 | `1c - Student Data (ATS) - BROKEN numbers cut off` (.csv only) | 1 Student Data | Refused: "numbers look cut off by Excel" for Student ID and both phone columns (they read like 1.23E+08). "Use it anyway" is offered. |
 | `2 - Parent Square` | 2 Parent Square | 28 rows. Upload it at step 1 instead and it is refused ("This looks like Parent Square data"). |
 | `3 - NYCSA (Students with Non-NYCSA Account)` | 3 NYCSA | 25 rows. |
+| `2b - Parent Square - a parent not in ATS` | 2 Parent Square | 29 rows: the same + Abe Simpson, a parent of Bart and Lisa that ATS doesn't have. At the end of Input Data Mode: "parents to add?"; 👤 Student Overrides lists Abe for Bart and for Lisa. |
+| `3b - NYCSA - a third guardian` | 3 NYCSA | 26 rows: the same + Patty Bouvier (Aunt), a third guardian for Bart (ATS lists two). Listed under Parents to add, from NYCSA. |
 | `4 - Site and Class` | 4 Site / Class | Paste the three columns (with the header) over A1 of the Site / Class tab, then Save. 6 sites, 12 classes; Y12 and Y50 have no teacher. |
 
 ## Your Lists (step 5 of Input Data Mode → Add another list)

@@ -94,6 +94,8 @@
     </div>
 
     <div class="dfoot">
+      <!-- Back to the 👤 Student Overrides main page (owner 2026-11-17: "allow back and forth") -->
+      <button type="button" class="btn txt" id="backBtn" onclick="backHome()" title="Parents to add, your changes and the report">← Student Overrides</button>
       <label class="cbx" for="hideFromReport"><input type="checkbox" id="hideFromReport"><span>Hide this change from the Delta Report</span></label>
       <span class="sp"></span>
       <button type="button" class="btn sec" onclick="closeDialog()">Cancel</button>
@@ -110,6 +112,8 @@
     // Globals for sibling tracking
     let currentSiblings = [];
     let isSyncingSiblings = false;
+    // Opened from the 👤 Student Overrides main page: Save goes back there (getNewStudentPrefill)
+    let fromHome = false;
 
     function buildGuardianHTML(index, isVisible) {
         const display = isVisible ? 'block' : 'none';
@@ -173,14 +177,45 @@
       btn.classList.remove('opacity-50');
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run.withSuccessHandler(osis => {
-            if (osis) {
+        google.script.run.withSuccessHandler(p => {
+            p = p || {};
+            fromHome = !!p.fromHome;
+            if (p.osis) {
                 document.getElementById('entryType').value = 'Edit Existing Student';
                 handleTypeChange();
-                selectSearchResult(osis); 
+                selectSearchResult(p.osis); 
             }
-        }).getPrefillOsis();
+            // A parent to add (main page → "Check and edit before adding"): in the next empty guardian slot
+            if (p.guardian && p.guardian.name) addPrefilledGuardian(p.guardian);
+        }).getNewStudentPrefill();
       }
+    }
+
+    function addPrefilledGuardian(g) {
+        let slot = 0;
+        for (let i = 1; i <= MAX_GUARDIANS; i++) {
+            if (!document.getElementById('g' + i + 'Name').value.trim()) { slot = i; break; }
+        }
+        if (!slot) {
+            alert(g.name + " can't be added here: this student already has " + MAX_GUARDIANS + " guardians. Remove one first, then type " + g.name + " in its place.");
+            return;
+        }
+        document.getElementById('g' + slot + 'Name').value = g.name || '';
+        document.getElementById('g' + slot + 'Rel').value = g.relationship || '';
+        document.getElementById('g' + slot + 'Phone').value = g.phone || '';
+        document.getElementById('g' + slot + 'Email').value = g.email || '';
+        while (visibleGuardians < slot) showNextGuardian();
+        const block = document.getElementById('guardianBlock' + slot);
+        block.style.display = 'block';
+        block.scrollIntoView({ block: 'center' });
+        document.getElementById('g' + slot + 'Name').focus();
+    }
+
+    function backHome() {
+        const b = document.getElementById('backBtn');
+        b.disabled = true;
+        google.script.run.withFailureHandler(err => { b.disabled = false; alert("Could not open Student Overrides: " + err.message); })
+            .openManageOverridesDialog(); // replaces this window
     }
 
     function handleSearch() {
@@ -490,7 +525,8 @@
 
         if (typeof google !== 'undefined' && google.script && google.script.run) {
            google.script.run
-               .withSuccessHandler(() => google.script.host.close())
+               // From the main page: back there (it shows the change); else close (the Build panel is behind)
+               .withSuccessHandler(() => fromHome ? backHome() : google.script.host.close())
                .withFailureHandler((err) => {
                    alert("Error saving: " + err.message);
                    btn.disabled = false;
