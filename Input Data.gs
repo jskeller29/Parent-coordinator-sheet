@@ -109,7 +109,7 @@ var IDM_STEPS = [
   {
     key: 'nycsa', tab: 'NYCSA Data', short: 'NYCSA', zone: 'NYCSA', required: false,
     col: 42, stampCell: 'AP1', stampPrefix: 'NYCSA - DATE UPDATED: ', minMatch: 3,
-    headers: ["Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name","Another Custodial NYCSA Account Exist","Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"],
+    headers: ["Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name","Another Primary NYCSA Account Exist","Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"],
     numberCols: ["Student ID","Guardian Home Number","Guardian Work Number","Guardian Cell Number"],
     keyCols: ["Student ID","Student First Name","Student Last Name","Guardian First Name","Guardian Last Name"], studentCol: "Student ID",
     uses: "Families who don't have an NYC Schools Account yet, with their account creation codes. Shows in Parents Divided. A family that signs up leaves this list, and the next build report counts them as NYCSA sign-ups.",

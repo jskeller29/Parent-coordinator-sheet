@@ -524,6 +524,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Release check round 1 fixes (2026-11-14, later): re-paste Core, Build, Edits, Menus, Input Data (scripts) and Styles,
   ProgressSidebar, InputDataSidebar, MigrationUI (pages) on every sheet (master template too); then DEPLOY.md step 9:
   column D's dropdown = 'Backend'!$CF2:$CO2 and Build Sheets Only once more (it takes the old R2 formula out).
+- NYCSA header "Another Primary NYCSA Account Exist" (was "Another Custodial ...", 2026-11-18): re-paste Edits,
+  Input Data, Regenerate on every sheet (master template too). Raw Data's NYCSA header text only; an old export with
+  the Custodial header is still accepted (header match needs 3 of 17).
 - Contact Log ends at P (2026-11-15): re-paste Edits (Core only has a comment change) on every sheet (master
   template too); with column D on the Backend (step 9), the next Build Sheets Only takes the checkboxes after P out
   and deletes the empty columns Q:AA.

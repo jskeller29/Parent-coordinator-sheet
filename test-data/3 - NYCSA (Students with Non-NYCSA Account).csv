@@ -1,4 +1,4 @@
-﻿Location Code,School District,School Name,Class Code,Grade Level,Student ID,Student First Name,Student Last Name,Guardian First Name,Guardian Last Name,Another Custodial NYCSA Account Exist,Guardian Home Number,Guardian Work Number,Guardian Cell Number,Relationship,Role,Account Creation Code
+﻿Location Code,School District,School Name,Class Code,Grade Level,Student ID,Student First Name,Student Last Name,Guardian First Name,Guardian Last Name,Another Primary NYCSA Account Exist,Guardian Home Number,Guardian Work Number,Guardian Cell Number,Relationship,Role,Account Creation Code
 M094,75,P.S. M094,Y41,6,123456789,BART,SIMPSON,HOMER,SIMPSON,No,,,1111111111,FATHER,Custodial User,B11111C2
 M094,75,P.S. M094,Y41,6,123456789,BART,SIMPSON,MARGE,SIMPSON,Yes,,,2222222222,MOTHER,Custodial User,B11111C3
 M094,75,P.S. M094,Y25,3,567891234,LISA,SIMPSON,HOMER,SIMPSON,No,,,1111111111,FATHER,Custodial User,L22222A1

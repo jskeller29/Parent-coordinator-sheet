@@ -272,7 +272,7 @@ function writeRawDataHeaders_(ss) {
   const psHeaders = ["Name","Students","Email","Phone","Secondary Phone","Record Created","Registered?","SIS Synced"];
   const nycsaHeaders = [
     "Location Code","School District","School Name","Class Code","Grade Level","Student ID","Student First Name",
-    "Student Last Name","Guardian First Name","Guardian Last Name","Another Custodial NYCSA Account Exist",
+    "Student Last Name","Guardian First Name","Guardian Last Name","Another Primary NYCSA Account Exist",
     "Guardian Home Number","Guardian Work Number","Guardian Cell Number","Relationship","Role","Account Creation Code"
   ];
 
