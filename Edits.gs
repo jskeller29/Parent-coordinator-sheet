@@ -198,11 +198,11 @@ function handleEdit_(e) {
   // =======================================================
   // CONTACT LOG GHOST TYPIST — PASTED COLUMN (fills every pasted row)
   // =======================================================
-  let pasteAddedRow = false; // the paste reached END and a blank row was added there
+  let pasteAddedRows = 0; // the paste reached END and empty rows were added there
   if (numRows > 1 && (col === CL_COL_GUARDIAN || col === CL_COL_OSIS || col === CL_COL_STUDENT)) {
     try {
       const pasteRows = endRow ? Math.min(numRows, endRow - row) : numRows;
-      if (pasteRows > 0) pasteAddedRow = !!fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow, range.getNumColumns());
+      if (pasteRows > 0) pasteAddedRows = Number(fillPastedContactLogRows_(e.source, sheet, row, pasteRows, col, endRow, range.getNumColumns())) || 0;
     } catch (err) {
       console.error(err);
       e.source.toast("Auto-fill failed: " + err.message, "⚠️ Ghost Typist Error", 5);
@@ -318,7 +318,7 @@ function handleEdit_(e) {
   // A row was added above END (by this edit, or by the paste above when it reached END: before
   // 2026-11-18 the paste's row was missed, so END's clean-up cleared the new row's checkbox)
   // (the paste's row first: a paste that started on the last row would otherwise get a second one)
-  const addedBlankRow = pasteAddedRow || autoAddBlankRow_(sheet, row, endRow);
+  const addedRows = pasteAddedRows || autoAddBlankRow_(sheet, row, endRow); // how many empty rows went in above END
   // (the week formula check, patchMissingFormulasInRow_, runs at the end of the
   // edit: its reads would hold up the clean-up and the notes)
 
@@ -333,7 +333,7 @@ function handleEdit_(e) {
   // Where END is now: it was checked at the start of this edit, and moves down
   // exactly one row when a blank row was added above it (no read needed);
   // column E is only scanned when END was not known
-  const finalEndRow = endRow ? (addedBlankRow ? endRow + 1 : endRow) : findEndRowInColumnE_(sheet);
+  const finalEndRow = endRow ? endRow + addedRows : findEndRowInColumnE_(sheet);
   rememberEndRow_(sheet, finalEndRow);
   if (finalEndRow) {
     // the line above the END bar only (under it is the lookup box's thick line; release check 4.4)
@@ -1351,18 +1351,24 @@ function FIX_ALL_MISSING_FORMULAS_BATCH() {
   ss.toast("Week formulas restored and borders fixed!", "Success", 3);
 }
 
-/** Adds the empty row above END when editedRow was the last one. true = a row was added (END moved down one). */
+/**
+ * Typing in the LAST empty row above END adds CL_NEW_ROWS_ (3) empty rows under it (owner 2026-11-18; was 1):
+ * the next two entries need no insert, which is one of the slowest steps of an edit. Returns how many rows
+ * were added (0 = none; END moved down that many).
+ */
+var CL_NEW_ROWS_ = 3;
 function autoAddBlankRow_(sheet, editedRow, endRow) {
-  if (!endRow || editedRow !== endRow - 1) return false;
-  sheet.insertRowAfter(editedRow);
-  formatContactLogRows_(sheet, editedRow + 1, 1);
-  sheet.getRange(editedRow + 1, CL_COL_CHECKBOX).setValue(false);
+  if (!endRow || editedRow !== endRow - 1) return 0;
+  const n = CL_NEW_ROWS_;
+  sheet.insertRowsAfter(editedRow, n);
+  formatContactLogRows_(sheet, editedRow + 1, n);
+  sheet.getRange(editedRow + 1, CL_COL_CHECKBOX, n, 1).setValue(false);
 
   // The end bar's black border sticks to the edited row's bottom edge when
   // the new row is inserted above it. Strip its horizontal borders so only
   // the dark brown end bar (re-drawn by the onEdit sweep) keeps a border.
   sheet.getRange(editedRow, 1, 1, CL_WIDTH).setBorder(null, null, false, null, null, false);
-  return true;
+  return n;
 }
 
 /**
@@ -1602,7 +1608,7 @@ function fillPastedContactLogRows_(ss, sheet, row, numRows, col, endRow, numCols
   const added = autoAddBlankRow_(sheet, row + numRows - 1, endRow);
 
   toastGhostMisses_(ss, filledRows.length, missing);
-  return added; // END moved down one: the edit's END clean-up must know (it cleared the new row's checkbox)
+  return added; // rows added (END moved down that many): the edit's END clean-up must know (it cleared the new row's checkbox)
 }
 
 /** Notes: fills OSIS / Guardian / Student for every pasted row; families already on the sheet are removed. */

@@ -538,6 +538,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   Contacts Sync, Sheet Lock, Regenerate, Z#ContactLog (scripts) and InputDataSidebar, ManageOverridesDialog,
   ProgressSidebar, SettingsDialog, YourListsSidebar (pages) on every sheet; owner sheet also z_MINE. The next build
   renames the tab. User Guide Doc: "Parents Divided" -> "Parents List" by hand.
+- Contact Log adds 3 empty rows at the bottom (2026-11-18, later): re-paste Edits on every sheet.
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):
@@ -630,6 +631,9 @@ deploy: see the 2026-11-18 line under Deploying):
   the lookup box guardian count, Contacts Sync); Sheets updates formulas / dropdowns that point at a renamed tab.
   KEEP_TABS_ and TAB_VISIBILITY list both names; the setting key stays parentsDivided, function names keep
   "ParentsDivided"; Migration and Z#ContactLog also look for the old name in an older tracker.
+- CONTACT LOG: 3 NEW ROWS (owner 2026-11-18, later, from the speed ideas): typing in the LAST empty row above END adds
+  CL_NEW_ROWS_ (3) rows in one insertRowsAfter (autoAddBlankRow_ returns the count; the paste path too; the handler's
+  finalEndRow = endRow + addedRows), so two of every three entries need no insert.
 - Input Data Mode, later the same day: Select all / Unselect all (#footPick, pickAll) above Start on the start page;
   the All done screen has "Back to the start" (backToStart -> idm_open = a new run on the start page).
 - The round 2 page got the re-tests ("Fixed, re-test" + the newest fixes first) and new checks 2.22 (pick what to

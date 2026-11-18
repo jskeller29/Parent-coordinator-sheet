@@ -346,7 +346,8 @@ A few things happen on their own:
   siblings too. If the tracker can't find the name, a message says so. Pasting a whole
   column of names or OSIS numbers works too.
 - Date, # and Follow-up fill in only where you left them blank. Anything you type stays.
-- A blank row is always kept above the dark END bar. The checkbox on the END bar
+- Empty rows are always kept above the dark END bar: when you type in the last one, three more
+  are added. The checkbox on the END bar
   switches a filter that shows only this week and last week (or only today, see
   Settings) plus open follow-ups.
 

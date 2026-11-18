@@ -97,13 +97,15 @@ const eq = (a, b, m) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a === u
       return rg;
     }
   };
-  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 9, 10), true, 'the last row before END: a row is added');
-  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 5, 10), false, 'not the last row: none');
-  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 9, null), false, 'END unknown: none');
-  assert.strictEqual(inserted, 1);
+  let insertedRows = 0;
+  fakeLog.insertRowsAfter = (r, n) => { inserted++; insertedRows += n; };
+  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 9, 10), 3, 'the last row before END: 3 empty rows are added');
+  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 5, 10), 0, 'not the last row: none');
+  assert.strictEqual(g.autoAddBlankRow_(fakeLog, 9, null), 0, 'END unknown: none');
+  assert.strictEqual(inserted, 1, 'one insert call'); assert.strictEqual(insertedRows, 3);
   const edits = fs.readFileSync(path.join(ROOT, 'Edits.gs'), 'utf8');
   const handler = edits.slice(edits.indexOf('function handleEdit_'), edits.indexOf('// CONTACT LOG SEARCH BAR'));
-  assert(/pasteAddedRow \|\| autoAddBlankRow_\(sheet, row, endRow\)/.test(handler), 'a paste that added the row: END known to have moved, no second row');
+  assert(/pasteAddedRows \|\| autoAddBlankRow_\(sheet, row, endRow\)/.test(handler) && /endRow \+ addedRows/.test(handler), 'a paste that added the row: END known to have moved, no second row');
   assert(/rowLock\.tryLock\(10000\)/.test(handler) && handler.indexOf('releaseRowLock(); // the new row') > handler.indexOf('autoAddBlankRow_(sheet, row, endRow)'),
     'one Contact Log edit at a time until the new row is on the sheet');
   assert(handler.indexOf('releaseRowLock(); // the new row') < handler.indexOf('syncNotesForRowOsis_(mainOsis'), 'let go before the notes (they lock too)');

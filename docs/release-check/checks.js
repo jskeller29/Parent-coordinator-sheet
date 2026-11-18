@@ -22,6 +22,7 @@ module.exports = {
   // What changed since round 1, for the page's "Fixed since round 1" list (each links to its re-test)
   fixes: [
     // 11/18: from your notes of 11/17 (each is marked "Fixed, re-test" on its check)
+    { text: "11/18, later (your idea): the Contact Log adds 3 empty rows when you reach the last one, so most entries skip the slow row insert.", checks: ["s4-01"] },
     { text: "11/18, later: \"Parents Divided\" is now \"Parents List\" everywhere (the tab is renamed by itself at the next build); Select all on the start page; Back to the start on the All done screen.", checks: ["s4-16", "s2-22", "s2-16"] },
     { text: "11/18, new (your idea): Input Data Mode asks what you want to update. Tick the data you have new files for; it goes through only those and ends with Build my sheets and Done.", checks: ["s2-05", "s2-22", "s2-16"] },
     { text: "11/18: no \"Not now\" in the welcome window (your note on 2.5).", checks: ["s2-05"] },
@@ -325,7 +326,7 @@ module.exports = {
           do: ["Type a fake parent's name (Marge Simpson) in the Guardian column of the empty row and press Enter. Count the seconds until the row is filled in.",
                "Right away (before it finishes) type in that row's Person Spoke With and Event Description too."],
           see: ["The student, OSIS, date, # and follow-up fill in by themselves.",
-                "Exactly ONE new empty row above END, with its checkbox in P."],
+                "Typing in the LAST empty row above END adds THREE new empty rows (each with its checkbox in P); typing in the first two of them adds none. Never more than three at once."],
           timing: "Seconds until the row filled in",
           fixed: "11/18 (your note on 7.2: a new row had no checkbox): two quick edits ran side by side, both added a row and one took the other's checkbox. Now the second one waits until the first has added its row." },
         { id: "s4-02", optional: true, title: "Pasting and deleting rows",
