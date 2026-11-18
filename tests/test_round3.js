@@ -431,3 +431,40 @@ function parentsSheet() {
   assert(/id="restartBtn" onclick="backToStart\(\)"/.test(sb) && /call\('idm_open'\); \/\/ starts a new run/.test(sb), 'All done: Back to the start');
   console.log("Parents List rename, Select all, Back to the start: ok");
 }
+
+// ---------------------------------------------------------------- 2026-11-18 later: maybe the same parent, tabs by hand
+{
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(["Contact Log"])) } });
+  const gs = [g.buildGuardianObject_("1", "MARGE SIMPSON", "MOTHER", "English", "", "marge@x.org", "2222222222"),
+              g.buildGuardianObject_("1", "HOMER SIMPSON", "FATHER", "English", "", "", "1111111111")];
+  let m = g.parentMaybeSame_("Bouvier, Marge", [], "", gs);
+  assert(m && m.name === "Marge Simpson" && m.pct >= 60 && /same first name/.test(m.why), 'a maiden name: ' + JSON.stringify(m));
+  m = g.parentMaybeSame_("Marge Bouvier", [], "marge@x.org", gs);
+  assert(m && m.pct >= 90 && /email/.test(m.why), 'same email too: ' + JSON.stringify(m));
+  assert.strictEqual(g.parentMaybeSame_("Patty Bouvier", ["4444444444"], "", gs), null, 'someone else: nothing');
+  const { ss, g: g2 } = parentsSheet();
+  const patty = g2.findParentsToAdd_(ss).items.find(it => it.name === "Patty Bouvier");
+  eq(patty.current, ["Homer Simpson", "Marge Simpson"], 'the card lists the student\'s parents now');
+  const home = fs.readFileSync(path.join(ROOT, 'ManageOverridesDialog.html'), 'utf8');
+  assert(/Parents now: /.test(home) && /Maybe the same person as/.test(home) && /fold\('addSec'\)/.test(home) && /fold\('chgSec'\)/.test(home),
+    'page: parents now, maybe the same, both sections fold');
+  console.log("Parents to add: maybe the same person, parents now, folding: ok");
+}
+{
+  const ss = makeSpreadsheet(["Contact Log", "Student List", "Phone Contacts", "Directory", "Backend"]);
+  ss.getSheetByName("Student List")._put([["OSIS", "Student"], ["123456789", "Bart Simpson"]], 1, 1);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, props: { SETUP_COMPLETE: 'true' } });
+  ss.getSheetByName("Directory").hideSheet(); // hidden by hand (default: shown)
+  eq(g.rememberTabChoices_(ss).sort(), ["phoneContacts", "showDirectory", "showMasterTable"], 'shown / hidden by hand -> the settings');
+  assert.strictEqual(g.__props.phoneContacts, 'true'); assert.strictEqual(g.__props.showDirectory, 'false');
+  eq(g.rememberTabChoices_(ss), [], 'nothing new: nothing written');
+  ss.getSheetByName("Directory").showSheet();
+  g.__props.INPUT_DATA_MODE_STATE = '{"step":0}';
+  eq(g.rememberTabChoices_(ss), [], 'Input Data Mode on: tabs hidden on purpose, not choices');
+  delete g.__props.INPUT_DATA_MODE_STATE; delete g.__props.SETUP_COMPLETE;
+  eq(g.rememberTabChoices_(ss), [], 'before setup: nothing');
+  const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8'), idm = fs.readFileSync(path.join(ROOT, 'Input Data.gs'), 'utf8');
+  assert(/function openSettingsDialog\(\) \{[\s\S]{0,200}rememberTabChoices_\(\)/.test(menus), 'Settings opens with the tabs as they are');
+  assert(/rememberTabChoices_\(ss\)/.test(idm), 'Input Data Mode reads them before hiding the tabs');
+  console.log("tabs shown / hidden by hand become the settings: ok");
+}

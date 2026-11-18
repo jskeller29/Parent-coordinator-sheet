@@ -1496,6 +1496,39 @@ function showStartingTabs_(ss) {
 }
 
 /**
+ * A tab shown or hidden BY HAND (View → Hidden sheets, right-click → Hide sheet) becomes the ⚙️ Settings choice
+ * for it (owner 2026-11-18): run before the tracker shows / hides tabs from the settings (⚙️ Settings opening,
+ * Input Data Mode starting, whose end shows the settings' tabs again), so those never undo what was done by hand.
+ * Not while the tabs are hidden on purpose: before setup / the first build (only the Welcome tab), during setup,
+ * while Input Data Mode is on, or when the Contact Log itself is hidden (something else hid the tabs).
+ * Returns the setting keys it changed (also saved to the Backend settings block, so a copy keeps them).
+ */
+function rememberTabChoices_(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getDocumentProperties();
+  const all = props.getProperties();
+  if (all.SETUP_COMPLETE !== 'true' || all[IDM_STATE_KEY] || IS_RUNNING_SETUP) return [];
+  const byName = {};
+  ss.getSheets().forEach(function(s) { byName[s.getName()] = s; });
+  const log = byName["Contact Log"];
+  if (!log || log.isSheetHidden() || !studentListIsBuilt_(ss)) return [];
+  const vals = {}, changed = [];
+  TAB_VISIBILITY.forEach(function(t) {
+    let sh = null;
+    t.sheets.forEach(function(n) { if (!sh && byName[n]) sh = byName[n]; });
+    if (!sh) return;
+    const v = all[t.key];
+    const saved = (v === undefined || v === null || v === '') ? t.def : v === 'true';
+    const shown = !sh.isSheetHidden();
+    if (saved !== shown) { vals[t.key] = String(shown); changed.push(t.key); }
+  });
+  if (!changed.length) return changed;
+  props.setProperties(vals);
+  try { saveSettingsToVersionSheet_(ss); } catch (e) { console.warn("Settings block not saved: " + e.message); }
+  return changed;
+}
+
+/**
  * End of every build (Build.gs). On a new copy this is the first build: the everyday
  * tabs come out from behind the 👋 Welcome tab, and the Welcome tab goes. Inside Input
  * Data Mode (step 5 builds) they are added to the tabs the mode shows when it ends.
@@ -1810,6 +1843,8 @@ function onEdit(e) {
 // ⚙️ SETTINGS BACKEND LOGIC (was Settings Backend.gs)
 // ==========================================
 function openSettingsDialog() {
+  // Tabs shown / hidden by hand show in the dialog as they are (owner 2026-11-18)
+  try { rememberTabChoices_(); } catch (e) { console.warn("Tab choices not read: " + e.message); }
   // ✅ Getting Started step 3 "Check your settings" ticks however Settings is opened (owner 2026-11-17,
   // release check 2.20: opened from the menu before the checklist, it stayed unticked)
   try { PropertiesService.getDocumentProperties().setProperty('ZG_SETTINGS_SEEN', 'true'); } catch (e) { console.warn(e.message); }
@@ -2622,10 +2657,15 @@ function findParentsToAdd_(ss, all) {
     const key = parentsToAddKey_(st.id, tokens);
     let item = items.get(key);
     if (!item) {
+      const guardians = guardiansOf.get(st.id) || [];
       item = { key: key, osis: st.id, student: st.name, studentFirst: st.first, studentLast: st.last, cls: st.cls,
-               name: parentDisplayName_(rawName), relationship: "", phone: "", email: "", sources: [] };
+               name: parentDisplayName_(rawName), relationship: "", phone: "", email: "", sources: [],
+               // the student's parents now (the card lists them), and the one this may be (owner 2026-11-18)
+               current: guardians.map(g => stripTrailingParenthetical_(g.guardianOutput)), maybe: null };
       items.set(key, item);
     }
+    const maybe = parentMaybeSame_(rawName, phones, email, guardiansOf.get(st.id) || []);
+    if (maybe && (!item.maybe || maybe.pct > item.maybe.pct)) item.maybe = maybe;
     if (!item.relationship && info.relationship) item.relationship = properCase_(info.relationship);
     if (!item.phone && phones.length) item.phone = formatPhone_(phones[0]) || phones[0];
     if (!item.email && email) item.email = toText_(info.email);
@@ -2689,6 +2729,34 @@ function findParentsToAdd_(ss, all) {
   items.forEach(it => { if (skipped.has(it.key)) out.skipped++; else out.items.push(it); });
   out.items.sort((a, b) => compareNatural_(lastOf(a), lastOf(b)) || compareNatural_(a.student, b.student) || compareNatural_(a.name, b.name));
   return out;
+}
+
+/**
+ * "Maybe just a different name?" (owner 2026-11-18): how alike a parent to add is to each of the student's
+ * guardians now, as a %, with why. Same first name but another last name (a married / maiden name), a close
+ * spelling, the same phone or email. The best one at 50% or more: { name, pct, why }, else null. Uses the
+ * Your Lists name scoring (od_nameScore_: 45% first name + 55% last name, nicknames and initials count).
+ */
+function parentMaybeSame_(rawName, phones, email, guardians) {
+  const cand = od_nameParts_(rawName);
+  if (!cand || !guardians.length) return null;
+  let best = null;
+  guardians.forEach(g => {
+    const gName = stripTrailingParenthetical_(g.guardianOutput);
+    const gp = od_nameParts_(gName);
+    if (!gp) return;
+    let score = od_nameScore_(cand, gp);
+    const firstAlike = od_firstScore_(cand.first, gp.first) >= 0.9;
+    const lastAlike = od_bestPair_(cand.lastTokens.length ? cand.lastTokens : cand.tokens, gp.lastTokens.length ? gp.lastTokens : gp.tokens) >= 0.9;
+    const contact = (phones.length && phones.indexOf(normalizePhoneForMatch_(g.mobile)) !== -1) || (email && email === normalizeEmail_(g.email));
+    const why = [];
+    if (firstAlike && !lastAlike) { score = Math.max(score, 0.6); why.push("same first name, another last name"); }
+    else if (score >= 0.75) why.push("a close spelling");
+    if (contact) { score = Math.min(0.99, score + 0.3); why.push("the same " + (email && email === normalizeEmail_(g.email) ? "email" : "phone")); }
+    const pct = Math.round(Math.min(0.99, score) * 100);
+    if (pct >= 50 && (!best || pct > best.pct)) best = { name: gName, pct: pct, why: why.join(" and ") || "a similar name" };
+  });
+  return best;
 }
 
 /** The main page: parents to add, your changes, whether builds are paused. */

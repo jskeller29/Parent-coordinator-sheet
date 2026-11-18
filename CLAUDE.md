@@ -539,6 +539,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   ProgressSidebar, SettingsDialog, YourListsSidebar (pages) on every sheet; owner sheet also z_MINE. The next build
   renames the tab. User Guide Doc: "Parents Divided" -> "Parents List" by hand.
 - Contact Log adds 3 empty rows at the bottom (2026-11-18, later): re-paste Edits on every sheet.
+- Parents to add "maybe the same" + parents now + folding, tabs by hand -> Settings (2026-11-18, later): re-paste
+  Menus, Input Data (scripts) and ManageOverridesDialog (page) on every sheet. The claude/peaceful-clarke-82x3jz
+  branch was deleted at the owner's request (everything is on Test-Version).
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):
@@ -634,6 +637,16 @@ deploy: see the 2026-11-18 line under Deploying):
 - CONTACT LOG: 3 NEW ROWS (owner 2026-11-18, later, from the speed ideas): typing in the LAST empty row above END adds
   CL_NEW_ROWS_ (3) rows in one insertRowsAfter (autoAddBlankRow_ returns the count; the paste path too; the handler's
   finalEndRow = endRow + addedRows), so two of every three entries need no insert.
+- PARENTS TO ADD, later (owner 2026-11-18): each item has current (the student's guardians now; the card says
+  "Parents now: ...") and maybe = parentMaybeSame_ (Menus.gs): the closest of those guardians by od_nameScore_, same
+  first name + another last name = at least 60% ("same first name, another last name": a maiden / married name),
+  75%+ = "a close spelling", same phone / email +30; shown at 50%+ ("Maybe the same person as X: 68% alike ... If so,
+  click Not new"). Your changes cards show "Parents: ..." for every kind. Both sections fold with Hide / Show
+  (localStorage pc-overrides-folded).
+- TABS BY HAND -> SETTINGS (owner 2026-11-18): rememberTabChoices_ (Menus.gs) writes each TAB_VISIBILITY tab's shown /
+  hidden state into its setting (+ the Backend block) when it differs. Called by openSettingsDialog (the dialog shows
+  the tabs as they are) and when Input Data Mode starts (its end shows the settings' tabs). Skipped before setup /
+  the first build, during setup, while Input Data Mode is on, and when the Contact Log is hidden.
 - Input Data Mode, later the same day: Select all / Unselect all (#footPick, pickAll) above Start on the start page;
   the All done screen has "Back to the start" (backToStart -> idm_open = a new run on the start page).
 - The round 2 page got the re-tests ("Fixed, re-test" + the newest fixes first) and new checks 2.22 (pick what to

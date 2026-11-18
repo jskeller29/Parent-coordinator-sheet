@@ -22,6 +22,7 @@ module.exports = {
   // What changed since round 1, for the page's "Fixed since round 1" list (each links to its re-test)
   fixes: [
     // 11/18: from your notes of 11/17 (each is marked "Fixed, re-test" on its check)
+    { text: "11/18, later: Parents to add says when a parent may be one already there under another name, lists the student's parents now, and both sections fold; tabs shown / hidden by hand become the settings.", checks: ["s4-14", "s4-17"] },
     { text: "11/18, later (your idea): the Contact Log adds 3 empty rows when you reach the last one, so most entries skip the slow row insert.", checks: ["s4-01"] },
     { text: "11/18, later: \"Parents Divided\" is now \"Parents List\" everywhere (the tab is renamed by itself at the next build); Select all on the start page; Back to the start on the All done screen.", checks: ["s4-16", "s2-22", "s2-16"] },
     { text: "11/18, new (your idea): Input Data Mode asks what you want to update. Tick the data you have new files for; it goes through only those and ends with Build my sheets and Done.", checks: ["s2-05", "s2-22", "s2-16"] },
@@ -391,7 +392,8 @@ module.exports = {
                 "After Add: the Build panel runs; Bart's guardians are Homer, Marge and Abe in the Student List, Parents List, the phone contacts and the Person Spoke With list (not the Directory: it is ATS only). Lisa still has two.",
                 "Your changes shows Bart as \"Added guardian · Parent Square\" (then Edited, after the Patty save), with Edit and Delete.",
                 "Not new hides Lisa's Abe (\"1 parent you marked not new is hidden\"); Show them again brings him back.",
-                "The report lists Abe as Guardian: [Not in ATS] → Added from: Parent Square."],
+                "The report lists Abe as Guardian: [Not in ATS] → Added from: Parent Square.",
+                "Each parent to add says \"Parents now: Homer Simpson, Marge Simpson\". A parent with a guardian's first name and another last name (try a copy of 3b with PATTY changed to MARGE) says \"Maybe the same person as Marge Simpson: …% alike\". Hide / Show folds each section."],
           fixed: "New on 11/18 (your idea): one main page instead of Manage Overrides, with parents to add and back and forth to New / Edit Student." },
         { id: "s4-15", title: "Additional Notes as bullets",
           do: ["Contact Log: on a contact row for Bart, type in Additional Notes: \"- Needs the trip form\", Alt+Enter (Mac ⌥+Enter), \"- Will call Friday\", Enter.",
@@ -405,7 +407,11 @@ module.exports = {
           see: ["The tab is now called \"Parents List\" (renamed, not a second tab); its columns and data are as before.",
                 "Settings lists \"Parents List\" and keeps your show / hide choice.",
                 "The lookup box still lists the guardians (Sheets changed its formula to the new name by itself)."],
-          fixed: "New on 11/18 (your request): the new name everywhere." }
+          fixed: "New on 11/18 (your request): the new name everywhere." },
+        { id: "s4-17", title: "Tabs shown or hidden by hand",
+          do: ["Right-click the Directory tab → Hide sheet. View → Hidden sheets → Phone Contacts.", "Open ⚙️ Settings → Tabs & columns, close it. Then 📥 Input Data Mode → Finish or exit → Exit without saving."],
+          see: ["Settings shows Directory unticked and Phone Contacts ticked, as you left them.", "After Input Data Mode your tabs are as you left them (Directory hidden, Phone Contacts shown)."],
+          fixed: "New on 11/18 (your request): showing / hiding a tab by hand updates the settings." }
       ]
     },
     {

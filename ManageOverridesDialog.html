@@ -32,6 +32,11 @@
     .state { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 26px 0; color: var(--muted); font-size: 13.5px; }
     .empty { text-align: center; padding: 18px 16px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); font-size: 13px; }
     .hidden { display: none !important; }
+    /* "Maybe the same person" (owner 2026-11-18) */
+    .maybe { margin-top: 5px; font-size: 12.5px; color: var(--warn); background: var(--warn-soft); border-radius: var(--radius); padding: 3px 8px; }
+    /* Show / hide a section quickly (owner 2026-11-18) */
+    .fold { border: 0; background: none; color: var(--accent); font: 600 12.5px var(--font); cursor: pointer; padding: 0 2px; }
+    .sec.closed > :not(.sec-h) { display: none !important; }
   </style>
 </head>
 <body>
@@ -43,7 +48,7 @@
 
     <!-- 1. Parents to add -->
     <div class="sec hidden" id="addSec">
-      <div class="sec-h"><h2>Parents to add</h2><span class="count" id="addCount">0</span></div>
+      <div class="sec-h"><h2>Parents to add</h2><span class="count" id="addCount">0</span><button type="button" class="fold" id="fold-addSec" onclick="fold('addSec')">Hide</button></div>
       <p class="help" style="margin:0">Parent Square, NYCSA or one of your lists has these parents for a student, but your Student Data (ATS) doesn't. Add the ones who are the student's guardians: they show in the Student List, Parents List, the phone contacts and the Person Spoke With list (the Directory stays ATS only).</p>
       <div class="notice warn" id="addWarn">Only add someone who may get information about the student. ATS has the school's official guardians.</div>
       <div class="bar" id="addBarTop">
@@ -60,7 +65,7 @@
 
     <!-- 2. Your changes -->
     <div class="sec hidden" id="chgSec">
-      <div class="sec-h"><h2>Your changes</h2><span class="count" id="chgCount">0</span></div>
+      <div class="sec-h"><h2>Your changes</h2><span class="count" id="chgCount">0</span><button type="button" class="fold" id="fold-chgSec" onclick="fold('chgSec')">Hide</button></div>
       <p class="help" style="margin:0">Students you added or edited, and parents you added. Edit opens the student; Delete puts the student's ATS data back.</p>
       <div class="list" id="chgList"></div>
       <div class="empty hidden" id="chgEmpty">No changes yet. New / Edit Student (at the bottom) adds a student who isn't in ATS yet, or changes one who is.</div>
@@ -84,7 +89,25 @@
     function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
     function run() { return google.script.run.withFailureHandler(onFail); }
 
-    window.onload = function () { load(); };
+    window.onload = function () { applyFolds(); load(); };
+
+    // Each section folds shut and opens again with its Hide / Show button; remembered in this browser
+    var FOLD_KEY = 'pc-overrides-folded';
+    function folded() { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { return {}; } }
+    function applyFolds() {
+      var f = folded();
+      ['addSec', 'chgSec'].forEach(function (id) {
+        $(id).classList.toggle('closed', !!f[id]);
+        $('fold-' + id).textContent = f[id] ? 'Show' : 'Hide';
+      });
+    }
+    function fold(id) {
+      var f = folded();
+      f[id] = !f[id];
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(f)); } catch (e) { /* this time only */ }
+      $(id).classList.toggle('closed', !!f[id]);
+      $('fold-' + id).textContent = f[id] ? 'Show' : 'Hide';
+    }
 
     function load(note, kind) {
       setBusy(true);
@@ -145,6 +168,8 @@
           '<div class="chips">' + (p.sources || []).map(function (s) { return '<span class="chip">' + esc(s) + '</span>'; }).join('') + '</div></div>' +
           '<div class="meta">for <b>' + esc(p.student) + '</b>' + (p.cls ? ' · Class ' + esc(p.cls) : '') + ' · OSIS ' + esc(p.osis) + '</div>' +
           (contact ? '<div class="meta">' + esc(contact) + '</div>' : '') +
+          '<div class="meta">Parents now: ' + (p.current && p.current.length ? esc(p.current.join(', ')) : 'none in ATS') + '</div>' +
+          (p.maybe ? '<div class="maybe">Maybe the same person as <b>' + esc(p.maybe.name) + '</b>: ' + p.maybe.pct + '% alike (' + esc(p.maybe.why) + '). If so, click Not new.</div>' : '') +
           '<div class="acts"><button type="button" class="link" onclick="event.preventDefault(); editFirst(' + i + ')">Check and edit before adding</button></div>' +
           '</div></label>';
       }).join('');
@@ -217,7 +242,7 @@
       $('chgList').innerHTML = list.map(function (o, i) {
         var pill = o.kind === 'added' ? '<span class="pill">Added guardian' + (o.source ? ' · ' + esc(o.source) : '') + '</span>'
           : o.kind === 'new' ? '<span class="pill new">New student</span>' : '<span class="pill">Edited</span>';
-        var who = o.kind === 'added' && o.guardians && o.guardians.length ? '<div class="meta">Added: ' + esc(o.guardians.join(', ')) + '</div>' : '';
+        var who = o.guardians && o.guardians.length ? '<div class="meta">' + (o.kind === 'added' ? 'Added: ' : 'Parents: ') + esc(o.guardians.join(', ')) + '</div>' : '';
         return '<div class="card"><div class="main">' +
           '<div class="top"><div><span class="nm">' + esc(o.lastName) + ', ' + esc(o.firstName) + '</span></div><div class="chips">' + pill + '</div></div>' +
           '<div class="meta">OSIS ' + esc(o.osis) + (o.classCode ? ' · Class ' + esc(o.classCode) : '') + ' · changed ' + esc(o.date) + (o.hidden ? ' · hidden from the report' : '') + '</div>' + who +

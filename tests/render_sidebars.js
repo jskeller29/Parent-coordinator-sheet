@@ -128,7 +128,8 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   const home = { toAdd: [
       { key: 'a', name: 'Grandmama Addams', relationship: 'Grandmother', student: 'Wednesday Addams', cls: 'Y12', osis: '111222333', phone: '(777) 777-7777', email: '', sources: ['NYCSA'] },
       { key: 'b', name: 'Abe Simpson', relationship: '', student: 'Bart Simpson', cls: 'Y41', osis: '123456789', phone: '(333) 333-3333', email: 'abe@x.org', sources: ['Parent Square', '👪 PTA'] },
-      { key: 'c', name: 'Patty Bouvier', relationship: 'Aunt', student: 'Bart Simpson', cls: 'Y41', osis: '123456789', phone: '(444) 444-4444', email: '', sources: ['NYCSA'] }],
+      { key: 'c', name: 'Marge Bouvier', relationship: 'Mother', student: 'Bart Simpson', cls: 'Y41', osis: '123456789', phone: '(444) 444-4444', email: '', sources: ['NYCSA'],
+        current: ['Homer Simpson', 'Marge Simpson'], maybe: { name: 'Marge Simpson', pct: 68, why: 'same first name, another last name' } }],
     skipped: 2, paused: false, error: '',
     changes: [{ date: '11/18/2026', type: 'Added Guardian (NYCSA)', kind: 'added', source: 'NYCSA', osis: '567891234', lastName: 'Simpson', firstName: 'Lisa', classCode: 'Y25', guardians: ['Selma Bouvier'] },
               { date: '11/02/2026', type: 'New Student', kind: 'new', source: '', osis: '998877665', lastName: 'Belcher', firstName: 'Tina', classCode: 'Y42', guardians: ['Bob Belcher'] },

@@ -246,7 +246,9 @@ Overrides → 🗂️ Student Overrides.
 
 - Parents to add: parents Parent Square, NYCSA or your lists have for a student who
   aren't one of the student's guardians in ATS, with where each one came from. Tick the
-  ones who are guardians and click Add, or Not new to stop seeing one. Check and edit
+  ones who are guardians and click Add, or Not new to stop seeing one. Each one shows the
+  student's parents now, and says when it may be one of them under another name (for example
+  the same first name with another last name), with how alike they are. Check and edit
   before adding opens the student with that parent filled in. An added parent joins the
   ATS guardians, so a new phone in next month's ATS still comes in.
 - Your changes: every student you added or edited and every parent you added, with Edit
@@ -318,7 +320,9 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 | 📥 your lists | One tab per list from Your Lists, with the icon you picked (📥 unless you picked another). | No |
 | Backend | The tracker's own settings and data. Leave it alone, except the Type List in column BL. | No, always hidden |
 
-Turn tabs on or off in ⚙️ Settings → Tabs & columns. Hidden tabs keep updating.
+Turn tabs on or off in ⚙️ Settings → Tabs & columns. Hidden tabs keep updating. A tab you
+show or hide by hand (View → Hidden sheets, or right-click a tab → Hide sheet) is kept that
+way: Settings takes it over the next time it opens.
 
 ### The Contact Log
 

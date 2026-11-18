@@ -214,6 +214,8 @@ function idm_startOrResume_(ss) {
   let state = idm_loadState_();
   if (!state) {
     if (!idm_rawSheet_(ss)) return { error: 'The "Raw Data" tab is missing, so there is nowhere to put the data.' };
+    // Tabs shown / hidden by hand become the settings first: the end of the mode shows the settings' tabs
+    try { rememberTabChoices_(ss); } catch (e) { console.warn("Tab choices not read: " + e.message); }
     let active = ss.getActiveSheet();
     // Started from the 👋 Welcome tab (new copy): come back to the Contact Log, not to it
     if (active && active.getName() === WELCOME_TAB_NAME) active = ss.getSheetByName("Contact Log") || null;
