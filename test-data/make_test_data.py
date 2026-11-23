@@ -87,6 +87,19 @@ NY_EXTRA = ["M094", "75", "P.S. M094", "Y41", "6", "123456789", "BART", "SIMPSON
 write("2b - Parent Square - a parent not in ATS", PS_H, ps + [PS_EXTRA])
 write("3b - NYCSA - a third guardian", NY_H, ny + [NY_EXTRA])
 
+# 2c. New numbers for parents ATS already has (👤 Student Overrides → Phone numbers to check, 2026-11-23):
+# Homer Simpson has a new number on both his rows (Bart and Lisa: one card), and Parent Square spells Morticia
+# "Adams" with a new number on Wednesday's row only (a card that says how alike the names are; Pugsley's row
+# is unchanged, so after "Add as a 2nd number" she is one phone contact with both numbers)
+def new_numbers(r):
+    r = list(r)
+    if r[0] == "Simpson, Homer":
+        r[3] = "(111) 555-0101"
+    elif r[0] == "Addams, Morticia" and r[1] == "Wednesday Addams":
+        r[0], r[3] = "Adams, Morticia", "(333) 555-0303"
+    return r
+write("2c - Parent Square - new phone numbers", PS_H, [new_numbers(r) for r in ps])
+
 # 4. Site / Class: paste over the "Site / Class" tab in Input Data Mode step 4 (columns A:C)
 site_class = [["Y11","Bam","276"],["Y12","","276"],["Y24","Lam","281"],["Y25","Sam","51"],["Y27","Rosa","51"],["Y28","Ortiz","281"],
               ["Y41","Tessa","15"],["Y42","Nina","15"],["Y50","","340"],["Y66","Carl","51"],["X30","Ham","188"],["X31","Lee","188"]]
@@ -142,6 +155,15 @@ write("5c - Your Lists - Field Trip Forms (first + last name columns)", ["First 
   ["Kim","Possible","X31","Yes","$10"],
   ["Mirabel","Madrigal","Y28","Yes",""],
   ["Tina","Belcher","Y42","Yes",""],                                  # not in ATS (a New/Edit Student override in the fake data)
+])
+
+# 5e. A list only for finding parents and numbers (2026-11-23: "What is this list for?" → Only find parents and
+#     phone numbers to add): a new number for Homer, a parent ATS doesn't have, one the same as ATS, one not found
+write("5e - Your Lists - Parent Contact Cards (only find parents and numbers)", ["Parent","Child","Cell Phone","Email"], [
+  ["Homer Simpson","Bart Simpson","(111) 222-3333","HOMERSIMPSON@gmail.com"],   # a parent we have, another number
+  ["Marge Simpson","Lisa Simpson","(222) 222-2222","MARGE.SIMPSON@gmail.com"],  # the same number: nothing to check
+  ["Selma Bouvier","Wednesday Addams","(444) 555-6666",""],                    # not in ATS: Parents to add
+  ["Natasha Romanoff","","(555) 000-1234",""]                                  # no child: not found, nothing offered
 ])
 
 write("5d - Your Lists - After School Sign-up (LAST, FIRST)", ["Name","Grade","Program","Days"], [

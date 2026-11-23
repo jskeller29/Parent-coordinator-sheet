@@ -594,7 +594,9 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   add/instead | From | Date) + a build. getOverrideData_ returns phones (readPhoneChanges_, doc cache PHONE_CHANGES_<id>,
   cleared by every PHONES write in Core.gs); buildGuardianObjects_(raw, guardians, phones) applies them
   (applyPhoneChanges_; not the Directory). cleanRedundantPhoneChanges_ (in cleanRedundantOverrides) drops a row ATS has
-  caught up with. Resets clear PHONES; Migration copies it. getOverridesHome reads the sources once for both sections;
+  caught up with. Your changes lists the saved numbers (savedPhoneChanges_: one card per parent + number + use,
+  siblings together, getOverridesHome.phoneChanges) with Delete (deletePhoneChanges(keys): rows go, a build, offered
+  again; release check round 3, a wrong "Use it instead" could not be undone before). Resets clear PHONES; Migration copies it. getOverridesHome reads the sources once for both sections;
   the end of Input Data Mode counts both (idm_parentsToAddSummary .phones).
 - 3 LIST PURPOSE: setup.purpose "info" (default; as before) | "contacts". YourListsSidebar: "What is this list for?"
   on the first screen (od_setListPurpose) and in step 1; contacts = steps Columns -> Match only, needs a guardian
@@ -609,9 +611,11 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
   getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
   OSIS, phone digits, email. getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
-  FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyLogContact writes the OSIS in the first empty row
-  after the last filled one and calls handleEdit_ with { range, value, source } (exactly as typing it), then Person
-  Spoke With; findFamilyEditStudent opens New / Edit Student filled in.
+  FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyEditStudent opens New / Edit Student filled in.
+  NO "Log a contact" (owner 2026-11-23: the logging-a-contact UI is a future update): the card's Log a contact /
+  Log a contact with them buttons and findFamilyLogContact (the OSIS in the first empty Contact Log row, then
+  handleEdit_ as if typed, then Person Spoke With) were built and taken out the same day; the code is in commit
+  160a224 if that update wants it.
 - Own ideas not built (owner may ask): "Remove the school contacts from this Google account" (deletes contacts),
   emails in Phone numbers to check.
 
@@ -1297,6 +1301,10 @@ Workflow:
   2 new / 1 left and a broken one with cut-off numbers, Parent Square, NYCSA, Site and Class) and 4 Your Lists files
   (bus routes = student list with title rows / typos / initials / wrong OSIS, PTA = guardian list, field trip =
   first + last columns, after school = "LAST, FIRST" + nicknames), each .csv + .xlsx, plus "PC Tracker test data.zip".
+  2026-11-23: 2c (Parent Square with new numbers: Homer for Bart + Lisa, "Adams, Morticia" for Wednesday = Phone numbers
+  to check's 2 cards) and 5e (Parent Contact Cards, an "only find parents and numbers" list: Selma to add, Homer's other
+  number); tests/test_round4.js checks what both show. make_test_data.py rewrites every .xlsx (new timestamps): keep
+  only the new files and git checkout the rest, then --zip-only.
   Same 18 students as Regenerate's fake data (make_test_data.py reads them from Regenerate.gs; needs openpyxl).
   README.md there says what each file should show; tests/test_testdata.js checks those counts.
 - DEPLOY.md (repo root): the owner's one-page checklist (files to delete, the files each copy should have, manifests,
@@ -1343,7 +1351,20 @@ Workflow:
   added at the END of their stage (2.22, 2.23, 4.14, 4.15) so every earlier number stays.
   Round 2's setup checks are 1.6 / 1.7 (s1r-1, s1r-2) at the END of stage s1, so every round 1 number stays the same.
   A later round: copy that round's db doc into roundN-results.json, point lastRound at it, bump round, publish the
-  built page WITHOUT url (a new page). When the owner says "release check done", read checks/current on the round 2 url.
+  built page WITHOUT url (a new page). When the owner says "release check done", read checks/current on the round 3 url.
+  ROUND 3 (owner 2026-11-23, after the 10 ideas: "give me the checklist again ... skip the set-up of making the blank and
+  example sheet, start from what a new user would see"): https://claude.ai/artifact/68r88BXD58pjvejrLmYLCQ (title "PC
+  Tracker Release Check Round 3"; capabilities db + downloads; never publish over round 1 / round 2). lastRound =
+  round2-results.json (round 2's db doc, answers kept only for checks round 3 still has: checks.js filters them). The
+  set-up stage s1 is gone: s0 = the 4 rules + s0-5 "This version on your copies" (the files, Build once, the Method 2
+  dropdown by hand, then the owner's own Make Release Copies). Order: s0, s2 "What a new user sees" (the new-user
+  flow with the new features where a new user meets them), sn "What's new, on the fake-data copy" (phone numbers to
+  check with 2c, two numbers, Delete a saved number, add a parent), s3, s4, s5, s6, s7 (+ phone numbers / Find a Family
+  at real size), s8 (8.4 / 8.5 optional: the owner makes copies their own way), sb (b-19..b-22 new). New ids n3-01 ..
+  n3-13. Data fields for the round: isNew (chip "New", box "New:"), partsIntro / partsIntroText (the intro's first item),
+  fixesLabel, fixLinkWord, retestTitle (page.template.html + build.js read them; round 2's page unchanged without them).
+  The round box's links have a space between them (a long row of them was one unbreakable run: 73 px of sideways
+  scroll at phone width). "Log a contact" is not tested: the owner's logging-a-contact UI is a future update.
   Republishing round 2 (a check fixed, a typo): publish release-check.html with url = the round 2 page (from another
   session pass that url; capabilities db + downloads are kept when omitted). Round 1's page,
   https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1, keeps round 1's answers: never publish over it. The page:

@@ -271,7 +271,8 @@ Overrides → 🗂️ Student Overrides.
   one goes), or Not needed. The number shows in the Parents List and the phone contacts
   after the build. Once ATS has the number, the change removes itself.
 - Your changes: every student you added or edited and every parent you added, with Edit
-  and Delete.
+  and Delete, and every phone number you saved under Phone numbers to check. Delete on a
+  number undoes it: the old number comes back at the next build.
 - Create the Override Report, and New / Edit Student, at the bottom. New / Edit Student
   has a "← Student Overrides" button back to the page.
 
@@ -389,8 +390,6 @@ name (the spelling doesn't have to be exact), an OSIS, part of a phone number or
 email. Pick a result to see the student, every parent with their numbers and email,
 Parent Square and NYCSA, open follow-ups, Student Info from your lists, and the notes.
 
-- Log a contact starts a Contact Log row for that student (Log a contact with them also
-  fills in Person Spoke With). Type the Method and the rest there.
 - Edit student opens ✨ New / Edit Student with the student filled in.
 - Open as side panel moves it to the right of the sheet, so it stays open while you
   type in the Contact Log. Open as popup moves it back. It opens the way you left it.

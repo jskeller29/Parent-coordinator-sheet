@@ -31,7 +31,8 @@ const exportsExpected = [
   ["2 - Parent Square.csv", "ps", 28, false],
   ["3 - NYCSA (Students with Non-NYCSA Account).csv", "nycsa", 25, false],
   ["2b - Parent Square - a parent not in ATS.csv", "ps", 29, false],
-  ["3b - NYCSA - a third guardian.csv", "nycsa", 26, false]
+  ["3b - NYCSA - a third guardian.csv", "nycsa", 26, false],
+  ["2c - Parent Square - new phone numbers.csv", "ps", 28, false]
 ];
 exportsExpected.forEach(([file, key, n, cut]) => {
   const rows = csv(file);
@@ -52,7 +53,8 @@ const listsExpected = [
   ["5a - Your Lists - Bus Routes (student list).csv", "student", 10, 6, 2],
   ["5b - Your Lists - PTA Members (guardian list).csv", "guardian", 11, 1, 1],
   ["5c - Your Lists - Field Trip Forms (first + last name columns).csv", "student", 9, 0, 1],
-  ["5d - Your Lists - After School Sign-up (LAST, FIRST).csv", "student", 6, 2, 0]
+  ["5d - Your Lists - After School Sign-up (LAST, FIRST).csv", "student", 6, 2, 0],
+  ["5e - Your Lists - Parent Contact Cards (only find parents and numbers).csv", "student", 3, 0, 1]
 ];
 listsExpected.forEach(([file, by, ok, guesses, none]) => {
   const block = csv(file).filter(r => r.some(x => String(x).trim() !== ""));

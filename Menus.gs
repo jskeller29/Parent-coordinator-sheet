@@ -2980,6 +2980,59 @@ function unskipPhoneNumbers() {
 }
 
 /**
+ * The numbers saved with "Add as a 2nd number" / "Use it instead" (Backend PHONES), for Your changes on the
+ * main page, so a wrong click can be undone (release check round 3): one card per parent + number + use, its
+ * students together. key = guardian name parts | the number's digits | use (deletePhoneChanges takes it).
+ */
+function phoneChangeKey_(guardian, phone, use) {
+  return nameTokens_(toText_(guardian)).sort().join(" ") + "|" + normalizePhoneForMatch_(toText_(phone)) + "|" + (toText_(use).toLowerCase() === "instead" ? "instead" : "add");
+}
+function savedPhoneChanges_(ss) {
+  const rows = backendReadBlock_(ss, "PHONES");
+  if (rows.length < 2) return [];
+  const names = new Map(); // OSIS -> student, from the build's Student List copy (one read)
+  try { studentLookupRows_(ss, 2).forEach(r => { if (isRealStudentId_(r[0])) names.set(normalizeOsis_(r[0]), toText_(r[1])); }); }
+  catch (e) { console.warn("Saved phone numbers: no student names: " + e.message); }
+  const tz = Session.getScriptTimeZone();
+  const cards = new Map();
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const osis = toText_(r[0]), guardian = toText_(r[1]), phone = formatPhone_(r[2]) || toText_(r[2]);
+    if (!isRealStudentId_(osis) || !guardian || !phone) continue;
+    const key = phoneChangeKey_(guardian, phone, r[3]);
+    let c = cards.get(key);
+    if (!c) {
+      const d = r[5];
+      c = { key: key, guardian: guardian, phone: phone, use: key.slice(key.lastIndexOf("|") + 1), from: toText_(r[4]),
+            date: Object.prototype.toString.call(d) === "[object Date]" && !isNaN(d) ? Utilities.formatDate(d, tz, "MM/dd/yyyy") : toText_(d),
+            students: [] };
+      cards.set(key, c);
+    }
+    if (!c.students.some(s => s.osis === osis)) c.students.push({ osis: osis, name: names.get(normalizeOsis_(osis)) || ("OSIS " + osis) });
+  }
+  return Array.from(cards.values());
+}
+
+/** Delete on a saved number (Your changes): its rows go, then a build; the number is offered again to check. */
+function deletePhoneChanges(keys) {
+  keys = (Array.isArray(keys) ? keys : []).map(String);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rows = backendReadBlock_(ss, "PHONES");
+  const idxs = [];
+  for (let i = rows.length - 1; i > 0; i--) {
+    if (keys.indexOf(phoneChangeKey_(rows[i][1], rows[i][2], rows[i][3])) !== -1) idxs.push(i);
+  }
+  if (!idxs.length) return { removed: 0, building: false, home: getOverridesHome() };
+  backendDeleteRows_(ss, "PHONES", idxs);
+  SpreadsheetApp.flush();
+  const settings = getSettings();
+  const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
+  if (!paused) runBuildOnly();
+  else ss.toast("Deleted. Your sheets get the old numbers back at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  return { removed: idxs.length, building: !paused, home: getOverridesHome() };
+}
+
+/**
  * "Maybe just a different name?" (owner 2026-11-18): how alike a parent to add is to each of the student's
  * guardians now, as a %, with why. Same first name but another last name (a married / maiden name), a close
  * spelling, the same phone or email. The best one at 50% or more: { name, pct, why }, else null. Uses the
@@ -3020,8 +3073,11 @@ function getOverridesHome() {
     try { phones = findPhonesToCheck_(ss, false, src); }
     catch (e) { console.warn("Phone numbers to check: " + e.message); phonesError = e.message; }
   }
+  let phoneChanges = [];
+  try { phoneChanges = savedPhoneChanges_(ss); } // Your changes: the numbers saved here (Delete undoes one)
+  catch (e) { console.warn("Saved phone numbers: " + e.message); }
   const settings = getSettings();
-  return { toAdd: found.items, skipped: found.skipped, changes: getOverridesList(), error: error,
+  return { toAdd: found.items, skipped: found.skipped, changes: getOverridesList(), phoneChanges: phoneChanges, error: error,
            phones: phones.items, phonesSkipped: phones.skipped, phonesError: phonesError,
            paused: settings.disableRebuilds === true || settings.disableRebuilds === 'true' };
 }
@@ -5189,8 +5245,8 @@ function loadGuideLinkFromVersionSheet_() {
 // side panel and back (the page's switch; the choice is remembered per person, FIND_FAMILY_AS). Search
 // a student, a parent, an OSIS, a phone number or an email; spelling doesn't have to be exact. The
 // family card shows the student, every parent with their numbers, email, Parent Square / NYCSA, the
-// open follow-ups, Student Info (Your Lists) and the notes, with "Log a contact" (the next empty
-// Contact Log row, filled the same way as typing the OSIS there) and "Edit student". It only reads
+// open follow-ups, Student Info (Your Lists) and the notes, with "Edit student" (logging a contact from
+// here comes with the logging UI, a future update: the owner, 2026-11-23). It only reads
 // the built tabs (Student List, Parents List, Combined Contact Tracking) and the Contact Log, so it
 // shows what the last build made. The page: FindFamily.html.
 // ======================================================================
@@ -5312,33 +5368,6 @@ function getFindFamilyDetails(osis) {
     }
   } catch (err) { console.warn("Find a Family: Student Info not read: " + err.message); }
   return out;
-}
-
-/**
- * "Log a contact": the OSIS goes into the first empty Contact Log row above END and the row is filled
- * exactly as when it is typed there (the edit handler: guardian, student, site / class, date, #,
- * follow-up), then Person Spoke With when a parent was picked; the cursor waits on Method (J).
- */
-function findFamilyLogContact(osis, guardianName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Contact Log");
-  if (!sheet) throw new Error("There is no Contact Log tab.");
-  osis = toText_(osis);
-  if (!isRealStudentId_(osis)) throw new Error("That student has no OSIS.");
-  const end = findEndRowInColumnE_(sheet);
-  if (!end || end < 3) throw new Error("The Contact Log's END row wasn't found.");
-  let last = -1; // the last row with anything in C:O
-  sheet.getRange(2, 3, end - 2, 13).getDisplayValues().forEach((r, i) => { if (r.some(v => String(v).trim() !== "")) last = i; });
-  const row = 2 + last + 1;
-  if (row >= end) throw new Error("There is no empty Contact Log row above END. Type something in the last row once (new rows come), then try again.");
-  const cell = sheet.getRange(row, CL_COL_OSIS);
-  cell.setValue(osis);
-  SpreadsheetApp.flush();
-  handleEdit_({ range: cell, value: osis, source: ss }); // the same as typing the OSIS there
-  if (toText_(guardianName)) sheet.getRange(row, CL_COL_SPOKE_WITH).setValue(toText_(guardianName));
-  sheet.activate();
-  sheet.setActiveRange(sheet.getRange(row, 10)); // Method (J): type on from there
-  return { row: row };
 }
 
 /** "Edit student": New / Edit Student with this student filled in. */

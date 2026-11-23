@@ -195,8 +195,7 @@
       f.parents.forEach(function (p, i) {
         html += '<div class="par"><b>' + esc(p.name) + '</b>' + (p.rel ? ' · ' + esc(p.rel) : '') + (p.lang && !/^english$/i.test(p.lang) ? ' · ' + esc(p.lang) : '') +
           '<div class="nums">' + esc(p.phones.join(' · ') || 'no phone') + (p.email ? ' · ' + esc(p.email) : '') + '</div>' +
-          statusTag('Parent Square', p.ps) + statusTag('NYCSA', p.nycsa) +
-          ' <button type="button" class="link" onclick="logContact(' + i + ')">Log a contact with them</button></div>';
+          statusTag('Parent Square', p.ps) + statusTag('NYCSA', p.nycsa) + '</div>';
       });
       if (!d) {
         html += '<div class="state"><div class="spinner"></div>Loading notes…</div>';
@@ -218,8 +217,8 @@
         html += d.notes ? '<div class="notes" id="notes">' + esc(d.notes) + '</div><button type="button" class="link hidden" id="moreNotes" onclick="allNotes()">Show all notes</button>'
                         : '<div class="meta">No notes yet.</div>';
       }
-      html += '<div class="acts"><button type="button" class="btn pri" onclick="logContact(-1)">Log a contact</button>' +
-              '<button type="button" class="btn sec" onclick="editStudent()">Edit student</button></div>';
+      // Logging a contact from here comes with the logging UI (a future update, owner 2026-11-23)
+      html += '<div class="acts"><button type="button" class="btn sec" onclick="editStudent()">Edit student</button></div>';
       $('fam').innerHTML = html;
       show('fam', true);
       var n = $('notes');
@@ -228,17 +227,6 @@
     function allNotes() { $('notes').classList.add('all'); show('moreNotes', false); }
 
     // ---------- actions ----------
-    function logContact(i) {
-      var f = BY[picked];
-      if (!f || busy) return;
-      var p = i >= 0 ? f.parents[i] : null;
-      busy = true;
-      say('Starting a Contact Log row for ' + f.st.name + '…');
-      google.script.run.withSuccessHandler(function (r) {
-        busy = false;
-        say('Done: Contact Log row ' + r.row + ' has ' + f.st.name + (p ? ' and ' + p.name : '') + '. Type the Method and the rest there.', 'ok');
-      }).withFailureHandler(onFail).findFamilyLogContact(f.st.osis, p ? p.name : '');
-    }
     function editStudent() {
       if (!picked || busy) return;
       google.script.run.withFailureHandler(onFail).findFamilyEditStudent(picked);

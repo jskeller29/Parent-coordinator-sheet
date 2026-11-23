@@ -482,8 +482,47 @@ function phonesSheet() {
   const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
   assert(/readBackendBlockFromOtherSpreadsheet_\(oldSS, "PHONES"\)/.test(menus), "Migration brings them");
   const html = fs.readFileSync(path.join(ROOT, 'ManageOverridesDialog.html'), 'utf8');
-  ['savePhoneNumbers', 'skipPhoneNumbers', 'unskipPhoneNumbers'].forEach(fn => assert(html.indexOf('.' + fn + '(') !== -1, "the page calls " + fn));
+  ['savePhoneNumbers', 'skipPhoneNumbers', 'unskipPhoneNumbers', 'deletePhoneChanges'].forEach(fn => assert(html.indexOf('.' + fn + '(') !== -1, "the page calls " + fn));
   console.log("4 phone numbers to check: ok");
+}
+{
+  // Your changes lists the saved numbers (one card per parent + number + use, siblings together);
+  // Delete undoes one: its rows go, a build runs, the number is offered again, the others stay
+  const { ss, g, raw, builds } = phonesSheet();
+  ss.getSheetByName("Backend")._put([["OSIS", "Student"], ["123456789", "Bart Simpson"], ["567891234", "Lisa Simpson"]], 2, 76); // BX:BY copy
+  eq(g.getOverridesHome().phoneChanges, [], "nothing saved yet");
+  const found = g.findPhonesToCheck_(ss).items;
+  const homer = found.find(it => it.guardian === "Homer Simpson"), mort = found.find(it => it.guardian === "Morticia Addams");
+  g.savePhoneNumbers([homer.key], "add");
+  g.savePhoneNumbers([mort.key], "instead");
+  const saved = g.getOverridesHome().phoneChanges;
+  eq(saved.map(c => [c.guardian, c.phone, c.use, c.from, c.students.map(s => s.name)]), [
+    ["Homer Simpson", "(999) 999-0000", "add", "Parent Square", ["Bart Simpson", "Lisa Simpson"]],
+    ["Morticia Addams", "(888) 888-8888", "instead", "NYCSA", ["OSIS 111222333"]]], "one card each; a student the copy lacks shows its OSIS");
+  const numbers = (id, name) => {
+    const ov = g.getOverrideData_(ss);
+    return g.buildGuardianObjects_(raw.getDataRange().getValues(), ov.guardians, ov.phones).find(x => x.student_id === id && x.guardianOutput.indexOf(name) === 0).phones;
+  };
+  eq(numbers("111222333", "Morticia"), ["(888) 888-8888"], "\"instead\" in effect");
+  const b0 = builds();
+  let r = g.deletePhoneChanges([saved[1].key]);
+  eq([r.removed, r.building, builds() - b0], [1, true, 1], "deleted, then a build");
+  eq(numbers("111222333", "Morticia"), ["(555) 555-5555"], "ATS's number is back");
+  eq(numbers("123456789", "Homer"), ["(111) 111-1111", "(999) 999-0000"], "the other saved number stays");
+  assert(r.home.phones.some(it => it.guardian === "Morticia Addams" && it.phone === "(888) 888-8888"), "offered again to check");
+  eq(r.home.phoneChanges.map(c => c.guardian), ["Homer Simpson"]);
+  // Both siblings' rows go with one Delete; an unknown key does nothing
+  r = g.deletePhoneChanges([saved[0].key]);
+  eq([r.removed, r.home.phoneChanges.length], [2, 0]);
+  eq(g.deletePhoneChanges(["nobody|0|add"]).removed, 0);
+  // Rebuilds paused: deleted, no build
+  const p2 = phonesSheet();
+  p2.g.savePhoneNumbers([p2.g.findPhonesToCheck_(p2.ss).items[0].key], "add");
+  p2.g.__props.disableRebuilds = "true";
+  const before = p2.builds();
+  r = p2.g.deletePhoneChanges([p2.g.getOverridesHome().phoneChanges[0].key]);
+  eq([r.removed > 0, r.building, p2.builds() - before], [true, false, 0]);
+  console.log("4 saved numbers can be deleted: ok");
 }
 {
   // The end of Input Data Mode counts both (the Student Data step's note says they're asked about there)
@@ -493,6 +532,55 @@ function phonesSheet() {
   const html = fs.readFileSync(path.join(ROOT, 'InputDataSidebar.html'), 'utf8');
   assert(/r\.phones/.test(html) && /phone numbers to check/.test(html), "the end screen card says so");
   console.log("4 end of Input Data Mode: ok");
+}
+{
+  // The test file 2c (test-data/README.md and the release check say what it shows): exactly these two cards
+  const parseCsv = text => {
+    const rows = []; let row = [], cell = '', q = false;
+    text = text.replace(/^﻿/, '');
+    for (let i = 0; i < text.length; i++) { const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+      else if (ch === '"') q = true; else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += ch; }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  };
+  const csv = n => parseCsv(fs.readFileSync(path.join(ROOT, 'test-data', n), 'utf8')).filter(r => r.some(c => String(c).trim())).slice(1);
+  const ss = makeSpreadsheet(["Contact Log", "Raw Data", "Student List", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  g.od_loadLists_ = () => [];
+  g.runBuildOnly = () => {};
+  ss.getSheetByName("Backend")._put([g.__get("OVERRIDES_HEADERS_")], 2, 7);
+  const raw = ss.getSheetByName("Raw Data");
+  raw._put(csv("1 - Student Data (ATS).csv"), 7, 1);
+  raw._put(csv("2c - Parent Square - new phone numbers.csv"), 7, 33);
+  raw._put(csv("3 - NYCSA (Students with Non-NYCSA Account).csv"), 7, 42);
+  const found = g.findPhonesToCheck_(ss);
+  eq(found.items.map(it => it.guardian + " " + it.phone + " for " + it.students.map(s => s.name).join(" & ") + " (has " + it.current.join(", ") + ")" +
+      (it.alike ? ", as " + it.alike.name + " " + it.alike.pct + "%" : "")), [
+    "Morticia Addams (333) 555-0303 for Wednesday Addams (has (333) 333-3333), as Morticia Adams 99%",
+    "Homer Simpson (111) 555-0101 for Bart Simpson & Lisa Simpson (has (111) 111-1111)"], "the two cards of the test file");
+  eq(g.findParentsToAdd_(ss).items, [], "nobody to add from it");
+  // Both as 2nd numbers: Homer has both for Bart and Lisa; Morticia both for Wednesday, one for Pugsley
+  g.savePhoneNumbers(found.items.map(it => it.key), "add");
+  const ov = g.getOverrideData_(ss);
+  const gs = g.buildGuardianObjects_(raw.getDataRange().getValues(), ov.guardians, ov.phones);
+  const nums = (id, first) => gs.find(x => x.student_id === id && x.guardianOutput.indexOf(first) === 0).phones;
+  eq([nums("123456789", "Homer"), nums("567891234", "Homer"), nums("234567891", "Morticia"), nums("245678912", "Morticia")], [
+    ["(111) 111-1111", "(111) 555-0101"], ["(111) 111-1111", "(111) 555-0101"], ["(333) 333-3333", "(333) 555-0303"], ["(333) 333-3333"]]);
+  eq(g.findPhonesToCheck_(ss).items, [], "nothing left to check");
+  // Phone Contacts: Morticia is ONE contact with both numbers (the same email links Wednesday's and Pugsley's rows)
+  const ids = ["123456789", "567891234", "234567891", "245678912"];
+  const studentMap = new Map(ids.map(id => [id, { student: id, classCode: "Y41", site: "", teachers: "" }]));
+  const pc = g.buildPhoneContactsData_(ss, studentMap, gs.filter(x => ids.indexOf(x.student_id) !== -1), [["OSIS"]].concat(ids.map(id => [id])), [["OSIS"]],
+    g.buildParentSquareIndex_([]), g.buildNYCSAIndex_([]));
+  const col = name => pc[0].indexOf(name);
+  const contact = first => pc.filter(r => String(r[col("First Name")]).indexOf(first) !== -1);
+  eq(contact("Morticia").map(r => [r[col("Phone 1 - Value")], r[col("Phone 2 - Value")], r[col("OSIS")]]),
+    [["(333) 333-3333", "(333) 555-0303", "234567891, 245678912"]], "one Morticia with both numbers");
+  eq(contact("Homer").map(r => [r[col("Phone 1 - Value")], r[col("Phone 2 - Value")]]), [["(111) 111-1111", "(111) 555-0101"]], "one Homer with both numbers");
+  console.log("4 the test file 2c: ok");
 }
 
 // ---------------------------------------------------------------- 3. "What is this list for?"
@@ -556,6 +644,47 @@ function phonesSheet() {
   const num = g.findPhonesToCheck_(ss).items.find(it => it.phone === "(555) 123-4567");
   assert(num && num.guardian === "Homer Simpson" && num.sources[0] === "👪 Contact cards", "another number for a parent we have: " + JSON.stringify(g.findPhonesToCheck_(ss).items.map(i => i.guardian + " " + i.phone)));
   console.log("3 list purpose: ok");
+}
+{
+  // The test file 5e as "Only find parents and phone numbers to add", with the standard exports (the release check):
+  // the column guess, 3 matched + 1 not found, then exactly Selma (to add) and Homer's other number (to check)
+  const parseCsv = text => {
+    const rows = []; let row = [], cell = '', q = false;
+    text = text.replace(/^﻿/, '');
+    for (let i = 0; i < text.length; i++) { const ch = text[i];
+      if (q) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') q = false; else cell += ch; }
+      else if (ch === '"') q = true; else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += ch; }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  };
+  const all = n => parseCsv(fs.readFileSync(path.join(ROOT, 'test-data', n), 'utf8')).filter(r => r.some(c => String(c).trim()));
+  const ss = makeSpreadsheet(["Contact Log", "Raw Data", "Student List", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const raw = ss.getSheetByName("Raw Data");
+  const ats = all("1 - Student Data (ATS).csv").slice(1);
+  raw._put(ats, 7, 1);
+  raw._put(all("2 - Parent Square.csv").slice(1), 7, 33);
+  raw._put(all("3 - NYCSA (Students with Non-NYCSA Account).csv").slice(1), 7, 42);
+  const rawVals = [[], [], [], [], [], []].concat(ats);
+  const sm = g.buildStudentMap_(rawVals, new Map());
+  const idx = g.od_index_([...sm.entries()].map(([id, s]) => [id, s.student, "", s.site || "", s.classCode || ""]), g.buildGuardianObjects_(rawVals, new Map()));
+  const block = all("5e - Your Lists - Parent Contact Cards (only find parents and numbers).csv");
+  const headers = block[0], rows = block.slice(1);
+  const guess = g.od_guessRoles_(headers, rows, idx);
+  eq([guess.by, guess.roles.student, guess.roles.guardian, guess.roles.phone, guess.roles.email], ["student", { col: 2 }, { col: 1 }, 3, 4],
+    "guessed: a row per child, Parent = the guardian column (so the contacts list can go straight on)");
+  const tab = ss.insertSheet("📥 Parent Contact Cards");
+  tab._put(block, 4, 1);
+  g.od_loadLists_ = () => [{ tabId: tab.getSheetId(), name: "Parent Contact Cards", sheet: tab,
+    setup: g.od_fillSetup_({ by: guess.by, ready: true, purpose: "contacts", headers: headers, roles: guess.roles, vars: [], picks: {} }) }];
+  eq(g.findParentsToAdd_(ss).items.map(it => it.student + ": " + it.name + " " + it.phone + " [" + it.sources.join(", ") + "]"),
+    ["Wednesday Addams: Selma Bouvier (444) 555-6666 [📥 Parent Contact Cards]"]);
+  eq(g.findPhonesToCheck_(ss).items.map(it => it.guardian + " " + it.phone + " for " + it.students.map(s => s.name).join(" & ") + " [" + it.sources.join(", ") + "]"),
+    ["Homer Simpson (111) 222-3333 for Bart Simpson [📥 Parent Contact Cards]"]);
+  eq(g.idm_parentsToAddSummary(), { count: 1, sample: ["Selma Bouvier (Wednesday Addams)"], phones: 1 }, "the end of Input Data Mode");
+  console.log("3 the test file 5e: ok");
 }
 
 // ---------------------------------------------------------------- 6. "Tell me what changed" (Your Lists)
@@ -683,17 +812,9 @@ function familySheet() {
   eq(det.info, [{ who: "", line: "Bus Route: R12" }, { who: "Marge Simpson", line: "PTA: Chair" }]);
   eq(g.getFindFamilyDetails("nonsense"), { notes: "", followUps: [], info: [] });
 
-  // Log a contact: the first empty row after the last filled one, filled as if the OSIS was typed there
-  let edits = [];
-  g.handleEdit_ = e => edits.push([e.range.getRow(), e.range.getColumn(), e.value]);
-  const r = g.findFamilyLogContact("123456789", "Marge Simpson");
-  assert.strictEqual(r.row, 6, "row 6 (rows 2-5 are filled)");
-  eq(edits, [[6, 5, "123456789"]], "the edit handler ran for the OSIS cell");
-  eq([log.getRange(6, 5).getValue(), log.getRange(6, 4).getValue()], ["123456789", "Marge Simpson"], "OSIS + Person Spoke With");
-  log._put([["x"], ["x"]], 6, 3);
-  log._put([["x"]], 7, 3);
-  assert.throws(() => g.findFamilyLogContact("123456789", ""), /no empty Contact Log row/, "no empty row: says what to do");
-  assert.throws(() => g.findFamilyLogContact("12", ""), /no OSIS/);
+  // No "Log a contact" yet: logging a contact from the card comes with the logging UI (a future update, owner 2026-11-23)
+  assert.strictEqual(typeof g.findFamilyLogContact, "undefined", "no Log a contact endpoint");
+  assert(!/Log a contact/.test(fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8')), "no Log a contact button");
 
   // Edit student: New / Edit Student with the student filled in (not "back to Student Overrides")
   let opened = 0;

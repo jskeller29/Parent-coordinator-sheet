@@ -24,6 +24,7 @@ on the step's tab.
 | `3 - NYCSA (Students with Non-NYCSA Account)` | 3 NYCSA | 25 rows. |
 | `2b - Parent Square - a parent not in ATS` | 2 Parent Square | 29 rows: the same + Abe Simpson, a parent of Bart and Lisa that ATS doesn't have. At the end of Input Data Mode: "parents to add?"; 👤 Student Overrides lists Abe for Bart and for Lisa. |
 | `3b - NYCSA - a third guardian` | 3 NYCSA | 26 rows: the same + Patty Bouvier (Aunt), a third guardian for Bart (ATS lists two). Listed under Parents to add, from NYCSA. |
+| `2c - Parent Square - new phone numbers` | 2 Parent Square | 28 rows: the same, but Homer Simpson has a new number, (111) 555-0101, and Wednesday's row spells her mother "Adams, Morticia" with a new number, (333) 555-0303. At the end of Input Data Mode: "2 phone numbers to check"; 👤 Student Overrides → Phone numbers to check has 2 cards: Morticia Addams for Wednesday ("Parent Square has them as Morticia Adams: 99% alike") and Homer Simpson for Bart and Lisa (one card for both). Add them as 2nd numbers and build: the Parents List and Phone Contacts show both numbers (one contact per parent). |
 | `4 - Site and Class` | 4 Site / Class | Paste the three columns (with the header) over A1 of the Site / Class tab, then Save. 6 sites, 12 classes; Y12 and Y50 have no teacher. |
 
 ## Your Lists (step 5 of Input Data Mode → Add another list)
@@ -36,6 +37,7 @@ Columns → Variables → Match. These counts are against the 18 ATS students ab
 | `5b - Your Lists - PTA Members` | guardian | Guessed as a guardian list (parent first + last columns). **11 matched**, incl. typos the phone or email settles (Marj → Marge, Adams → Addams, Pennywise → Pennyworth). **1 best guess:** Martha K. → Martha Kent 84%. **1 not found:** Natasha Romanoff. |
 | `5c - Your Lists - Field Trip Forms` | student | First and last name in two columns. **9 matched.** **1 not found:** Tina Belcher, with Louise / Gene Belcher as the closest (on a sheet with 🧪 Reset + Load Fake Data, Tina is a New/Edit Student and matches). Wednesday and Bruce Banner have no form: try "If the cell is blank → Not returned". |
 | `5d - Your Lists - After School Sign-up` | student | "LAST, FIRST" names. **6 matched.** **2 best guesses:** STARK, ANTHONY → Tony Stark 98% (nickname), BELCHER, EUGENE → Gene Belcher 86%. |
+| `5e - Your Lists - Parent Contact Cards` | student (with a Parent column) | For "What is this list for?" → **Only find parents and phone numbers to add**. Guessed: a row per child, Parent = the guardian column. **3 matched**, **1 not found** (Natasha Romanoff, no child). Nothing goes on your sheets. At the end of Input Data Mode: "1 parent to add? And 1 phone number to check." 👤 Student Overrides: Selma Bouvier for Wednesday Addams (Parents to add) and Homer Simpson's (111) 222-3333 for Bart (Phone numbers to check), both from this list. Marge's row has the number ATS has: nothing to check. |
 
 Then try: **Accept the high-confidence** (90%+), pick someone with "Pick someone else",
 Save, finish Input Data Mode, **Build**, and look at the new Student List / Parents

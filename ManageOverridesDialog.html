@@ -89,7 +89,7 @@
     <!-- 3. Your changes -->
     <div class="sec hidden" id="chgSec">
       <div class="sec-h"><h2>Your changes</h2><span class="count" id="chgCount">0</span><button type="button" class="fold" id="fold-chgSec" onclick="fold('chgSec')">Hide</button></div>
-      <p class="help" style="margin:0">Students you added or edited, and parents you added. Edit opens the student; Delete puts the student's ATS data back.</p>
+      <p class="help" style="margin:0">Students you added or edited, parents you added, and phone numbers you saved. Edit opens the student; Delete puts the student's ATS data back.</p>
       <div class="list" id="chgList"></div>
       <div class="empty hidden" id="chgEmpty">No changes yet. New / Edit Student (at the bottom) adds a student who isn't in ATS yet, or changes one who is.</div>
     </div>
@@ -348,10 +348,10 @@
 
     // --- 2. Your changes ---
     function renderChanges() {
-      var list = home.changes || [];
-      $('chgCount').textContent = list.length;
-      $('chgCount').className = 'count' + (list.length ? '' : ' zero');
-      show('chgEmpty', list.length === 0);
+      var list = home.changes || [], nums = home.phoneChanges || [];
+      $('chgCount').textContent = list.length + nums.length;
+      $('chgCount').className = 'count' + (list.length + nums.length ? '' : ' zero');
+      show('chgEmpty', list.length + nums.length === 0);
       $('chgList').innerHTML = list.map(function (o, i) {
         var pill = o.kind === 'added' ? '<span class="pill">Added guardian' + (o.source ? ' · ' + esc(o.source) : '') + '</span>'
           : o.kind === 'new' ? '<span class="pill new">New student</span>' : '<span class="pill">Edited</span>';
@@ -362,7 +362,30 @@
           '<div class="acts"><button type="button" class="btn sec sm" onclick="editChange(' + i + ')">Edit</button>' +
           '<button type="button" class="btn dgr sm" onclick="deleteChange(' + i + ')">Delete</button></div>' +
           '</div></div>';
+      }).join('') + nums.map(function (c, i) {
+        // A number saved under Phone numbers to check (Delete undoes it; release check round 3)
+        var pill = '<span class="pill">' + (c.use === 'instead' ? 'Number used instead' : '2nd number') + (c.from ? ' · ' + esc(c.from) : '') + '</span>';
+        var kids = (c.students || []).map(function (s) { return esc(s.name); }).join(', ');
+        return '<div class="card"><div class="main">' +
+          '<div class="top"><div><span class="nm">' + esc(c.guardian) + '</span></div><div class="chips">' + pill + '</div></div>' +
+          '<div class="meta">' + esc(c.phone) + ' · for ' + kids + (c.date ? ' · saved ' + esc(c.date) : '') + '</div>' +
+          '<div class="acts"><button type="button" class="btn dgr sm" onclick="deletePhoneChange(' + i + ')">Delete</button></div>' +
+          '</div></div>';
       }).join('');
+    }
+    function deletePhoneChange(i) {
+      var c = (home.phoneChanges || [])[i];
+      if (!c || busy) return;
+      if (!confirm('Delete the number ' + c.phone + ' you saved for ' + c.guardian + '?\n\n' +
+          (c.use === 'instead' ? 'The number from your Student Data (ATS) comes back' : 'It leaves their contact') +
+          ' at the next build, and it is offered again under Phone numbers to check.')) return;
+      setBusy(true);
+      say('Deleting…');
+      run().withSuccessHandler(function (r) {
+        render(r.home);
+        say(r.building ? 'Deleted. Your sheets are rebuilt without it: the Build panel is on the right (it shows once you close this).'
+                       : 'Deleted. Your sheets lose it at the next build.', 'ok');
+      }).deletePhoneChanges([c.key]);
     }
     function editChange(i) {
       var o = (home.changes || [])[i];
