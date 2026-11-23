@@ -60,15 +60,15 @@ function buildIssueTemplate() {
   L.push("How to put the new version on a copy: [DEPLOY.md](https://github.com/jskeller29/Parent-coordinator-sheet/blob/Test-Version/DEPLOY.md), sections 1 to 3.");
   L.push("Test files: [test-data](https://github.com/jskeller29/Parent-coordinator-sheet/tree/Test-Version/test-data) (its README says what each one should show).");
   L.push("Something fails? Write it as a comment on this issue: the step, what you saw, a screenshot, and any red error from Extensions → Apps Script → **Executions**.");
-  L.push("Checks marked _(optional)_ can wait, and _(try to break it)_ ones are extra. Do the other " + N_ESS + " (the essentials) before any school gets this version." + (DATA.round ? " Round " + DATA.round + ": **Fixed, re-test** marks what changed since the last round." : ""));
+  L.push("Checks marked _(optional)_ can wait, and _(try to break it)_ ones are extra. Do the other " + N_ESS + " (the essentials) before any school gets this version." + (DATA.round ? " Round " + DATA.round + ": **" + (DATA.round > 2 ? "New** and **" : "") + "Fixed, re-test** mark what changed since the last round." : ""));
   DATA.stages.forEach((st, si) => {
     if (partStarts(st, si)) { const p = partOf(st); L.push("", "## Part " + p.n + ": " + p.title, p.about); }
     L.push("", "### " + (st.safety ? "" : si + ". ") + st.title + (allOptional(st) ? " (optional)" : ""), "_" + st.where + "_");
     st.checks.forEach((c, ci) => {
       const num = si + "." + (ci + 1);
-      let line = "- [ ] **" + num + " " + c.title + ".**" + (c.optional ? " _(optional)_" : "") + (c.breakit ? " _(try to break it)_" : "") + (c.fixed ? " **Fixed, re-test.**" : "") + " " + c.do.join(" ") + " **You should see:** " + c.see.join(" ");
+      let line = "- [ ] **" + num + " " + c.title + ".**" + (c.optional ? " _(optional)_" : "") + (c.breakit ? " _(try to break it)_" : "") + (c.fixed ? (c.isNew ? " **New.**" : " **Fixed, re-test.**") : "") + " " + c.do.join(" ") + " **You should see:** " + c.see.join(" ");
       if (c.why) line += " _Why: " + c.why + "_";
-      if (c.fixed) line += " _Fixed: " + c.fixed + "_";
+      if (c.fixed) line += " _" + (c.isNew ? "New" : "Fixed") + ": " + c.fixed + "_";
       if (lastText(c.id)) line += " _Last time: " + lastText(c.id) + "_";
       if (c.timing) line += " (" + c.timing + ": ___)";
       L.push(line);
@@ -86,12 +86,12 @@ function printHtml() {
     const checks = st.checks.map((c, ci) => {
       const num = si + "." + (ci + 1);
       return `<div class="check">
-  <div class="ch"><span class="num">${num}</span><span class="t">${esc(c.title)}${c.optional ? '<span class="opt">Optional</span>' : ""}${c.breakit ? '<span class="opt">Try to break it</span>' : ""}${c.fixed ? '<span class="opt fx">Fixed, re-test</span>' : ""}</span>
+  <div class="ch"><span class="num">${num}</span><span class="t">${esc(c.title)}${c.optional ? '<span class="opt">Optional</span>' : ""}${c.breakit ? '<span class="opt">Try to break it</span>' : ""}${c.fixed ? '<span class="opt fx">' + (c.isNew ? "New" : "Fixed, re-test") + '</span>' : ""}</span>
     <span class="boxes"><span class="box"></span>Works <span class="box"></span>Problem <span class="box"></span>Skip</span></div>
   <div class="cols"><div><p class="lbl">Do</p><ol>${c.do.map(x => "<li>" + esc(x) + "</li>").join("")}</ol></div>
   <div><p class="lbl">You should see</p><ul>${c.see.map(x => "<li>" + esc(x) + "</li>").join("")}</ul></div></div>
   ${c.why ? `<p class="why"><b>Why:</b> ${esc(c.why)}</p>` : ""}
-  ${c.fixed ? `<p class="fixed"><b>Fixed, re-test:</b> ${esc(c.fixed)}</p>` : ""}
+  ${c.fixed ? `<p class="fixed"><b>${c.isNew ? "New" : "Fixed, re-test"}:</b> ${esc(c.fixed)}</p>` : ""}
   ${lastText(c.id) ? `<p class="last"><b>Last time:</b> ${esc(lastText(c.id))}</p>` : ""}
   ${c.timing ? `<p class="timing">${esc(c.timing)}: <span class="blank"></span> seconds</p>` : ""}
   <div class="notes"><span>Notes</span><span class="rule"></span></div><div class="notes"><span></span><span class="rule"></span></div>
@@ -151,8 +151,8 @@ function printHtml() {
   <h1>${esc(DATA.title)}</h1>
   <div class="meta"><span>Version tested: <span class="blank"></span></span><span>Date: <span class="blank" style="width:90pt"></span></span></div>
   <ol class="how">
-    <li>Four parts, in order: 1 set up the test copies, 2 test with fake data (the main test), 3 a short check with your real data, 4 release the new version. Your live sheet is only touched in part 4.</li>
-    <li>Do the ${N_ESS} essentials before any school gets this version. The checks marked OPTIONAL can wait.${DATA.round ? " Round " + DATA.round + ": the checks marked FIXED, RE-TEST changed since the last round; \"Last time\" is what you wrote then." : ""}</li>
+    <li>${esc(DATA.partsIntroText || "Four parts, in order: 1 set up the test copies, 2 test with fake data (the main test), 3 a short check with your real data, 4 release the new version. Your live sheet is only touched in part 4.")}</li>
+    <li>Do the ${N_ESS} essentials before any school gets this version. The checks marked OPTIONAL can wait.${DATA.round ? " Round " + DATA.round + ": the checks marked " + (DATA.round > 2 ? "NEW or " : "") + "FIXED, RE-TEST changed since the last round; \"Last time\" is what you wrote then." : ""}</li>
     <li>Tick Works, Problem or Skip for each check. For a Problem, write what you saw under Notes.</li>
     <li>Done? Tell Claude what failed (the check numbers and your notes), or tick the same checks in the web checklist so Claude can read them.</li>
   </ol>

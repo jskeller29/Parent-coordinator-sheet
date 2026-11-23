@@ -239,7 +239,7 @@
       <input id="release" type="text" autocomplete="off">
     </div>
     <ol class="how-list">
-      <li>Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4. A fifth part, <b>Try to break it</b>, is extra: Show → Try to break it, where you can also add tests of your own.</li>
+      <li id="partsIntro">Four parts, in order: <b>1</b> set up the test copies, <b>2</b> test with fake data (the main test), <b>3</b> a short check with your real data, <b>4</b> release the new version. Everything runs on copies; your live sheet is only touched in part 4. A fifth part, <b>Try to break it</b>, is extra: Show → Try to break it, where you can also add tests of your own.</li>
       <li>Do the <b>essentials</b> before any school gets this version. The switch below shows only them; the optional checks can wait.</li>
       <li>For each check, do the steps, compare with "You should see", and mark it <b>Works</b>, <b>Problem</b> or <b>Skip</b>. For a Problem, write what you saw.</li>
       <li>Your answers save as you go, on any device that opens this page.</li>
@@ -248,7 +248,7 @@
     <section class="round" id="roundBox" hidden>
       <h2 id="roundTitle">Since the last round</h2>
       <p class="lastsum" id="lastSum"></p>
-      <p class="lbl" style="margin:4px 0 0">Fixed: re-test these first</p>
+      <p class="lbl" style="margin:4px 0 0" id="fixesLabel">Fixed: re-test these first</p>
       <ul class="fixlist" id="fixList"></ul>
     </section>
     <div class="viewrow">
@@ -406,7 +406,7 @@
     head.appendChild(el("span", "num", o.num));
     var h4 = el("h4", null, c.title);
     if (c.optional) h4.appendChild(el("span", "opt", "Optional"));
-    if (c.fixed) h4.appendChild(el("span", "chip fix", "Fixed, re-test"));
+    if (c.fixed) h4.appendChild(el("span", "chip fix", c.isNew ? "New" : "Fixed, re-test"));
     if (c.breakit) h4.appendChild(el("span", "chip brk", "Try to break it"));
     head.appendChild(h4);
     var seg = el("div", "seg"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Result of " + o.num);
@@ -425,7 +425,7 @@
     cols.appendChild(d1); cols.appendChild(d2); body.appendChild(cols);
     if (c.why) { var w = el("p", "why"); w.appendChild(el("b", null, "Why: ")); w.appendChild(document.createTextNode(c.why)); body.appendChild(w); }
     // Round 2: what changed since the last round, and what you wrote then
-    if (c.fixed) { var fx = el("p", "fixed-box"); fx.appendChild(el("b", null, "Fixed, re-test: ")); fx.appendChild(document.createTextNode(c.fixed)); body.appendChild(fx); }
+    if (c.fixed) { var fx = el("p", "fixed-box"); fx.appendChild(el("b", null, c.isNew ? "New: " : "Fixed, re-test: ")); fx.appendChild(document.createTextNode(c.fixed)); body.appendChild(fx); }
     var lr = LAST[c.id];
     if (lr && (lr.status || lr.note)) {
       var lb = el("div", "last-box"); lb.dataset.was = lr.status || "";
@@ -825,9 +825,9 @@
     ORDER.forEach(function (o) {
       if (!o.check.fixed) return;
       var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
-      re.push(o.num + " " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? " (last time: " + LABEL[l.status] + ")" : ""));
+      re.push(o.num + " " + o.check.title + ": " + (r.status ? LABEL[r.status] : (o.check.isNew ? "not tested yet" : "not re-tested yet")) + (l.status ? " (last time: " + LABEL[l.status] + ")" : ""));
     });
-    section("RE-TESTS (fixed since the last round)", re);
+    section((DATA.retestTitle || "Re-tests (fixed since the last round)").toUpperCase(), re);
     var ownLines = [];
     own.forEach(function (x, i) {
       ownLines.push("Y" + (i + 1) + " [" + (OWN_LABEL[x.status] || "Not marked") + "] " + x.title);
@@ -920,10 +920,10 @@
     probs.forEach(function (o) { line(o.num + "  " + o.check.title, { bold: true }); line(state.results[o.check.id].note || "(no note)", { indent: 18, after: 6 }); });
     var fixedOnes = ORDER.filter(function (o) { return o.check.fixed; });
     if (fixedOnes.length) {
-      head("Re-tests (fixed since the last round)");
+      head(DATA.retestTitle || "Re-tests (fixed since the last round)");
       fixedOnes.forEach(function (o) {
         var r = state.results[o.check.id] || {}, l = LAST[o.check.id] || {};
-        line(o.num + "  " + o.check.title + ": " + (r.status ? LABEL[r.status] : "not re-tested yet") + (l.status ? "  (last time: " + LABEL[l.status] + ")" : ""), { color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
+        line(o.num + "  " + o.check.title + ": " + (r.status ? LABEL[r.status] : (o.check.isNew ? "not tested yet" : "not re-tested yet")) + (l.status ? "  (last time: " + LABEL[l.status] + ")" : ""), { color: r.status === "problem" ? [163, 49, 42] : [27, 36, 48], after: 0 });
       });
     }
     var ownT = ownList();
@@ -996,15 +996,20 @@
     $("roundBox").hidden = false;
     $("roundTitle").textContent = "Since " + (DATA.lastRound.label || "the last round").toLowerCase() + (DATA.lastRound.date ? " (" + DATA.lastRound.date + ")" : "");
     $("lastSum").textContent = "Last time: " + (DATA.lastRound.summary || "") + ". Each check shows what you wrote then.";
+    if (DATA.fixesLabel) $("fixesLabel").textContent = DATA.fixesLabel;
     DATA.fixes.forEach(function (f) {
       var li = el("li", null, f.text + " ");
       (f.checks || []).forEach(function (id) {
         var o = BY_ID[id]; if (!o) return;
-        var a = el("a", "go", "Re-test " + o.num); a.href = "#c-" + id; a.dataset.check = id; li.appendChild(a);
+        // a space between the links, so a long row of them can wrap on a phone (they were one unbreakable run)
+        li.appendChild(document.createTextNode(" "));
+        var a = el("a", "go", (DATA.fixLinkWord || "Re-test") + " " + o.num); a.href = "#c-" + id; a.dataset.check = id; li.appendChild(a);
       });
       $("fixList").appendChild(li);
     });
   }
+  // Round 3: the intro's first item from the data (its own HTML, written in checks.js)
+  if (DATA.partsIntro) $("partsIntro").innerHTML = DATA.partsIntro;
   state.release = DATA.release;
   paintAll();
   applyView();

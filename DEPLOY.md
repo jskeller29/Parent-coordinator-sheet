@@ -81,14 +81,15 @@ z_MINE. No new permissions (same manifests). Then do step 10 below once.
    (and the 10 PM run draws it with the others).
 
 ## 4. Test it on copies: the release checklist
-Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,
-test with fake data (the main test), a short check with your real data, then the release steps. Do the 56
-**essentials** before any school gets a version; the 27 checks marked Optional can wait. Three ways to use the same
-list:
-- **The web checklist** (best), **round 2** (2026-11-14): https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc (only you can
-  open it). It marks every check fixed since round 1 "Fixed, re-test", shows what you wrote last time on each check, and has a
-  third view, **Try to break it**, where you can also add tests of your own. (Round 1's page,
-  https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1, keeps its answers.) Mark each
+Everything for a new version, step by step, with what you should see, in four parts: before you start (the rules,
+and this version on your copies), test with fake data (what a new user sees, what's new, day to day: the main test),
+a short check with your real data, then the release steps. Do the 61 **essentials** before any school gets a
+version; the 29 checks marked Optional can wait. Three ways to use the same list:
+- **The web checklist** (best), **round 3** (2026-11-23, your 10 ideas): https://claude.ai/artifact/68r88BXD58pjvejrLmYLCQ
+  (only you can open it). It marks every new check "New" and every changed one "Fixed, re-test", shows what you wrote
+  in round 2 on each check, and has a third view, **Try to break it**, where you can also add tests of your own.
+  (Round 2's page, https://claude.ai/artifact/VgrJLTu3a2Vaixz8JLQHYc, and round 1's,
+  https://claude.ai/artifact/SdhtaNhpTbvt6NMCXmcLa1, keep their answers.) Mark each
   check Works, Problem or Skip and write what you saw. It saves as you go, on any device. When you're done, tell
   Claude "release check done": Claude reads your answers there. It can also copy the report or save it as a PDF.
 - **On paper:** `docs/release-check/PC_Tracker_Release_Check.pdf` (also a button on the web checklist).

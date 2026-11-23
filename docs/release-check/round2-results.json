@@ -1,0 +1,127 @@
+{
+ "label": "Round 2",
+ "date": "11/18/2026",
+ "release": "Test-Version (November 2026), round 2",
+ "summary": "Works 27 · Problems 2 · Skipped 5 · Essentials done 28 of 56",
+ "results": {
+  "s0-1": {
+   "status": "pass"
+  },
+  "s0-2": {
+   "status": "pass"
+  },
+  "s0-3": {
+   "status": "pass"
+  },
+  "s0-4": {
+   "status": "pass"
+  },
+  "s1-1": {
+   "status": "skip"
+  },
+  "s1-2": {
+   "status": "skip"
+  },
+  "s1-3": {
+   "status": "skip"
+  },
+  "s1-4": {
+   "status": "skip"
+  },
+  "s1-5": {
+   "status": "skip",
+   "note": "deleting all z_ code directly from both copies and not doing the test master (SKIP 1-1.5 before unless you think the way i am doing it (just using my main to click fake data and test then deleting in them is bad)"
+  },
+  "s1r-1": {
+   "status": "pass"
+  },
+  "s1r-2": {
+   "status": "pass"
+  },
+  "s2-01": {
+   "status": "pass"
+  },
+  "s2-02": {
+   "status": "pass"
+  },
+  "s2-03": {
+   "status": "pass",
+   "seconds": 20
+  },
+  "s2-04": {
+   "status": "pass"
+  },
+  "s2-05": {
+   "status": "pass",
+   "note": "Don't have a \"Not now\", since they have to do input data mode"
+  },
+  "s2-06": {
+   "status": "pass"
+  },
+  "s2-08": {
+   "status": "pass"
+  },
+  "s2-09": {
+   "status": "pass",
+   "note": "have the error message show up bellow input data mode / tab list header"
+  },
+  "s2-10": {
+   "status": "pass"
+  },
+  "s2-11": {
+   "note": "have Save and go to Your Lists be at bottom of tab above skip but still have it locked at bottom"
+  },
+  "s2-12": {
+   "status": "problem",
+   "note": "works but when i go back it does not show in \"your list tab\" but does show in sidebar"
+  },
+  "s2-13": {
+   "status": "pass",
+   "note": "again even when it goes back to \"your list\" when i save, it does nopt show in your list tab."
+  },
+  "s2-14": {
+   "status": "pass"
+  },
+  "s2-15": {
+   "status": "pass",
+   "note": "but maybe have it if you hover over it it says \"edit\"? if possible. if not no worries"
+  },
+  "s2-16": {
+   "status": "pass"
+  },
+  "s2-17": {
+   "status": "pass",
+   "note": "Now Lists do show. I guess it needed to be built first?"
+  },
+  "s2-18": {
+   "status": "problem",
+   "note": "Works for discharged / new students. However I made my own fake nycsa / parents square data and it worked for NYCSA but did not update for parents square. give that another look .\n\nDid another build after (when i went to settings and saved) and it still said two new NYCSA"
+  },
+  "s2-19": {
+   "status": "pass",
+   "note": "Works. But for Student Info (code =HSTACK(\n  \"Student Info\",\n  LET(\n    targetE, INDIRECT(ADDRESS(ROW()-6, 5)),\n    IF(targetE=\"\", \"\",\n      LET(\n        osisArray, SPLIT(targetE, \",\", FALSE, TRUE),\n        numStudents, COUNTA(osisArray),\n        \n        studentLines, MAP(osisArray, LAMBDA(osis, \n          LET(\n            oText, TO_TEXT(TRIM(osis)),\n            oNum, IFERROR(VALUE(oText), oText),\n            \n            name, IFNA(VLOOKUP(oNum, 'Student List'!A:B, 2, FALSE), IFNA(VLOOKUP(oText, 'Student List'!A:B, 2, FALSE), \"Unknown\")),\n            \n            sibVal, IFNA(VLOOKUP(oNum, 'Student List'!A:F, 6, FALSE), IFNA(VLOOKUP(oText, 'Student List'!A:F, 6, FALSE), \"\")),\n            \n            bioVal, IFNA(VLOOKUP(oNum, 'Raw Data'!C:Z, 5, FALSE), IFNA(VLOOKUP(oText, 'Raw Data'!C:Z, 5, FALSE), \"\")),\n            ageVal, IFNA(VLOOKUP(oNum, 'Raw Data'!C:Z, 6, FALSE), IFNA(VLOOKUP(oText, 'Raw Data'!C:Z, 6, FALSE), \"\")),\n            gradeVal, IFNA(VLOOKUP(oNum, 'Raw Data'!C:Z, 15, FALSE), IFNA(VLOOKUP(oText, 'Raw Data'!C:Z, 15, FALSE), \"\")),\n            \n            statusVal, IFNA(VLOOKUP(oNum, 'Student List'!A:G, 7, FALSE), IFNA(VLOOKUP(oText, 'Student List'!A:G, 7, FALSE), \"\")),\n            \n            addInfoVal, IFNA(VLOOKUP(oNum, Backend!BN3:BQ, 4, FALSE), IFNA(VLOOKUP(oText, Backend!BN3:BQ, 4, FALSE), \"\")),\n            \n            namePrefix, IF(numStudents > 1, \"[\" & name & \"] \", \"\"),\n            \n            statusLine, IF(AND(statusVal<>\"\", statusVal<>\"Current\"), \"𝗦𝘁𝗮𝘁𝘂𝘀: \" & statusVal, \"\"),\n            \n            bioDetails, TEXTJOIN(\", \", TRUE, IF(bioVal<>\"\", bioVal, \"\"), IF(ageVal<>\"\", \"𝘈𝘨𝘦 \" & ageVal, \"\"), IF(gradeVal<>\"\", \"𝘎𝘳𝘢𝘥𝘦 \" & gradeVal, \"\")),\n            bioLine, IF(bioVal=\"\", \"\", \"𝗕𝗶𝗼𝗴𝗿𝗮𝗽𝗵𝗶𝗰𝘀: \" & bioDetails),\n            \n            addInfoLine, IF(addInfoVal=\"\", \"\", CHAR(10) & \"𝗔𝗱𝗱𝗶𝘁𝗶𝗼𝗻𝗮𝗹 𝗜𝗻𝗳𝗼𝗿𝗺𝗮𝘁𝗶𝗼𝗻:\" & CHAR(10) & addInfoVal),\n            \n            sibLine, IF(sibVal<>\"\", \"𝗦𝗶𝗯𝗹𝗶𝗻𝗴: \" & sibVal, \"\"),\n            \n            namePrefix & TEXTJOIN(CHAR(10), TRUE, statusLine, bioLine, addInfoLine, sibLine)\n          )\n        )),\n        TEXTJOIN(CHAR(10) & \"────────────────\" & CHAR(10), TRUE, studentLines)\n      )\n    )\n  )\n)\n\nIt just says \"Volunteer\" for PTA role, maybe add one other column after BO that says whether data is student based or guardian based, if it is guardian based give me updated code that then adds guardian name before Volunteer"
+  },
+  "s2-20": {
+   "note": "Works. though i opened settings on my own beforehand and it didnt say i did it."
+  },
+  "s4-12": {
+   "status": "pass"
+  },
+  "s6-2": {
+   "status": "pass"
+  },
+  "s7-1": {
+   "status": "pass"
+  },
+  "s7-2": {
+   "status": "pass",
+   "note": "Works, one but was new row creates didn’t have checkbox? Also contact log tab is slow, it should prioritize 1) ghost typist and 2) making new row. Brainstorm ideas to make it quick"
+  },
+  "s8-04": {
+   "status": "pass"
+  },
+  "s8-05": {
+   "status": "pass"
+  }
+ }
+}
