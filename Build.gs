@@ -55,6 +55,9 @@ function buildAllDerivedSheetsRun_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   // New/Edit Student header on row 2 (an older sheet has it one row lower; Core.gs)
   try { fixOverridesHeaderRow_(ss, false); } catch (e) { console.warn("New/Edit Student header: " + e.message); }
+  // The saved phone numbers are read fresh by every build (a change by hand on the Backend tab counts at the next
+  // build, not 6 hours later; release check round 3)
+  try { clearPhoneChangesCache_(ss); } catch (e) { /* read from the cache then */ }
   const rawSheet = ss.getSheetByName("Raw Data");
   if (!rawSheet) throw new Error('Sheet "Raw Data" not found.');
   const rawData = rawSheet.getDataRange().getValues();
@@ -887,8 +890,8 @@ function readPhoneChanges_(ss) {
   } catch (e) { cache = null; }
   let rows = [];
   try { rows = backendReadBlock_(ss, "PHONES").slice(1); } catch (e) { return []; }
-  const list = rows.map(r => ({ osis: toText_(r[0]), guardian: toText_(r[1]), phone: formatPhone_(r[2]),
-                                use: toText_(r[3]).toLowerCase() === "instead" ? "instead" : "add", from: toText_(r[4]) }))
+  const list = rows.map(r => { const u = phoneChangeUse_(r[3]);
+      return { osis: toText_(r[0]), guardian: toText_(r[1]), phone: formatPhone_(r[2]), use: u.use, replaced: u.replaced, from: toText_(r[4]) }; })
     .filter(c => isRealStudentId_(c.osis) && c.guardian && c.phone);
   try {
     const json = JSON.stringify(list);
@@ -897,48 +900,107 @@ function readPhoneChanges_(ss) {
   return list;
 }
 
-/** The rows in order (oldest first): "instead" makes that number the only one, "add" adds it at the end. */
-function applyPhoneChanges_(guardianRows, changes) {
+/**
+ * The Use cell: "add", or "instead" / "instead of (111) 111-1111" (release check round 3: the numbers ATS had for
+ * that parent when it was saved; when ATS has other numbers since, ATS changed and the row no longer applies).
+ */
+function phoneChangeUse_(cell) {
+  const u = toText_(cell);
+  if (!/^instead\b/i.test(u)) return { use: "add", replaced: [] };
+  return { use: "instead", replaced: phonesFromCell_(u.replace(/^instead\s*(of\b)?/i, "")) };
+}
+
+/** How well a saved row's parent name fits a parent: 2 the same name, 1 all its parts (ATS added a middle name), 0 no. */
+function phoneChangeNameFit_(tokens, savedTokens) {
+  if (sameNameExactly_(tokens, savedTokens)) return 2;
+  return namesMatch_(tokens, savedTokens) ? 1 : 0;
+}
+
+/** ATS's own numbers per student (Raw Data A:AE): normalized OSIS -> [{ tokens, phones }]. */
+function atsPhonesByStudent_(rawData) {
+  const ats = new Map();
+  for (let i = 6; i < (rawData || []).length; i++) {
+    const r = rawData[i];
+    if (!r || !isRealStudentId_(r[2])) continue;
+    ats.set(normalizeOsis_(r[2]), [[19, 21], [25, 27]]
+      .map(c => ({ tokens: nameTokens_(toText_(r[c[0]])), phones: phonesFromCell_(r[c[1]]) })).filter(x => x.tokens.length));
+  }
+  return ats;
+}
+
+/** The ATS parent a saved row is about (the best name fit), or null. */
+function atsParentFor_(atsList, savedTokens) {
+  let best = null, fit = 0;
+  (atsList || []).forEach(a => { const f = phoneChangeNameFit_(a.tokens, savedTokens); if (f > fit) { best = a; fit = f; } });
+  return best;
+}
+
+/** An "instead" row whose parent ATS lists with numbers it didn't have when the row was saved: ATS changed since. */
+function phoneChangeStale_(c, atsParent) {
+  if (c.use !== "instead" || !c.replaced || !c.replaced.length || !atsParent) return false;
+  const had = c.replaced.map(normalizePhoneForMatch_);
+  return atsParent.phones.some(p => had.indexOf(normalizePhoneForMatch_(p)) === -1);
+}
+
+/**
+ * The saved numbers on the guardians (each row goes to the student's parent whose name fits it best):
+ * the "instead" numbers replace the parent's numbers (several "instead" rows = several numbers), "add" numbers
+ * come after. An "instead" row that went stale (ATS changed the number since) is left out: ATS's number shows.
+ * g.atsPhones = the numbers the parent had before (Phone numbers to check counts them as known).
+ */
+function applyPhoneChanges_(guardianRows, changes, rawData) {
   if (!changes || !changes.length) return guardianRows;
-  const byOsis = new Map();
+  const byOsis = new Map(); // normalized OSIS -> its guardian rows
+  guardianRows.forEach(g => {
+    const k = normalizeOsis_(g.student_id);
+    if (!byOsis.has(k)) byOsis.set(k, []);
+    byOsis.get(k).push(g);
+  });
+  const ats = rawData ? atsPhonesByStudent_(rawData) : new Map();
+  const perGuardian = new Map(); // guardian row -> its saved rows (oldest first)
   changes.forEach(c => {
     const k = normalizeOsis_(c.osis);
-    if (!byOsis.has(k)) byOsis.set(k, []);
-    byOsis.get(k).push(c);
-  });
-  guardianRows.forEach(g => {
-    const list = byOsis.get(normalizeOsis_(g.student_id));
-    if (!list) return;
-    const tokens = nameTokens_(stripTrailingParenthetical_(g.guardianOutput));
-    list.forEach(c => {
-      if (!sameNameExactly_(tokens, nameTokens_(c.guardian))) return;
-      const phones = guardianPhones_(g);
-      g.phones = c.use === "instead" ? [c.phone] : (phones.indexOf(c.phone) === -1 ? phones.concat([c.phone]) : phones);
-      g.mobile = g.phones[0] || "";
+    const saved = nameTokens_(c.guardian);
+    if (phoneChangeStale_(c, atsParentFor_(ats.get(k), saved))) return;
+    let best = null, fit = 0;
+    (byOsis.get(k) || []).forEach(g => {
+      const f = phoneChangeNameFit_(nameTokens_(stripTrailingParenthetical_(g.guardianOutput)), saved);
+      if (f > fit) { best = g; fit = f; }
     });
+    if (!best) return;
+    if (!perGuardian.has(best)) perGuardian.set(best, []);
+    perGuardian.get(best).push(c);
+  });
+  perGuardian.forEach((list, g) => {
+    const before = guardianPhones_(g);
+    const insteads = list.filter(c => c.use === "instead");
+    const phones = insteads.length ? [] : before.slice();
+    insteads.forEach(c => { if (phones.indexOf(c.phone) === -1) phones.push(c.phone); });
+    list.forEach(c => { if (c.use !== "instead" && phones.indexOf(c.phone) === -1) phones.push(c.phone); });
+    g.atsPhones = before;
+    g.phones = phones;
+    g.mobile = phones[0] || "";
   });
   return guardianRows;
 }
 
-/** cleanRedundantOverrides: a row whose number ATS has now goes ("instead": ATS's first number is it). */
+/**
+ * cleanRedundantOverrides: a row goes once ATS has its number (in any place), and an "instead" row once it went
+ * stale (ATS changed that parent's number since: ATS's new number shows, and is checked again if it differs).
+ */
 function cleanRedundantPhoneChanges_(ss, rawData) {
   const rows = backendReadBlock_(ss, "PHONES");
   if (rows.length < 2) return 0;
-  const ats = new Map(); // normalized OSIS -> [{ tokens, phones }]
-  for (let i = 6; i < rawData.length; i++) {
-    const r = rawData[i];
-    if (!isRealStudentId_(r[2])) continue;
-    ats.set(normalizeOsis_(r[2]), [[19, 21], [25, 27]]
-      .map(c => ({ tokens: nameTokens_(toText_(r[c[0]])), phones: phonesFromCell_(r[c[1]]) })).filter(x => x.tokens.length));
-  }
+  const ats = atsPhonesByStudent_(rawData);
   const gone = [];
   for (let i = 1; i < rows.length; i++) {
     const r = rows[i];
     const phone = formatPhone_(r[2]);
     if (!phone) continue;
-    const g = (ats.get(normalizeOsis_(r[0])) || []).find(x => sameNameExactly_(x.tokens, nameTokens_(toText_(r[1]))));
+    const u = phoneChangeUse_(r[3]);
+    const g = atsParentFor_(ats.get(normalizeOsis_(r[0])), nameTokens_(toText_(r[1])));
     if (!g) continue;
-    if (toText_(r[3]).toLowerCase() === "instead" ? g.phones[0] === phone : g.phones.indexOf(phone) !== -1) gone.push(i);
+    if (g.phones.indexOf(phone) !== -1 || phoneChangeStale_({ use: u.use, replaced: u.replaced }, g)) gone.push(i);
   }
   if (gone.length) backendDeleteRows_(ss, "PHONES", gone);
   return gone.length;
@@ -973,7 +1035,7 @@ function buildGuardianObjects_(rawData, overrideGuardians, phoneChanges) {
     guardianList.forEach(g => { if (!guardianListHas_(ats, g)) out.push(g); });
   }
 
-  return applyPhoneChanges_(out, phoneChanges);
+  return applyPhoneChanges_(out, phoneChanges, rawData);
 }
 
 function buildGuardianObject_(studentId, fullName, relationship, spokenLanguage, writtenLanguage, email, phone) {

@@ -185,6 +185,8 @@
       $('phCount').className = 'count' + (list.length ? '' : ' zero');
       show('phBar', list.length > 0); show('phBarTop', list.length > 1);
       show('phEmpty', list.length === 0);
+      $('phEmpty').textContent = home.noData ? 'Load your data first (🚀 App Menu → 📥 Input Data Mode): then this lists the numbers to check.'
+        : 'No numbers to check: Parent Square, NYCSA and your lists have the same numbers as your Student Data.';
       show('phSkippedLine', home.phonesSkipped > 0);
       $('phSkippedText').textContent = home.phonesSkipped === 1 ? '1 number you marked "not needed" is hidden.' : home.phonesSkipped + ' numbers you marked "not needed" are hidden.';
       $('phList').innerHTML = list.map(function (p, i) {
@@ -234,15 +236,16 @@
       var keys = phKeysTicked();
       if (!keys.length || busy) return;
       if (use === 'instead' && !confirm('Use the new number' + (keys.length > 1 ? 's' : '') + ' INSTEAD of the one' + (keys.length > 1 ? 's' : '') +
-          ' these parents have now?\n\nThe number they have now leaves their contact. If your Student Data (ATS) gets the new number later, this goes away by itself.')) return;
+          ' these parents have now?\n\nThe number they have now leaves their contact. If your Student Data (ATS) later has this number, or another new one, ATS\'s number is used again and this goes away by itself.')) return;
       setBusy(true);
       say('Saving…');
       run().withSuccessHandler(function (r) {
         phTicked = {};
         render(r.home);
+        if (!r.saved) { say('Nothing to save: those numbers were already saved or changed (maybe in another window). The page shows them as they are now.', 'ok'); return; }
         var text = r.saved === 1 ? 'Saved 1 number.' : 'Saved ' + r.saved + ' numbers.';
         if (r.building) text += ' Your sheets are being rebuilt with them: the Build panel is on the right (it shows once you close this).';
-        else if (r.saved) text += ' They show in your sheets after the next build.';
+        else text += ' They show in your sheets after the next build.';
         say(text, 'ok');
       }).savePhoneNumbers(keys, use);
     }
@@ -269,6 +272,8 @@
       $('addCount').className = 'count' + (list.length ? '' : ' zero');
       show('addWarn', list.length > 0); show('addBar', list.length > 0); show('addBarTop', list.length > 1);
       show('addEmpty', list.length === 0);
+      $('addEmpty').textContent = home.noData ? 'Load your data first (🚀 App Menu → 📥 Input Data Mode): then this lists the parents to add.'
+        : 'No parents to add: everyone Parent Square, NYCSA and your lists have is in your Student Data.';
       show('skippedLine', home.skipped > 0);
       $('skippedText').textContent = home.skipped === 1 ? '1 parent you marked "not new" is hidden.' : home.skipped + ' parents you marked "not new" are hidden.';
       $('addList').innerHTML = list.map(function (p, i) {
@@ -383,6 +388,7 @@
       say('Deleting…');
       run().withSuccessHandler(function (r) {
         render(r.home);
+        if (!r.removed) { say('Already deleted (maybe in another window). The page shows your changes as they are now.', 'ok'); return; }
         say(r.building ? 'Deleted. Your sheets are rebuilt without it: the Build panel is on the right (it shows once you close this).'
                        : 'Deleted. Your sheets lose it at the next build.', 'ok');
       }).deletePhoneChanges([c.key]);

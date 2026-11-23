@@ -465,7 +465,7 @@ function phonesSheet() {
   // ATS gets the number: the row goes by itself at the next build's cleanup
   raw._put([["1111111111 / 9999990000"]], 7, 22); // Bart's Homer now has both in ATS
   g.cleanRedundantOverrides();
-  eq(g.backendReadBlock_(ss, "PHONES").slice(1).map(x => x[0] + " " + x[3]), ["567891234 add", "111222333 instead"], "Bart's row went; Lisa's ATS doesn't have it yet");
+  eq(g.backendReadBlock_(ss, "PHONES").slice(1).map(x => x[0] + " " + x[3]), ["567891234 add", "111222333 instead of (555) 555-5555"], "Bart's row went; Lisa's ATS doesn't have it yet (\"instead\" notes the number it replaced)");
   raw._put([["8888888888"]], 9, 22);
   g.cleanRedundantOverrides();
   eq(g.backendReadBlock_(ss, "PHONES").slice(1).map(x => x[0]), ["567891234"], "\"instead\": goes once it is ATS's number");

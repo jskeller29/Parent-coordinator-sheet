@@ -2360,8 +2360,12 @@ function saveStudentOverrides(payloads) {
     return atsById.get(normalizeOsis_(osis)) || null;
   };
   const addedBefore = new Map(); // normalized OSIS -> { sources, names (token lists) } of its Added Guardian rows
+  // A student who already has a New / Edit row (a label, a changed field or parent): a save stays an Edit row,
+  // so nothing that row holds is lost (release check round 3: its Status label went when a parent was added)
+  const editedBefore = new Set();
   for (let i = 1; i < existingData.length; i++) {
     const r = existingData[i];
+    if (isRealStudentId_(r[2]) && !isAddedGuardianType_(r[1])) editedBefore.add(normalizeOsis_(r[2]));
     if (!isAddedGuardianType_(r[1]) || !isRealStudentId_(r[2])) continue;
     const k = normalizeOsis_(r[2]);
     const e = addedBefore.get(k) || { sources: [], names: [] };
@@ -2379,11 +2383,12 @@ function saveStudentOverrides(payloads) {
   backendDeleteRows_(ss, "OVERRIDES", dupIdxs);
 
   // 2. COMPILE ALL NEW ROWS IN MEMORY
+  const phoneSkips = []; // "Not needed" for numbers replaced by hand in "Check and edit before adding"
   const rowsToAppend = payloads.map(data => {
       // Expanded to 42 columns to support Label and Hide From Report
       const row = new Array(42).fill("");
       const ats = atsRowFor(data.osis);
-      const extras = addedGuardiansOnly_(data, ats);
+      const extras = editedBefore.has(normalizeOsis_(data.osis)) ? null : addedGuardiansOnly_(data, ats);
       let guardians = data.guardians;
       row[0] = dateStr;
       row[1] = data.entryType;
@@ -2400,6 +2405,14 @@ function saveStudentOverrides(payloads) {
         const before = addedBefore.get(normalizeOsis_(data.osis)) || { sources: [], names: [] };
         const sources = before.sources.slice();
         const pre = data.prefilled && toText_(data.prefilled.name) ? data.prefilled : null; // "Check and edit before adding"
+        // The source's phone changed by hand before adding: that number isn't offered back under Phone numbers to
+        // check (it would be at once: release check round 3)
+        if (pre && toText_(pre.phone)) {
+          const g = extras.find(x => sameNameExactly_(nameTokens_(pre.name), nameTokens_(x.name)));
+          if (g && normalizePhoneForMatch_(toText_(g.phone)) !== normalizePhoneForMatch_(toText_(pre.phone))) {
+            phoneSkips.push(nameTokens_(toText_(g.name)).sort().join(" ") + "|" + normalizePhoneForMatch_(toText_(pre.phone)));
+          }
+        }
         extras.forEach(g => {
           if (before.names.some(t => sameNameExactly_(t, nameTokens_(g.name)))) return; // its earlier row's sources
           const from = pre && sameNameExactly_(nameTokens_(pre.name), nameTokens_(g.name)) && Array.isArray(pre.sources) && pre.sources.length
@@ -2435,6 +2448,7 @@ function saveStudentOverrides(payloads) {
 
   // 3. BULK PASTE INSTANTLY
   backendAppendRows_(ss, "OVERRIDES", rowsToAppend);
+  if (phoneSkips.length) addToSkipList_(PHONES_SKIPPED_KEY_, phoneSkips);
   SpreadsheetApp.flush();
 
  // 4. CHECK SETTINGS & REBUILD
@@ -2697,9 +2711,53 @@ function parentDisplayName_(raw) {
   return properCase_(s);
 }
 
-function parentsSkipped_() {
-  try { return JSON.parse(PropertiesService.getDocumentProperties().getProperty(PARENTS_SKIPPED_KEY_) || "[]") || []; }
-  catch (e) { return []; }
+function parentsSkipped_() { return readSkipList_(PARENTS_SKIPPED_KEY_); }
+
+// "Not new" / "Not needed" lists, kept over up to 8 document properties (KEY, KEY_1 .. KEY_7) of about 8.5 KB each:
+// one property holds about 9 KB, and at a big school 400 "Not new" parents filled it, so the oldest came back
+// without a word (release check round 3). Now the oldest go only past about 68 KB (2,000 or so).
+var SKIP_LIST_PIECES_ = 8, SKIP_LIST_PIECE_CHARS_ = 8500;
+function skipListKeys_(key) {
+  const out = [key];
+  for (let i = 1; i < SKIP_LIST_PIECES_; i++) out.push(key + "_" + i);
+  return out;
+}
+function readSkipList_(key) {
+  let all = [];
+  try {
+    const got = PropertiesService.getDocumentProperties().getProperties();
+    skipListKeys_(key).forEach(k => {
+      if (!got[k]) return;
+      try { const part = JSON.parse(got[k]); if (Array.isArray(part)) all = all.concat(part.map(String)); } catch (e) { /* a broken piece */ }
+    });
+  } catch (e) { return []; }
+  return all;
+}
+function writeSkipList_(key, list) {
+  const pieces = [];
+  let cur = [], size = 2;
+  list.forEach(k => {
+    const add = JSON.stringify(String(k)).length + (cur.length ? 1 : 0);
+    if (cur.length && size + add > SKIP_LIST_PIECE_CHARS_) { pieces.push(cur); cur = []; size = 2; }
+    cur.push(String(k));
+    size += JSON.stringify(String(k)).length + (cur.length > 1 ? 1 : 0);
+  });
+  if (cur.length) pieces.push(cur);
+  while (pieces.length > SKIP_LIST_PIECES_) pieces.shift(); // only past ~68 KB: the oldest go
+  const props = PropertiesService.getDocumentProperties();
+  const keys = skipListKeys_(key), set = {};
+  keys.forEach((k, i) => { if (pieces[i]) set[k] = JSON.stringify(pieces[i]); });
+  if (Object.keys(set).length) props.setProperties(set); // the other properties stay
+  keys.forEach((k, i) => { if (!pieces[i]) props.deleteProperty(k); });
+}
+function addToSkipList_(key, keys) {
+  const list = readSkipList_(key);
+  (keys || []).map(String).forEach(k => { const i = list.indexOf(k); if (i !== -1) list.splice(i, 1); list.push(k); });
+  writeSkipList_(key, list);
+}
+function clearSkipList_(key) {
+  const props = PropertiesService.getDocumentProperties();
+  skipListKeys_(key).forEach(k => props.deleteProperty(k));
 }
 
 /**
@@ -2799,7 +2857,7 @@ function parentSources_(ss, listMatched) {
       });
     }
   } catch (e) { console.warn("Parents to add: your lists skipped: " + e.message); }
-  return { rows: rows, guardiansOf: guardiansOf };
+  return { rows: rows, guardiansOf: guardiansOf, atsPhonesOf: atsPhonesByStudent_(rawData) };
 }
 
 /**
@@ -2875,10 +2933,7 @@ function findParentsToAdd_(ss, all, src) {
 // ======================================================================
 var PHONES_SKIPPED_KEY_ = "PHONES_TO_CHECK_SKIPPED";
 
-function phonesSkipped_() {
-  try { return JSON.parse(PropertiesService.getDocumentProperties().getProperty(PHONES_SKIPPED_KEY_) || "[]") || []; }
-  catch (e) { return []; }
-}
+function phonesSkipped_() { return readSkipList_(PHONES_SKIPPED_KEY_); }
 
 /**
  * { items, skipped }: { key, guardian, relationship, phone, kinds, sources, current (their numbers now),
@@ -2902,19 +2957,24 @@ function findPhonesToCheck_(ss, all, src) {
     const email = normalizeEmail_(x.info.email);
     const g = knownGuardianFor_(src.guardiansOf.get(x.st.id) || [], tokens, digits, email);
     if (!g) return;                                       // a new parent: Parents to add has them
-    const have = guardianPhones_(g).map(normalizePhoneForMatch_);
-    if (digits.some(d => have.indexOf(d) !== -1)) return; // the source has a number we have: nothing to check
     const gName = stripTrailingParenthetical_(g.guardianOutput);
     const gTokens = nameTokens_(gName);
+    // What we have: the numbers now, the ones before a saved change and ATS's own for that parent (release check
+    // round 3: after "Use it instead" or an edited phone, the number just replaced was offered right back)
+    const atsParent = src.atsPhonesOf ? atsParentFor_(src.atsPhonesOf.get(normalizeOsis_(x.st.id)), gTokens) : null;
+    const atsNumbers = atsParent ? atsParent.phones : [];
+    const have = guardianPhones_(g).concat(g.atsPhones || [], atsNumbers).map(normalizePhoneForMatch_);
+    if (digits.some(d => have.indexOf(d) !== -1)) return; // the source has a number we have: nothing to check
     numbers.forEach(n => {
       const key = gTokens.slice().sort().join(" ") + "|" + normalizePhoneForMatch_(n.phone);
       let it = items.get(key);
       if (!it) {
         it = { key: key, guardian: gName, relationship: toText_(g.relationship), phone: n.phone, kinds: [], sources: [],
-               current: guardianPhones_(g), students: [], alike: null };
+               current: guardianPhones_(g), students: [], alike: null, atsByStudent: {} };
         items.set(key, it);
       }
       if (!it.students.some(s => s.osis === x.st.id)) it.students.push({ osis: x.st.id, name: x.st.name });
+      it.atsByStudent[x.st.id] = atsNumbers; // what "Use it instead" replaces, per student
       if (it.sources.indexOf(x.source) === -1) it.sources.push(x.source);
       const kind = n.kind && x.source.indexOf(n.kind) === -1 ? x.source + " (" + n.kind + ")" : x.source;
       if (it.kinds.indexOf(kind) === -1) it.kinds.push(kind);
@@ -2945,12 +3005,29 @@ function savePhoneNumbers(keys, use) {
   if (!picked.length) return { saved: 0, building: false, home: getOverridesHome() };
   const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
   const rows = [];
-  picked.forEach(it => it.students.forEach(s => rows.push([s.osis, it.guardian, it.phone, use, it.sources.join(", "), today])));
+  // "instead" notes the numbers ATS had for that parent ("instead of (111) 111-1111"): when ATS changes them later,
+  // the row stops applying and ATS's new number shows (release check round 3)
+  const useFor = (it, s) => {
+    if (use !== "instead") return "add";
+    const ats = (it.atsByStudent && it.atsByStudent[s.osis]) || [];
+    return ats.length ? "instead of " + ats.join(", ") : "instead";
+  };
+  picked.forEach(it => it.students.forEach(s => rows.push([s.osis, it.guardian, it.phone, useFor(it, s), it.sources.join(", "), today])));
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS.PHONES;
   backendBlockReady_(sheet, b, true);
   const header = sheet.getRange(BACKEND_HEADER_ROW, b.col, 1, b.width);
   if (!header.getValues()[0].some(v => String(v).trim() !== "")) header.setValues([PHONES_HEADERS_]);
+  if (use === "instead") {
+    // "Use it instead" replaces what that parent has: their numbers saved here before go (the ones ticked now stay)
+    const before = backendReadBlock_(ss, "PHONES"), old = [];
+    for (let i = before.length - 1; i > 0; i--) {
+      const r = before[i];
+      if (picked.some(it => it.students.some(st => normalizeOsis_(st.osis) === normalizeOsis_(r[0])) &&
+          phoneChangeNameFit_(nameTokens_(toText_(r[1])), nameTokens_(it.guardian)) > 0)) old.push(i);
+    }
+    if (old.length) backendDeleteRows_(ss, "PHONES", old);
+  }
   backendAppendRows_(ss, "PHONES", rows);
   SpreadsheetApp.flush();
   const settings = getSettings();
@@ -2962,20 +3039,13 @@ function savePhoneNumbers(keys, use) {
 
 /** "Not needed": these numbers aren't offered again. */
 function skipPhoneNumbers(keys) {
-  const list = phonesSkipped_();
-  (Array.isArray(keys) ? keys : []).map(String).forEach(k => {
-    const i = list.indexOf(k);
-    if (i !== -1) list.splice(i, 1);
-    list.push(k);
-  });
-  while (list.length && JSON.stringify(list).length > 8500) list.shift(); // a property holds about 9 KB
-  PropertiesService.getDocumentProperties().setProperty(PHONES_SKIPPED_KEY_, JSON.stringify(list));
+  addToSkipList_(PHONES_SKIPPED_KEY_, Array.isArray(keys) ? keys : []);
   return getOverridesHome();
 }
 
 /** "Show them again": every "Not needed" number is offered again. */
 function unskipPhoneNumbers() {
-  PropertiesService.getDocumentProperties().deleteProperty(PHONES_SKIPPED_KEY_);
+  clearSkipList_(PHONES_SKIPPED_KEY_);
   return getOverridesHome();
 }
 
@@ -2985,7 +3055,7 @@ function unskipPhoneNumbers() {
  * students together. key = guardian name parts | the number's digits | use (deletePhoneChanges takes it).
  */
 function phoneChangeKey_(guardian, phone, use) {
-  return nameTokens_(toText_(guardian)).sort().join(" ") + "|" + normalizePhoneForMatch_(toText_(phone)) + "|" + (toText_(use).toLowerCase() === "instead" ? "instead" : "add");
+  return nameTokens_(toText_(guardian)).sort().join(" ") + "|" + normalizePhoneForMatch_(toText_(phone)) + "|" + phoneChangeUse_(use).use;
 }
 function savedPhoneChanges_(ss) {
   const rows = backendReadBlock_(ss, "PHONES");
@@ -3048,7 +3118,10 @@ function parentMaybeSame_(rawName, phones, email, guardians) {
     if (!gp) return;
     let score = od_nameScore_(cand, gp);
     const firstAlike = od_firstScore_(cand.first, gp.first) >= 0.9;
-    const lastAlike = od_bestPair_(cand.lastTokens.length ? cand.lastTokens : cand.tokens, gp.lastTokens.length ? gp.lastTokens : gp.tokens) >= 0.9;
+    const candLast = cand.lastTokens.length ? cand.lastTokens : cand.tokens, gLast = gp.lastTokens.length ? gp.lastTokens : gp.tokens;
+    // One letter off (Adams / Addams) is a close spelling, not "another last name" (release check round 3)
+    const oneLetterOff = (x, y) => x.length >= 4 && y.length >= 4 && Math.round((1 - od_editRatio_(x, y)) * Math.max(x.length, y.length)) <= 1;
+    const lastAlike = od_bestPair_(candLast, gLast) >= 0.9 || candLast.some(x => gLast.some(y => oneLetterOff(x, y)));
     const contact = (phones.length && guardianPhones_(g).some(x => phones.indexOf(normalizePhoneForMatch_(x)) !== -1)) || (email && email === normalizeEmail_(g.email));
     const why = [];
     if (firstAlike && !lastAlike) { score = Math.max(score, 0.6); why.push("same first name, another last name"); }
@@ -3078,6 +3151,7 @@ function getOverridesHome() {
   catch (e) { console.warn("Saved phone numbers: " + e.message); }
   const settings = getSettings();
   return { toAdd: found.items, skipped: found.skipped, changes: getOverridesList(), phoneChanges: phoneChanges, error: error,
+           noData: !error && !src, // no Raw Data rows yet: the page says to load the data first
            phones: phones.items, phonesSkipped: phones.skipped, phonesError: phonesError,
            paused: settings.disableRebuilds === true || settings.disableRebuilds === 'true' };
 }
@@ -3146,21 +3220,13 @@ function addParentsAsGuardians(keys) {
 
 /** "Not new" on the main page: these parents aren't offered again. */
 function skipParentsToAdd(keys) {
-  const list = parentsSkipped_();
-  (Array.isArray(keys) ? keys : []).map(String).forEach(k => {
-    const i = list.indexOf(k);
-    if (i !== -1) list.splice(i, 1);
-    list.push(k);
-  });
-  // A document property holds about 9 KB: the oldest "not new" ones go first
-  while (list.length && JSON.stringify(list).length > 8500) list.shift();
-  PropertiesService.getDocumentProperties().setProperty(PARENTS_SKIPPED_KEY_, JSON.stringify(list));
+  addToSkipList_(PARENTS_SKIPPED_KEY_, Array.isArray(keys) ? keys : []);
   return getOverridesHome();
 }
 
 /** "Show the ones you skipped": every "Not new" is offered again. */
 function unskipParentsToAdd() {
-  PropertiesService.getDocumentProperties().deleteProperty(PARENTS_SKIPPED_KEY_);
+  clearSkipList_(PARENTS_SKIPPED_KEY_);
   return getOverridesHome();
 }
 

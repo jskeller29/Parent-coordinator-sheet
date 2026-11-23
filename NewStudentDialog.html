@@ -205,7 +205,7 @@
             alert(g.name + " can't be added here: this student already has " + MAX_GUARDIANS + " guardians. Remove one first, then type " + g.name + " in its place.");
             return;
         }
-        prefilled = { name: g.name || '', sources: Array.isArray(g.sources) ? g.sources : [] };
+        prefilled = { name: g.name || '', sources: Array.isArray(g.sources) ? g.sources : [], phone: g.phone || '' };
         document.getElementById('g' + slot + 'Name').value = g.name || '';
         document.getElementById('g' + slot + 'Rel').value = g.relationship || '';
         document.getElementById('g' + slot + 'Phone').value = g.phone || '';
