@@ -23,7 +23,7 @@ A file from an older version left in the project = the project won't load
 |---|---|---|
 | **Scripts** | Core, Build, Edits, Menus, Input Data, Contacts Sync, Sheet Lock, Regenerate, Z#ContactLog | same |
 | **Your scripts** | z_MINE, z_ContactLogDebug, z_InputDataDebug, z_NewCopy | **none** (never copy these) |
-| **Pages** | Styles, SettingsDialog, ProgressSidebar, NewStudentDialog, ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog, InputDataSidebar, YourListsSidebar, GettingStartedSidebar, Z#ContactLogSidebar | same |
+| **Pages** | Styles, SettingsDialog, ProgressSidebar, NewStudentDialog, ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog, InputDataSidebar, YourListsSidebar, GettingStartedSidebar, FindFamily, Z#ContactLogSidebar | same |
 | **Your pages** | z_ContactLogDebugSidebar | **none** |
 | **Manifest** (`appsscript.json`) | contents of `App Scripts (Mine).Json` | contents of `App Scripts (General).Json` |
 
@@ -36,6 +36,11 @@ the ones that don't exist yet with the same name (script: + → Script; page: + 
 **Making a new copy of your sheet** (for a school, the master template or a test): open the
 copy and a pop-up lists what to change in it (z_NewCopy.gs, your sheet only). The same list
 with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
+
+**This update (2026-11-23, your 10 ideas):** re-paste the scripts Core, Build, Edits, Menus, Input Data,
+Contacts Sync, Regenerate and the pages InputDataSidebar, ManageOverridesDialog, NewStudentDialog,
+SettingsDialog, ProgressSidebar, YourListsSidebar; **add** the page **FindFamily** (new). Your sheet: also
+z_MINE. No new permissions (same manifests). Then do step 10 below once.
 
 ## 3. After pasting
 1. Save, then reload the spreadsheet.
@@ -64,6 +69,16 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
    a sheet still set to that keeps working the old way (the build keeps R2 and R:AA; only checkboxes after P
    go) until you change it. Leave R1 empty. Schools' sheets: the same rule by hand after their next build, or
    they get it with next year's copy of the template; until then their build adds no columns after P.
+
+10. Master template and your sheet: the **Method 2** dropdown, once, by hand (2026-11-23; a script can't change a
+   Table's dropdown column). First **🏗️ Build Sheets Only** once: it writes the list on the hidden Backend tab
+   (column **CQ**: your fixed choices first, then every Method 2 already typed). Then Contact Log → **Method 2**
+   column (K) → Data validation → **Dropdown (from a range)** `='Backend'!$CQ$3:$CQ`, Advanced options →
+   **Show a warning** (NOT "Reject the input": a new choice can only join the list after it is typed once).
+   To change the fixed choices (now Call, Text, Email, Voicemail, Meeting, In School), edit the formula in
+   **Backend CQ3** on the sheet: the build keeps a formula there that reads Contact Log K.
+   Nothing to do by hand for the **light red Method** color: every build adds that rule when it is missing
+   (and the 10 PM run draws it with the others).
 
 ## 4. Test it on copies: the release checklist
 Everything for a new version, step by step, with what you should see, in four parts: set up the test copies,

@@ -474,6 +474,7 @@ function backendRowFor_(i) {
 function backendBlockRange_(ss, key, i, c, numRows, numCols) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too
+  if (key === "PHONES") clearPhoneChangesCache_(ss); // Build.gs keeps a cached copy (read on every build and owner edit)
   const sheet = getBackendSheet_(ss);
   return sheet.getRange(backendRowFor_(i), BACKEND_BLOCKS[key].col + c, numRows || 1, numCols || 1);
 }
@@ -506,6 +507,7 @@ function backendWriteBlock_(ss, key, values) {
 function backendClearBlock_(ss, key, fromRow) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too (a write clears first, so it lands here)
+  if (key === "PHONES") clearPhoneChangesCache_(ss); // Build.gs keeps a cached copy (read on every build and owner edit)
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   if (!backendBlockReady_(sheet, b, false)) return; // a grow section that was never written: nothing to clear
@@ -537,6 +539,7 @@ function backendBlockReady_(sheet, b, create) {
 function backendAppendRows_(ss, key, rows) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
   if (key === "ADDL_INFO") clearAdditionalInfoCache_(ss); // Build.gs keeps a cached copy too
+  if (key === "PHONES") clearPhoneChangesCache_(ss); // Build.gs keeps a cached copy (read on every build and owner edit)
   if (!rows || rows.length === 0) return;
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
@@ -554,6 +557,7 @@ function backendAppendRows_(ss, key, rows) {
  */
 function backendDeleteRows_(ss, key, idxs) {
   if (key === "EVENT_LOG" && typeof clearNotesSourcesCache_ === "function") clearNotesSourcesCache_(); // cached copy is stale now
+  if (key === "PHONES") clearPhoneChangesCache_(ss); // Build.gs keeps a cached copy (read on every build and owner edit)
   const sheet = getBackendSheet_(ss);
   const b = BACKEND_BLOCKS[key];
   Array.from(new Set(idxs)).filter(i => i >= 1).sort((x, y) => y - x).forEach(i => {

@@ -189,6 +189,10 @@ Student Data (required), from ATS / Insight:
    download.
 4. In your Downloads, look for the file whose name starts with general_.
 
+This file has 2 guardians per student, with one phone and one email each. Other parents
+and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about
+them at the end of Input Data Mode, and in 👤 Student Overrides.
+
 Parent Square (optional):
 
 1. Sign in to ParentSquare and open Admin.
@@ -234,6 +238,16 @@ then has four steps:
 Your choices are remembered. When a new version of the list comes in, click Paste new
 version and only the new rows need you. A list with an OSIS column matches best.
 
+The first screen of a list asks what it is for. Show its info is the four steps above.
+Only find parents and phone numbers to add is for a list of parents with their child's
+name or OSIS (contact cards, a sign-in sheet): nothing from it goes on your sheets, it
+has only the Columns and Match steps, and the parents it has that your Student Data
+doesn't, and other numbers for the parents you have, show in 👤 Student Overrides.
+
+On the Variables step, tick Tell me what changed at each build to see, in the Build
+panel's report, who is new on the list, who dropped off and which values changed (a new
+bus route, a form now returned). The first build after you tick it only takes a copy.
+
 > [!WARNING]
 > Anything shown under Additional Information goes into your Google Contacts, and onto
 > your phone after the next sync. Keep private lists (IEP, housing, health) off the
@@ -251,13 +265,19 @@ Overrides → 🗂️ Student Overrides.
   the same first name with another last name), with how alike they are. Check and edit
   before adding opens the student with that parent filled in. An added parent joins the
   ATS guardians, so a new phone in next month's ATS still comes in.
+- Phone numbers to check: parents you already have whom Parent Square, NYCSA or one of
+  your lists has with another number. Each card shows the number they have now and the
+  other one. Tick them, then Add as a 2nd number (both stay), Use it instead (the other
+  one goes), or Not needed. The number shows in the Parents List and the phone contacts
+  after the build. Once ATS has the number, the change removes itself.
 - Your changes: every student you added or edited and every parent you added, with Edit
   and Delete.
 - Create the Override Report, and New / Edit Student, at the bottom. New / Edit Student
   has a "← Student Overrides" button back to the page.
 
 Use ✨ New / Edit Student to add a student who isn't in ATS yet, or to fix a name or a
-parent's phone. Your change shows in the Student List, Combined Contact Tracking,
+parent's phone. To add a parent, pick the student, click + Add another guardian and save:
+when you only added parents, the student's ATS parents keep updating from ATS. Your change shows in the Student List, Combined Contact Tracking,
 Parents List and Phone Contacts at the next build. The Directory always shows ATS
 data only. An override removes itself once ATS has the same information.
 
@@ -287,6 +307,7 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 
 | 🚀 App Menu item | What it does |
 |---|---|
+| 🔍 Find a Family | Search a student, a parent, an OSIS, a phone number or an email (below). |
 | 🧱 Full Sync | Builds the sheets and updates your Google Contacts. Shows only when the phone sync is on. |
 | 🏗️ Build Sheets Only | Rebuilds every tab from your data without touching Google Contacts. |
 | 📥 Input Data Mode | Loads new exports, Site / Class and your lists (Part 1, Step 5). |
@@ -337,7 +358,7 @@ Log every call, email, meeting and walk-in here, one row each.
 | Person Spoke With | Who you actually spoke to. |
 | # | How many people this counts for in the PCAR. A call is 1; an email to 30 parents is 30. Fills in 1 if blank. |
 | Site and Class | Fill in from the student. Turn them on in Settings. |
-| Method 1 and Method 2 | How you reached the family, for the PCAR. |
+| Method 1 and Method 2 | How you reached the family, for the PCAR. Method 1 shows light red until you pick it. Method 2's list has the usual choices plus any you already typed: type a new one once and it joins the list. |
 | Type | Your own topic list (Attendance, Behavior …). Turn it on in Settings; edit the choices in the Backend tab, column BL. |
 | Event Description | What you talked about. |
 | Follow-up | No Followup Needed, Followup Needed, Followup Needed - ASAP, Followed up / Resolved, Skipped / Newer Interaction, or Waiting for Response. Fills in No Followup Needed if blank. |
@@ -361,6 +382,21 @@ communications before you call.
 If you get "Could not find … in the Student List", that student isn't in the sheets yet.
 Run 🏗️ Build Sheets Only and try again.
 
+### Find a Family
+
+🚀 App Menu → 🔍 Find a Family opens a search window. Type a student's or a parent's
+name (the spelling doesn't have to be exact), an OSIS, part of a phone number or an
+email. Pick a result to see the student, every parent with their numbers and email,
+Parent Square and NYCSA, open follow-ups, Student Info from your lists, and the notes.
+
+- Log a contact starts a Contact Log row for that student (Log a contact with them also
+  fills in Person Spoke With). Type the Method and the rest there.
+- Edit student opens ✨ New / Edit Student with the student filled in.
+- Open as side panel moves it to the right of the sheet, so it stays open while you
+  type in the Contact Log. Open as popup moves it back. It opens the way you left it.
+
+It shows what the last build made: after you load new data, build first.
+
 ### Events
 
 Use the Events tab for workshops, conferences and other group events, so they don't
@@ -378,7 +414,7 @@ Open 🚀 App Menu → ⚙️ Settings. Choose a section on the left, then click
 
 | Section | Setting | What it does |
 |---|---|---|
-| Contacts & sync | Sync contacts to my phone every night | Puts the school directory in your Google Contacts during the nightly run. |
+| Contacts & sync | Sync contacts to Google Contacts every night | Puts the school directory in the Google Contacts of the account that runs the nightly job (it says which). It asks first: use only your DOE Google account, on your DOE phone. |
 | Tabs & columns | Show these tabs | Which tabs show. Contact Log, Combined Contact Tracking, PCAR and Directory show at first. |
 | Tabs & columns | Contact Log columns | Shows or hides Site & Class and Type in the Contact Log. |
 | Live updates | Rebuild sheets | After every edit and nightly (the default), nightly and when you click Build, after every edit but not nightly, or only when you click Build. No nightly run also means no nightly phone sync. |
@@ -408,6 +444,15 @@ Directory" label in your contacts matching the Phone Contacts tab: it adds new p
 updates changed ones and removes those who left. A side panel shows the progress. You
 can close it; the sync keeps going. Large schools may take more than one run, and it
 picks up where it stopped. With the phone sync on, the nightly run does the same.
+
+Full Sync puts the contacts into the Google account of whoever clicks it, so it asks
+first and names that account. Use only your DOE Google account, on your DOE phone.
+
+> [!IMPORTANT]
+> Change a parent's number in the sheet (👤 Student Overrides), not on the phone. Every
+> sync rewrites each contact the way the sheet has it, so a number typed on the phone is
+> gone the next night. Turning the phone sync off doesn't remove the contacts: in Google
+> Contacts, open the School Directory label, select all and delete.
 
 ## Part 3: New versions and the end of the year
 
@@ -476,7 +521,8 @@ your Google account, as you.
 - When you allow the script, you give the permission to the script in your own account.
   Nobody else receives anything.
 - The tracker reads and writes your own spreadsheet, and your own Google Contacts only
-  if you turn on the phone sync.
+  if you turn on the phone sync. Turn it on only in your DOE Google account, and only on a
+  phone that is yours for work.
 - You can read the code: Extensions → Apps Script in the sheet.
 - You can remove access at any time: myaccount.google.com → Security → Your connections
   to third-party apps & services.

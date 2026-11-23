@@ -23,7 +23,8 @@ Files (shared = every school's sheet):
   (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables. (The temporary
   🐞 Contact Log Debug sidebar is the owner's test file z_ContactLogDebug.gs, see below.)
 - Menus.gs: onOpen menus, setup, 👋 Welcome tab (new copies, see below), Getting Started (welcome + checklist, see
-  below), Settings, Student Overrides + report, Rollover, Migration, Version Check, data update reminder, links.
+  below), Settings, Student Overrides + report, Rollover, Migration, Version Check, data update reminder, links,
+  🔍 Find a Family (+ FindFamily.html, 2026-11-23, see THE OWNER'S 10 IDEAS).
 - Input Data.gs: Input Data Mode (part 1) + Your Lists (part 2), see below.
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
@@ -37,7 +38,8 @@ Files (shared = every school's sheet):
   tab, DATE UPDATED titles left-aligned, Parent Square header #f6dfc4 instead of #ff9900), the fake data's 2 Raw Data
   fonts, resetMasterTable_ deletes the Student List's columns after H (STUDENT_LIST_COLUMNS_; clears
   min(9, columns)), and resetContactLogFormatting's Workshop rows (J = "Workshop", C:O) are pale green
-  SHEET_LOOK_.workshopRow #e6f1ea (was solid #b6d7a8).
+  SHEET_LOOK_.workshopRow #e6f1ea (was solid #b6d7a8). 2026-11-23 (owner's ideas): resetContactLogFormatting also
+  draws the light red Method rule (methodMissingRule_), resetDerivedSheets_ clears Backend PHONES and LIST_WATCH.
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -542,6 +544,76 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Parents to add "maybe the same" + parents now + folding, tabs by hand -> Settings (2026-11-18, later): re-paste
   Menus, Input Data (scripts) and ManageOverridesDialog (page) on every sheet. The claude/peaceful-clarke-82x3jz
   branch was deleted at the owner's request (everything is on Test-Version).
+- The owner's 10 ideas (2026-11-23, see THE OWNER'S 10 IDEAS below; branch claude/determined-euler-vq9la3): re-paste
+  Core, Build, Edits, Menus, Input Data, Contacts Sync, Regenerate (scripts) and InputDataSidebar,
+  ManageOverridesDialog, NewStudentDialog, SettingsDialog, ProgressSidebar, YourListsSidebar (pages); ADD the page
+  FindFamily; owner sheet also z_MINE. Same manifests. Then Build Sheets Only once and DEPLOY.md step 10 (Method 2
+  dropdown by hand: 'Backend'!$CQ$3:$CQ, Show a warning) on the master template and the owner's sheet.
+
+THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
+- 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
+  =AND($B2<>"", $J2="") on J2:J. resetContactLogFormatting (Regenerate.gs, the 10 PM run) draws it
+  (methodMissingRule_, Edits.gs); every build adds it when missing (ensureMethodMissingRule_: one read, a recolored
+  rule with the same formula is kept). A rule added by hand would be wiped by the 10 PM redraw: put rules in code.
+- 10 METHOD 2 CHOICES: Backend CQ (BACKEND_BLOCKS.METHOD2, formulaOnly): CQ1 title, CQ2 "Method 2", CQ3
+  method2ChoicesFormula_ (fixed METHOD2_FIXED_CHOICES_ + every K typed above END, UNIQUE). Every build:
+  ensureMethod2ChoicesOnBackend_ writes it when missing, keeps any formula there that reads Contact Log K (the owner
+  can change the fixed choices on the sheet), frees a #REF! (clears under it), never writes over values. Column K's
+  dropdown is BY HAND (DEPLOY.md step 10).
+- 2 INSIGHT NOTE: IDM_STEPS ats.note ("2 guardians per student, one phone and one email each ...") shows as a
+  "Good to know" box on the Student Data step (InputDataSidebar #stepNote; idm_view_ passes step.note); uses text too.
+- 8 PHONE SYNC WARNING (Contacts Sync.gs WHOSE GOOGLE CONTACTS): myAccountEmail_ = DriveApp.getRootFolder().getOwner()
+  (Drive permission already there; "" when it can't say), isDoeAccount_ (DOE_ACCOUNT_DOMAIN_ schools.nyc.gov).
+  rememberNightlyTrigger_ stores the nightly job's account (doc property NIGHTLY_OWNER_EMAIL; older sheets learn it at
+  their next nightly run). getPhoneSyncAccount (Settings): { me, target, nightlyIsMine, doe }. Settings: the switch
+  "Sync contacts to Google Contacts every night" goes on only after "Before you turn this on" -> "I understand"
+  (red box when the account isn't DOE; "Goes to: <account>" under it while on). 🧱 Full Sync (openProgressBarSidebar)
+  asks first (confirmFullSyncAccount_: once per person for a DOE account, user property FULL_SYNC_OK_FOR; every time
+  for any other account; No = no sync). The sync itself is unchanged.
+- 7 ADD A PARENT: saveStudentOverrides (Menus.gs) turns an "Edit Existing Student" save that only ADDS parents
+  (addedGuardiansOnly_: student fields, label (the dialog sends labelAtOpen) and every ATS parent unchanged, 1+ new)
+  into an "Added Guardian (<sources>)" row with only the new parents (ATS parents stay live; it cleans itself up once
+  ATS lists them). Sources: the earlier Added Guardian rows' (addedGuardianSources_), "Check and edit before adding"'s
+  (the prefill carries sources; the dialog sends prefilled { name, sources }), else "by hand". Real edits (anything
+  else changed, a parent removed, nothing added) stay Edit rows as before. Covers + Add another guardian, Check and
+  edit, Edit on an added card, Sync to all siblings.
+- 5 SEVERAL NUMBERS PER PARENT: phonesFromCell_ (Core.gs) reads every 10-digit number in a cell (one number reads as
+  formatPhone_ did; two in one cell used to give none); guardian objects get phones[] (mobile = first);
+  guardianPhones_(g) reads them (falls back to mobile). Parents List "mobile" = every number ", "; Directory lines list
+  them; sibling map, Your Lists index and Parents to add match on any of them. Shared Phone Contacts: ONE contact per
+  parent (same name + a shared number or email; was name|email|mobile), Phone 1-3 (same class label) + E-mail 1-3. The
+  shared sync (phoneContactsRowReader_ by header; searchAndUpsertSingleContact extra { phones, emails }) writes them; a
+  row with one number / email builds exactly the old contact (old-vs-new run on the test data: identical tabs). A parent
+  merged from two contacts (a different number per child) becomes one contact at the next sync (the old two go as
+  usual, under the "more than half" guard). Owner: z_MINE's tall layout adds every number (group.phones).
+- 4 PHONE NUMBERS TO CHECK (Menus.gs): parentSources_ (shared with Parents to add; NYCSA cell/home/work, Parent Square
+  phone/2nd phone, Your Lists incl. guardian-list rows matched to a guardian, matchedOnly) + knownGuardianFor_. A known
+  parent with numbers none of which we have -> one card per parent + number (siblings together, % alike when spelled
+  differently). Student Overrides page: third section (ticks; Add as a 2nd number / Use it instead (confirm) / Not
+  needed; PHONES_TO_CHECK_SKIPPED). savePhoneNumbers writes Backend PHONES (CS:CX: OSIS | Guardian | Number | Use
+  add/instead | From | Date) + a build. getOverrideData_ returns phones (readPhoneChanges_, doc cache PHONE_CHANGES_<id>,
+  cleared by every PHONES write in Core.gs); buildGuardianObjects_(raw, guardians, phones) applies them
+  (applyPhoneChanges_; not the Directory). cleanRedundantPhoneChanges_ (in cleanRedundantOverrides) drops a row ATS has
+  caught up with. Resets clear PHONES; Migration copies it. getOverridesHome reads the sources once for both sections;
+  the end of Input Data Mode counts both (idm_parentsToAddSummary .phones).
+- 3 LIST PURPOSE: setup.purpose "info" (default; as before) | "contacts". YourListsSidebar: "What is this list for?"
+  on the first screen (od_setListPurpose) and in step 1; contacts = steps Columns -> Match only, needs a guardian
+  column, done screen opens Student Overrides. od_buildOutputs_ skips a contacts list's columns / Additional
+  Information (its tab's Matched column and counts still update); Parents to add / Phone numbers to check read it.
+- 6 TELL ME WHAT CHANGED: setup.watch (tick in step 2). od_buildOutputs_ keeps a copy per watched list in Backend
+  LIST_WATCH (CZ:DC: Tab ID | Key | Who | Values JSON; OD_WATCH_MARK_ row = copied once) and compares with the last
+  build's (od_watchChanges_: new on the list / dropped off / changed values, only labels in both copies, HTML-escaped);
+  BUILD_REPORT_LOGS.listChanges -> ProgressSidebar "<list>: what changed". The first build after ticking only copies.
+- 1 FIND A FAMILY (Menus.gs FIND A FAMILY + FindFamily.html): 🚀 App Menu → 🔍 Find a Family (full menu). A modeless
+  popup (460x640) or a side panel; the page's "Open as side panel / Open as popup" (findFamilySwitch) opens the other
+  with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
+  getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
+  OSIS, phone digits, email. getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
+  FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyLogContact writes the OSIS in the first empty row
+  after the last filled one and calls handleEdit_ with { range, value, source } (exactly as typing it), then Person
+  Spoke With; findFamilyEditStudent opens New / Edit Student filled in.
+- Own ideas not built (owner may ask): "Remove the school contacts from this Google account" (deletes contacts),
+  emails in Phone numbers to check.
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):
@@ -1052,7 +1124,8 @@ Backend tab (see Core.gs):
   Row 1 = section titles; each old layout sits one row lower. A:E Version & Settings, G:AV New/Edit Student,
   AX:BF Event Log, BH:BJ Send Out list (BH3:BJ3 = the owner's formulas for the Send Out dropdown options; resets
   clear BH:BJ rows 3+ and write SEND_OUT_LIST_FORMULAS_ back via writeSendOutListFormulas_), BL Type List,
-  BN:BQ Additional Information and BS:BV Your Lists setup (both Your Lists, Input Data.gs), BX:CD Student List (OSIS..Status incl.
+  BN:BQ Additional Information and BS:BV Your Lists setup (both Your Lists, Input Data.gs), CQ Method 2 choices (formula),
+  CS:CX phone numbers added in Student Overrides, CZ:DC Your Lists "Tell me what changed" copies (2026-11-23), BX:CD Student List (OSIS..Status incl.
   the sibling-group rows; every build; read by the autofill), CF:CO Person Spoke With choices (2026-11-14: ONE formula in CF2,
   row n = Contact Log row n, no header row; column D's dropdown reads it; see "BACKEND COPY"). PLAIN RANGE, no Sheets Table (owner's choice 2026-11-11):
   the Contact Log's dropdowns read Backend!$BX$3:$BX (OSIS) / $BY$3:$BY (Student) / $BZ$3:$BZ (Guardian), open-ended, so

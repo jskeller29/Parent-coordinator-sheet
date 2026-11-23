@@ -865,12 +865,36 @@ function buildStudentMap_(rawData, overrideStudents) {
 ========================= */
 var PHONES_HEADERS_ = ["OSIS", "Guardian", "Number", "Use", "From", "Date"];
 
+// Kept in the document cache (6 h): the owner's per-edit Phone Contacts update reads the overrides on
+// every Contact Log edit, where each sheet call is slow. Any write to the section clears it (Core.gs
+// backend helpers), so a read never sees an old copy.
+function phoneChangesCacheKey_(ss) {
+  return "PHONE_CHANGES_" + (ss || SpreadsheetApp.getActiveSpreadsheet()).getId();
+}
+
+function clearPhoneChangesCache_(ss) {
+  try { CacheService.getDocumentCache().remove(phoneChangesCacheKey_(ss)); }
+  catch (e) { console.warn("Phone numbers cache not cleared: " + e.message); }
+}
+
 function readPhoneChanges_(ss) {
+  let cache = null, key = null;
+  try {
+    cache = CacheService.getDocumentCache();
+    key = phoneChangesCacheKey_(ss);
+    const hit = cache.get(key);
+    if (hit) return JSON.parse(hit);
+  } catch (e) { cache = null; }
   let rows = [];
   try { rows = backendReadBlock_(ss, "PHONES").slice(1); } catch (e) { return []; }
-  return rows.map(r => ({ osis: toText_(r[0]), guardian: toText_(r[1]), phone: formatPhone_(r[2]),
-                          use: toText_(r[3]).toLowerCase() === "instead" ? "instead" : "add", from: toText_(r[4]) }))
+  const list = rows.map(r => ({ osis: toText_(r[0]), guardian: toText_(r[1]), phone: formatPhone_(r[2]),
+                                use: toText_(r[3]).toLowerCase() === "instead" ? "instead" : "add", from: toText_(r[4]) }))
     .filter(c => isRealStudentId_(c.osis) && c.guardian && c.phone);
+  try {
+    const json = JSON.stringify(list);
+    if (cache && key && json.length < 90000) cache.put(key, json, 21600);
+  } catch (e) { /* read again next time */ }
+  return list;
 }
 
 /** The rows in order (oldest first): "instead" makes that number the only one, "add" adds it at the end. */
