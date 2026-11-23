@@ -615,3 +615,94 @@ function phonesSheet() {
   assert(/id="watchBox"/.test(sidebar) && /watch: purpose === 'contacts' \? false : !!setup\.watch/.test(sidebar), "the tick in step 2");
   console.log("6 tell me what changed: ok");
 }
+
+// ---------------------------------------------------------------- 1. 🔍 Find a Family
+function familySheet() {
+  const ss = makeSpreadsheet(["Contact Log", "Student List", "Parents List", "Combined Contact Tracking", "Backend"]);
+  const app = fakeSpreadsheetApp(ss);
+  const ui = app.getUi();
+  ui._shown = [];
+  ui.showSidebar = h => ui._shown.push(["panel", h._title]);
+  ui.showModelessDialog = (h, t) => ui._shown.push(["popup", t]);
+  const g = loadProject({ extra: { SpreadsheetApp: app } });
+  const user = require('./lib/load').propStore();
+  g.PropertiesService.getUserProperties = () => user;
+  g.htmlFromFile_ = name => { const h = { _name: name, setTitle: t => { h._title = t; return h; }, setWidth: () => h, setHeight: () => h }; return h; };
+  return { ss, g, ui, user };
+}
+{
+  let { ss, g, ui, user } = familySheet();
+  // Before the first build: a note, no data
+  eq([g.getFindFamilyData().notBuilt, g.getFindFamilyData().as], [true, "popup"]);
+  ss.getSheetByName("Student List")._put([["OSIS", "Student", "Guardian", "Site", "Class", "Sibling", "Status", "Last Interaction", "Bus Route"],
+    ["123456789", "Bart Simpson", "Homer Simpson and Marge Simpson", "Main", "Y41", "567891234 - Lisa Simpson", "Current", "11/16/2026", "R12"],
+    ["567891234", "Lisa Simpson", "Homer Simpson and Marge Simpson", "Main", "Y25", "123456789 - Bart Simpson", "Current", "None logged", ""],
+    ["111, 222", "Group row", "", "", "", "", "", "", ""]], 1, 1);
+  ss.getSheetByName("Parents List")._put([["student_id", "Guardian output", "Student", "Class / Site", "relationship", "language", "email", "mobile", "Sibling", "Parents Square", "NYCSA", "Last Interaction"],
+    ["123456789", "Marge Simpson", "Bart Simpson", "Y41", "Mother", "English", "marge@x.org", "(718) 555-0102, (917) 555-0144", "", "Yes", "Yes/Unknown", "11/16/2026"],
+    ["123456789", "Homer Simpson", "Bart Simpson", "Y41", "Father", "English", "", "(718) 555-0101", "", "No", "No (NG) K7Q2", ""]], 1, 1);
+  let d = g.getFindFamilyData();
+  eq(d.students.map(s => s.osis + " " + s.name + " " + s.cls + " " + s.last), ["123456789 Bart Simpson Y41 11/16/2026", "567891234 Lisa Simpson Y25 None logged"], "students (no sibling-group rows)");
+  eq(d.parents[0].phones, ["(718) 555-0102", "(917) 555-0144"], "every number of a parent");
+  eq([d.parents[1].ps, d.parents[1].nycsa], ["No", "No (NG) K7Q2"]);
+
+  // Popup by default; the switch opens the other one with the same search, remembered per person
+  g.openFindFamily();
+  eq(ui._shown.pop(), ["popup", "Find a Family"]);
+  assert.strictEqual(g.findFamilySwitch("panel", { q: "simpsn", osis: "123456789" }), "panel");
+  eq(ui._shown.pop(), ["panel", "Find a Family"]);
+  d = g.getFindFamilyData();
+  eq([d.as, d.keep], ["panel", { q: "simpsn", osis: "123456789" }], "the side panel gets the search");
+  assert.strictEqual(g.getFindFamilyData().keep, null, "read once");
+  g.openFindFamily();
+  eq(ui._shown.pop()[0], "panel", "the next time it opens as you left it");
+
+  // The family's details: notes (no divider lines), open follow-ups (newest first), Student Info
+  const cct = ss.getSheetByName("Combined Contact Tracking");
+  cct._put([["OSIS", "Student", "Guardian", "Communications"], ["567891234", "Lisa", "", "x"],
+            ["123456789", "Bart", "", "────\nMon 11/16 - {Call - Homer} start of year\n────\nThu 11/12 - {Email - Marge} teacher email\n────"]], 1, 1);
+  const realGetRange = cct.getRange;
+  cct.getRange = function (a, b, c, d2) {
+    const r = realGetRange.apply(this, arguments);
+    if (a === 1 && b === 1 && d2 === 1) {
+      r.createTextFinder = text => { const f = { matchEntireCell: () => f, findNext: () => {
+        for (let i = 1; i <= c; i++) if (String(cct._get(i, 1)) === String(text)) return realGetRange.call(cct, i, 1);
+        return null; } }; return f; };
+    }
+    return r;
+  };
+  const log = ss.getSheetByName("Contact Log");
+  const L = (b, osis, n, m, o) => ["", b, "Homer Simpson and Marge Simpson", "Marge Simpson", osis, "Bart Simpson", 1, "", "", "Phone", "Call", "Type", m, n, o, false];
+  log._put([L("11/10/2026", "123456789", "Followup Needed", "first open", ""), L("11/11/2026", "123456789", "No Followup Needed", "closed", ""),
+            L("11/12/2026", "123456789", "Followup Needed - ASAP", "teacher email", "call back"), L("11/12/2026", "567891234", "Followup Needed", "Lisa's", "")], 2, 1);
+  log._put([["END"]], 8, 5);
+  g.backendWriteBlock_(ss, "ADDL_INFO", [["OSIS", "Student", "Guardian", "Additional Information"], ["123456789", "Bart Simpson", "", "Bus Route: R12"], ["123456789", "Bart Simpson", "Marge Simpson", "PTA: Chair"]]);
+  const det = g.getFindFamilyDetails("123456789");
+  assert(!/─/.test(det.notes) && /start of year/.test(det.notes) && /teacher email/.test(det.notes), "notes without the divider lines: " + JSON.stringify(det.notes));
+  eq(det.followUps.map(u => u.status + " " + u.text), ["Followup Needed - ASAP teacher email", "Followup Needed first open"], "open ones, newest first, this student only");
+  eq(det.info, [{ who: "", line: "Bus Route: R12" }, { who: "Marge Simpson", line: "PTA: Chair" }]);
+  eq(g.getFindFamilyDetails("nonsense"), { notes: "", followUps: [], info: [] });
+
+  // Log a contact: the first empty row after the last filled one, filled as if the OSIS was typed there
+  let edits = [];
+  g.handleEdit_ = e => edits.push([e.range.getRow(), e.range.getColumn(), e.value]);
+  const r = g.findFamilyLogContact("123456789", "Marge Simpson");
+  assert.strictEqual(r.row, 6, "row 6 (rows 2-5 are filled)");
+  eq(edits, [[6, 5, "123456789"]], "the edit handler ran for the OSIS cell");
+  eq([log.getRange(6, 5).getValue(), log.getRange(6, 4).getValue()], ["123456789", "Marge Simpson"], "OSIS + Person Spoke With");
+  log._put([["x"], ["x"]], 6, 3);
+  log._put([["x"]], 7, 3);
+  assert.throws(() => g.findFamilyLogContact("123456789", ""), /no empty Contact Log row/, "no empty row: says what to do");
+  assert.throws(() => g.findFamilyLogContact("12", ""), /no OSIS/);
+
+  // Edit student: New / Edit Student with the student filled in (not "back to Student Overrides")
+  let opened = 0;
+  g.openNewStudentDialog = () => { opened++; };
+  user.setProperty("OVERRIDES_FROM_HOME", "1");
+  g.findFamilyEditStudent("123456789");
+  eq([opened, user.getProperty("PREFILL_OSIS"), user.getProperty("OVERRIDES_FROM_HOME")], [1, "123456789", null]);
+  // In the full menu
+  const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
+  assert(/menu\.addItem\("🔍 Find a Family", "openFindFamily"\)/.test(menus), "🚀 App Menu → 🔍 Find a Family");
+  console.log("1 find a family (server): ok");
+}

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include_('Styles') ?>
+  <style>
+    /* 🔍 Find a Family (owner 2026-11-23): a popup that can become a side panel (Menus.gs FIND A FAMILY) */
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .ff-top { padding: 10px 14px 8px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+    .ff-row { display: flex; gap: 6px; align-items: center; }
+    .ff-row input[type=search] { flex: 1; min-width: 0; font-size: 15px; }
+    .ff-mode { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 5px; }
+    .ff-mode .hint { margin: 0; }
+    .ff-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .ff-body > * { flex-shrink: 0; } /* (the results list squeezed to nothing under a long family card) */
+    .res { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    .res button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--panel); background: #ffffff; padding: 7px 10px; font: 13.5px var(--font); color: var(--ink); cursor: pointer; }
+    .res button:first-child { border-top: 0; }
+    .res button:hover, .res button:focus, .res button.on { background: var(--accent-soft); outline: none; }
+    .res .rn { font-weight: 700; }
+    .res .rs { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
+    .res mark { background: #fde68a; padding: 0 1px; color: inherit; }
+    .fam { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+    .fam h3 { margin: 0 0 2px; }
+    .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+    .eyebrow2 { font: 700 11px var(--font); letter-spacing: .5px; text-transform: uppercase; color: var(--accent); margin: 10px 0 4px; }
+    .par { font-size: 13px; padding: 6px 0; border-top: 1px solid var(--panel); }
+    .par:first-of-type { border-top: 0; padding-top: 2px; }
+    .par .nums { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .tag { display: inline-block; font-size: 10.5px; font-weight: 700; border-radius: 9px; padding: 0 7px; margin: 3px 4px 0 0; }
+    .tag.y { background: var(--ok-soft); color: var(--ok); }
+    .tag.n { background: var(--danger-soft); color: var(--danger); }
+    .tag.g { background: var(--panel); color: var(--muted); }
+    .fu { font-size: 12.5px; margin: 3px 0; }
+    .fu .st { display: inline-block; background: var(--danger); color: #ffffff; border-radius: 9px; padding: 0 7px; font-weight: 600; font-size: 11px; margin-right: 4px; }
+    .fu .st.w { background: var(--warn-soft); color: var(--warn); }
+    .notes { white-space: pre-wrap; font-size: 12.5px; line-height: 1.45; max-height: 200px; overflow: hidden; position: relative; overflow-wrap: anywhere; }
+    .notes.all { max-height: none; }
+    .acts { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .acts .btn { flex: 1; min-width: 120px; }
+    .state { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13.5px; padding: 18px 0; justify-content: center; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="ff-top">
+    <div class="ff-row">
+      <input type="search" id="q" placeholder="A name, OSIS, phone or email" autocomplete="off" aria-label="Search a family" disabled>
+    </div>
+    <div class="ff-mode">
+      <p class="hint" id="hint">Spelling doesn't have to be exact.</p>
+      <button type="button" class="link" id="modeBtn" onclick="switchMode()">Open as side panel</button>
+    </div>
+  </div>
+  <div class="ff-body" id="body">
+    <div id="msg" class="notice hidden" role="status"></div>
+    <div id="loading" class="state"><div class="spinner"></div>Loading the families…</div>
+    <div id="results" class="res hidden" role="listbox" aria-label="Families found"></div>
+    <div id="none" class="state hidden">Nobody found. Try part of the name, or the last 4 digits of the phone number.</div>
+    <div id="fam" class="fam hidden"></div>
+  </div>
+
+  <script>
+    var DATA = null;        // getFindFamilyData()
+    var BY = {};            // OSIS -> { st, parents: [] }
+    var ENTRIES = [];       // what the search looks through
+    var picked = null;      // the OSIS on show
+    var mode = 'popup';     // 'popup' | 'panel'
+    var busy = false;
+
+    function $(id) { return document.getElementById(id); }
+    function show(id, on) { $(id).classList.toggle('hidden', !on); }
+    function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function say(text, kind) { $('msg').className = 'notice' + (kind ? ' ' + kind : ''); $('msg').textContent = text; show('msg', !!text); }
+    function onFail(e) { busy = false; show('loading', false); say('Something went wrong: ' + (e && e.message ? e.message : e), 'err'); }
+
+    // ---------- search ----------
+    function plain(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+    function words(s) { return plain(s).replace(/[^a-z0-9@]+/g, ' ').trim().split(' ').filter(Boolean); }
+    function digits(s) { return String(s || '').replace(/\D/g, ''); }
+    // Edit distance, stopping once it is over max
+    function dist(a, b, max) {
+      if (Math.abs(a.length - b.length) > max) return max + 1;
+      var prev = [], cur, i, j;
+      for (j = 0; j <= b.length; j++) prev[j] = j;
+      for (i = 1; i <= a.length; i++) {
+        cur = [i]; var low = i;
+        for (j = 1; j <= b.length; j++) {
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+          if (cur[j] < low) low = cur[j];
+        }
+        if (low > max) return max + 1;
+        prev = cur;
+      }
+      return prev[b.length];
+    }
+    // How well one typed word fits a name part: exact 3, start of it 2.5, one or two letters off 1.5 / 1.2
+    function fit(w, t) {
+      if (t === w) return 3;
+      if (t.indexOf(w) === 0) return 2.5;
+      if (w.length < 4) return 0;
+      var max = w.length >= 7 ? 2 : 1;
+      if (dist(w, t, max) <= max) return 1.5;
+      if (t.length > w.length && dist(w, t.slice(0, w.length), 1) <= 1) return 1.2;
+      return 0;
+    }
+    function nameScore(ws, toks) {
+      var total = 0;
+      for (var i = 0; i < ws.length; i++) {
+        var best = 0;
+        for (var j = 0; j < toks.length; j++) best = Math.max(best, fit(ws[i], toks[j]));
+        if (!best) return 0; // every typed word has to fit somewhere
+        total += best;
+      }
+      return total;
+    }
+    function buildIndex() {
+      BY = {}; ENTRIES = [];
+      DATA.students.forEach(function (s) { BY[s.osis] = { st: s, parents: [] }; ENTRIES.push({ kind: 'student', osis: s.osis, toks: words(s.name), name: s.name }); });
+      DATA.parents.forEach(function (p) {
+        if (!BY[p.osis]) return;
+        BY[p.osis].parents.push(p);
+        ENTRIES.push({ kind: 'parent', osis: p.osis, toks: words(p.name), name: p.name, p: p, phones: p.phones.map(digits), email: plain(p.email) });
+      });
+    }
+    function search(q) {
+      var qd = digits(q), qp = plain(q).trim();
+      var hits = {}; // OSIS -> { score, why }
+      var add = function (osis, score, why) { if (!hits[osis] || hits[osis].score < score) hits[osis] = { score: score, why: why }; };
+      if (!qp) return [];
+      var digitsOnly = qd.length >= 3 && qd.length >= qp.replace(/[\s()+.\-]/g, '').length;
+      if (digitsOnly) {
+        ENTRIES.forEach(function (e) {
+          if (e.kind === 'student' && e.osis.indexOf(qd) !== -1) add(e.osis, e.osis === qd ? 9 : 6, 'OSIS ' + e.osis);
+          if (e.kind === 'parent') e.phones.forEach(function (ph, i) {
+            if (ph.indexOf(qd) !== -1) add(e.osis, ph === qd ? 9 : 7, 'Parent: ' + e.p.name + (e.p.rel ? ' · ' + e.p.rel : '') + ' · ' + e.p.phones[i]);
+          });
+        });
+      } else if (qp.indexOf('@') !== -1) {
+        ENTRIES.forEach(function (e) { if (e.kind === 'parent' && e.email && e.email.indexOf(qp) !== -1) add(e.osis, 8, 'Parent: ' + e.p.name + ' · ' + e.p.email); });
+      } else {
+        var ws = words(q);
+        ENTRIES.forEach(function (e) {
+          var sc = nameScore(ws, e.toks);
+          if (!sc) return;
+          if (e.kind === 'student') add(e.osis, sc + 0.1, 'Student');
+          else add(e.osis, sc, 'Parent: ' + e.p.name + (e.p.rel ? ' · ' + e.p.rel : ''));
+        });
+      }
+      return Object.keys(hits).map(function (o) { return { osis: o, score: hits[o].score, why: hits[o].why }; })
+        .sort(function (a, b) { return b.score - a.score || BY[a.osis].st.name.localeCompare(BY[b.osis].st.name); })
+        .slice(0, 8);
+    }
+    function renderResults() {
+      var q = $('q').value;
+      var list = q.trim() ? search(q) : [];
+      show('none', !!q.trim() && !list.length);
+      show('results', list.length > 0);
+      $('results').innerHTML = list.map(function (r, i) {
+        var s = BY[r.osis].st;
+        var sub = (r.why === 'Student' ? 'OSIS ' + s.osis + (s.cls ? ' · ' + s.cls : '') : r.why);
+        return '<button type="button" role="option" data-osis="' + esc(r.osis) + '" class="' + (r.osis === picked ? 'on' : '') + '" onclick="pick(\'' + esc(r.osis) + '\')">' +
+          '<span class="rn">' + esc(s.name) + '</span><span class="rs">' + esc(sub) + '</span></button>';
+      }).join('');
+    }
+
+    // ---------- the family card ----------
+    var detailsFor = null;
+    function pick(osis) {
+      picked = osis;
+      renderResults();
+      renderFamily(null);
+      detailsFor = osis;
+      google.script.run.withSuccessHandler(function (d) { if (detailsFor === osis) renderFamily(d); })
+        .withFailureHandler(function (e) { if (detailsFor === osis) renderFamily({ error: e && e.message ? e.message : String(e) }); })
+        .getFindFamilyDetails(osis);
+    }
+    function statusTag(label, text) {
+      var t = String(text || '').trim();
+      if (!t) return '';
+      var yes = /^yes/i.test(t);
+      return '<span class="tag ' + (yes ? 'y' : /^no/i.test(t) ? 'n' : 'g') + '">' + esc(label + ': ' + t) + '</span>';
+    }
+    function renderFamily(d) {
+      var f = BY[picked];
+      if (!f) { show('fam', false); return; }
+      var s = f.st, html = '';
+      html += '<h3>' + esc(s.name) + '</h3>';
+      html += '<div class="meta">OSIS ' + esc(s.osis) + (s.cls ? ' · ' + esc(s.cls) : '') + (s.site ? ' · ' + esc(s.site) : '') +
+        (s.sibling ? ' · sibling: ' + esc(s.sibling.replace(/\b\d{6,}\s*-\s*/g, '')) : '') + '</div>';
+      html += '<div class="meta">' + (s.status && s.status !== 'Current' ? '<b>' + esc(s.status) + '</b> · ' : '') + 'Last contact: ' + esc(s.last || 'None logged') + '</div>';
+      html += '<div class="eyebrow2">Parents</div>';
+      if (!f.parents.length) html += '<div class="meta">No parents in the Parents List.</div>';
+      f.parents.forEach(function (p, i) {
+        html += '<div class="par"><b>' + esc(p.name) + '</b>' + (p.rel ? ' · ' + esc(p.rel) : '') + (p.lang && !/^english$/i.test(p.lang) ? ' · ' + esc(p.lang) : '') +
+          '<div class="nums">' + esc(p.phones.join(' · ') || 'no phone') + (p.email ? ' · ' + esc(p.email) : '') + '</div>' +
+          statusTag('Parent Square', p.ps) + statusTag('NYCSA', p.nycsa) +
+          ' <button type="button" class="link" onclick="logContact(' + i + ')">Log a contact with them</button></div>';
+      });
+      if (!d) {
+        html += '<div class="state"><div class="spinner"></div>Loading notes…</div>';
+      } else if (d.error) {
+        html += '<div class="notice err" style="margin-top:8px">' + esc(d.error) + '</div>';
+      } else {
+        if (d.followUps && d.followUps.length) {
+          html += '<div class="eyebrow2">Open follow-up' + (d.followUps.length > 1 ? 's' : '') + '</div>';
+          d.followUps.forEach(function (u) {
+            html += '<div class="fu"><span class="st' + (/asap/i.test(u.status) ? '' : ' w') + '">' + esc(u.status) + '</span>' + esc(u.date) +
+              (u.text ? ' · ' + esc(u.text) : '') + (u.more ? '<div class="meta">' + esc(u.more) + '</div>' : '') + '</div>';
+          });
+        }
+        if (d.info && d.info.length) {
+          html += '<div class="eyebrow2">Student Info</div>';
+          d.info.forEach(function (x) { html += '<div class="meta" style="color:var(--ink)">' + (x.who ? '<b>' + esc(x.who) + ':</b> ' : '') + esc(x.line) + '</div>'; });
+        }
+        html += '<div class="eyebrow2">Notes</div>';
+        html += d.notes ? '<div class="notes" id="notes">' + esc(d.notes) + '</div><button type="button" class="link hidden" id="moreNotes" onclick="allNotes()">Show all notes</button>'
+                        : '<div class="meta">No notes yet.</div>';
+      }
+      html += '<div class="acts"><button type="button" class="btn pri" onclick="logContact(-1)">Log a contact</button>' +
+              '<button type="button" class="btn sec" onclick="editStudent()">Edit student</button></div>';
+      $('fam').innerHTML = html;
+      show('fam', true);
+      var n = $('notes');
+      if (n && n.scrollHeight > n.clientHeight + 4) show('moreNotes', true);
+    }
+    function allNotes() { $('notes').classList.add('all'); show('moreNotes', false); }
+
+    // ---------- actions ----------
+    function logContact(i) {
+      var f = BY[picked];
+      if (!f || busy) return;
+      var p = i >= 0 ? f.parents[i] : null;
+      busy = true;
+      say('Starting a Contact Log row for ' + f.st.name + '…');
+      google.script.run.withSuccessHandler(function (r) {
+        busy = false;
+        say('Done: Contact Log row ' + r.row + ' has ' + f.st.name + (p ? ' and ' + p.name : '') + '. Type the Method and the rest there.', 'ok');
+      }).withFailureHandler(onFail).findFamilyLogContact(f.st.osis, p ? p.name : '');
+    }
+    function editStudent() {
+      if (!picked || busy) return;
+      google.script.run.withFailureHandler(onFail).findFamilyEditStudent(picked);
+    }
+    function switchMode() {
+      var other = mode === 'panel' ? 'popup' : 'panel';
+      $('modeBtn').disabled = true;
+      google.script.run.withSuccessHandler(function () { google.script.host.close(); })
+        .withFailureHandler(function (e) { $('modeBtn').disabled = false; onFail(e); })
+        .findFamilySwitch(other, { q: $('q').value, osis: picked || '' });
+    }
+
+    // ---------- start ----------
+    var timer = null;
+    $('q').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(renderResults, 120); });
+    $('q').addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { var b = document.querySelector('#results button'); if (b) b.click(); }
+      if (ev.key === 'ArrowDown') { var first = document.querySelector('#results button'); if (first) { ev.preventDefault(); first.focus(); } }
+    });
+    $('results').addEventListener('keydown', function (ev) {
+      var b = document.activeElement;
+      if (!b || b.parentNode !== $('results')) return;
+      if (ev.key === 'ArrowDown' && b.nextSibling) { ev.preventDefault(); b.nextSibling.focus(); }
+      if (ev.key === 'ArrowUp') { ev.preventDefault(); (b.previousSibling || $('q')).focus(); }
+    });
+    function start() {
+      google.script.run.withSuccessHandler(function (data) {
+        DATA = data || { students: [], parents: [] };
+        mode = DATA.as === 'panel' ? 'panel' : 'popup';
+        $('modeBtn').textContent = mode === 'panel' ? 'Open as popup' : 'Open as side panel';
+        show('loading', false);
+        if (DATA.notBuilt) { say('Build your sheets first (🚀 App Menu → 🏗️ Build Sheets Only), then search here.', 'warn'); return; }
+        buildIndex();
+        $('q').disabled = false;
+        if (DATA.keep && DATA.keep.q) $('q').value = DATA.keep.q;
+        renderResults();
+        if (DATA.keep && DATA.keep.osis && BY[DATA.keep.osis]) pick(DATA.keep.osis);
+        $('q').focus();
+      }).withFailureHandler(onFail).getFindFamilyData();
+    }
+    start();
+  </script>
+</body>
+</html>

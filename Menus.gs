@@ -428,6 +428,7 @@ function buildMenus_(realOpen) {
     const syncToPhones = prop('syncToPhones') === 'true';
 
     const menu = ui.createMenu("🚀 App Menu");
+    menu.addItem("🔍 Find a Family", "openFindFamily"); // search a family (owner 2026-11-23)
     // Only show Full Sync if they have Phone Syncing enabled!
     if (syncToPhones) {
       menu.addItem("🧱 Full Sync (Build + Push to Google Contacts)", "openProgressBarSidebar");
@@ -5181,4 +5182,169 @@ function loadGuideLinkFromVersionSheet_() {
     console.error(e);
     return "";
   }
+}
+
+// ======================================================================
+// 🔍 FIND A FAMILY (owner 2026-11-23, idea 1): a search popup (a modeless dialog) that can turn into a
+// side panel and back (the page's switch; the choice is remembered per person, FIND_FAMILY_AS). Search
+// a student, a parent, an OSIS, a phone number or an email; spelling doesn't have to be exact. The
+// family card shows the student, every parent with their numbers, email, Parent Square / NYCSA, the
+// open follow-ups, Student Info (Your Lists) and the notes, with "Log a contact" (the next empty
+// Contact Log row, filled the same way as typing the OSIS there) and "Edit student". It only reads
+// the built tabs (Student List, Parents List, Combined Contact Tracking) and the Contact Log, so it
+// shows what the last build made. The page: FindFamily.html.
+// ======================================================================
+var FIND_FAMILY_AS_KEY_ = "FIND_FAMILY_AS";     // user property: "panel" | "popup" (the default)
+var FIND_FAMILY_KEEP_KEY_ = "FIND_FAMILY_KEEP"; // user property: { q, osis } carried to the other mode, read once
+// Follow-up values that are still open (the Contact Log's grey-out rule; compared in lower case)
+var FIND_FAMILY_OPEN_FOLLOWUPS_ = ["followup needed", "followup needed - asap", "waiting for response", "need to respond", "waiting - check up"];
+
+function openFindFamily() {
+  const as = PropertiesService.getUserProperties().getProperty(FIND_FAMILY_AS_KEY_);
+  showFindFamily_(as === "panel" ? "panel" : "popup");
+}
+
+function showFindFamily_(as) {
+  const html = htmlFromFile_('FindFamily');
+  const ui = SpreadsheetApp.getUi();
+  if (as === "panel") ui.showSidebar(html.setTitle("Find a Family"));
+  else ui.showModelessDialog(html.setWidth(460).setHeight(640), "Find a Family");
+}
+
+/** The page's "Open as side panel" / "Open as popup": the other one opens with the same search (the page then closes itself). */
+function findFamilySwitch(as, keep) {
+  as = as === "panel" ? "panel" : "popup";
+  const up = PropertiesService.getUserProperties();
+  up.setProperty(FIND_FAMILY_AS_KEY_, as);
+  const k = keep && typeof keep === "object" ? keep : {};
+  up.setProperty(FIND_FAMILY_KEEP_KEY_, JSON.stringify({ q: String(k.q || "").slice(0, 100), osis: String(k.osis || "").slice(0, 20) }));
+  showFindFamily_(as);
+  return as;
+}
+
+/**
+ * The page's first call: { as, keep, students: [{ osis, name, site, cls, sibling, status, last }],
+ * parents: [{ osis, name, rel, lang, email, phones, ps, nycsa, last }] }, or { notBuilt: true } before the first build.
+ */
+function getFindFamilyData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const up = PropertiesService.getUserProperties();
+  let keep = null;
+  try { keep = JSON.parse(up.getProperty(FIND_FAMILY_KEEP_KEY_) || "null"); } catch (e) { keep = null; }
+  if (keep) up.deleteProperty(FIND_FAMILY_KEEP_KEY_);
+  const as = up.getProperty(FIND_FAMILY_AS_KEY_) === "panel" ? "panel" : "popup";
+  const sl = getStudentListSheet_(ss);
+  if (!sl || !studentListIsBuilt_(ss)) return { notBuilt: true, as: as, keep: keep, students: [], parents: [] };
+
+  const byHeader = (header, names) => {
+    const h = header.map(x => String(x).trim().toLowerCase());
+    const out = {};
+    Object.keys(names).forEach(k => { out[k] = h.indexOf(names[k]); });
+    return out;
+  };
+  const cell = (r, i) => (i >= 0 ? toText_(r[i]) : "");
+
+  const students = [];
+  const hr = studentListHeaderRow_(sl);
+  const lastRow = sl.getLastRow();
+  if (lastRow > hr) {
+    const vals = sl.getRange(hr, 1, lastRow - hr + 1, Math.max(8, sl.getLastColumn())).getDisplayValues();
+    const c = byHeader(vals[0], { osis: "osis", name: "student", site: "site", cls: "class", sibling: "sibling", status: "status", last: "last interaction" });
+    vals.slice(1).forEach(r => {
+      const osis = cell(r, c.osis);
+      if (!isRealStudentId_(osis) || osis.indexOf(",") !== -1) return;
+      students.push({ osis: osis, name: cell(r, c.name), site: cell(r, c.site), cls: cell(r, c.cls), sibling: cell(r, c.sibling),
+                      status: cell(r, c.status), last: cell(r, c.last) });
+    });
+  }
+
+  const parents = [];
+  const pl = getParentsListSheet_(ss);
+  if (pl && pl.getLastRow() > 1) {
+    const vals = pl.getDataRange().getDisplayValues();
+    const c = byHeader(vals[0], { osis: "student_id", name: "guardian output", rel: "relationship", lang: "language", email: "email",
+                                  mobile: "mobile", ps: "parents square", nycsa: "nycsa", last: "last interaction" });
+    vals.slice(1).forEach(r => {
+      const osis = cell(r, c.osis), name = cell(r, c.name);
+      if (!osis || !name) return;
+      parents.push({ osis: osis, name: name, rel: cell(r, c.rel), lang: cell(r, c.lang), email: cell(r, c.email),
+                     phones: phonesFromCell_(cell(r, c.mobile)), ps: cell(r, c.ps), nycsa: cell(r, c.nycsa), last: cell(r, c.last) });
+    });
+  }
+  return { as: as, keep: keep, students: students, parents: parents };
+}
+
+/** One family's notes (Combined Contact Tracking), open follow-ups (Contact Log) and Student Info (Your Lists). */
+function getFindFamilyDetails(osis) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  osis = toText_(osis);
+  const out = { notes: "", followUps: [], info: [] };
+  if (!isRealStudentId_(osis)) return out;
+
+  const cct = ss.getSheetByName("Combined Contact Tracking");
+  if (cct && cct.getLastRow() > 1) {
+    const col = cct.getRange(1, 1, cct.getLastRow(), 1);
+    const find = text => col.createTextFinder(text).matchEntireCell(true).findNext();
+    // (an OSIS kept as a number there lost its leading zero)
+    const hit = find(osis) || (/^0+\d/.test(osis) ? find(osis.replace(/^0+/, "")) : null);
+    if (hit) out.notes = stripNoteDividers_(toText_(cct.getRange(hit.getRow(), 4).getDisplayValue())).replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  const log = ss.getSheetByName("Contact Log");
+  const end = log ? findEndRowInColumnE_(log) : 0;
+  if (end && end > 2) {
+    log.getRange(2, 2, end - 2, 14).getDisplayValues().forEach(r => { // B:O
+      if (!osisCellIncludes_(r[3], osis)) return;                     // E
+      const fu = toText_(r[12]);                                       // N
+      if (FIND_FAMILY_OPEN_FOLLOWUPS_.indexOf(fu.toLowerCase()) === -1) return;
+      out.followUps.push({ date: toText_(r[0]), status: fu, spoke: toText_(r[2]), text: toText_(r[11]), more: toText_(r[13]) });
+    });
+    out.followUps.reverse(); // newest first
+  }
+
+  try {
+    const map = readAdditionalInfo_(ss);
+    let e = map.get(osis);
+    if (!e) map.forEach((v, k) => { if (!e && normalizeOsis_(k) === normalizeOsis_(osis)) e = v; });
+    if (e) {
+      e.student.forEach(l => out.info.push({ who: "", line: l }));
+      e.byGuardian.forEach((lines, g) => lines.forEach(l => out.info.push({ who: properCase_(g), line: l })));
+    }
+  } catch (err) { console.warn("Find a Family: Student Info not read: " + err.message); }
+  return out;
+}
+
+/**
+ * "Log a contact": the OSIS goes into the first empty Contact Log row above END and the row is filled
+ * exactly as when it is typed there (the edit handler: guardian, student, site / class, date, #,
+ * follow-up), then Person Spoke With when a parent was picked; the cursor waits on Method (J).
+ */
+function findFamilyLogContact(osis, guardianName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) throw new Error("There is no Contact Log tab.");
+  osis = toText_(osis);
+  if (!isRealStudentId_(osis)) throw new Error("That student has no OSIS.");
+  const end = findEndRowInColumnE_(sheet);
+  if (!end || end < 3) throw new Error("The Contact Log's END row wasn't found.");
+  let last = -1; // the last row with anything in C:O
+  sheet.getRange(2, 3, end - 2, 13).getDisplayValues().forEach((r, i) => { if (r.some(v => String(v).trim() !== "")) last = i; });
+  const row = 2 + last + 1;
+  if (row >= end) throw new Error("There is no empty Contact Log row above END. Type something in the last row once (new rows come), then try again.");
+  const cell = sheet.getRange(row, CL_COL_OSIS);
+  cell.setValue(osis);
+  SpreadsheetApp.flush();
+  handleEdit_({ range: cell, value: osis, source: ss }); // the same as typing the OSIS there
+  if (toText_(guardianName)) sheet.getRange(row, CL_COL_SPOKE_WITH).setValue(toText_(guardianName));
+  sheet.activate();
+  sheet.setActiveRange(sheet.getRange(row, 10)); // Method (J): type on from there
+  return { row: row };
+}
+
+/** "Edit student": New / Edit Student with this student filled in. */
+function findFamilyEditStudent(osis) {
+  const up = PropertiesService.getUserProperties();
+  ['OVERRIDES_FROM_HOME', 'PREFILL_GUARDIAN'].forEach(k => up.deleteProperty(k));
+  if (toText_(osis)) up.setProperty('PREFILL_OSIS', toText_(osis)); else up.deleteProperty('PREFILL_OSIS');
+  openNewStudentDialog();
 }
