@@ -2830,7 +2830,7 @@ function parentSources_(ss, listMatched) {
       const idx = od_index_(studentRows, guardianRows);
       lists.forEach(list => {
         try {
-          const table = od_readTable_(list.sheet, list.setup);
+          const table = od_readTable_(od_savedTab_(ss, list), list.setup); // a new version not saved yet: the saved one
           const label = od_listIcon_(list) + " " + list.name;
           od_matchAll_(list.setup, table.rows, idx).forEach(res => {
             const c = res.cells;
@@ -3294,9 +3294,13 @@ function buildOverrideReport() {
     return guardians;
   }
 
+  // A phone as the sheets show it ("(718) 555-0101", several = ", "); text that isn't a number stays as typed.
+  // Compared this way too, so "718-555-0101" vs "(718) 555-0101" isn't a change (tester fix 2026-11-23)
+  function reportPhone(p) { const list = phonesFromCell_(p); return list.length ? list.join(", ") : String(p || "").trim(); }
+
   // 4. Helper to format a full parent block
   function formatFullParent(g) {
-    return `Guardian: ${g.name}\n  Phone: ${g.phone || "None"}\n  Email: ${g.email || "None"}\n  Lang: ${g.lang || "None"}`;
+    return `Guardian: ${g.name}\n  Phone: ${reportPhone(g.phone) || "None"}\n  Email: ${g.email || "None"}\n  Lang: ${g.lang || "None"}`;
   }
 
   const reportOutput = [];
@@ -3322,7 +3326,11 @@ function buildOverrideReport() {
     if (isAddedGuardianType_(oRow[1])) {
       if (!rawMap.has(osis) || !newGuardians.length) return; // the student left ATS: nothing to show
       const from = (String(oRow[1]).match(/\((.*)\)\s*$/) || [])[1] || "";
-      const newInfoString = newGuardians.map(ng => formatFullParent(ng) + (from ? `\n  Added from: ${from}` : "")).join("\n\n");
+      // The row keeps its sources for all its parents together: one parent = under it, several = once at the end
+      // (each parent used to get every source: "Mona ... Added from: Parent Square, by hand" for one typed by hand)
+      const newInfoString = newGuardians.length === 1
+        ? formatFullParent(newGuardians[0]) + (from ? `\n  Added from: ${from}` : "")
+        : newGuardians.map(formatFullParent).join("\n\n") + (from ? `\n\nThese parents were added from: ${from}` : "");
       const rtv = SpreadsheetApp.newRichTextValue().setText(newInfoString);
       newGuardians.forEach(ng => {
         const startIdx = newInfoString.indexOf(`Guardian: ${ng.name}`);
@@ -3388,7 +3396,7 @@ function buildOverrideReport() {
         let oldF = [];
         let newF = [];
         
-        if (og.phone !== ng.phone) { oldF.push(`Phone: ${og.phone || "None"}`); newF.push(`Phone: ${ng.phone || "None"}`); }
+        if (reportPhone(og.phone) !== reportPhone(ng.phone)) { oldF.push(`Phone: ${reportPhone(og.phone) || "None"}`); newF.push(`Phone: ${reportPhone(ng.phone) || "None"}`); }
         if (og.email !== ng.email) { oldF.push(`Email: ${og.email || "None"}`); newF.push(`Email: ${ng.email || "None"}`); }
         if (og.lang !== ng.lang) { oldF.push(`Lang: ${og.lang || "None"}`); newF.push(`Lang: ${ng.lang || "None"}`); }
 
@@ -3589,10 +3597,12 @@ function processRolloverBackend() {
     // Your Lists (owner 2026-11-12): each list tab goes into the archive PDF too. This sheet
     // keeps them, and "Upgrade and bring over last year's data" (Migration) copies them into
     // next year's sheet (od_migrateLists_).
+    // A new version not saved yet: the saved one is archived (od_savedTab_). Shown in the copy, since a
+    // PDF of a spreadsheet leaves hidden tabs out (list tabs are hidden after Input Data Mode).
     try {
-      od_listSummaries_(ss).forEach(l => {
-        const tab = ss.getSheets().filter(x => x.getSheetId() === l.tabId)[0];
-        if (tab) tab.copyTo(tempSs).setName(l.tabName);
+      od_loadLists_(ss).filter(l => l.sheet).forEach(l => {
+        const copy = od_savedTab_(ss, l).copyTo(tempSs).setName(l.sheet.getName());
+        if (copy.isSheetHidden()) copy.showSheet();
       });
     } catch (e) { console.warn("Rollover: Your Lists not archived: " + e.message); }
     

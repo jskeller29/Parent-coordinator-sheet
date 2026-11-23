@@ -255,7 +255,9 @@ function buildAllDerivedSheetsRun_() {
   // ...and the Method 2 choices list column K's dropdown reads (Backend CQ, Edits.gs)
   try {
     const m2 = ensureMethod2ChoicesOnBackend_(ss);
-    if (m2 !== "kept") console.log("Method 2 choices (Backend): " + m2);
+    // "skipped" = something typed in Backend CQ: the list stops updating, so it's a warning (🐞 Debug toasts show it)
+    if (/^skipped/.test(String(m2))) console.warn("Method 2 choices (Backend): " + m2 + ". Clear it to get the list back.");
+    else if (m2 !== "kept") console.log("Method 2 choices (Backend): " + m2);
   } catch (e) { console.warn("Method 2 choices skipped: " + e.message); }
 
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /

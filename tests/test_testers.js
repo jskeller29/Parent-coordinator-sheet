@@ -252,3 +252,221 @@ const homerKey = t => t.g.findPhonesToCheck_(t.ss).items.find(it => it.guardian 
   console.log("Find a Family / New Student search fixes: ok");
 }
 console.log("tester findings: ok");
+
+// ---------------------------------------------------------------- Your Lists: "Paste new version" keeps the saved one until Save
+{
+  const { newTracker, parseCsv: readCsv } = require('./lib/tracker');
+  const t = newTracker();
+  t.idmUpload("1 - Student Data (ATS).csv", "2 - Parent Square.csv", "3 - NYCSA (Students with Non-NYCSA Account).csv");
+  t.g.idm_exit(); t.build();
+  const g = t.g, ss = t.ss;
+  const busCsv = t.csvText("5a - Your Lists - Bus Routes (student list).csv");
+  const r = g.od_createList("Bus Routes", "🚌");
+  const v = g.od_uploadCsv(busCsv);
+  const vars = v.vars.map(x => Object.assign({}, x, { show: x.header !== 'AM Pickup', column: x.header !== 'AM Pickup',
+    notOnList: x.header === 'Route' ? { mode: 'text', text: 'No bus' } : { mode: 'nothing', text: '' } }));
+  g.od_saveList({ by: v.by, roles: v.roles, vars: vars, view: v.view, purpose: 'info', watch: true, decisions: {} });
+  t.build(); t.build(); // the first build copies the list for "Tell me what changed", the second compares
+  const report = () => JSON.parse(g.CacheService.getScriptCache().get('BUILD_REPORT_LOGS') || '{}').listChanges || [];
+  const routes = () => { const sl = t.tab("Student List"); const c = sl[0].indexOf("Route"); return sl.slice(1).map(x => x[1] + "=" + x[c]).join("; "); };
+  const tab = () => ss.getSheets().find(s => s.getSheetId() === r.tabId);
+  const oldTabs = () => ss.getSheets().filter(s => / \(old version\)$/.test(s.getName()));
+  const cells = () => JSON.stringify(tab().getDataRange().getValues());
+  const setupOf = () => g.od_loadLists_(ss).find(l => l.tabId === r.tabId).setup;
+  const routesBefore = routes(), tabBefore = cells(), addlBefore = JSON.stringify(g.backendReadBlock_(ss, "ADDL_INFO"));
+  assert(/Bart Simpson=R12/.test(routesBefore) && /Wednesday Addams=R7/.test(routesBefore), routesBefore);
+
+  // The click: the saved version goes to a hidden tab, the list's tab waits for the paste
+  g.od_repasteList(r.tabId);
+  eq(oldTabs().map(s => [s.getName(), s.isSheetHidden()]), [["🚌 Bus Routes (old version)", true]], "the saved version is kept, hidden");
+  assert.strictEqual(tab().getRange(4, 1).getValue(), "PASTE HERE", "the list's tab waits for the paste");
+  assert.strictEqual(g.od_listSummaries_(ss)[0].waiting, true, "the step 5 card says a new version isn't saved");
+  assert.strictEqual(g.od_getWizard().list.keptOld, true, "the paste view says the old one stays in use");
+  // A build before the paste (10 PM, an override save) uses the saved version and writes nothing on the tab
+  t.build();
+  assert.strictEqual(routes(), routesBefore, "the Student List keeps every route (it said \"No bus\" for everyone)");
+  assert.strictEqual(JSON.stringify(g.backendReadBlock_(ss, "ADDL_INFO")), addlBefore, "Additional Information (phone notes) unchanged");
+  eq(report(), [], "\"Tell me what changed\" reports nothing (it said all 10 dropped off)");
+  assert.strictEqual(tab().getRange(4, 1).getValue(), "PASTE HERE", "no ✔ Matched columns written on the waiting tab");
+  assert(!JSON.stringify(tab().getDataRange().getValues()).includes("✔ Matched"));
+  // Back without pasting: the saved version is back, as it was
+  g.od_backToInputMode();
+  assert.strictEqual(cells(), tabBefore, "Back puts the list back on its tab, cell for cell");
+  eq(oldTabs().length, 0, "the hidden copy is gone");
+  assert.strictEqual(setupOf().oldVersion, undefined);
+  assert.strictEqual(g.od_listSummaries_(ss)[0].waiting, false);
+
+  // Two clicks keep the FIRST copy (not the emptied tab)
+  g.od_repasteList(r.tabId); g.od_repasteList(r.tabId);
+  eq(oldTabs().length, 1, "one hidden copy");
+  g.od_backToInputMode();
+  assert.strictEqual(cells(), tabBefore, "the list comes back after two clicks too");
+
+  // A new version read but not saved: builds still use the saved one; Edit setup drops the unsaved one
+  const newCsv = busCsv.replace("Bart Simpson,123456789,R12", "Bart Simpson,123456789,R14");
+  g.od_repasteList(r.tabId);
+  assert.strictEqual(g.od_uploadCsv(newCsv).phase, "setup");
+  t.build();
+  assert(/Bart Simpson=R12/.test(routes()), "not saved yet: the build uses the saved version");
+  g.od_openList(r.tabId);
+  assert.strictEqual(cells(), tabBefore, "Edit setup puts the saved version back");
+  eq(oldTabs().length, 0);
+
+  // ... and so does the end of Input Data Mode
+  g.idm_open(); g.idm_goToStep(4);
+  g.od_repasteList(r.tabId);
+  g.od_uploadCsv(newCsv);
+  g.idm_exit();
+  assert.strictEqual(cells(), tabBefore, "leaving Input Data Mode puts the saved version back");
+  eq(oldTabs().length, 0);
+
+  // Saved: the new version is the list now (the copy goes), and the build reports the real change
+  g.od_repasteList(r.tabId);
+  const nv = g.od_uploadCsv(newCsv);
+  assert.strictEqual(nv.kept, true, "same columns: the setup was kept");
+  eq(nv.missing, [], "no kept column is missing");
+  g.od_saveList({ by: nv.by, roles: nv.roles, vars: nv.vars, view: nv.view, purpose: 'info', watch: true, decisions: {} });
+  eq(oldTabs().length, 0, "Save drops the hidden copy");
+  t.build();
+  assert(/Bart Simpson=R14/.test(routes()), "the saved new version is used");
+  const ch = report();
+  assert(ch.length === 1 && ch[0].changed.some(c => /Bart Simpson: Route R12 → R14/.test(c)) && !ch[0].removed.length,
+    "only the real change is reported: " + JSON.stringify(ch));
+
+  // Deleting a list while a new version waits deletes its hidden copy too
+  g.od_repasteList(r.tabId);
+  g.od_deleteList(r.tabId);
+  eq(oldTabs().length, 0, "no hidden copy left behind");
+  assert(!tab(), "the list's tab is gone");
+
+  // A renamed kept column is named (it said "Same columns as last time" and dropped it without a word)
+  const r2 = g.od_createList("Bus Routes 2", "🚌");
+  const v2 = g.od_uploadCsv(busCsv);
+  const vars2 = v2.vars.map(x => Object.assign({}, x, { show: true, column: true }));
+  g.od_saveList({ by: v2.by, roles: v2.roles, vars: vars2, view: v2.view, purpose: 'info', watch: false, decisions: {} });
+  g.od_repasteList(r2.tabId);
+  let nv2 = g.od_uploadCsv(busCsv.replace("Student,OSIS,Route,Stop", "Student,OSIS,Route #,Stop"));
+  assert.strictEqual(nv2.kept, true, "the columns that find the student are the same");
+  eq(nv2.missing, ["Route"], "Route is named as missing");
+  assert.strictEqual(nv2.changed, false);
+  g.od_repasteList(r2.tabId);
+  nv2 = g.od_uploadCsv(busCsv.replace("Student,OSIS,Route,Stop", "Student,Student ID,Route,Stop"));
+  assert.strictEqual(nv2.kept, false, "the OSIS column is gone: guesses again");
+  assert.strictEqual(nv2.changed, true, "... and the sidebar says the columns changed");
+  const ys = fs.readFileSync(path.join(ROOT, 'YourListsSidebar.html'), 'utf8');
+  assert(/id="missingNote"/.test(ys) && /id="changedNote"/.test(ys) && /show\('keptNote', !!v\.kept && !missing\.length\)/.test(ys),
+    "the page shows the missing columns instead of \"Same columns as last time\"");
+  assert(/id="oldNotePaste"/.test(ys) && /show\('oldNotePaste', !!v\.list\.keptOld\)/.test(ys), "the paste view says the old version stays in use");
+  const ids = fs.readFileSync(path.join(ROOT, 'InputDataSidebar.html'), 'utf8');
+  assert(/l\.waiting \?/.test(ids), "the step 5 card shows a list waiting for its new version");
+  g.od_backToInputMode();
+  console.log("Your Lists: a new version doesn't replace the saved one until Save; renamed columns are named: ok");
+}
+
+// ---------------------------------------------------------------- Migration / Rollover: an unsaved new version stays behind
+{
+  const { newTracker } = require('./lib/tracker');
+  const t = newTracker();
+  t.idmUpload("1 - Student Data (ATS).csv");
+  t.g.idm_exit(); t.build();
+  const g = t.g, old = t.ss;
+  const busCsv = t.csvText("5a - Your Lists - Bus Routes (student list).csv");
+  const r = g.od_createList("Bus Routes", "🚌");
+  const v = g.od_uploadCsv(busCsv);
+  g.od_saveList({ by: v.by, roles: v.roles, vars: v.vars.map(x => Object.assign({}, x, { show: true, column: true })), view: v.view, purpose: 'info', watch: false, decisions: {} });
+  const listTab = () => old.getSheets().find(s => s.getSheetId() === r.tabId);
+  const saved = JSON.stringify(listTab().getDataRange().getValues());
+  g.od_repasteList(r.tabId); // a new version started on last year's tracker, never saved
+  g.od_uploadCsv(busCsv.replace("R12", "R99"));
+  // Migration into a new tracker: the saved version comes over, without the unsaved one or its hidden copy
+  const t2 = newTracker();
+  const moved = t2.g.od_migrateLists_(old, t2.ss);
+  assert.strictEqual(moved, 1);
+  const lists2 = t2.g.od_loadLists_(t2.ss);
+  assert.strictEqual(lists2.length, 1);
+  assert.strictEqual(JSON.stringify(lists2[0].sheet.getDataRange().getValues()), saved, "the saved version came over");
+  assert.strictEqual(lists2[0].sheet.getName(), "🚌 Bus Routes", "under the list's own tab name");
+  assert.strictEqual(lists2[0].setup.oldVersion, undefined, "no hidden copy to look for in the new tracker");
+  assert(!t2.ss.getSheets().some(s => / \(old version\)$/.test(s.getName())));
+  // The Rollover archive and Parents to add read the saved version too
+  const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
+  const roll = menus.slice(menus.indexOf('function processRolloverBackend'));
+  assert(/od_savedTab_\(ss, l\)\.copyTo\(tempSs\)/.test(roll) && /if \(copy\.isSheetHidden\(\)\) copy\.showSheet\(\)/.test(roll),
+    "Rollover archives the saved version, shown (a PDF leaves hidden tabs out)");
+  assert(/od_readTable_\(od_savedTab_\(ss, list\), list\.setup\)/.test(menus), "Parents to add / Phone numbers to check read the saved version");
+  console.log("Your Lists: Migration / Rollover / Parents to add use the saved version: ok");
+}
+
+// ---------------------------------------------------------------- Contacts sync: a 2nd number / email change counts as Edited
+{
+  const g = loadProject({});
+  let writes = 0;
+  g.People = { People: { updateContact: (data, rn) => { writes++; return { resourceName: rn, etag: "e2" }; }, createContact: () => ({ resourceName: "people/new" }) } };
+  const contact = (phones, emails) => ({ resourceName: "people/1", etag: "e1",
+    names: [{ givenName: "(Mother) Martha Kent", familyName: "| Student: Clark Kent |" }],
+    phoneNumbers: phones.map(v => ({ value: v, type: "Class: Y50" })), emailAddresses: emails.map(v => ({ value: v, type: "home" })),
+    biographies: [{ value: "notes" }], organizations: [], memberships: [] });
+  const index = { add() {} };
+  const upsert = (existing, phone, extraPhones, email, extraEmails) => {
+    g.findIndexedContact_ = () => existing;
+    return g.searchAndUpsertSingleContact("(Mother) Martha Kent", "| Student: Clark Kent |", email, phone, "Class: Y50", "notes", "", "", null, index,
+      { phones: (extraPhones || []).map(v => ({ value: v, type: "Class: Y50" })), emails: extraEmails || [] });
+  };
+  let res = upsert(contact(["(718) 555-0105", "(212) 555-0106"], ["MARTHA.KENT@gmail.com"]), "(718) 555-0105", ["(212) 555-0999"], "MARTHA.KENT@gmail.com");
+  assert(res.wrote && res.isEdited, "only Phone 2 changed: written AND counted as edited");
+  assert.strictEqual(res.logStr, "Phone: 7185550105, 2125550106 ➔ 7185550105, 2125550999");
+  res = upsert(contact(["(718) 555-0105"], ["MARTHA.KENT@gmail.com"]), "(718) 555-0105", [], "MARTHA.KENT@gmail.com", ["work@x.org"]);
+  assert(res.isEdited && res.logStr === "Email: martha.kent@gmail.com ➔ martha.kent@gmail.com, work@x.org", "a 2nd email: " + res.logStr);
+  // One number and one email: the same log text as before the change
+  res = upsert(contact(["(718) 555-0105"], ["MARTHA.KENT@gmail.com"]), "(917) 555-0144", [], "MARTHA.KENT@gmail.com");
+  assert.strictEqual(res.logStr, "Phone: 7185550105 ➔ 9175550144");
+  // Nothing changed: nothing written, nothing counted
+  const before = writes;
+  res = upsert(contact(["(718) 555-0105", "(212) 555-0106"], ["MARTHA.KENT@gmail.com"]), "(718) 555-0105", ["(212) 555-0106"], "MARTHA.KENT@gmail.com");
+  assert(!res.wrote && !res.isEdited && writes === before, "no change: no write");
+  console.log("Contacts sync: every number and email counts for Edited: ok");
+}
+
+// ---------------------------------------------------------------- Added parents: the siblings' source, the report's sources and phones
+{
+  const { newTracker } = require('./lib/tracker');
+  const t = newTracker();
+  t.idmUpload("1 - Student Data (ATS).csv", "2b - Parent Square - a parent not in ATS.csv", "3 - NYCSA (Students with Non-NYCSA Account).csv");
+  t.g.idm_exit(); t.build();
+  const g = t.g;
+  const rows = () => g.backendReadBlock_(t.ss, 'OVERRIDES').slice(1).filter(r => r[2]).map(r => r[2] + " " + r[1]);
+  const formFor = osis => {
+    const s = g.getAllStudentsForEdit().find(x => x.osis === osis);
+    return { entryType: 'Edit Existing Student', osis: s.osis, classCode: s.classCode, firstName: s.firstName, lastName: s.lastName, label: s.label || 'Current',
+      hideFromReport: !!s.hideFromReport, grade: s.grade || '', age: s.age || '', gender: s.gender || '', homeLanguage: s.homeLanguage || '',
+      labelAtOpen: s.label || 'Current', prefilled: null,
+      guardians: s.guardians.map(x => ({ name: x.name, relationship: x.relationship, phone: x.phone, email: x.email, language: x.language })) };
+  };
+  // "Check and edit before adding" on Abe (Parent Square), then "Sync to all siblings": both rows name Parent Square
+  const abe = g.getOverridesHome().toAdd.find(p => p.name === "Abe Simpson" && p.osis === "123456789");
+  g.openNewStudentFromHome(abe.osis, { name: abe.name, relationship: abe.relationship, phone: abe.phone, email: abe.email, sources: abe.sources });
+  const pre = g.getNewStudentPrefill();
+  const bart = formFor(pre.osis);
+  bart.guardians.push({ name: pre.guardian.name, relationship: pre.guardian.relationship, phone: pre.guardian.phone, email: pre.guardian.email, language: '' });
+  bart.prefilled = { name: pre.guardian.name, sources: pre.guardian.sources, phone: pre.guardian.phone };
+  const lisa = formFor("567891234");
+  // what the dialog sends for a sibling now (NewStudentDialog submitForm): the same guardians AND the same prefilled
+  const sib = Object.assign({}, lisa, { label: lisa.label || bart.label, hideFromReport: bart.hideFromReport, prefilled: bart.prefilled, guardians: bart.guardians });
+  g.saveStudentOverrides([bart, sib]); t.build();
+  eq(rows(), ["123456789 Added Guardian (Parent Square)", "567891234 Added Guardian (Parent Square)"], "the sibling's row names Parent Square too (it said \"by hand\")");
+  const dlg = fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8');
+  const sibCode = dlg.slice(dlg.indexOf('currentSiblings.forEach(sib =>'), dlg.indexOf('payloads.push(sibData)'));
+  assert(/prefilled: data\.prefilled/.test(sibCode), "the dialog's sibling payload carries prefilled");
+  // Mona typed by hand for Bart: one "added from" line for the row, phones as the sheets show them
+  const bart2 = formFor("123456789");
+  bart2.guardians.push({ name: 'Mona Simpson', relationship: 'Grandmother', phone: '7185559999', email: '', language: '' });
+  g.saveStudentOverrides([bart2]); t.build();
+  g.buildOverrideReport();
+  const rep = t.tab('Students Override Report').find(r => r[0] === "123456789" || r[0] === 123456789);
+  assert(rep, "Bart is in the report");
+  const text = String(rep[2]);
+  assert(/Phone: \(718\) 555-9999/.test(text), "Mona's phone formatted (it showed 7185559999): " + text);
+  assert.strictEqual((text.match(/added from/gi) || []).length, 1, "the sources once for the row, not under each parent: " + text);
+  assert(/These parents were added from: Parent Square, by hand$/.test(text), text);
+  console.log("Added parents: siblings keep the source; the report's sources once, phones formatted: ok");
+}

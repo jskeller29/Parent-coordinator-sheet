@@ -104,6 +104,7 @@
 
   <!-- WAITING FOR THE PASTE -->
   <div id="pasteView" class="hidden">
+    <div id="oldNotePaste" class="ok hidden">Your sheets keep using the version you have until you save this one. To keep the one you have, go back without saving (← Back to Input Data Mode).</div>
     <div id="purposePaste"></div>
     <div class="card">
       <b>Option 1: Upload the file</b>
@@ -131,6 +132,8 @@
 
     <div id="step1">
       <div id="keptNote" class="ok hidden">Same columns as last time, so your setup was kept. Check it, then go on.</div>
+      <div id="missingNote" class="warnbox hidden"></div>
+      <div id="changedNote" class="warnbox hidden">Some columns changed since the last version, so check each one below. Your sheets keep using the last version until you save this one.</div>
       <div id="purposeSetup"></div>
       <label class="f">List name</label>
       <input type="text" id="listName" maxlength="60">
@@ -224,6 +227,7 @@
     $('title').textContent = v.list.name;
     $('pasteTab').textContent = '“' + v.list.tabName + '”';
     $('uploadTab').textContent = '“' + v.list.tabName + '”';
+    show('oldNotePaste', !!v.list.keptOld);
     show('pasteView', true); show('setupView', false); show('doneView', false); show('leaveRow', true);
     show('backBtn', false); show('nextBtn', false);
     stopPoll(); pollTimer = setTimeout(poll, 2000);
@@ -305,7 +309,15 @@
     $('headerRow').textContent = v.headerRow;
     $('headerCells').textContent = v.columns.map(function (c) { return c.header; }).join(' · ');
     $('titleHint').textContent = v.list.title ? 'Title rows above it were left out: “' + v.list.title + '”' : '';
-    show('keptNote', !!v.kept);
+    // A new version: kept columns it doesn't have (renamed?) are named, so they aren't lost without a word
+    var missing = v.missing || [];
+    show('keptNote', !!v.kept && !missing.length);
+    $('missingNote').innerHTML = missing.length ? (v.kept ? 'Your setup was kept, but ' : '') +
+      (missing.length === 1 ? 'a column you kept isn\'t in this version: ' : 'these columns you kept aren\'t in this version: ') +
+      missing.map(function (h) { return '<b>“' + esc(h) + '”</b>'; }).join(', ') +
+      '. If it was renamed, keep the new column again in step 2 (Variables).' : '';
+    show('missingNote', missing.length > 0);
+    show('changedNote', !!v.changed);
     purpose = v.purpose === 'contacts' ? 'contacts' : 'info';
     renderPurpose();
     show('pasteView', false); show('setupView', true); show('doneView', false); show('leaveRow', true);

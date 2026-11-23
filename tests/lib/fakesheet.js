@@ -6,6 +6,8 @@
 // (setBackground / getBackground), column widths, conditional format rules,
 // data validations (sheet._dv: "r,c" -> rule), cell notes (sheet._notes) and bandings (sheet._bandings).
 // insertColumnsAfter at the right end copies the left column's rules, like Sheets.
+// sheet.copyTo(ss) makes a real copy ("Copy of <name>", at the end, visible, not active); range.copyTo(dest)
+// with no paste type copies values, formulas, fills, notes and rules (a typed paste is only logged).
 // Not a full SpreadsheetApp: add what a new test needs.
 
 function colNum(letters) { return letters.toUpperCase().split('').reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0); }
@@ -60,6 +62,19 @@ function makeRange(sheet, row, col, nr, nc) {
     setValue: v => { sheet._set(row, col, v); return p; },
     clearContent: () => { log('clearContent', []); for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) sheet._set(row + i, col + j, ""); return p; },
     clear: () => r.clearContent(),
+    copyTo: function (dest, type) {
+      log('copyTo', arguments);
+      if (type !== undefined || !dest || typeof dest.getSheet !== 'function') return p; // PASTE_FORMAT etc.: not kept
+      const ds = dest.getSheet(), r0 = dest.getRow(), c0 = dest.getColumn();
+      const grid = r.getValues(); // read first: the source and the destination may overlap
+      for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) {
+        const k = (row + i) + ',' + (col + j), dk = (r0 + i) + ',' + (c0 + j);
+        ds._set(r0 + i, c0 + j, grid[i][j]);
+        if (sheet._formulas.has(k)) ds._formulas.set(dk, sheet._formulas.get(k));
+        ['_bg', '_notes', '_dv'].forEach(m => { if (sheet[m].has(k)) ds[m].set(dk, sheet[m].get(k)); else ds[m].delete(dk); });
+      }
+      return p;
+    },
     setRichTextValue: v => { sheet._set(row, col, v && v.text !== undefined ? v.text : ""); return p; },
     // deleteCells(ROWS): the cells under the range, in its columns only, move up (the Backend's sections)
     deleteCells: dim => {
@@ -102,6 +117,23 @@ function makeSheet(ss, name) {
     },
     activate: () => { s._hidden = false; ss._active = p; return p; },
     getMaxRows: () => s._maxRows, getMaxColumns: () => s._maxCols,
+    _frozen: 0,
+    setFrozenRows: n => { s._frozen = Number(n) || 0; s._logSheet('setFrozenRows', [n]); return p; },
+    getFrozenRows: () => s._frozen,
+    // a copy of the whole tab in another (or the same) spreadsheet, like Sheets: "Copy of <name>", added at the
+    // end, shown, and not made the active tab
+    copyTo: target => {
+      const t = target || ss;
+      const c = makeSheet(t, "Copy of " + s._name);
+      cells.forEach((v, k) => c._cells.set(k, v));
+      [['_formulas'], ['_bg'], ['_notes'], ['_dv']].forEach(([m]) => s[m].forEach((v, k) => c[m].set(k, v)));
+      c._merges = s._merges.map(m => Object.assign({}, m));
+      Object.assign(c._widths, s._widths);
+      c._maxRows = s._maxRows; c._maxCols = s._maxCols; c._frozen = s._frozen;
+      t._sheets.push(c);
+      s._logSheet('copyTo', [c.getName()]);
+      return c;
+    },
     // hidden columns (logged like any other call, so tests can count hideColumns)
     _hiddenCols: new Set(),
     hideColumns: (...a) => { for (let i = 0; i < (a[1] || 1); i++) s._hiddenCols.add(a[0] + i); s._logSheet('hideColumns', a); return p; },

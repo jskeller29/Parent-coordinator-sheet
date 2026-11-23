@@ -78,9 +78,9 @@ var IDM_STEPS = [
     // studentCol: the "<n> students" part of the "completed!" message (release check 3.1: the count looked wrong)
     keyCols: ["Student ID","Last Name","First Name"], studentCol: "Student ID",
     // The start page (owner 2026-11-14, release check 2.16): what each file is for
-    uses: "The one file the tracker needs: every student with their guardians (2 per student, one phone and one email each), languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
+    uses: "The one file the tracker needs: every student with their guardians (2 per student, usually one phone and one email each), languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
     // Shown on the step as "Good to know" (owner 2026-11-23: Insight's download has only 2 contacts)
-    note: "This file has 2 guardians per student, with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about them at the end of Input Data Mode, and in 👤 Student Overrides.",
+    note: "This file has 2 guardians per student, usually with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about them at the end of Input Data Mode, and in 👤 Student Overrides.",
     where: "TeachHub → Insight → Tools → Downloader → Guardian Contact Information",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
@@ -1418,6 +1418,8 @@ function idm_listTabIds_(ss) {
 
 /** Shows the tabs we hid, deletes the temp tab, clears the saved state. */
 function idm_cleanup_(ss, state, goToRawData) {
+  // "Paste new version" never saved: the saved version comes back on the list's tab (tester fix 2026-11-23)
+  try { od_restoreUnsavedVersions_(ss); } catch (e) { console.warn("Your Lists: " + e.message); }
   // Your Lists tabs stay hidden once the mode ends (owner's request 2026-11-12): they are opened
   // from step 5 (od_openList shows the tab again). Hidden after the others are back, so a tab still shows.
   const listIds = idm_listTabIds_(ss);
@@ -1802,6 +1804,90 @@ function od_resetListTab_(sheet, name) {
     .setNote("Paste your whole list here (headers too). Title rows above the headers are fine.");
   sheet.setColumnWidth(1, 160);
   try { sheet.setTabColor(OD_COLORS.band1); } catch (e) { /* cosmetic */ }
+}
+
+// ---------------------------------------------------------------------
+// A NEW VERSION OF A LIST (tester fix 2026-11-23): "Paste new version" used to empty the list's tab at
+// the click, so a build before the new paste (the 10 PM one, an override save) put the "not on the
+// list" text on every student, and "Tell me what changed" said everyone had dropped off. Now the saved
+// version stays in a hidden "<tab> (old version)" tab (setup.oldVersion = { tabId, updated, title })
+// until the new one is SAVED (od_saveList). Until then every reader uses it (od_savedTab_: the build,
+// Parents to add / Phone numbers to check, Migration, Rollover) and a build writes nothing on the
+// list's tab. Not saved = put back (od_restoreOldVersion_): "← Back to Input Data Mode", Edit setup,
+// and the end of Input Data Mode.
+// ---------------------------------------------------------------------
+
+/** The hidden copy of the list's saved version while a new one isn't saved, else null. */
+function od_oldVersionTab_(ss, list) {
+  const old = list && list.setup && list.setup.oldVersion;
+  return old && old.tabId ? od_sheetById_(ss, old.tabId) : null;
+}
+
+/** The tab with the list's saved version: the hidden copy while a new one isn't saved, else the list's tab. */
+function od_savedTab_(ss, list) {
+  return od_oldVersionTab_(ss, list) || list.sheet;
+}
+
+/** "Paste new version": the saved version is copied to a hidden tab (once: a second click keeps the first copy). */
+function od_keepOldVersion_(ss, list) {
+  if (!list.setup.ready || od_oldVersionTab_(ss, list)) return; // never saved: nothing uses it yet
+  const copy = list.sheet.copyTo(ss);
+  copy.setName(od_uniqueTabName_(ss, list.sheet.getName() + " (old version)", copy));
+  if (!copy.isSheetHidden()) copy.hideSheet();
+  list.setup.oldVersion = { tabId: copy.getSheetId(), updated: list.updated || "", title: list.setup.title || "" };
+}
+
+/** The new version is saved (or the list deleted): the hidden copy goes (never the tab the user is on). */
+function od_dropOldVersion_(ss, list) {
+  const old = od_oldVersionTab_(ss, list);
+  delete list.setup.oldVersion;
+  if (!old) return;
+  const active = ss.getActiveSheet();
+  if (active && active.getSheetId() === old.getSheetId()) return; // opened by hand: left for the user to delete
+  try { ss.deleteSheet(old); } catch (e) { console.warn("Your Lists: the old version of \"" + list.name + "\" was not deleted: " + e.message); }
+}
+
+/**
+ * A new version was started but not saved: the saved version goes back on the list's tab as it was
+ * (values, colors, the ✔ Matched columns), with its date and title. Returns true when it did.
+ */
+function od_restoreOldVersion_(ss, list) {
+  const kept = list.setup.oldVersion;
+  const old = od_oldVersionTab_(ss, list);
+  if (!old) { delete list.setup.oldVersion; return false; } // its tab was deleted by hand: nothing to put back
+  const sheet = list.sheet;
+  try { sheet.setFrozenRows(0); } catch (e) { /* none */ }
+  sheet.getDataRange().clearDataValidations();
+  sheet.clear();
+  const rows = Math.max(1, old.getLastRow()), cols = Math.max(1, old.getLastColumn());
+  if (sheet.getMaxRows() < rows) sheet.insertRowsAfter(sheet.getMaxRows(), rows - sheet.getMaxRows());
+  if (sheet.getMaxColumns() < cols) sheet.insertColumnsAfter(sheet.getMaxColumns(), cols - sheet.getMaxColumns());
+  old.getRange(1, 1, rows, cols).copyTo(sheet.getRange(1, 1, rows, cols));
+  try { const frozen = old.getFrozenRows(); if (frozen) sheet.setFrozenRows(frozen); } catch (e) { /* cosmetic */ }
+  od_retitleBand_(sheet, list.name); // renamed while the new version waited
+  if (kept.updated !== undefined) list.updated = kept.updated;
+  if (kept.title !== undefined) list.setup.title = kept.title;
+  od_dropOldVersion_(ss, list);
+  return true;
+}
+
+/** The end of Input Data Mode: every new version that wasn't saved is dropped and the saved one put back. */
+function od_restoreUnsavedVersions_(ss) {
+  const lists = od_loadLists_(ss);
+  const waiting = lists.filter(l => l.sheet && l.setup.oldVersion);
+  if (!waiting.length) return;
+  waiting.forEach(l => {
+    try { od_restoreOldVersion_(ss, l); } catch (e) { console.warn("Your Lists: \"" + l.name + "\" not put back: " + e.message); }
+  });
+  od_saveLists_(ss, lists);
+}
+
+/** Row 1's band names the list ("📥 OWN DATA · BUS ROUTES — DATE UPDATED: ..."). */
+function od_retitleBand_(sheet, name) {
+  const title = String(sheet.getRange(1, 1).getValue());
+  if (title.indexOf(OD_BAND_TITLE) !== 0) return;
+  const now = title.replace(/^📥 OWN DATA · .*? — /, OD_BAND_TITLE + String(name).toUpperCase() + " — ");
+  if (now !== title) sheet.getRange(1, 1).setValue(now);
 }
 
 /** Index of the first row that is part of the paste (rows 1-3 are ours while the title band is still in A1). */
@@ -2760,9 +2846,10 @@ function od_buildOutputs_(ss, masterTable, guardianRows) {
   ready.forEach(list => {
     try {
       const setup = list.setup;
-      const table = od_readTable_(list.sheet, setup);
+      const old = od_oldVersionTab_(ss, list); // a new version not saved yet: the saved one is used
+      const table = od_readTable_(old || list.sheet, setup);
       const results = od_matchAll_(setup, table.rows, idx);
-      od_writeToolColumns_(list.sheet, list, table, results, idx);
+      if (!old) od_writeToolColumns_(list.sheet, list, table, results, idx);
       setup.stats = od_stats_(results);
       // A list only for finding parents and numbers (idea 3): no columns, no Additional Information
       if (setup.purpose === "contacts") return;
@@ -3064,7 +3151,8 @@ function od_withLock_(fn) {
 function od_listSummaries_(ss) {
   return od_loadLists_(ss).filter(l => l.sheet).map(l => ({
     tabId: l.tabId, name: l.name, tabName: l.sheet.getName(), icon: od_listIcon_(l), by: l.setup.by, ready: !!l.setup.ready,
-    updated: l.updated, stats: l.setup.stats || null, purpose: l.setup.purpose === "contacts" ? "contacts" : "info"
+    updated: l.updated, stats: l.setup.stats || null, purpose: l.setup.purpose === "contacts" ? "contacts" : "info",
+    waiting: !!(l.setup.oldVersion && od_oldVersionTab_(ss, l)) // "Paste new version" not saved: the old one is used
   }));
 }
 
@@ -3094,12 +3182,14 @@ function od_createList(name, icon) {
   return res;
 }
 
-/** "Edit setup": the setup sidebar on an existing list. */
+/** "Edit setup": the setup sidebar on an existing list (a new version that wasn't saved is dropped first). */
 function od_openList(tabId) {
   const res = od_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const list = od_findList_(od_loadLists_(ss), tabId);
+    const lists = od_loadLists_(ss);
+    const list = od_findList_(lists, tabId);
     if (!list || !list.sheet) return { error: "That list's tab is gone." };
+    if (list.setup.oldVersion) { od_restoreOldVersion_(ss, list); od_saveLists_(ss, lists); }
     if (list.sheet.isSheetHidden()) list.sheet.showSheet();
     list.sheet.activate();
     return { tabId: list.tabId };
@@ -3108,13 +3198,19 @@ function od_openList(tabId) {
   return res;
 }
 
-/** "Paste new version": empties the list's tab (its setup and your decisions are kept) and waits for the paste. */
+/**
+ * "Paste new version": empties the list's tab (its setup and your decisions are kept) and waits for the
+ * paste. The saved version is kept (hidden) and used until the new one is saved.
+ */
 function od_repasteList(tabId) {
   const res = od_withLock_(() => {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const list = od_findList_(od_loadLists_(ss), tabId);
+    const lists = od_loadLists_(ss);
+    const list = od_findList_(lists, tabId);
     if (!list || !list.sheet) return { error: "That list's tab is gone." };
     if (list.sheet.isSheetHidden()) list.sheet.showSheet();
+    od_keepOldVersion_(ss, list);
+    od_saveLists_(ss, lists);
     od_resetListTab_(list.sheet, list.name);
     list.sheet.activate();
     return { tabId: list.tabId };
@@ -3139,8 +3235,7 @@ function od_renameList(tabId, name, icon) {
     }
     list.name = name;
     list.sheet.setName(od_uniqueTabName_(ss, od_tabNameFor_(od_listIcon_(list), name), list.sheet));
-    const title = String(list.sheet.getRange(1, 1).getValue());
-    if (title.indexOf(OD_BAND_TITLE) === 0) list.sheet.getRange(1, 1).setValue(title.replace(/^📥 OWN DATA · .*? — /, OD_BAND_TITLE + name.toUpperCase() + " — "));
+    od_retitleBand_(list.sheet, name);
     od_saveLists_(ss, lists);
     return { ok: true };
   });
@@ -3161,6 +3256,7 @@ function od_deleteList(tabId) {
       }
       ss.deleteSheet(list.sheet);
     }
+    od_dropOldVersion_(ss, list);
     od_saveLists_(ss, lists.filter(l => l !== list));
     idm_noteListsChanged_();
     return { ok: true };
@@ -3186,13 +3282,14 @@ function od_getWizard() {
     const w = od_wizardList_(ss);
     if (!w.list || !w.list.sheet) return { error: "This list's tab is gone. Go back to Input Data Mode." , gone: true };
     const table = od_readTable_(w.list.sheet, null);
-    if (!table.headers.length || !od_hasPaste_(w.list.sheet)) return od_pasteView_(w.list);
+    if (!table.headers.length || !od_hasPaste_(w.list.sheet)) return od_pasteView_(w.list, ss);
     return od_setupView_(ss, w.list, table, null);
   });
 }
 
-function od_pasteView_(list) {
-  return { phase: "paste", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!list.setup.ready },
+function od_pasteView_(list, ss) {
+  return { phase: "paste", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!list.setup.ready,
+                                   keptOld: !!(ss && od_oldVersionTab_(ss, list)) }, // "Paste new version": the old one is in use until Save
            purpose: list.setup.purpose === "contacts" ? "contacts" : "info" };
 }
 
@@ -3236,10 +3333,10 @@ function od_readPaste() {
  */
 function od_readTab_(ss, w, fromUpload) {
   const taken = od_takePaste_(w.list.sheet, w.list.name);
-  if (!taken) return od_pasteView_(w.list);
+  if (!taken) return od_pasteView_(w.list, ss);
   if (!taken.rows.length) {
     od_resetListTab_(w.list.sheet, w.list.name);
-    return Object.assign(od_pasteView_(w.list), { cleared: true, error: "I found the header row, but no rows under it. " +
+    return Object.assign(od_pasteView_(w.list, ss), { cleared: true, error: "I found the header row, but no rows under it. " +
       (fromUpload ? "Upload the whole list, headers and rows." : "Paste the whole list, headers and rows.") + " The tab was cleared, so you can try again." });
   }
   w.list.updated = od_today_();
@@ -3271,7 +3368,7 @@ function od_uploadRows(rows) {
     const cells = (rows || []).map(r => (r || []).map(c => (c === null || c === undefined) ? "" : String(c)));
     const width = cells.reduce((m, r) => Math.max(m, r.length), 0);
     if (!width || !cells.some(r => r.some(c => c.trim() !== ""))) {
-      return Object.assign(od_pasteView_(w.list), { error: "That file is empty." });
+      return Object.assign(od_pasteView_(w.list, ss), { error: "That file is empty." });
     }
     const table = cells.map(r => r.concat(new Array(width - r.length).fill("")));
     const sheet = w.list.sheet;
@@ -3292,10 +3389,18 @@ function od_setupView_(ss, list, table, taken) {
   const savedRoles = saved.ready ? (taken ? od_rolesByHeader_(saved, table.headers) : saved.roles) : null;
   const roles = savedRoles || guess.roles;
   const by = savedRoles ? saved.by : guess.by;
+  // A new version: the columns you kept that it doesn't have (renamed? tester fix 2026-11-23: "Route" became
+  // "Route #" and the sidebar still said "Same columns as last time"), and whether the setup had to start over
+  const headersNow = table.headers.map(h => String(h).trim().toLowerCase());
+  const missing = taken && saved.ready ? (saved.vars || []).filter(v => (v.show || v.column) &&
+    headersNow.indexOf(String(v.header || "").trim().toLowerCase()) === -1).map(v => String(v.header || v.label || "")) : [];
   return {
     phase: "setup",
-    list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!saved.ready, title: saved.title || "" },
+    list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!saved.ready, title: saved.title || "",
+            keptOld: !!od_oldVersionTab_(ss, list) },
     kept: !!savedRoles,                 // a new version of the list: the old setup was kept
+    missing: missing,                   // ... but these kept columns aren't in it
+    changed: !!(taken && saved.ready && !savedRoles), // ... or a column that finds the person is gone: guesses again
     headerRow: OD_HEADER_ROW,
     rowCount: table.rows.length,
     columns: guess.stats.map(s => ({ col: s.col, letter: od_colLetter_(s.col), header: s.header, samples: s.samples,
@@ -3426,6 +3531,7 @@ function od_saveList(p) {
     }
     if (!list.updated) list.updated = od_today_();
     od_writeToolColumns_(list.sheet, list, table, results, idx);
+    od_dropOldVersion_(ss, list); // "Paste new version": the new one is the saved one now
     od_saveLists_(ss, w.lists);
     idm_noteListsChanged_();
     return { phase: "done", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName() }, stats: setup.stats,
@@ -3450,6 +3556,10 @@ function od_migrateLists_(oldSS, newSS) {
     if (!oldSheet) return; // its tab was deleted on the old sheet
     let setup = null;
     try { setup = JSON.parse(String(r[2] || "{}")); } catch (e) { setup = null; }
+    // A new version started there but not saved: its saved version comes over (od_savedTab_)
+    const kept = setup && setup.oldVersion ? setup.oldVersion : null;
+    const keptTab = kept && kept.tabId ? od_sheetById_(oldSS, kept.tabId) : null;
+    if (setup) delete setup.oldVersion;
     // (the tab name keeps its icon: copied as it is, and the icon comes along in the setup)
     const oldIcon = od_listIcon_({ setup: setup }) + " ";
     const oldTab = oldSheet.getName();
@@ -3467,9 +3577,15 @@ function od_migrateLists_(oldSS, newSS) {
     });
     lists = lists.filter(l => l.name.toLowerCase() !== name.toLowerCase());
 
-    const copy = oldSheet.copyTo(newSS);
+    const copy = (keptTab || oldSheet).copyTo(newSS);
     copy.setName(od_uniqueTabName_(newSS, oldSheet.getName(), copy));
-    lists.push({ tabId: copy.getSheetId(), name: name, setup: od_fillSetup_(setup), updated: toText_(r[3]), sheet: copy });
+    let updated = toText_(r[3]);
+    if (keptTab) {
+      if (copy.isSheetHidden() && !oldSheet.isSheetHidden()) copy.showSheet();
+      updated = toText_(kept.updated);
+      if (kept.title !== undefined && setup) setup.title = kept.title;
+    }
+    lists.push({ tabId: copy.getSheetId(), name: name, setup: od_fillSetup_(setup), updated: updated, sheet: copy });
     moved++;
   });
   od_saveLists_(newSS, lists);
@@ -3479,6 +3595,18 @@ function od_migrateLists_(oldSS, newSS) {
 /** Back to Input Data Mode's sidebar (when it is on), else just close. */
 function od_backToInputMode() {
   const props = PropertiesService.getDocumentProperties();
+  const tabId = props.getProperty(OD_WIZARD_KEY);
+  // Leaving before Save: a new version that wasn't saved goes, the saved one comes back
+  if (tabId) {
+    const r = od_withLock_(() => {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const lists = od_loadLists_(ss);
+      const list = od_findList_(lists, tabId);
+      if (list && list.sheet && list.setup.oldVersion) { od_restoreOldVersion_(ss, list); od_saveLists_(ss, lists); }
+      return { ok: true };
+    });
+    if (r && r.error) console.warn("Your Lists: old version not put back: " + r.error);
+  }
   props.deleteProperty(OD_WIZARD_KEY);
   if (idm_loadState_()) {
     // its first call (idm_open) puts the user back on the Your Lists tab and hides the list's tab

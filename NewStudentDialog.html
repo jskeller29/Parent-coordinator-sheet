@@ -533,6 +533,7 @@
                     gender: sib.gender || '',
                     homeLanguage: sib.homeLanguage || '',
                     labelAtOpen: sib.label || data.labelAtOpen,
+                    prefilled: data.prefilled, // "Check and edit before adding": the siblings' rows name its source too
                     guardians: data.guardians
                 };
                 payloads.push(sibData);

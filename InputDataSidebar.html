@@ -932,6 +932,7 @@
         '<button class="del" title="Delete this list and its tab" onclick="deleteList(' + l.tabId + ',\'' + esc(l.name).replace(/'/g, "\\'") + '\')">Delete</button></div>' +
         '<div class="meta">' + (l.purpose === 'contacts' ? 'for finding parents and numbers' : 'by ' + (l.by === 'guardian' ? 'guardian' : 'student')) + (st ? ' · ' + st.rows + ' rows' : '') + (l.updated ? ' · updated ' + esc(l.updated) : '') + '</div>' +
         (chips ? '<div class="chips">' + chips + '</div>' : '') +
+        (l.waiting ? '<div class="warnline">A new version isn\'t saved yet, so your sheets still use this one. Paste new version to try again, or Edit setup to keep this one.</div>' : '') +
         '<div class="btns"><button class="soft" onclick="listCall(\'od_repasteList\',' + l.tabId + ')">Paste new version</button>' +
         '<button onclick="listCall(\'od_openList\',' + l.tabId + ')">' + (l.ready ? 'Edit setup' : 'Finish setup') + '</button></div>' +
         '<div class="iconpick hidden" id="ip' + l.tabId + '"><div class="muted">Pick an icon for its tab</div><div class="icons">' +

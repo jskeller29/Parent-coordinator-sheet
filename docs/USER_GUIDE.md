@@ -189,7 +189,7 @@ Student Data (required), from ATS / Insight:
    download.
 4. In your Downloads, look for the file whose name starts with general_.
 
-This file has 2 guardians per student, with one phone and one email each. Other parents
+This file has 2 guardians per student, usually with one phone and one email each. Other parents
 and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about
 them at the end of Input Data Mode, and in 👤 Student Overrides.
 

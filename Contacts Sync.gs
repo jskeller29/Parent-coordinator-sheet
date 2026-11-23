@@ -535,22 +535,6 @@ function searchAndUpsertSingleContact(parentName, studentNames, email, phone, ph
 
     let isEdited = false;
     let editDetails = [];
-    
-    if (existingContact) {
-      let currentEmail = existingContact.emailAddresses && existingContact.emailAddresses.length > 0 ? String(existingContact.emailAddresses[0].value).toLowerCase().trim() : "";
-      let currentPhone = "";
-      if (existingContact.phoneNumbers && existingContact.phoneNumbers.length > 0) {
-        currentPhone = String(existingContact.phoneNumbers[0].value).replace(/\D/g, '');
-        if (currentPhone.length === 11 && currentPhone.startsWith('1')) currentPhone = currentPhone.substring(1);
-      }
-      let currentNotes = existingContact.biographies && existingContact.biographies.length > 0 ? String(existingContact.biographies[0].value).trim() : "";
-      
-      if (currentEmail !== safeEmail) editDetails.push(`Email: ${currentEmail || 'Empty'} ➔ ${safeEmail || 'Empty'}`);
-      if (currentPhone !== safePhone) editDetails.push(`Phone: ${currentPhone || 'Empty'} ➔ ${safePhone || 'Empty'}`);
-      if (currentNotes !== String(notes || "").trim()) editDetails.push(`Notes updated`);
-      
-      if (editDetails.length > 0) isEdited = true; 
-    }
 
     // Build the payload exactly as the row dictates. Zero assumptions.
     const contactData = {
@@ -585,6 +569,21 @@ function searchAndUpsertSingleContact(parentName, studentNames, email, phone, ph
         if (!value || contactData.emailAddresses.some(x => String(x.value).toLowerCase().trim() === value.toLowerCase())) return;
         contactData.emailAddresses.push({ value: value, type: 'home' });
       });
+    }
+
+    // What changed, for the "Edited" count and the log: EVERY number and email (tester fix 2026-11-23: only
+    // the first ones were compared, so a new Phone 2 / E-mail 2 was written but counted "Edited: 0"). A row with
+    // one number and one email reads exactly as before ("Phone: 7185550101 ➔ 9175550144").
+    if (existingContact) {
+      const phonesIn = list => (list || []).map(x => String(x && x.value !== undefined ? x.value : "").replace(/\D/g, "").replace(/^1(\d{10})$/, "$1")).filter(Boolean);
+      const emailsIn = list => (list || []).map(x => String(x && x.value !== undefined ? x.value : "").toLowerCase().trim()).filter(Boolean);
+      const currentEmails = emailsIn(existingContact.emailAddresses).join(", "), newEmails = emailsIn(contactData.emailAddresses).join(", ");
+      const currentPhones = phonesIn(existingContact.phoneNumbers).join(", "), newPhones = phonesIn(contactData.phoneNumbers).join(", ");
+      const currentNotes = existingContact.biographies && existingContact.biographies.length > 0 ? String(existingContact.biographies[0].value).trim() : "";
+      if (currentEmails !== newEmails) editDetails.push(`Email: ${currentEmails || 'Empty'} ➔ ${newEmails || 'Empty'}`);
+      if (currentPhones !== newPhones) editDetails.push(`Phone: ${currentPhones || 'Empty'} ➔ ${newPhones || 'Empty'}`);
+      if (currentNotes !== String(notes || "").trim()) editDetails.push(`Notes updated`);
+      if (editDetails.length > 0) isEdited = true;
     }
 
     // Already exactly like the row (and in the label): nothing to write
