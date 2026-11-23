@@ -828,7 +828,7 @@ function idm_processRows_(ss, state, values, displays, ignoreCutoff, fromUpload)
   }
   if (found.step.key !== step.key) {
     return fail('wrongType', "This looks like <b>" + found.step.zone + "</b> data, but this step is <b>" + step.zone + "</b>. " +
-      "Use the " + step.zone + " export instead (or Skip to the " + found.step.zone + " step).");
+      "Use the " + step.zone + " export here. To load " + found.step.short + " instead, click " + found.step.short + " in the bar at the top.");
   }
 
   const mapped = idm_mapRows_(step, values, displays, found.row);
@@ -1515,8 +1515,16 @@ function idm_lastUpdated_(raw, step) {
     return saved ? idm_dateInfo_(saved) : null;
   }
   const text = String(raw.getRange(step.stampCell).getDisplayValue());
-  if (/00\/00\/00/.test(text)) return null;
-  return idm_dateInfo_(text);
+  const info = /00\/00\/00/.test(text) ? null : idm_dateInfo_(text);
+  if (info) return info;
+  // Rows there but no date (pasted by hand before Input Data Mode, or the fake data): loaded, date not known
+  // (typical-user tester 2026-11-23: the start page said "Never loaded", ticked every card and asked to go on
+  // without Student Data). Not "due": its age isn't known.
+  if (step.col && step.headers && raw.getLastRow() >= 7 &&
+      raw.getRange(7, step.col, 1, step.headers.length).getDisplayValues()[0].some(v => String(v).trim() !== "")) {
+    return { text: "(date not known)", days: null };
+  }
+  return null;
 }
 
 /** { text: "MM/dd/yy", days } from the first date in a string (null if none). */
@@ -1537,8 +1545,9 @@ function idm_summary_(results) {
     if (r && r.lists) return "✅ " + step.zone + ": " + r.rows + " list(s) set up";
     if (r && r.saved) return "✅ " + step.zone + ": " + r.rows + " class(es) saved";
     if (r && r.rows) return "✅ " + step.zone + ": " + r.rows + " row(s) imported";
-    if (r && r.skipped) return "⏭️ " + step.zone + ": skipped (old data kept)";
-    return "— " + step.zone + ": not loaded (old data kept)";
+    // "nothing changed" (typical-user tester 2026-11-23: "old data kept" on a new copy that never had any)
+    if (r && r.skipped) return "⏭️ " + step.zone + ": skipped (nothing changed)";
+    return "— " + step.zone + ": not loaded (nothing changed)";
   });
 }
 

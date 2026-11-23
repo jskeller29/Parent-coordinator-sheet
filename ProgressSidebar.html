@@ -395,6 +395,8 @@
           el('etaText').innerText = "";
 
           showControls(false);
+          // Nothing to build yet: "Build again" would only say the same (typical-user tester 2026-11-23)
+          if (state.notice) el('btnStart').style.display = 'none';
           google.script.run.resetSyncStatus();
           return;
         }

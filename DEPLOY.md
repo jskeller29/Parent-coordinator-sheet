@@ -44,7 +44,7 @@ z_MINE. No new permissions (same manifests). Then do step 10 below once.
 The testers' fixes from the same day, and the Student List's new Home Language column (Build), are in these
 same files, so there is nothing more to paste. If you
 already pasted the 10 ideas before them, re-paste Core, Build, Menus, Input Data, Contacts Sync and the pages
-FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, YourListsSidebar.
+FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar, YourListsSidebar.
 
 ## 3. After pasting
 1. Save, then reload the spreadsheet.

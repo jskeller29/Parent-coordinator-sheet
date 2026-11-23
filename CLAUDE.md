@@ -565,8 +565,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   dropdown by hand: 'Backend'!$CQ$3:$CQ, Show a warning) on the master template and the owner's sheet.
 - Student List Home Language (2026-11-23, later): Build.gs only (re-paste it on every sheet), then Build Sheets Only.
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
-  Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, YourListsSidebar (pages) on
-  every sheet (master template too). No new files, no new permissions, nothing to do by hand.
+  Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,
+  YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
@@ -680,9 +680,26 @@ tests in tests/test_testers.js. Fixed (branch claude/determined-euler-vq9la3):
 - Wording: the Student Data export "usually" has one number per parent (Good to know, the step's uses, the Phone
   numbers to check intro, the User Guide): several numbers in one ATS cell are read now.
 - Method 2 "skipped" (values typed in Backend CQ) is a console.warn, so 🐞 Debug toasts show it.
+- THE TYPICAL USER (stopped at an API limit, resumed on the fixes): "Maybe the same person" needs a reason
+  (parentMaybeSame_: same first name + another last name; "a close spelling" = last names alike AND first names close,
+  od_firstScore_ >= 0.8 or one letter off; the same phone / email): a shared last name alone scored 76% and called Abe
+  Simpson "maybe Marge Simpson (a close spelling)". knownGuardianFor_(..., rawName): a guardian saved with one name
+  ("Hippolyta", the fake data's Diana Prince override) is that student's source parent with that FIRST name
+  ("HIPPOLYTA PRINCE" in NYCSA; od_nameParts_ first, never a last name alone): it was offered as a parent to add on
+  every fake-data copy, and adding it made the same person twice. idm_lastUpdated_: a Raw Data section with rows but
+  no date stamp (pasted by hand, the fake data's 00/00/00) is "Last loaded (date not known)", not due (the start page
+  said "Never loaded", ticked every card and asked to go on without Student Data). A wrong paste says to click its own
+  step in the bar (it said "Skip to ..."; Skip only goes forward). Wording: the summary / skip line "(nothing changed)"
+  (was "old data kept" on a copy that never had any), "has a parent who isn't", "1 still needs you", a parents-only
+  list's not-found advice is about the child on the row, New / Edit Student says Override Report (was Delta Report),
+  the "Use it instead" question says a phone contact shared with a sibling not on the card keeps the old number,
+  ProgressSidebar hides "Build again" under the no-data note. Checklist: s2-11's count (10 of 12 classes have a teacher),
+  s2-22's order (look at NYCSA before the upload), s4-14's report line.
 Not changed: a Parent Square 2nd phone / NYCSA home or work number is not offered when that source's first number is
 one we have (idea 4 as specified: a parent with numbers none of which we have); the Build panel doesn't show the Method
-2 "skipped" (offered to the owner).
+2 "skipped" (offered to the owner); typing only one parent's name ("Morticia Addams") in the Contact Log's Guardian
+column finds no student (the ghost typist matches the dropdown's whole text "Morticia Addams and Gomez Addams";
+suspected by the typical user, not tried on a sheet).
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):

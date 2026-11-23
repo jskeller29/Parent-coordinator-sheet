@@ -236,7 +236,7 @@
       var keys = phKeysTicked();
       if (!keys.length || busy) return;
       if (use === 'instead' && !confirm('Use the new number' + (keys.length > 1 ? 's' : '') + ' INSTEAD of the one' + (keys.length > 1 ? 's' : '') +
-          ' these parents have now?\n\nThe number they have now leaves their contact. If your Student Data (ATS) later has this number, or another new one, ATS\'s number is used again and this goes away by itself.')) return;
+          ' these parents have now, for the students on the card?\n\nAfter the next build the Parents List shows only the new number for those students. A phone contact they share with a brother or sister who isn\'t on the card keeps the old number too. If your Student Data (ATS) later has this number, or another new one, ATS\'s number is used again and this goes away by itself.')) return;
       setBusy(true);
       say('Saving…');
       run().withSuccessHandler(function (r) {

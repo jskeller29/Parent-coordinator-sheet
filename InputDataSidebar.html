@@ -447,7 +447,7 @@
     var done = v.done || [];
     $('doneList').innerHTML = done.map(function (d) {
       return d.skipped
-        ? '<div class="done-line skip"><span class="mk skip">–</span>"' + d.name + '" skipped (old data kept)</div>'
+        ? '<div class="done-line skip"><span class="mk skip">–</span>"' + d.name + '" skipped (nothing changed)</div>'
         : '<div class="done-line"><span class="mk yes">✓</span>"' + d.name + '" successful (' + d.rows + ' rows)</div>';
     }).join('');
     show('doneList', done.length > 0);
@@ -672,8 +672,8 @@
     var text = '';
     if (r.count) {
       var sample = r.sample || [], more = r.count - sample.length;
-      text = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents') +
-        ' who aren\'t in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
+      text = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent who isn\'t' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents who aren\'t') +
+        ' in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
         '. Add the ones who are guardians, so they show in the Student List, Parents List, the phone contacts and the Person Spoke With list.';
     }
     if (phones) text += (text ? ' ' : '') + (phones === 1

@@ -515,7 +515,12 @@
         html += '<div class="q">' + esc(a.reason) + '. Which one?</div>' + opts.map(function (o) { return optRow(a, o); }).join('') +
           '<div class="row" style="margin-top:6px"><button class="small" onclick="pickOpen(' + a.i + ')">Someone else</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
       } else {
-        html += '<div class="q">' + esc(a.reason) + '.' + (match.by === 'student' ? ' New and not in ATS yet? Add them with 👤 Student Overrides → New / Edit Student and build, then open this list again.' : '') + '</div>' +
+        // A list only for finding parents finds them through their child (typical-user tester 2026-11-23: a parent
+        // with no child on the row was told to add a student)
+        var advice = purpose === 'contacts'
+          ? ' Parents are found through their child: check the child\'s name or OSIS on that row of your list. A child not in ATS yet can be added with 👤 Student Overrides → New / Edit Student.'
+          : (match.by === 'student' ? ' New and not in ATS yet? Add them with 👤 Student Overrides → New / Edit Student and build, then open this list again.' : '');
+        html += '<div class="q">' + esc(a.reason) + '.' + advice + '</div>' +
           (opts.length ? '<div class="alt">Closest ' + (match.by === 'guardian' ? 'guardians' : 'on the Student List') + '</div>' + opts.map(function (o) { return optRow(a, o); }).join('') : '') +
           '<div class="row" style="margin-top:6px"><button class="small soft" onclick="pickOpen(' + a.i + ')">Search the ' + (match.by === 'guardian' ? 'guardians' : 'Student List') + '</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
       }
@@ -731,7 +736,7 @@
     var s = v.stats || { matched: 0, rows: 0, review: 0, skipped: 0 };
     $('title').textContent = v.list.name;
     $('doneText').innerHTML = 'Saved “' + esc(v.list.name) + '”: ' + s.matched + ' of ' + s.rows + ' rows matched' +
-      (s.skipped ? ', ' + s.skipped + ' skipped' : '') + (s.review ? '. ' + s.review + ' still need you (open the list again any time).' : '.');
+      (s.skipped ? ', ' + s.skipped + ' skipped' : '') + (s.review ? '. ' + s.review + (s.review === 1 ? ' still needs you' : ' still need you') + ' (open the list again any time).' : '.');
     // During Input Data Mode the build comes at its end (a build now would run with the other tabs hidden)
     var contacts = v.purpose === 'contacts';
     $('doneHint').textContent = contacts

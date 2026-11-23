@@ -470,3 +470,57 @@ console.log("tester findings: ok");
   assert(/These parents were added from: Parent Square, by hand$/.test(text), text);
   console.log("Added parents: siblings keep the source; the report's sources once, phones formatted: ok");
 }
+
+// ---------------------------------------------------------------- the typical user's findings (2026-11-23)
+{
+  const g = loadProject({});
+  const G = n => ({ guardianOutput: n, email: '', phones: [], mobile: '' });
+  const maybe = (raw, names) => g.parentMaybeSame_(raw, [], '', names.map(G));
+  // "Maybe the same person" only with a reason: a shared last name alone is another person (Abe was "Marge, a close spelling")
+  assert.strictEqual(maybe('Abe Simpson', ['Homer Simpson', 'Marge Simpson']), null, "Abe Simpson is not maybe Marge");
+  assert.strictEqual(maybe('Patty Bouvier', ['Homer Simpson', 'Marge Simpson']), null);
+  eq(maybe('Morticia Adams', ['Morticia Addams', 'Gomez Addams']).why, "a close spelling");
+  eq(maybe('Marje Simpson', ['Homer Simpson', 'Marge Simpson']).why, "a close spelling");
+  eq(maybe('Marge Bouvier', ['Homer Simpson', 'Marge Simpson']).why, "same first name, another last name", "the s4-14 variant still shows");
+  assert(/has no last name in your sheets/.test(maybe('Hippolyta Prince', ['Hippolyta']).why), "a one-name guardian has no last name to differ");
+  // A guardian saved with one name is the source's parent with that FIRST name (same student), never a last name alone
+  const gs = [G('Hippolyta')];
+  assert.strictEqual(g.knownGuardianFor_(gs, ['hippolyta', 'prince'], [], '', 'HIPPOLYTA PRINCE'), gs[0], "Hippolyta = HIPPOLYTA PRINCE");
+  assert.strictEqual(g.knownGuardianFor_(gs, ['prince', 'hippolyta'], [], '', 'Prince, Hippolyta'), gs[0], "\"Last, First\" too");
+  assert.strictEqual(g.knownGuardianFor_([G('Prince')], ['hippolyta', 'prince'], [], '', 'HIPPOLYTA PRINCE'), null, "a last name alone never matches");
+  assert.strictEqual(g.knownGuardianFor_(gs, ['hippolyta', 'prince'], [], ''), null, "without the raw name: as before");
+  const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
+  assert(/tokens, phones, email, rawName\)\) return;/.test(menus) && /tokens, digits, email, x\.rawName\);/.test(menus), "both callers pass the raw name");
+
+  // Rows in Raw Data but no date stamp (pasted by hand, the fake data): loaded, date not known
+  const { newTracker } = require('./lib/tracker');
+  const t = newTracker();
+  t.idmUpload("1 - Student Data (ATS).csv", "2 - Parent Square.csv"); t.g.idm_exit();
+  const raw = t.ss.getSheetByName("Raw Data");
+  raw.getRange("A1").setValue("ATS - DATE UPDATED: 00/00/00");
+  raw.getRange("AG1").setValue("Parent Square - DATE UPDATED: 00/00/00");
+  const items = t.g.idm_startItems_(t.ss, null);
+  eq(items[0].last, { text: "(date not known)", days: null }, "Student Data: loaded, date not known (it said Never loaded)");
+  eq(items[1].last, { text: "(date not known)", days: null });
+  assert.strictEqual(items[2].last, null, "NYCSA was never loaded");
+  eq(items.map(i => i.picked), [false, false, false, false, false], "nothing ticked: no age to go by (every card was ticked)");
+  const ids = fs.readFileSync(path.join(ROOT, 'InputDataSidebar.html'), 'utf8');
+  assert(/ats && ats\.required && !ats\.last/.test(ids), "the \"Go on without it?\" question needs no Student Data at all");
+
+  // Wording
+  const idm = fs.readFileSync(path.join(ROOT, 'Input Data.gs'), 'utf8');
+  assert(/click " \+ found\.step\.short \+ " in the bar at the top/.test(idm) && !/or Skip to the/.test(idm), "a wrong paste says to click its step in the bar (Skip only goes forward)");
+  eq(g.idm_summary_({ nycsa: { skipped: true } })[0], "— Student Data (ATS / Insight): not loaded (nothing changed)");
+  assert(/skipped \(nothing changed\)/.test(g.idm_summary_({ nycsa: { skipped: true } })[2]), "no \"old data kept\" on a copy that never had any");
+  assert(/has a parent who isn\\'t/.test(ids) && /parents who aren\\'t/.test(ids), "the end card's grammar");
+  assert(/skipped \(nothing changed\)<\/div>/.test(ids));
+  const ys = fs.readFileSync(path.join(ROOT, 'YourListsSidebar.html'), 'utf8');
+  assert(/s\.review === 1 \? ' still needs you'/.test(ys), "1 still needs you");
+  assert(/purpose === 'contacts'\s*\?\s*' Parents are found through their child/.test(ys), "a parents-only list's advice is about the child on the row");
+  assert(!/Delta Report/.test(fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8')), "Override Report, as the page calls it");
+  const mo = fs.readFileSync(path.join(ROOT, 'ManageOverridesDialog.html'), 'utf8');
+  assert(/for the students on the card\?/.test(mo) && !/leaves their contact\. If your Student Data/.test(mo), "\"Use it instead\" says what happens for siblings");
+  const ps = fs.readFileSync(path.join(ROOT, 'ProgressSidebar.html'), 'utf8');
+  assert(/if \(state\.notice\) el\('btnStart'\)\.style\.display = 'none'/.test(ps), "no \"Build again\" when there's nothing to build yet");
+  console.log("the typical user's findings (maybe the same, one-name guardians, undated data, wording): ok");
+}

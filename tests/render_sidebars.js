@@ -69,7 +69,7 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   };
   await shoot('InputDataSidebar', { idm_getState: ats, idm_check: ats }, 'idm_ats');
   await shoot('InputDataSidebar', { idm_getState: lists, idm_check: lists }, 'idm_lists');
-  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '⏭️ Parent Square: skipped (old data kept)', '— NYCSA: not loaded (old data kept)', '✅ Your Lists: 1 list(s) set up'] }, idm_deleteLeftoverTab: { deleted: true } }, 'idm_done');
+  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '⏭️ Parent Square: skipped (nothing changed)', '— NYCSA: not loaded (nothing changed)', '✅ Your Lists: 1 list(s) set up'] }, idm_deleteLeftoverTab: { deleted: true } }, 'idm_done');
   await shoot('InputDataSidebar', { idm_getState: Object.assign({}, ats, { debug: ['+0ms lock ok', '+12ms temp tab has data: false'] }), idm_check: ats }, 'idm_debug');
   // 2026-11-12: a wrong paste cleared, step 5 building first / built, the end screen after it, the list upload
   const cleared = Object.assign({}, ats, { notice: { type: 'error', code: 'wrongType', cleared: true, fromUpload: false,
@@ -123,7 +123,7 @@ const matchView = { phase: 'match', by: 'student', stats: { rows: 40, matched: 3
   const wrong = Object.assign({}, cleared, { stepIndex: 1, step: Object.assign({}, ats.step, { key: 'ps', zone: 'Parent Square', required: false }), progress: progress(1, {}) });
   await shoot('InputDataSidebar', { idm_getState: wrong, idm_check: ps }, 'idm_error_top');
   await shoot('InputDataSidebar', { idm_getState: listsIcons }, 'idm_icon_hover', async p => { await p.hover('#listItems .li button.ico'); await p.waitForTimeout(250); });
-  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, guideNext: false, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '— Parent Square: not loaded (old data kept)'] },
+  await shoot('InputDataSidebar', { idm_getState: { active: false, finished: true, anyImported: true, guideNext: false, summary: ['✅ Student Data (ATS / Insight): 120 row(s) imported', '— Parent Square: not loaded (nothing changed)'] },
     idm_deleteLeftoverTab: { deleted: true }, idm_parentsToAddSummary: { count: 4, sample: ['Abe Simpson (Bart Simpson)', 'Patty Bouvier (Bart Simpson)', 'Grandmama Addams (Wednesday Addams)'] } }, 'idm_done_parents', async p => { await p.waitForTimeout(400); });
   const home = { toAdd: [
       { key: 'a', name: 'Grandmama Addams', relationship: 'Grandmother', student: 'Wednesday Addams', cls: 'Y12', osis: '111222333', phone: '(777) 777-7777', email: '', sources: ['NYCSA'] },

@@ -2865,9 +2865,17 @@ function parentSources_(ss, listMatched) {
  * (any order, a 2+ part subset), else the same phone / email and a shared name part.
  * phones = the source's numbers as digits (normalizePhoneForMatch_).
  */
-function knownGuardianFor_(guardians, tokens, phones, email) {
+function knownGuardianFor_(guardians, tokens, phones, email, rawName) {
   const byName = guardians.find(g => namesMatch_(nameTokens_(g.guardianOutput), tokens));
   if (byName) return byName;
+  // A guardian saved with one name only ("Hippolyta" in New / Edit Student) is that student's parent with
+  // that FIRST name in the source ("HIPPOLYTA PRINCE" in NYCSA): typical-user tester 2026-11-23 (offered as a
+  // new parent, "Check and edit before adding" made the same person twice). Never a last name alone.
+  const first = rawName ? ((od_nameParts_(rawName) || {}).first || "") : "";
+  if (first) {
+    const oneName = guardians.find(g => { const gt = nameTokens_(g.guardianOutput); return gt.length === 1 && gt[0] === first; });
+    if (oneName) return oneName;
+  }
   return guardians.find(g => {
     const sameContact = (phones.length && guardianPhones_(g).some(x => phones.indexOf(normalizePhoneForMatch_(x)) !== -1)) ||
                         (email && email === normalizeEmail_(g.email));
@@ -2894,7 +2902,7 @@ function findParentsToAdd_(ss, all, src) {
     if (sameNameExactly_(tokens, st.tokens)) return;      // the student's own account
     const phones = (info.phones || []).map(normalizePhoneForMatch_).filter(Boolean);
     const email = normalizeEmail_(info.email);
-    if (knownGuardianFor_(guardiansOf.get(st.id) || [], tokens, phones, email)) return;
+    if (knownGuardianFor_(guardiansOf.get(st.id) || [], tokens, phones, email, rawName)) return;
     const key = parentsToAddKey_(st.id, tokens);
     let item = items.get(key);
     if (!item) {
@@ -2955,7 +2963,7 @@ function findPhonesToCheck_(ss, all, src) {
     if (!numbers.length) return;
     const digits = numbers.map(n => normalizePhoneForMatch_(n.phone));
     const email = normalizeEmail_(x.info.email);
-    const g = knownGuardianFor_(src.guardiansOf.get(x.st.id) || [], tokens, digits, email);
+    const g = knownGuardianFor_(src.guardiansOf.get(x.st.id) || [], tokens, digits, email, x.rawName);
     if (!g) return;                                       // a new parent: Parents to add has them
     const gName = stripTrailingParenthetical_(g.guardianOutput);
     const gTokens = nameTokens_(gName);
@@ -3123,12 +3131,19 @@ function parentMaybeSame_(rawName, phones, email, guardians) {
     const oneLetterOff = (x, y) => x.length >= 4 && y.length >= 4 && Math.round((1 - od_editRatio_(x, y)) * Math.max(x.length, y.length)) <= 1;
     const lastAlike = od_bestPair_(candLast, gLast) >= 0.9 || candLast.some(x => gLast.some(y => oneLetterOff(x, y)));
     const contact = (phones.length && guardianPhones_(g).some(x => phones.indexOf(normalizePhoneForMatch_(x)) !== -1)) || (email && email === normalizeEmail_(g.email));
+    // Only with a reason (typical-user tester, 2026-11-23): a shared last name alone scores ~55-75%, so
+    // "Abe Simpson" was "maybe the same person as Marge Simpson (a close spelling)"
+    const firstClose = od_firstScore_(cand.first, gp.first) >= 0.8 || oneLetterOff(cand.first, gp.first);
     const why = [];
-    if (firstAlike && !lastAlike) { score = Math.max(score, 0.6); why.push("same first name, another last name"); }
-    else if (score >= 0.75) why.push("a close spelling");
+    if (firstAlike && !lastAlike) {
+      score = Math.max(score, 0.6);
+      // A guardian saved with one name only ("Hippolyta") has no last name to differ
+      why.push(gp.lastTokens.length ? "same first name, another last name" : "same first name; " + gName + " has no last name in your sheets");
+    } else if (lastAlike && firstClose && score >= 0.75) why.push("a close spelling");
     if (contact) { score = Math.min(0.99, score + 0.3); why.push("the same " + (email && email === normalizeEmail_(g.email) ? "email" : "phone")); }
+    if (!why.length) return; // different first names, same last name: another person (a grandparent, an aunt)
     const pct = Math.round(Math.min(0.99, score) * 100);
-    if (pct >= 50 && (!best || pct > best.pct)) best = { name: gName, pct: pct, why: why.join(" and ") || "a similar name" };
+    if (pct >= 50 && (!best || pct > best.pct)) best = { name: gName, pct: pct, why: why.join(" and ") };
   });
   return best;
 }
