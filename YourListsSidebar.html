@@ -104,6 +104,7 @@
 
   <!-- WAITING FOR THE PASTE -->
   <div id="pasteView" class="hidden">
+    <div id="purposePaste"></div>
     <div class="card">
       <b>Option 1: Upload the file</b>
       <div class="muted">Pick your list's file (CSV or Excel; the first sheet is used). It goes on the tab <b id="uploadTab"></b> just like a paste.</div>
@@ -126,10 +127,11 @@
 
   <!-- SETUP -->
   <div id="setupView" class="hidden">
-    <div class="steps"><span id="st1">1 Columns</span><i>→</i><span id="st2">2 Variables</span><i>→</i><span id="st3">3 Match</span><i>→</i><span id="st4">4 View</span></div>
+    <div class="steps"><span id="st1">1 Columns</span><i id="ar2">→</i><span id="st2">2 Variables</span><i id="ar3">→</i><span id="st3">3 Match</span><i id="ar4">→</i><span id="st4">4 View</span></div>
 
     <div id="step1">
       <div id="keptNote" class="ok hidden">Same columns as last time, so your setup was kept. Check it, then go on.</div>
+      <div id="purposeSetup"></div>
       <label class="f">List name</label>
       <input type="text" id="listName" maxlength="60">
       <div class="muted" id="tabHint"></div>
@@ -143,7 +145,7 @@
       <div class="map" id="roleMap"></div>
       <label class="f">Other columns</label>
       <div id="otherCols"></div>
-      <div class="muted">Next step: choose what to keep from these.</div>
+      <div class="muted" id="step1Next">Next step: choose what to keep from these.</div>
     </div>
 
     <div id="step2" class="hidden">
@@ -168,6 +170,7 @@
     <div class="muted" id="doneHint"></div>
     <div class="row hidden" id="doneBackRow"><button class="primary" onclick="leave()">← Back to Input Data Mode</button></div>
     <div class="row hidden" id="buildRow"><button class="primary" onclick="buildNow()">Build sheets now</button></div>
+    <div class="row hidden" id="overridesRow"><button class="primary" onclick="openOverrides()">Open Student Overrides</button></div>
   </div>
 
   <div class="footer">
@@ -187,6 +190,7 @@
   var openPicker = {};    // row index -> true while "pick someone else" is open
   var pollTimer = null, busy = false;
   var advOpen = null, pvIndex = 0, pvCase = 'match'; // step 4: Advanced options open?, preview row, preview case
+  var purpose = 'info';   // "What is this list for?": 'info' (its values on the sheets) | 'contacts' (owner 2026-11-23)
 
   function $(id) { return document.getElementById(id); }
   function show(id, on) { $(id).classList.toggle('hidden', !on); }
@@ -213,6 +217,8 @@
   // ---------- paste ----------
   function showPaste(v) {
     view = v;
+    purpose = v.purpose === 'contacts' ? 'contacts' : 'info';
+    renderPurpose();
     $('title').textContent = v.list.name;
     $('pasteTab').textContent = '“' + v.list.tabName + '”';
     $('uploadTab').textContent = '“' + v.list.tabName + '”';
@@ -298,6 +304,8 @@
     $('headerCells').textContent = v.columns.map(function (c) { return c.header; }).join(' · ');
     $('titleHint').textContent = v.list.title ? 'Title rows above it were left out: “' + v.list.title + '”' : '';
     show('keptNote', !!v.kept);
+    purpose = v.purpose === 'contacts' ? 'contacts' : 'info';
+    renderPurpose();
     show('pasteView', false); show('setupView', true); show('doneView', false); show('leaveRow', true);
     goStep(1);
   }
@@ -314,7 +322,9 @@
   function renderStep1() {
     $('byStudent').classList.toggle('on', setup.by === 'student');
     $('byGuardian').classList.toggle('on', setup.by === 'guardian');
-    $('byHint').innerHTML = setup.by === 'student'
+    $('byHint').innerHTML = purpose === 'contacts'
+      ? (setup.by === 'student' ? 'Each row is one student, with a column for their parent.' : 'Each row is one parent, with their child\'s name or OSIS.')
+      : setup.by === 'student'
       ? 'Each row is one student. The values go on that student (and their guardians\' phone contacts) and become Student List columns.'
       : 'Each row is one guardian. The values go on every child of that guardian (siblings too) and become Parents List columns.';
     var r = setup.roles, html = '';
@@ -412,7 +422,7 @@
   function setVarText(i, which, text) { setup.vars[i][which].text = text; refreshVar(i); }
 
   // ---------- step 3: match ----------
-  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, view: setup.view, decisions: decisions }; }
+  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, view: setup.view, decisions: decisions, purpose: purpose }; }
   function loadMatch() { loading('Matching every row to the Student List…'); run('od_matchPreview', payload(), function (v) { showMatch(v); }); }
   function showMatch(v) {
     match = v; renderMatch();
@@ -634,12 +644,27 @@
   function setPreviewCase(c) { pvCase = c; refreshViewPreview(); }
 
   // ---------- steps / buttons ----------
+  // A list only for finding parents and numbers skips Variables and View (nothing goes on the sheets)
+  function stepsFor() { return purpose === 'contacts' ? [1, 3] : [1, 2, 3, 4]; }
+  var STEP_NAMES = { 1: 'Columns', 2: 'Variables', 3: 'Match', 4: 'View' };
   function goStep(n) {
     step = n;
+    var order = stepsFor(), cur = order.indexOf(n);
     show('step1', n === 1); show('step2', n === 2); show('step3', n === 3); show('step4', n === 4);
-    ['st1', 'st2', 'st3', 'st4'].forEach(function (id, i) { $(id).className = (i + 1 === n) ? 'on' : (i + 1 < n ? 'done' : ''); $(id).textContent = (i + 1 < n ? '✓ ' : (i + 1) + ' ') + ['Columns', 'Variables', 'Match', 'View'][i]; });
-    show('backBtn', n > 1); show('nextBtn', true);
-    $('nextBtn').textContent = n === 1 ? 'Next: Variables →' : n === 2 ? 'Next: Match →' : n === 3 ? 'Next: View →' : 'Save';
+    [1, 2, 3, 4].forEach(function (k) {
+      var at = order.indexOf(k);
+      show('st' + k, at !== -1);
+      if (k > 1) show('ar' + k, at !== -1);
+      if (at === -1) return;
+      $('st' + k).className = at === cur ? 'on' : (at < cur ? 'done' : '');
+      $('st' + k).textContent = (at < cur ? '✓ ' : (at + 1) + ' ') + STEP_NAMES[k];
+    });
+    show('backBtn', cur > 0); show('nextBtn', true);
+    var after = order[cur + 1];
+    $('nextBtn').textContent = after ? 'Next: ' + STEP_NAMES[after] + ' →' : 'Save';
+    $('step1Next').textContent = purpose === 'contacts'
+      ? 'Next step: check who each row is. Nothing from this list goes on your sheets.'
+      : 'Next step: choose what to keep from these.';
     if (n === 1) renderStep1();
     if (n === 2) renderStep2();
     if (n === 3) loadMatch();
@@ -652,14 +677,39 @@
       var r = setup.roles;
       var any = r.osis || r.phone || r.email || (r.student && (r.student.col || r.student.first || r.student.last)) || (r.guardian && (r.guardian.col || r.guardian.first || r.guardian.last));
       if (!any) { $('errorBox').innerHTML = 'Pick at least one column that says who the row is (OSIS, a name, phone or email).'; show('errorBox', true); return; }
-      show('errorBox', false); goStep(2); return;
+      var g = r.guardian;
+      if (purpose === 'contacts' && !(g && (g.col || g.first || g.last))) {
+        $('errorBox').innerHTML = 'Pick the column with the parent\'s name: a list for finding parents and numbers needs it.'; show('errorBox', true); return;
+      }
+      show('errorBox', false);
     }
-    if (step === 2) { goStep(3); return; }
-    if (step === 3) { goStep(4); return; }
+    var order = stepsFor(), after = order[order.indexOf(step) + 1];
+    if (after) { goStep(after); return; }
     loading('Saving…');
     run('od_saveList', payload(), function (v) { showDone(v); });
   }
-  function back() { if (!busy && step > 1) goStep(step - 1); }
+  function back() { var order = stepsFor(), i = order.indexOf(step); if (!busy && i > 0) goStep(order[i - 1]); }
+
+  // ---------- "What is this list for?" (first screen + step 1) ----------
+  function purposeHtml(where) {
+    var opt = function (value, title, sub) {
+      return '<label class="ck"><input type="radio" name="purpose' + where + '" value="' + value + '"' + (purpose === value ? ' checked' : '') +
+        ' onchange="setPurpose(\'' + value + '\', \'' + where + '\')"><span>' + title + '<span class="sub">' + sub + '</span></span></label>';
+    };
+    return '<div class="card"><b>What is this list for?</b>' +
+      opt('info', 'Show its info', 'Bus routes, trip forms, PTA: on the phone contacts and as a Student List or Parents List column.') +
+      opt('contacts', 'Only find parents and phone numbers to add', 'A parent list with their child\'s name or OSIS. Nothing shows on your sheets: new parents and other numbers go to 👤 Student Overrides for you to check.') +
+      '</div>';
+  }
+  function renderPurpose() { $('purposePaste').innerHTML = purposeHtml('Paste'); $('purposeSetup').innerHTML = purposeHtml('Setup'); }
+  function setPurpose(value, where) {
+    purpose = value === 'contacts' ? 'contacts' : 'info';
+    renderPurpose();
+    // Before the paste it is saved right away (the setup comes later); in the setup it is saved with Save
+    if (where === 'Paste') google.script.run.withFailureHandler(fail).od_setListPurpose(purpose);
+    else if (step === 1 && setup) goStep(1);
+  }
+  function openOverrides() { stopPoll(); google.script.run.withFailureHandler(fail).openManageOverridesDialog(); }
   function showDone(v) {
     stopPoll();
     show('pasteView', false); show('setupView', false); show('doneView', true);
@@ -669,10 +719,14 @@
     $('doneText').innerHTML = 'Saved “' + esc(v.list.name) + '”: ' + s.matched + ' of ' + s.rows + ' rows matched' +
       (s.skipped ? ', ' + s.skipped + ' skipped' : '') + (s.review ? '. ' + s.review + ' still need you (open the list again any time).' : '.');
     // During Input Data Mode the build comes at its end (a build now would run with the other tabs hidden)
-    $('doneHint').textContent = v.inputMode
+    var contacts = v.purpose === 'contacts';
+    $('doneHint').textContent = contacts
+      ? 'Nothing from this list goes on your sheets. Parents it has that your Student Data doesn\'t, and other phone numbers for the parents you have, show in 👤 Student Overrides (Parents to add, Phone numbers to check)' +
+        (v.inputMode ? ', and at the end of Input Data Mode.' : '.')
+      : v.inputMode
       ? 'The Student List / Parents List columns and the phone contacts get it at the next build: go back, finish Input Data Mode, then build.'
       : 'Build the sheets so the Student List / Parents List columns and the phone contacts get it. Until then only the list\'s tab changed.';
-    show('doneBackRow', !!v.inputMode); show('buildRow', !v.inputMode); show('leaveRow', !v.inputMode);
+    show('doneBackRow', !!v.inputMode); show('buildRow', !v.inputMode && !contacts); show('overridesRow', !v.inputMode && contacts); show('leaveRow', !v.inputMode);
     $('leaveLink').textContent = v.inputMode ? '← Back to Input Data Mode' : 'Close';
   }
   function leave() {

@@ -1668,8 +1668,10 @@ var OD_HEADER_WORDS_ = /osis|student|name|first|last|parent|guardian|mother|fath
 // ======================================================================
 
 function od_emptySetup_() {
+  // purpose (owner 2026-11-23, idea 3): "info" = its values go on the sheets and phones (as before);
+  // "contacts" = only to find parents and phone numbers to add (👤 Student Overrides), nothing on the sheets
   return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null,
-           view: od_defaultView_(true), icon: OD_DEFAULT_ICON };
+           view: od_defaultView_(true), icon: OD_DEFAULT_ICON, purpose: "info" };
 }
 
 function od_fillSetup_(s) {
@@ -2700,6 +2702,8 @@ function od_buildOutputs_(ss, masterTable, guardianRows) {
       const results = od_matchAll_(setup, table.rows, idx);
       od_writeToolColumns_(list.sheet, list, table, results, idx);
       setup.stats = od_stats_(results);
+      // A list only for finding parents and numbers (idea 3): no columns, no Additional Information
+      if (setup.purpose === "contacts") return;
       const by = setup.by === "guardian" ? "guardian" : "student";
       const view = setup.view || od_defaultView_(false);
       // Each kept value: target -> its values (several rows for one person: joined " / ") + the not-on-list text
@@ -2974,7 +2978,7 @@ function od_withLock_(fn) {
 function od_listSummaries_(ss) {
   return od_loadLists_(ss).filter(l => l.sheet).map(l => ({
     tabId: l.tabId, name: l.name, tabName: l.sheet.getName(), icon: od_listIcon_(l), by: l.setup.by, ready: !!l.setup.ready,
-    updated: l.updated, stats: l.setup.stats || null
+    updated: l.updated, stats: l.setup.stats || null, purpose: l.setup.purpose === "contacts" ? "contacts" : "info"
   }));
 }
 
@@ -3102,7 +3106,21 @@ function od_getWizard() {
 }
 
 function od_pasteView_(list) {
-  return { phase: "paste", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!list.setup.ready } };
+  return { phase: "paste", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName(), ready: !!list.setup.ready },
+           purpose: list.setup.purpose === "contacts" ? "contacts" : "info" };
+}
+
+/** "What is this list for?" (the first screen of a list, before the paste): kept with the list's setup. */
+function od_setListPurpose(purpose) {
+  return od_withLock_(() => {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const w = od_wizardList_(ss);
+    if (!w.list || !w.list.sheet) return { error: "This list's tab is gone.", gone: true };
+    w.list.setup.purpose = purpose === "contacts" ? "contacts" : "info";
+    od_saveLists_(ss, w.lists);
+    if (w.list.setup.ready) idm_noteListsChanged_(); // a saved list's columns come or go at the next build
+    return { ok: true, purpose: w.list.setup.purpose };
+  });
 }
 
 /** Polled every 2 s while waiting: has something been pasted on the list's tab? */
@@ -3199,7 +3217,8 @@ function od_setupView_(ss, list, table, taken) {
     roles: roles,
     by: by,
     vars: od_varsFor_(table.headers, roles, saved.vars),
-    view: saved.view || od_defaultView_(false)
+    view: saved.view || od_defaultView_(false),
+    purpose: saved.purpose === "contacts" ? "contacts" : "info"
   };
 }
 
@@ -3224,6 +3243,7 @@ function od_cleanSetupInput_(p, headers) {
   }));
   const out = { by: p.by === "guardian" ? "guardian" : "student", roles: roles, vars: vars };
   if (p.view) out.view = od_cleanView_(p.view); // the View step (an older sidebar without it keeps the saved one)
+  if (p.purpose === "contacts" || p.purpose === "info") out.purpose = p.purpose; // (an older sidebar keeps the saved one)
   return out;
 }
 
@@ -3321,7 +3341,7 @@ function od_saveList(p) {
     od_saveLists_(ss, w.lists);
     idm_noteListsChanged_();
     return { phase: "done", list: { tabId: list.tabId, name: list.name, tabName: list.sheet.getName() }, stats: setup.stats,
-             inputMode: !!idm_loadState_() };
+             inputMode: !!idm_loadState_(), purpose: setup.purpose === "contacts" ? "contacts" : "info" };
   });
 }
 

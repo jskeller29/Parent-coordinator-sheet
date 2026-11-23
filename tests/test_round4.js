@@ -494,3 +494,66 @@ function phonesSheet() {
   assert(/r\.phones/.test(html) && /phone numbers to check/.test(html), "the end screen card says so");
   console.log("4 end of Input Data Mode: ok");
 }
+
+// ---------------------------------------------------------------- 3. "What is this list for?"
+{
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(["Backend"])) } });
+  // The setup: "info" unless said; an older sidebar (no purpose sent) keeps the saved one
+  assert.strictEqual(g.od_emptySetup_().purpose, "info");
+  assert.strictEqual(g.od_fillSetup_({ ready: true }).purpose, "info", "a list saved before: shows its info, as before");
+  const clean = p => g.od_cleanSetupInput_(Object.assign({ roles: {}, vars: [] }, p), ["Parent", "Child", "Phone"]).purpose;
+  eq([clean({ purpose: "contacts" }), clean({ purpose: "info" }), clean({}), clean({ purpose: "x" })], ["contacts", "info", null, null]);
+  // Saved from the first screen (before the paste)
+  let saved = null;
+  const list = { tabId: 7, name: "PTA", sheet: {}, setup: g.od_fillSetup_({}) };
+  g.od_withLock_ = fn => fn();
+  g.od_wizardList_ = () => ({ lists: [list], list: list });
+  g.od_saveLists_ = (ss, lists) => { saved = lists[0].setup.purpose; };
+  eq(g.od_setListPurpose("contacts"), { ok: true, purpose: "contacts" });
+  assert.strictEqual(saved, "contacts");
+  eq(g.od_setListPurpose("nonsense").purpose, "info", "anything else = info");
+}
+{
+  // A contacts list puts nothing on the sheets, but its tab and counts still update at the build
+  const { g } = (function () {
+    const ss = makeSpreadsheet(["Contact Log", "Backend"]);
+    return { g: loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } }) };
+  })();
+  const raw = [[], [], [], [], [], [], rawRow("123456789", "SIMPSON", "BART", "Y41", ["HOMER SIMPSON", "FATHER", "1111111111", ""], null)];
+  const sm = g.buildStudentMap_(raw, new Map());
+  const master = [["OSIS", "Student", "Guardian", "Site", "Class"], ["123456789", "Bart Simpson", "", "", "Y41"]];
+  const guardians = g.buildGuardianObjects_(raw, new Map());
+  const headers = ["Parent", "Child", "Phone", "Role"], rows = [["Homer Simpson", "Bart Simpson", "5551234567", "Chair"]];
+  let addl = null, toolCols = 0, list = null;
+  g.od_loadLists_ = () => [list];
+  g.od_readTable_ = () => ({ headers: headers, rows: rows });
+  g.od_writeToolColumns_ = () => { toolCols++; }; g.od_saveLists_ = () => {}; g.backendClearBlock_ = () => {};
+  g.backendWriteBlock_ = (ss, key, r) => { if (key === "ADDL_INFO") addl = r; };
+  const make = purpose => ({ tabId: 1, name: "PTA", sheet: { getSheetId: () => 1 },
+    setup: g.od_fillSetup_({ ready: true, by: "guardian", purpose: purpose, roles: { guardian: { col: 1 }, student: { col: 2 }, phone: 3 },
+      vars: [{ col: 4, header: "Role", label: "Role", show: true, column: true, blank: { mode: "nothing" }, notOnList: { mode: "nothing" } }], picks: {}, headers: headers }) });
+  list = make("info");
+  let out = g.od_buildOutputs_({}, master, guardians);
+  assert(addl.length > 1 && out.guardianCols.length === 1, "info: a line and a column, as before");
+  list = make("contacts");
+  toolCols = 0;
+  out = g.od_buildOutputs_({}, master, guardians);
+  eq([addl.length, out.studentCols.length, out.guardianCols.length], [1, 0, 0], "contacts: no lines (only the header), no columns");
+  assert.strictEqual(toolCols, 1, "its tab's Matched column still updates");
+  assert(list.setup.stats && list.setup.stats.rows === 1, "and its counts");
+}
+{
+  // ...and it feeds Parents to add and Phone numbers to check
+  const { ss, g } = phonesSheet();
+  const tab = ss.insertSheet("👪 Contact cards");
+  const headers = ["Parent", "Child", "Phone"];
+  tab._put([headers, ["Selma Bouvier", "Wednesday Addams", "4445556666"], ["Homer Simpson", "Bart Simpson", "(555) 123-4567"]], 4, 1);
+  g.od_loadLists_ = () => [{ tabId: tab.getSheetId(), name: "Contact cards", sheet: tab,
+    setup: g.od_fillSetup_({ by: "guardian", ready: true, purpose: "contacts", icon: "👪", headers: headers,
+      roles: { guardian: { col: 1 }, student: { col: 2 }, phone: 3 }, vars: [], picks: {} }) }];
+  const toAdd = g.findParentsToAdd_(ss).items.find(it => it.name === "Selma Bouvier");
+  assert(toAdd && toAdd.sources[0] === "👪 Contact cards" && toAdd.phone === "(444) 555-6666", "a new parent from the list");
+  const num = g.findPhonesToCheck_(ss).items.find(it => it.phone === "(555) 123-4567");
+  assert(num && num.guardian === "Homer Simpson" && num.sources[0] === "👪 Contact cards", "another number for a parent we have: " + JSON.stringify(g.findPhonesToCheck_(ss).items.map(i => i.guardian + " " + i.phone)));
+  console.log("3 list purpose: ok");
+}
