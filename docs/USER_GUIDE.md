@@ -332,7 +332,7 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 | Combined Contact Tracking | Every student's history in one place: Contact Log notes, events and Notes tab notes, newest first. Useful before a meeting. | Yes |
 | PCAR | Your PCAR counts, filled in from the other tabs. | Yes |
 | Directory | Each student's site, class and parents' phone and email, from ATS. | Yes |
-| Student List | One row per student: guardians, site, class, siblings, status, last interaction, and a column for each student list you keep. | No |
+| Student List | One row per student: guardians, site, class, siblings, status, last interaction, home language (from your Student Data), and a column for each student list you keep. | No |
 | Parents List | One row per guardian, with Parent Square and NYCSA sign-up. Useful for mail merges. | No |
 | Phone Contacts | What the phone sync sends to Google Contacts. | No |
 | Notes | Notes you always want at the top of a student's history. | No |

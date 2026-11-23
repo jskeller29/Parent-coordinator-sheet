@@ -312,7 +312,15 @@ const stages = [
         see: ["After both builds the Student List's Status for Louise says \"Moved, new address pending\".",
               "Your changes lists Louise as Edited, with the guardian you added."],
         why: "Two testers found it: a change of only the status was undone by the next build, and adding a parent later turned the edit into an \"Added guardian\" and lost the status.",
-        fixed: "11/23, found by the testers." }
+        fixed: "11/23, found by the testers." },
+      { id: "n3-16", isNew: true, title: "Home Language on the Student List",
+        do: ["Show the Student List (View → Hidden sheets if it is hidden) and look at the column after Last Interaction.",
+             "👤 Student Overrides → ✨ New / Edit Student → Edit a student from ATS → Gene Belcher. Set Home Language to Spanish, Save, and let the build run."],
+        see: ["Column I is \"Home Language\", right after Last Interaction, with the same header look: Wednesday and Pugsley Addams, Miles Morales and Mirabel Madrigal say Spanish, Mulan Fa says Chinese, the others English (from the Student Data). Tina Belcher (a New Student) says English, as typed for her.",
+              "The columns before it haven't moved (Status is still G, Last Interaction H), and a Your Lists column you keep comes after it.",
+              "After the build, Gene Belcher says Spanish."],
+        why: "Your request (11/23): the student's home language on the Student List, from ATS.",
+        fixed: "New on 11/23 (your request)." }
     ]
   },
   {
@@ -677,6 +685,7 @@ module.exports = {
   retestTitle: "New and fixed since round 2",
   // What changed since round 2, newest first (each links to its checks)
   fixes: [
+    { text: "11/23, your request: the Student List has a Home Language column (from the Student Data; a language typed in New / Edit Student wins).", checks: ["n3-16"] },
     { text: "11/23, found by three testers (a power user, a typical user and a careless one went through this version first): Your Lists \"Paste new version\" keeps your list until you save the new one. It emptied the list at the click, so a build before the paste put \"No bus\" on every student and their phone contacts.", checks: ["n3-14", "b-23"] },
     { text: "11/23, found by the testers: a Status / label set in New / Edit Student was undone by the next build, or lost when a parent was added later.", checks: ["n3-15"] },
     { text: "11/23, found by the testers: Phone numbers to check offered the replaced number right back after \"Use it instead\" and kept only one of several numbers for a parent; Find a Family missed numbers typed with +1 or an extension and showed only 8 families. Smaller: a Your Lists file was taken at the Parent Square step, an OSIS with a stray character couldn't be opened, the Override Report's phones and sources.", checks: ["n3-08", "n3-10", "n3-06", "n3-12"] },

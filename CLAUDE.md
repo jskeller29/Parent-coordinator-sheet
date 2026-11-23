@@ -563,6 +563,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   ManageOverridesDialog, NewStudentDialog, SettingsDialog, ProgressSidebar, YourListsSidebar (pages); ADD the page
   FindFamily; owner sheet also z_MINE. Same manifests. Then Build Sheets Only once and DEPLOY.md step 10 (Method 2
   dropdown by hand: 'Backend'!$CQ$3:$CQ, Show a warning) on the master template and the owner's sheet.
+- Student List Home Language (2026-11-23, later): Build.gs only (re-paste it on every sheet), then Build Sheets Only.
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, YourListsSidebar (pages) on
   every sheet (master template too). No new files, no new permissions, nothing to do by hand.
@@ -1158,6 +1159,14 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   tab first. A tab renamed by hand / by setName keeps its protections, data validations and formula references.
 - A:H only (owner 2026-11-12): every reset deletes the columns after H (the lists are cleared too); a build adds a
   Your Lists column back through writeSheet_ and gives its header the Status header's look.
+- HOME LANGUAGE (owner 2026-11-23, "add to students list the home language, drawing from ATS"): column I, right after
+  Last Interaction (addHomeLanguageColumn_, Build.gs; so no column moves and the Backend copy BX:CD stays OSIS..Status);
+  Your Lists columns follow it. Value = ATS's Home Language (Raw Data S, properCase_ like names: "SPANISH" -> Spanish),
+  or the one typed in New / Edit Student (getOverrideData_ homeLanguage = section column 10; empty = ATS's); a student
+  who left ATS keeps the one the Student List had (buildMasterTableData_ fills oldLanguages from its "Home Language"
+  header); a sibling-group row joins its students' (" / "). Resets still delete it with the columns after H
+  (Regenerate.gs STUDENT_LIST_COLUMNS_ = 8, left as is); the next build adds it back, its header styled like Status
+  (styleLastInteractionHeader_). Find a Family and the other readers find columns by header or read A:H: unchanged.
 - ONE ROW PER STUDENT (owner's request 2026-11-11): the tab has no sibling-group rows ("111, 222" / "Ann X & Ben X");
   the Sibling column stays. The build keeps the full table in memory (Combined Contact Tracking, Phone Contacts,
   New Students, build report unchanged), writes it OSIS..Status WITH the group rows to the Backend STUDENT_LIST
@@ -1173,7 +1182,7 @@ Student List tab (was "Master Table"; renamed 2026-11-05 at the owner's request)
   history, status snapshots, Your Lists index, Hide Discharged / Purge, isBuilt checks, Contact Log Debug anonymizer.
   The search bar's Communications formula SPLITs the OSIS, so 'Student List'!A:B still works.
 - Header on ROW 1, data from row 2 (owner moved it 2026-11-11; was row 4 / row 5): OSIS, Student, Guardian, Site, Class,
-  Sibling, Status, Last Interaction (H). STUDENT_LIST_HEADER_ROW (Core.gs) = where the build writes it. Readers find the
+  Sibling, Status, Last Interaction (H), Home Language (I, 2026-11-23). STUDENT_LIST_HEADER_ROW (Core.gs) = where the build writes it. Readers find the
   header themselves (studentListHeaderRow_: "OSIS" in A1:A10, else row 1), so a tab not rebuilt since still works:
   studentListIsBuilt_ (menus + Getting Started), the lookup fallback, resetMasterTable_ (clears under the header),
   getAllStudentsForEdit and ownerReadMasterStatusSnapshot_ (start under the header), buildMasterTableData_ /

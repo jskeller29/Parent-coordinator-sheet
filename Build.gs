@@ -99,9 +99,11 @@ function buildAllDerivedSheetsRun_() {
   // Read the Events tab now (step 2 writes these same rows to the Backend Event
   // Log), so the Student List's Last Interaction sees today's events too
   const freshEventData = buildBackendEventLogData_(ss);
-  let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap);
+  const oldLanguages = new Map();
+  let masterTable = buildMasterTableData_(ss, studentMap, guardianRows, siblingMap, oldLanguages);
   if (owner) masterTable = owner.adjustMasterTable(ss, masterTable); // Old Master Table history
   masterTable = addLastInteractionColumn_(masterTable, contactLogData, freshEventData);
+  masterTable = addHomeLanguageColumn_(masterTable, studentMap, oldLanguages); // ATS's (owner 2026-11-23)
   // Your Lists (Input Data.gs): matches every list tab, writes the Backend's
   // Additional Information (read by the phone contacts) and returns the
   // Student List / Parents List columns. A problem there never stops the build.
@@ -763,7 +765,8 @@ function getOverrideData_(ss) {
       classCode: classCode,
       site: "",
       teachers: "",
-      label: toText_(r[40]) // <-- Retrieves the new Custom Label
+      label: toText_(r[40]), // <-- Retrieves the new Custom Label
+      homeLanguage: properCase_(toText_(r[9])) // the Student List's Home Language (empty = ATS's)
     });
 
     const guardianList = [];
@@ -822,6 +825,8 @@ function buildStudentMap_(rawData, overrideStudents) {
   const classRefMap = buildClassReferenceMap_(rawData);
   // Raw Data's Official Class is the source of truth for where a student is now
   const rawClassById = new Map();
+  // ATS's Home Language (Raw Data S, owner 2026-11-23: the Student List shows it)
+  const rawLanguageById = new Map();
 
   for (let i = 0; i < rawData.length; i++) {
     const r = rawData[i];
@@ -830,6 +835,8 @@ function buildStudentMap_(rawData, overrideStudents) {
 
     const classCode = toText_(r[17]).toUpperCase();
     if (classCode && !rawClassById.has(id)) rawClassById.set(id, classCode);
+    const homeLanguage = properCase_(toText_(r[18]));
+    if (homeLanguage && !rawLanguageById.has(id)) rawLanguageById.set(id, homeLanguage);
 
     if (overrideStudents.has(id)) continue; 
 
@@ -849,7 +856,8 @@ function buildStudentMap_(rawData, overrideStudents) {
         classCode: classCode,
         site: assignedSite,
         teachers: assignedTeacher,
-        label: "Current" // Default ATS Status
+        label: "Current", // Default ATS Status
+        homeLanguage: homeLanguage
       });
     }
   }
@@ -858,6 +866,8 @@ function buildStudentMap_(rawData, overrideStudents) {
     // An override's class goes stale when ATS moves the student (e.g. Site 276 -> 188),
     // so prefer the current Raw Data class; override-only students keep their own.
     if (rawClassById.has(id)) studentObj.classCode = rawClassById.get(id);
+    // A home language typed in New / Edit Student wins; none typed = ATS's
+    if (!toText_(studentObj.homeLanguage) && rawLanguageById.has(id)) studentObj.homeLanguage = rawLanguageById.get(id);
     if (classRefMap.has(studentObj.classCode)) {
       const ref = classRefMap.get(studentObj.classCode);
       studentObj.site = ref.site;
@@ -1203,7 +1213,9 @@ function buildSiblingMap_(studentMap, guardianRows) {
  * Preserves "Discharged" students by comparing 
  * current raw data with previously generated Student List data.
  */
-function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
+// oldLanguages (optional Map, filled here): OSIS -> the Home Language the Student List had (students who
+// left ATS keep it, like their class)
+function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap, oldLanguages) {
   const out = [[
     "OSIS",
     "Student",
@@ -1245,6 +1257,7 @@ function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
     const hClass = oldHeaderMap["Class"] !== undefined ? oldHeaderMap["Class"] : 3;
     const hSibling = oldHeaderMap["Sibling"] !== undefined ? oldHeaderMap["Sibling"] : 4;
     const hStatus = oldHeaderMap["Status"] !== undefined ? oldHeaderMap["Status"] : 5;
+    const hLanguage = oldHeaderMap[HOME_LANGUAGE_HEADER_] !== undefined ? oldHeaderMap[HOME_LANGUAGE_HEADER_] : -1;
 
     for (let i = startRow; i < oldData.length; i++) {
       const row = oldData[i];
@@ -1262,6 +1275,7 @@ function buildMasterTableData_(ss, studentMap, guardianRows, siblingMap) {
           sibling: toText_(row[hSibling]),
           status: toText_(row[hStatus])
         });
+        if (oldLanguages && hLanguage !== -1 && toText_(row[hLanguage])) oldLanguages.set(osis, toText_(row[hLanguage]));
       }
     }
   }
@@ -2072,6 +2086,34 @@ function addLastInteractionColumn_(masterTable, contactLogData, eventLogData) {
       if (newest && (!latest || newest.dateObj > latest.dateObj)) latest = newest;
     });
     out.push(latest ? formatDateFull_(latest.dateRaw) : "None logged");
+    return out;
+  });
+}
+
+/**
+ * Adds a "Home Language" column after Last Interaction (owner 2026-11-23): ATS's Home Language
+ * (Raw Data S), or the one typed in New / Edit Student; a student who left ATS keeps the one the
+ * Student List had. A sibling-group row "111, 222" lists its students' languages (" / "). After
+ * Last Interaction so no column moves (Status stays G, Last Interaction H; the Backend copy BX:CD,
+ * OSIS..Status, is unchanged); Your Lists columns follow it.
+ */
+var HOME_LANGUAGE_HEADER_ = "Home Language";
+function addHomeLanguageColumn_(masterTable, studentMap, oldLanguages) {
+  const width = masterTable[0].length;
+  const languageOf = osis => {
+    const st = studentMap.get(osis);
+    if (st) return toText_(st.homeLanguage);
+    return (oldLanguages && oldLanguages.get(osis)) || "";
+  };
+  return masterTable.map((row, i) => {
+    const out = padRow_(row, width);
+    if (i === 0) { out.push(HOME_LANGUAGE_HEADER_); return out; }
+    const langs = [];
+    extractOsisTokens_(row[0]).forEach(osis => {
+      const l = languageOf(osis);
+      if (l && langs.indexOf(l) === -1) langs.push(l);
+    });
+    out.push(langs.join(" / "));
     return out;
   });
 }

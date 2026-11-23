@@ -827,3 +827,60 @@ function familySheet() {
   assert(/menu\.addItem\("🔍 Find a Family", "openFindFamily"\)/.test(menus), "🚀 App Menu → 🔍 Find a Family");
   console.log("1 find a family (server): ok");
 }
+
+// ---------------------------------------------------------------- Student List: Home Language from ATS (owner 2026-11-23)
+{
+  const { newTracker, parseCsv: readCsv, csvText } = require('./lib/tracker');
+  const t = newTracker();
+  t.idmUpload("1 - Student Data (ATS).csv");
+  t.g.idm_exit(); t.build();
+  const g = t.g;
+  const sl = () => t.tab("Student List");
+  const langOf = osis => { const tab = sl(); const c = tab[0].indexOf("Home Language"); const row = tab.find(r => String(r[0]) === osis); return row ? row[c] : undefined; };
+  const headers = sl()[0];
+  assert.deepStrictEqual(headers.slice(0, 9), ["OSIS", "Student", "Guardian", "Site", "Class", "Sibling", "Status", "Last Interaction", "Home Language"],
+    "Home Language right after Last Interaction; no other column moved: " + JSON.stringify(headers));
+  const ats = readCsv(csvText("1 - Student Data (ATS).csv")).slice(1).filter(r => r[2]);
+  ats.forEach(r => assert.strictEqual(langOf(r[2]), r[18], r[4] + " " + r[3] + ": ATS's Home Language"));
+  assert.strictEqual(langOf("989123456"), "Chinese");
+  // The autofill's Backend copy (BX:CD) is still OSIS..Status
+  assert.deepStrictEqual(g.backendReadBlock_(t.ss, "STUDENT_LIST")[0], ["OSIS", "Student", "Guardian", "Site", "Class", "Sibling", "Status"]);
+  // An all-caps export reads like the names do
+  assert.strictEqual(g.buildStudentMap_([[ "", "", "111222333", "SMITH", "ANN", "", "", "", "", "", "", "", "", "", "", "", "", "X01", "HAITIAN CREOLE" ]], new Map()).get("111222333").homeLanguage, "Haitian Creole");
+
+  // New / Edit Student: a language typed there wins; a New Student (not in ATS) shows its own
+  const pay = g.getAllStudentsForEdit().find(x => x.osis === "123456789");
+  g.saveStudentOverrides([{ entryType: "Edit Existing Student", osis: pay.osis, classCode: pay.classCode, firstName: pay.firstName, lastName: pay.lastName,
+    label: pay.label || "Current", hideFromReport: false, grade: pay.grade, age: pay.age, gender: pay.gender, homeLanguage: "Spanish",
+    labelAtOpen: pay.label || "Current", prefilled: null, guardians: pay.guardians.map(x => ({ name: x.name, relationship: x.relationship, phone: x.phone, email: x.email, language: x.language })) },
+    { entryType: "New Student", osis: "111222333", classCode: "Y41", firstName: "Ann", lastName: "Smith", label: "", hideFromReport: false,
+      grade: "", age: "", gender: "", homeLanguage: "haitian creole", labelAtOpen: "", prefilled: null,
+      guardians: [{ name: "Joe Smith", relationship: "Father", phone: "7185550199", email: "", language: "" }] }]);
+  t.build();
+  assert.strictEqual(langOf("123456789"), "Spanish", "Bart: the language typed in New / Edit Student");
+  assert.strictEqual(langOf("111222333"), "Haitian Creole", "a New Student shows the one typed for them");
+  assert.strictEqual(langOf("567891234"), "English", "Lisa: still ATS's");
+
+  // Next month: a student who left ATS keeps the language the Student List had
+  const before = new Set(ats.map(r => r[2]));
+  const next = readCsv(csvText("1b - Student Data (ATS) - next month (2 new, 1 left).csv")).slice(1).filter(r => r[2]);
+  const gone = Array.from(before).filter(o => !next.some(r => r[2] === o));
+  assert.strictEqual(gone.length, 1, "one student left");
+  const goneLang = langOf(gone[0]);
+  assert(goneLang, "had a language");
+  t.idmUpload("1b - Student Data (ATS) - next month (2 new, 1 left).csv");
+  t.g.idm_exit(); t.build();
+  const goneRow = sl().find(r => String(r[0]) === gone[0]);
+  assert(/discharged/i.test(goneRow[6]), "the student who left is Discharged");
+  assert.strictEqual(langOf(gone[0]), goneLang, "and keeps their Home Language");
+  next.filter(r => !before.has(r[2])).forEach(r => assert.strictEqual(langOf(r[2]), r[18], "a new student: ATS's"));
+
+  // Your Lists columns come after it
+  const r = g.od_createList("Bus Routes", "🚌");
+  const v = g.od_uploadCsv(csvText("5a - Your Lists - Bus Routes (student list).csv"));
+  g.od_saveList({ by: v.by, roles: v.roles, vars: v.vars.map(x => Object.assign({}, x, { show: true, column: x.header === "Route" })), view: v.view, purpose: 'info', watch: false, decisions: {} });
+  t.build();
+  const h2 = sl()[0];
+  assert.deepStrictEqual(h2.slice(7, 10), ["Last Interaction", "Home Language", "Route"], "a list column follows Home Language: " + JSON.stringify(h2));
+  console.log("Student List: Home Language from ATS (New / Edit Student wins, kept after leaving): ok");
+}
