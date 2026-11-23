@@ -153,6 +153,8 @@
       <div id="varCards"></div>
       <div class="muted" style="margin-top:6px">Everyone on the list gets it. Lines go on the phone contact under <b>Additional Information</b>, above Communications; Combined Contact Tracking doesn't change.</div>
       <div class="warnbox">Anything shown goes into the guardian's Google Contact (phone). Keep private lists (IEP, housing…) off.</div>
+      <!-- "Tell me what changed" (owner 2026-11-23, idea 6) -->
+      <label class="ck" style="margin-top:12px"><input type="checkbox" id="watchBox" onchange="setup.watch = this.checked"><span>Tell me what changed at each build<span class="sub">The Build panel's report then lists who is new on this list, who dropped off and which values changed. The first build after you tick this only takes a copy.</span></span></label>
     </div>
 
     <div id="step3" class="hidden">
@@ -293,7 +295,7 @@
   function showSetup(v) {
     stopPoll();
     view = v;
-    setup = { by: v.by, roles: JSON.parse(JSON.stringify(v.roles || {})), vars: JSON.parse(JSON.stringify(v.vars || [])),
+    setup = { by: v.by, watch: !!v.watch, roles: JSON.parse(JSON.stringify(v.roles || {})), vars: JSON.parse(JSON.stringify(v.vars || [])),
               view: JSON.parse(JSON.stringify(v.view || { layout: 'lines', boldNames: false, sep: 'comma', start: 'list', columns: 'each', order: [] })) };
     advOpen = null; pvIndex = 0; pvCase = 'match';
     decisions = {}; openPicker = {}; match = null;
@@ -422,7 +424,7 @@
   function setVarText(i, which, text) { setup.vars[i][which].text = text; refreshVar(i); }
 
   // ---------- step 3: match ----------
-  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, view: setup.view, decisions: decisions, purpose: purpose }; }
+  function payload() { return { name: $('listName').value, by: setup.by, roles: setup.roles, vars: setup.vars, view: setup.view, decisions: decisions, purpose: purpose, watch: purpose === 'contacts' ? false : !!setup.watch }; }
   function loadMatch() { loading('Matching every row to the Student List…'); run('od_matchPreview', payload(), function (v) { showMatch(v); }); }
   function showMatch(v) {
     match = v; renderMatch();
@@ -666,7 +668,7 @@
       ? 'Next step: check who each row is. Nothing from this list goes on your sheets.'
       : 'Next step: choose what to keep from these.';
     if (n === 1) renderStep1();
-    if (n === 2) renderStep2();
+    if (n === 2) { renderStep2(); $('watchBox').checked = !!setup.watch; }
     if (n === 3) loadMatch();
     if (n === 4) renderView();
     window.scrollTo(0, 0);

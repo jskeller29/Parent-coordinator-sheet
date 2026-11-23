@@ -557,3 +557,61 @@ function phonesSheet() {
   assert(num && num.guardian === "Homer Simpson" && num.sources[0] === "👪 Contact cards", "another number for a parent we have: " + JSON.stringify(g.findPhonesToCheck_(ss).items.map(i => i.guardian + " " + i.phone)));
   console.log("3 list purpose: ok");
 }
+
+// ---------------------------------------------------------------- 6. "Tell me what changed" (Your Lists)
+{
+  const g = loadProject();
+  const m = obj => new Map(Object.keys(obj).map(k => [k, obj[k]]));
+  const before = m({ a: { who: "Bart Simpson", values: { "Bus Route": "R12", Stop: "Elm" } }, b: { who: "Lisa Simpson", values: { "Bus Route": "R3" } } });
+  const now = m({ a: { who: "Bart Simpson", values: { "Bus Route": "R14", Stop: "Elm", New: "x" } }, c: { who: "Gene <b>Belcher</b>", values: { "Bus Route": "R7" } } });
+  eq(g.od_watchChanges_("🚌 Bus Routes", before, now), { list: "🚌 Bus Routes", added: ["Gene &lt;b&gt;Belcher&lt;/b&gt;"], removed: ["Lisa Simpson"],
+    changed: ["Bart Simpson: Bus Route R12 → R14"] }, "new, gone, changed (only values in both copies; text escaped)");
+  assert.strictEqual(g.od_watchChanges_("x", before, before), null, "nothing changed: nothing reported");
+}
+{
+  // Two builds: the first only takes the copy; the second reports
+  const ss = makeSpreadsheet(["Contact Log", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const raw = [[], [], [], [], [], [],
+    rawRow("123456789", "SIMPSON", "BART", "Y41", ["HOMER SIMPSON", "FATHER", "1111111111", ""], null),
+    rawRow("567891234", "SIMPSON", "LISA", "Y25", ["HOMER SIMPSON", "FATHER", "1111111111", ""], null),
+    rawRow("111222333", "BELCHER", "GENE", "Y12", ["LINDA BELCHER", "MOTHER", "2222222222", ""], null)];
+  const sm = g.buildStudentMap_(raw, new Map());
+  const master = [["OSIS", "Student", "Guardian", "Site", "Class"]].concat([...sm.entries()].map(([id, s]) => [id, s.student, "", "", s.classCode]));
+  const guardians = g.buildGuardianObjects_(raw, new Map());
+  const headers = ["OSIS", "Student", "Bus Route"];
+  let rows = [["123456789", "Bart Simpson", "R12"], ["567891234", "Lisa Simpson", "R3"]];
+  const list = { tabId: 42, name: "Bus Routes", sheet: { getSheetId: () => 42 },
+    setup: g.od_fillSetup_({ ready: true, by: "student", watch: true, icon: "🚌", roles: { osis: 1, student: { col: 2 } },
+      vars: [{ col: 3, header: "Bus Route", label: "Bus Route", show: true, column: true, blank: { mode: "nothing" }, notOnList: { mode: "nothing" } }], picks: {}, headers: headers }) };
+  g.od_loadLists_ = () => [list];
+  g.od_readTable_ = () => ({ headers: headers, rows: rows });
+  g.od_writeToolColumns_ = () => {}; g.od_saveLists_ = () => {};
+  let out = g.od_buildOutputs_(ss, master, guardians);
+  eq(out.listChanges, [], "first build: only the copy");
+  assert.strictEqual(g.backendReadBlock_(ss, "LIST_WATCH").length, 4, "header + the copied mark + 2 students");
+  rows = [["123456789", "Bart Simpson", "R14"], ["111222333", "Gene Belcher", "R7"]];
+  out = g.od_buildOutputs_(ss, master, guardians);
+  eq(out.listChanges, [{ list: "🚌 Bus Routes", added: ["Gene Belcher"], removed: ["Lisa Simpson"], changed: ["Bart Simpson: Bus Route R12 → R14"] }]);
+  out = g.od_buildOutputs_(ss, master, guardians);
+  eq(out.listChanges, [], "the build after: nothing new");
+  // Untick it: its copy goes at the next build
+  list.setup.watch = false;
+  g.od_buildOutputs_(ss, master, guardians);
+  assert.strictEqual(g.backendReadBlock_(ss, "LIST_WATCH").length, 1, "only the header left");
+  // A list that never watched writes nothing at all
+  const ss2 = makeSpreadsheet(["Contact Log", "Backend"]);
+  const g2 = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss2) } });
+  Object.assign(g2, { od_loadLists_: () => [Object.assign({}, list, { setup: g2.od_fillSetup_(Object.assign({}, list.setup, { watch: false })) })],
+    od_readTable_: g.od_readTable_, od_writeToolColumns_: () => {}, od_saveLists_: () => {} });
+  g2.od_buildOutputs_(ss2, master, guardians);
+  assert.strictEqual(g2.backendReadBlock_(ss2, "LIST_WATCH").length, 0, "no section written");
+  // The report carries them, and the panel shows them
+  const build = fs.readFileSync(path.join(ROOT, 'Build.gs'), 'utf8');
+  assert(/listChanges: \(listOutputs && listOutputs\.listChanges\) \|\| \[\]/.test(build), "in the build report");
+  const panel = fs.readFileSync(path.join(ROOT, 'ProgressSidebar.html'), 'utf8');
+  assert(/openBuildDetails\('list:\$\{i\}'\)/.test(panel) && /New on the list:/.test(panel), "the Build panel lists them");
+  const sidebar = fs.readFileSync(path.join(ROOT, 'YourListsSidebar.html'), 'utf8');
+  assert(/id="watchBox"/.test(sidebar) && /watch: purpose === 'contacts' \? false : !!setup\.watch/.test(sidebar), "the tick in step 2");
+  console.log("6 tell me what changed: ok");
+}

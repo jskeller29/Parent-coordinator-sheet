@@ -442,6 +442,7 @@
               <a onclick="openBuildDetails('discharged')">Discharged<b>${data.discharged ? data.discharged.length : 0}</b></a>
               <a onclick="openBuildDetails('nycsaUpgrades')">NYCSA sign-ups (left the NYCSA list)<b>${data.nycsaUpgrades ? data.nycsaUpgrades.length : 0}</b></a>
               <a onclick="openBuildDetails('psUpgrades')">Parent Square sign-ups<b>${data.psUpgrades ? data.psUpgrades.length : 0}</b></a>
+              ${(data.listChanges || []).map((c, i) => `<a onclick="openBuildDetails('list:${i}')">${c.list}: what changed<b>${c.added.length + c.removed.length + c.changed.length}</b></a>`).join('')}
               ${when ? `<div class="rhint" style="padding-bottom:7px">Compared with the build before this one. Built ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : ''}
           `;
       }
@@ -550,6 +551,16 @@
       }
 
       function renderBuildLogList(type) {
+        // Your Lists with "Tell me what changed" (Input Data.gs od_watchChanges_; the server escapes the text)
+        if (String(type).indexOf('list:') === 0) {
+          const c = ((cachedBuildLogData && cachedBuildLogData.listChanges) || [])[Number(String(type).slice(5))];
+          if (!c) return fillList("Your list", [], "upgrade");
+          const items = c.added.map(w => '<b>New on the list:</b> ' + w)
+            .concat(c.removed.map(w => '<b>Dropped off:</b> ' + w))
+            .concat(c.changed.map(w => '<b>Changed:</b> ' + w));
+          const box = document.createElement('div'); box.innerHTML = c.list; // the list name, as text
+          return fillList(box.textContent + ": what changed", items, "upgrade");
+        }
         let arr = cachedBuildLogData ? (cachedBuildLogData[type] || []) : [];
         let titleStr = "";
         let cssClass = "upgrade";

@@ -1671,7 +1671,8 @@ function od_emptySetup_() {
   // purpose (owner 2026-11-23, idea 3): "info" = its values go on the sheets and phones (as before);
   // "contacts" = only to find parents and phone numbers to add (👤 Student Overrides), nothing on the sheets
   return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null,
-           view: od_defaultView_(true), icon: OD_DEFAULT_ICON, purpose: "info" };
+           view: od_defaultView_(true), icon: OD_DEFAULT_ICON, purpose: "info",
+           watch: false }; // "Tell me what changed" after each build (idea 6, owner 2026-11-23)
 }
 
 function od_fillSetup_(s) {
@@ -2672,14 +2673,71 @@ function od_varValue_(v, row) {
  * "✔ Matched" columns and bands, writes the Backend's Additional Information and
  * returns { studentCols, guardianCols } for the Student List / Parents List.
  */
+// ======================================================================
+// "TELL ME WHAT CHANGED" (owner 2026-11-23, idea 6): a list with setup.watch keeps a copy of who is on
+// it (matched rows) and the values kept from it in the Backend LIST_WATCH section; each build compares
+// with the last build's copy and the Build panel's report lists who is new on the list, who dropped off
+// and what changed. The first build after ticking it only makes the copy (OD_WATCH_MARK_ row).
+// ======================================================================
+var OD_WATCH_MARK_ = "~copied";
+
+/** tabId (text) -> Map(key -> { who, values }) of the last build's copies. */
+function od_readWatch_(ss) {
+  const map = new Map();
+  backendReadBlock_(ss, "LIST_WATCH").slice(1).forEach(r => {
+    const tab = toText_(r[0]), key = toText_(r[1]);
+    if (!tab || !key) return;
+    if (!map.has(tab)) map.set(tab, new Map());
+    if (key === OD_WATCH_MARK_) return;
+    let values = {};
+    try { values = JSON.parse(String(r[3] || "{}")) || {}; } catch (e) { values = {}; }
+    map.get(tab).set(key, { who: toText_(r[2]), values: values });
+  });
+  return map;
+}
+
+function od_personLabel_(p) {
+  if (!p) return "";
+  const kids = (p.kids || []).map(k => k.name).filter(Boolean);
+  return p.name + (kids.length ? " (" + kids.join(", ") + ")" : "");
+}
+
+function od_escHtml_(s) {
+  return String(s === null || s === undefined ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
+ * { list, added: [who], removed: [who], changed: ["Who: Label old → new"] } (HTML-escaped, the Build panel
+ * shows them as they are), or null when nothing changed. Only labels in both copies are compared (a
+ * value kept or dropped in the setup is not a change for everyone).
+ */
+function od_watchChanges_(label, before, now) {
+  const added = [], removed = [], changed = [];
+  now.forEach((v, k) => {
+    const b = before.get(k);
+    if (!b) { added.push(od_escHtml_(v.who)); return; }
+    const diffs = Object.keys(v.values).filter(l => Object.prototype.hasOwnProperty.call(b.values, l) && String(b.values[l]) !== String(v.values[l]))
+      .map(l => od_escHtml_(l) + " " + od_escHtml_(b.values[l] || "(blank)") + " → " + od_escHtml_(v.values[l] || "(blank)"));
+    if (diffs.length) changed.push(od_escHtml_(v.who) + ": " + diffs.join("; "));
+  });
+  before.forEach((b, k) => { if (!now.has(k)) removed.push(od_escHtml_(b.who)); });
+  if (!added.length && !removed.length && !changed.length) return null;
+  return { list: od_escHtml_(label), added: added, removed: removed, changed: changed };
+}
+
 function od_buildOutputs_(ss, masterTable, guardianRows) {
   const lists = od_loadLists_(ss);
   const ready = lists.filter(l => l.sheet && l.setup.ready);
-  const out = { studentCols: [], guardianCols: [] };
+  const out = { studentCols: [], guardianCols: [], listChanges: [] };
   if (!lists.length) {
     backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
+    backendClearBlock_(ss, "LIST_WATCH", BACKEND_HEADER_ROW);
     return out;
   }
+  // "Tell me what changed" (idea 6): the last build's copy of each watched list, and this build's
+  let watchOld = new Map();
+  try { watchOld = od_readWatch_(ss); } catch (e) { console.warn("Your Lists: last build's copy not read: " + e.message); }
+  const watchNew = [];
   const idx = od_index_(masterTable.slice(1), guardianRows);
   const lines = new Map(); // OSIS -> { student: [], byGuardian: Map(lower name -> { name, lines }) }
   const entry = osis => {
@@ -2748,10 +2806,34 @@ function od_buildOutputs_(ss, masterTable, guardianRows) {
         if (oneColumn) out.guardianCols.push({ header: list.name, byGuardian: listCol });
         else kept.forEach((k, j) => { if (k.v.column) out.guardianCols.push({ header: k.label, byGuardian: colMaps[j] }); });
       }
+      if (setup.watch) {
+        // Who is on the list now (matched rows) with the values kept from it
+        const now = new Map(); // target -> { who, values: { label: value } }
+        results.forEach(res => {
+          if (res.status !== "ok" || now.has(res.target)) return;
+          const who = by === "student" ? ((idx.byOsis.get(res.target) || {}).name || "") : od_personLabel_(idx.pByKey.get(res.target));
+          if (!who) return;
+          const values = {};
+          kept.forEach(k => { values[k.label] = (k.values.get(res.target) || []).join(" / "); });
+          now.set(res.target, { who: who, values: values });
+        });
+        const before = watchOld.get(String(list.tabId));
+        if (before) {
+          const ch = od_watchChanges_(od_listIcon_(list) + " " + list.name, before, now);
+          if (ch) out.listChanges.push(ch);
+        }
+        watchNew.push([list.tabId, OD_WATCH_MARK_, "", ""]); // "copied once": the first build reports nothing
+        now.forEach((v, k) => watchNew.push([list.tabId, k, v.who, JSON.stringify(v.values)]));
+      }
     } catch (e) {
       console.warn("Your Lists: \"" + list.name + "\" skipped: " + e.message);
     }
   });
+  // This build's copy (only the watched lists; nothing written when none is or ever was)
+  if (watchNew.length || watchOld.size) {
+    try { backendWriteBlock_(ss, "LIST_WATCH", [["Tab ID", "Key", "Who", "Values"]].concat(watchNew)); }
+    catch (e) { console.warn("Your Lists: this build's copy not saved: " + e.message); }
+  }
 
   // Backend Additional Information: student lines (Guardian blank), then each guardian's
   const rows = [];
@@ -3218,7 +3300,8 @@ function od_setupView_(ss, list, table, taken) {
     by: by,
     vars: od_varsFor_(table.headers, roles, saved.vars),
     view: saved.view || od_defaultView_(false),
-    purpose: saved.purpose === "contacts" ? "contacts" : "info"
+    purpose: saved.purpose === "contacts" ? "contacts" : "info",
+    watch: !!saved.watch
   };
 }
 
@@ -3244,6 +3327,7 @@ function od_cleanSetupInput_(p, headers) {
   const out = { by: p.by === "guardian" ? "guardian" : "student", roles: roles, vars: vars };
   if (p.view) out.view = od_cleanView_(p.view); // the View step (an older sidebar without it keeps the saved one)
   if (p.purpose === "contacts" || p.purpose === "info") out.purpose = p.purpose; // (an older sidebar keeps the saved one)
+  if (p.watch !== undefined) out.watch = !!p.watch;
   return out;
 }
 

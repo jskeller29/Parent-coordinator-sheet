@@ -1052,6 +1052,7 @@ function resetDerivedSheets_(ss) {
   backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "PHONES", BACKEND_HEADER_ROW + 1); // numbers added in 👤 Student Overrides (header kept)
+  backendClearBlock_(ss, "LIST_WATCH", BACKEND_HEADER_ROW); // Your Lists: the last build's copies
   // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
   backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW + 1); // header kept: BX:CD is the owner's Sheets Table
 

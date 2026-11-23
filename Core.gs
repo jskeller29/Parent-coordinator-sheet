@@ -258,7 +258,10 @@ var BACKEND_BLOCKS = {
   METHOD2: { col: 95, width: 1, title: "METHOD 2 CHOICES (automatic: Contact Log K)", legacy: null, grow: true, formulaOnly: true },
   // Phone numbers from 👤 Student Overrides → Phone numbers to check (owner 2026-11-23, Build.gs
   // readPhoneChanges_): OSIS | Guardian | Number | Use (add / instead) | From | Date
-  PHONES: { col: 97, width: 6, title: "PHONE NUMBERS (Student Overrides: added / used instead)", legacy: null, grow: true }
+  PHONES: { col: 97, width: 6, title: "PHONE NUMBERS (Student Overrides: added / used instead)", legacy: null, grow: true },
+  // Your Lists "Tell me what changed" (owner 2026-11-23, Input Data.gs od_buildOutputs_): the last build's copy of
+  // each watched list: Tab ID | Key | Who | Values (JSON). Rewritten by every build.
+  LIST_WATCH: { col: 104, width: 4, title: "YOUR LISTS: LAST BUILD'S COPY (Tell me what changed)", legacy: null, grow: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)

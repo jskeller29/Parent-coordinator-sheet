@@ -218,6 +218,8 @@ function buildAllDerivedSheetsRun_() {
     discharged: dischargedLog,
     nycsaUpgrades: nycsaLog,
     psUpgrades: psLog,
+    // Your Lists with "Tell me what changed" (Input Data.gs; idea 6): [{ list, added, removed, changed }]
+    listChanges: (listOutputs && listOutputs.listChanges) || [],
     builtAt: Date.now() // the Build sidebar says when (a report always belongs to the build that just ran)
   }), 21600);
 
