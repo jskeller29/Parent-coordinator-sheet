@@ -44,8 +44,21 @@
         <div class="set-head"><h2>Contacts &amp; sync</h2><p class="help">How the school directory reaches your phone.</p></div>
         <div class="items">
           <div class="row">
-            <label class="t" for="syncToPhones"><div class="rt">Sync contacts to my phone every night</div><div class="help">Adds the school directory to your Google Contacts during the nightly run.</div></label>
+            <label class="t" for="syncToPhones"><div class="rt">Sync contacts to Google Contacts every night</div><div class="help">Adds the school directory to the Google Contacts of the account that runs the nightly job, and so to every phone signed in to it.</div><div class="help hidden" id="syncAccount" style="margin-top:4px"></div></label>
             <label class="sw"><input type="checkbox" id="syncToPhones"><span></span></label>
+          </div>
+          <!-- Turning phone sync on (owner 2026-11-23): whose contacts, DOE account and phone only -->
+          <div class="notice warn hidden" id="syncWarn" role="alertdialog" aria-labelledby="syncWarnTitle">
+            <b id="syncWarnTitle" style="font-size:14.5px">Before you turn this on</b>
+            <div id="syncWarnNotDoe" class="hidden" style="margin-top:6px;font-weight:700"></div>
+            <ul style="margin:6px 0 10px 18px;padding:0;line-height:1.5">
+              <li>Every family's names, phone numbers and notes go into the Google Contacts of <b id="syncWarnWho">the account that runs the nightly job</b>.</li>
+              <li id="syncWarnOther" class="hidden"></li>
+              <li>Use only your DOE (@schools.nyc.gov) Google account, on your DOE phone. Never a personal account or a personal phone.</li>
+              <li>Any phone or computer signed in to that account shows them too.</li>
+              <li>Turning this off later doesn't remove them: in Google Contacts, open the "School Directory" label, select all, delete.</li>
+            </ul>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn pri sm" id="syncWarnOk">I understand, turn it on</button><button type="button" class="btn sec sm" id="syncWarnCancel">Cancel</button></div>
           </div>
         </div>
       </div>
@@ -253,6 +266,59 @@
     // The "Show these tabs" checkboxes (one per TAB_VISIBILITY key in Menus.gs)
     function tabBoxes() { return Array.prototype.slice.call(document.querySelectorAll('input[data-tab]')); }
 
+    // ---------- Phone sync: whose Google Contacts get the families (owner 2026-11-23) ----------
+    // Turning it on shows "Before you turn this on" first; the switch only goes on with "I understand".
+    // getPhoneSyncAccount (Contacts Sync.gs) says which account the nightly job fills.
+    var syncAccountInfo = null;
+    function syncEl(id) { return document.getElementById(id); }
+    function renderSyncAccount() {
+      var a = syncAccountInfo;
+      var box = syncEl('syncToPhones');
+      var who = a && a.target ? a.target : (a && !a.nightlyIsMine ? 'the person who owns this tracker\'s nightly job' : 'the account that runs the nightly job');
+      syncEl('syncWarnWho').textContent = who;
+      var notDoe = !!(a && a.doe === false);
+      syncEl('syncWarnNotDoe').textContent = notDoe ? '⚠️ ' + a.target + ' is not a DOE (@' + a.domain + ') account. Student and family information should stay in DOE accounts.' : '';
+      syncEl('syncWarnNotDoe').classList.toggle('hidden', !notDoe);
+      syncEl('syncWarn').className = 'notice ' + (notDoe ? 'err' : 'warn') + (syncEl('syncWarn').classList.contains('hidden') ? ' hidden' : '');
+      var other = !!(a && !a.nightlyIsMine);
+      syncEl('syncWarnOther').textContent = other ? 'The nightly job belongs to another person, so the families go to their Google Contacts, not yours.' : '';
+      syncEl('syncWarnOther').classList.toggle('hidden', !other);
+      var line = syncEl('syncAccount');
+      line.textContent = a && a.target ? 'Goes to: ' + a.target + (notDoe ? ' (not a DOE account)' : '') : '';
+      line.classList.toggle('hidden', !(box.checked && a && a.target));
+    }
+    function loadSyncAccount() {
+      if (typeof google === 'undefined') return;
+      google.script.run.withSuccessHandler(function(a) { syncAccountInfo = a || null; renderSyncAccount(); })
+        .withFailureHandler(function() { syncAccountInfo = null; renderSyncAccount(); })
+        .getPhoneSyncAccount();
+    }
+    function showSyncWarn(on) {
+      syncEl('syncWarn').classList.toggle('hidden', !on);
+      if (on) syncEl('syncWarn').scrollIntoView({ block: 'nearest' });
+    }
+    syncEl('syncToPhones').addEventListener('change', function() {
+      if (this.checked) {
+        this.checked = false; // on only after "I understand"
+        showSyncWarn(true);
+        renderSyncAccount();
+        loadSyncAccount();
+      } else {
+        showSyncWarn(false);
+        renderSyncAccount();
+      }
+    });
+    syncEl('syncWarnOk').addEventListener('click', function() {
+      syncEl('syncToPhones').checked = true;
+      showSyncWarn(false);
+      renderSyncAccount();
+    });
+    syncEl('syncWarnCancel').addEventListener('click', function() {
+      syncEl('syncToPhones').checked = false;
+      showSyncWarn(false);
+      renderSyncAccount();
+    });
+
     // ---------- 1. Load the current settings ----------
     // Save stays off until they are here (2026-11-12): a quick click, or a load that failed,
     // saved the form's blank defaults over the real settings
@@ -268,6 +334,7 @@
         setBusy(false);
         document.getElementById('loadingText').textContent = 'Working…';
         document.getElementById('syncToPhones').checked = settings.syncToPhones;
+        if (settings.syncToPhones) loadSyncAccount(); // "Goes to: ..." under the switch
 
         tabBoxes().forEach(function(box) {
           var key = box.getAttribute('data-tab');
@@ -314,6 +381,8 @@
         return;
       }
       document.getElementById('syncToPhones').checked = false;
+      showSyncWarn(false);
+      renderSyncAccount();
       tabBoxes().forEach(function(box) { box.checked = box.getAttribute('data-default') === 'true'; });
       document.getElementById('showSiteClass').checked = false;
       document.getElementById('showTypeCol').checked = false;

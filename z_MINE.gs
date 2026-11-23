@@ -1756,11 +1756,13 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
         relationship: toText_(g.relationship),
         email: toText_(g.email),
         phone: toText_(g.mobile),
+        phones: [],   // every number the guardian has (several when ATS / an override gave more; 2026-11-23)
         students: []
       });
     }
 
     const group = groupedGuardians.get(key);
+    guardianPhones_(g).forEach(p => { if (group.phones.indexOf(p) === -1) group.phones.push(p); });
 
     let classDisplay = toText_(student.classCode); 
     if (student.teachers && toText_(student.teachers).trim() !== "") classDisplay += ` - ${toText_(student.teachers)}`;
@@ -1803,7 +1805,6 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
     let allPhones = [];
     let extraEmails = [];
     
-    const primaryPhoneClean = normalizePhoneForMerge_(group.phone);
     const primaryEmailClean = String(group.email).toLowerCase().trim();
     
     // 1. Add Old Matched Phones/Emails for ALL SIBLINGS (Old Phone Contacts numbers come first, so they are Contact 1+)
@@ -1836,10 +1837,11 @@ function ownerBuildPhoneContactsData_(ss, studentMap, guardianRows, masterTable,
       });
     });
 
-    // 2. Add the ATS Phone after the Old Phone Contacts numbers (skipped if it duplicates one)
-    if (primaryPhoneClean && !allPhones.some(p => p.clean === primaryPhoneClean)) {
-      allPhones.push({ val: group.phone, clean: primaryPhoneClean });
-    }
+    // 2. Add the ATS Phone(s) after the Old Phone Contacts numbers (skipped if it duplicates one)
+    (group.phones.length ? group.phones : [group.phone]).forEach(ph => {
+      const clean = normalizePhoneForMerge_(ph);
+      if (clean && !allPhones.some(p => p.clean === clean)) allPhones.push({ val: ph, clean: clean });
+    });
 
     // Safety fallback: if no phones exist, output at least one row for emails/notes
     if (allPhones.length === 0) allPhones.push({ val: "", clean: "" });
@@ -2047,7 +2049,7 @@ function ownerUpdateOsisDeltas_(osisList, opts) {
 
     const overrides = getOverrideData_(ss);
     const studentMap = buildStudentMap_(rawData, overrides.students);
-    const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+    const guardianRows = buildGuardianObjects_(rawData, overrides.guardians, overrides.phones);
     
     const parentSquareIndex = buildParentSquareIndex_(rawData);
     const nycsaIndex = buildNYCSAIndex_(rawData);

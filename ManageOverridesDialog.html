@@ -37,11 +37,17 @@
     /* Show / hide a section quickly (owner 2026-11-18) */
     .fold { border: 0; background: none; color: var(--accent); font: 600 12.5px var(--font); cursor: pointer; padding: 0 2px; }
     .sec.closed > :not(.sec-h) { display: none !important; }
+    /* Phone numbers to check (owner 2026-11-23): the number we have -> the other source's */
+    .cmp { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-top: 6px; }
+    .cmp .box { border: 1px solid var(--line); border-radius: var(--radius); padding: 5px 8px; font-size: 12.5px; background: var(--panel); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .cmp .box b { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+    .cmp .box.new { background: var(--warn-soft); border-color: #ecd9a8; }
+    .cmp .arr { color: var(--muted); font-size: 16px; }
   </style>
 </head>
 <body>
   <div class="ov-body">
-    <p class="help" style="margin:0">Parents to add, the students you changed, and the report, all in one place. Changes go into your sheets at the next build.</p>
+    <p class="help" style="margin:0">Parents to add, phone numbers to check, the students you changed, and the report, all in one place. Changes go into your sheets at the next build.</p>
 
     <div id="msg" class="notice hidden" role="status"></div>
     <div id="loading" class="state"><div class="spinner"></div>Looking through Parent Square, NYCSA and your lists…</div>
@@ -63,7 +69,24 @@
       <div class="hint hidden" id="skippedLine"><span id="skippedText"></span> <button type="button" class="link" onclick="unskip()">Show them again</button></div>
     </div>
 
-    <!-- 2. Your changes -->
+    <!-- 2. Phone numbers to check (owner 2026-11-23): parents we have, with a number from another source -->
+    <div class="sec hidden" id="phSec">
+      <div class="sec-h"><h2>Phone numbers to check</h2><span class="count" id="phCount">0</span><button type="button" class="fold" id="fold-phSec" onclick="fold('phSec')">Hide</button></div>
+      <p class="help" style="margin:0">Your Student Data (ATS / Insight) has one number per parent. Parent Square, NYCSA or one of your lists has another number for these parents. Nothing changes until you choose: the number shows in the Parents List and the phone contacts after the next build.</p>
+      <div class="bar" id="phBarTop">
+        <button type="button" class="link" id="phTickAllBtn" onclick="phTickAll()">Tick all</button>
+      </div>
+      <div class="list" id="phList"></div>
+      <div class="bar" id="phBar">
+        <button type="button" class="btn pri sm" id="phAddBtn" onclick="savePhones('add')" disabled>Add as a 2nd number</button>
+        <button type="button" class="btn sec sm" id="phUseBtn" onclick="savePhones('instead')" disabled>Use it instead</button>
+        <button type="button" class="btn sec sm" id="phSkipBtn" onclick="skipPhones()" disabled>Not needed</button>
+      </div>
+      <div class="empty hidden" id="phEmpty">No numbers to check: Parent Square, NYCSA and your lists have the same numbers as your Student Data.</div>
+      <div class="hint hidden" id="phSkippedLine"><span id="phSkippedText"></span> <button type="button" class="link" onclick="phUnskip()">Show them again</button></div>
+    </div>
+
+    <!-- 3. Your changes -->
     <div class="sec hidden" id="chgSec">
       <div class="sec-h"><h2>Your changes</h2><span class="count" id="chgCount">0</span><button type="button" class="fold" id="fold-chgSec" onclick="fold('chgSec')">Hide</button></div>
       <p class="help" style="margin:0">Students you added or edited, and parents you added. Edit opens the student; Delete puts the student's ATS data back.</p>
@@ -96,7 +119,7 @@
     function folded() { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { return {}; } }
     function applyFolds() {
       var f = folded();
-      ['addSec', 'chgSec'].forEach(function (id) {
+      ['addSec', 'phSec', 'chgSec'].forEach(function (id) {
         $(id).classList.toggle('closed', !!f[id]);
         $('fold-' + id).textContent = f[id] ? 'Show' : 'Hide';
       });
@@ -131,22 +154,112 @@
 
     function setBusy(on) {
       busy = on;
-      ['addBtn', 'skipBtn', 'reportBtn', 'newBtn', 'tickAllBtn'].forEach(function (id) { $(id).disabled = on; });
+      ['addBtn', 'skipBtn', 'reportBtn', 'newBtn', 'tickAllBtn', 'phAddBtn', 'phUseBtn', 'phSkipBtn', 'phTickAllBtn'].forEach(function (id) { $(id).disabled = on; });
       Array.prototype.forEach.call(document.querySelectorAll('.card button, .card input'), function (b) { b.disabled = on; });
-      if (!on) updateBar();
+      if (!on) { updateBar(); phUpdateBar(); }
     }
 
     function render(h) {
-      home = h || { toAdd: [], changes: [], skipped: 0 };
+      home = h || { toAdd: [], changes: [], skipped: 0, phones: [], phonesSkipped: 0 };
       var keys = {};
       (home.toAdd || []).forEach(function (p) { keys[p.key] = true; });
       Object.keys(ticked).forEach(function (k) { if (!keys[k]) delete ticked[k]; }); // gone (added / skipped)
+      var phKeys = {};
+      (home.phones || []).forEach(function (p) { phKeys[p.key] = true; });
+      Object.keys(phTicked).forEach(function (k) { if (!phKeys[k]) delete phTicked[k]; });
       show('loading', false);
-      show('addSec', true); show('chgSec', true);
+      show('addSec', true); show('phSec', true); show('chgSec', true);
       if (home.error) say('Parents to add could not be worked out: ' + home.error, 'err');
+      else if (home.phonesError) say('Phone numbers to check could not be worked out: ' + home.phonesError, 'err');
       renderAdd();
+      renderPhones();
       renderChanges();
       setBusy(false);
+    }
+
+    // --- 2. Phone numbers to check ---
+    var phTicked = {};   // number key -> true
+    function renderPhones() {
+      var list = home.phones || [];
+      $('phCount').textContent = list.length;
+      $('phCount').className = 'count' + (list.length ? '' : ' zero');
+      show('phBar', list.length > 0); show('phBarTop', list.length > 1);
+      show('phEmpty', list.length === 0);
+      show('phSkippedLine', home.phonesSkipped > 0);
+      $('phSkippedText').textContent = home.phonesSkipped === 1 ? '1 number you marked "not needed" is hidden.' : home.phonesSkipped + ' numbers you marked "not needed" are hidden.';
+      $('phList').innerHTML = list.map(function (p, i) {
+        var on = !!phTicked[p.key];
+        var kids = (p.students || []).map(function (s) { return '<b>' + esc(s.name) + '</b>'; }).join(', ');
+        var now = p.current && p.current.length ? p.current.join(', ') : 'no number';
+        var alike = '';
+        if (p.alike) {
+          alike = '<div class="maybe">' + esc((p.sources || []).join(', ')) + ' has them as <b>' + esc(p.alike.name) + '</b>' +
+            (p.alike.pct ? ': ' + p.alike.pct + '% alike' + (p.alike.why ? ' (' + esc(p.alike.why) + ')' : '') : '') +
+            '. If that isn\'t the same person, click Not needed.</div>';
+        }
+        return '<label class="card' + (on ? ' on' : '') + '">' +
+          '<input type="checkbox" ' + (on ? 'checked ' : '') + 'onchange="phTick(' + i + ', this.checked)" aria-label="' + esc(p.guardian + ' ' + p.phone) + '">' +
+          '<div class="main"><div class="top"><div><span class="nm">' + esc(p.guardian) + '</span>' +
+          (p.relationship ? ' <span class="rel">' + esc(p.relationship) + '</span>' : '') + '</div>' +
+          '<div class="chips">' + (p.sources || []).map(function (s) { return '<span class="chip">' + esc(s) + '</span>'; }).join('') + '</div></div>' +
+          '<div class="meta">for ' + kids + '</div>' + alike +
+          '<div class="cmp"><div class="box"><b>Has now</b>' + esc(now) + '</div><div class="arr" aria-hidden="true">→</div>' +
+          '<div class="box new"><b>' + esc((p.kinds || []).join(', ')) + '</b>' + esc(p.phone) + '</div></div>' +
+          '</div></label>';
+      }).join('');
+      phUpdateBar();
+    }
+    function phTick(i, on) {
+      var p = (home.phones || [])[i];
+      if (!p) return;
+      if (on) phTicked[p.key] = true; else delete phTicked[p.key];
+      renderPhones();
+    }
+    function phTickAll() {
+      var list = home.phones || [];
+      var all = list.every(function (p) { return phTicked[p.key]; });
+      list.forEach(function (p) { if (all) delete phTicked[p.key]; else phTicked[p.key] = true; });
+      renderPhones();
+    }
+    function phKeysTicked() { return Object.keys(phTicked); }
+    function phUpdateBar() {
+      var n = phKeysTicked().length;
+      $('phAddBtn').textContent = n > 1 ? 'Add the ' + n + ' as 2nd numbers' : 'Add as a 2nd number';
+      $('phUseBtn').textContent = n > 1 ? 'Use the ' + n + ' instead' : 'Use it instead';
+      ['phAddBtn', 'phUseBtn', 'phSkipBtn'].forEach(function (id) { $(id).disabled = busy || n === 0; });
+      var list = (home && home.phones) || [];
+      $('phTickAllBtn').textContent = list.length && list.every(function (p) { return phTicked[p.key]; }) ? 'Untick all' : 'Tick all';
+    }
+    function savePhones(use) {
+      var keys = phKeysTicked();
+      if (!keys.length || busy) return;
+      if (use === 'instead' && !confirm('Use the new number' + (keys.length > 1 ? 's' : '') + ' INSTEAD of the one' + (keys.length > 1 ? 's' : '') +
+          ' these parents have now?\n\nThe number they have now leaves their contact. If your Student Data (ATS) gets the new number later, this goes away by itself.')) return;
+      setBusy(true);
+      say('Saving…');
+      run().withSuccessHandler(function (r) {
+        phTicked = {};
+        render(r.home);
+        var text = r.saved === 1 ? 'Saved 1 number.' : 'Saved ' + r.saved + ' numbers.';
+        if (r.building) text += ' Your sheets are being rebuilt with them: the Build panel is on the right (it shows once you close this).';
+        else if (r.saved) text += ' They show in your sheets after the next build.';
+        say(text, 'ok');
+      }).savePhoneNumbers(keys, use);
+    }
+    function skipPhones() {
+      var keys = phKeysTicked();
+      if (!keys.length || busy) return;
+      setBusy(true);
+      run().withSuccessHandler(function (h) {
+        phTicked = {};
+        render(h);
+        say(keys.length === 1 ? 'OK: that number won\'t be offered again.' : 'OK: those ' + keys.length + ' numbers won\'t be offered again.', 'ok');
+      }).skipPhoneNumbers(keys);
+    }
+    function phUnskip() {
+      if (busy) return;
+      setBusy(true);
+      run().withSuccessHandler(function (h) { render(h); say('Every number you marked "not needed" is back in the list.', 'ok'); }).unskipPhoneNumbers();
     }
 
     // --- 1. Parents to add ---
@@ -230,7 +343,7 @@
     function editFirst(i) {
       var p = (home.toAdd || [])[i];
       if (!p || busy) return;
-      openStudent(p.osis, { name: p.name, relationship: p.relationship, phone: p.phone, email: p.email });
+      openStudent(p.osis, { name: p.name, relationship: p.relationship, phone: p.phone, email: p.email, sources: p.sources || [] });
     }
 
     // --- 2. Your changes ---

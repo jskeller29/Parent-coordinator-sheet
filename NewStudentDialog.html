@@ -114,6 +114,11 @@
     let isSyncingSiblings = false;
     // Opened from the 👤 Student Overrides main page: Save goes back there (getNewStudentPrefill)
     let fromHome = false;
+    // The Status / label the form was filled with (saveStudentOverrides: a save that only adds a
+    // parent is stored as an "Added Guardian" row; a changed label makes it a real edit)
+    let labelAtOpen = null;
+    // A parent put in by "Check and edit before adding" ({ name, sources }): its row keeps where it came from
+    let prefilled = null;
 
     function buildGuardianHTML(index, isVisible) {
         const display = isVisible ? 'block' : 'none';
@@ -200,6 +205,7 @@
             alert(g.name + " can't be added here: this student already has " + MAX_GUARDIANS + " guardians. Remove one first, then type " + g.name + " in its place.");
             return;
         }
+        prefilled = { name: g.name || '', sources: Array.isArray(g.sources) ? g.sources : [] };
         document.getElementById('g' + slot + 'Name').value = g.name || '';
         document.getElementById('g' + slot + 'Rel').value = g.relationship || '';
         document.getElementById('g' + slot + 'Phone').value = g.phone || '';
@@ -327,6 +333,7 @@
       document.getElementById('firstName').value = student.firstName;
       document.getElementById('lastName').value = student.lastName;
       document.getElementById('label').value = student.label || 'Current';
+      labelAtOpen = student.label || 'Current'; // the server tells "only added a parent" from a real edit
       document.getElementById('hideFromReport').checked = student.hideFromReport || false;
       document.getElementById('grade').value = student.grade || '';
       document.getElementById('age').value = student.age || '';
@@ -383,6 +390,7 @@
       document.getElementById('firstName').value = '';
       document.getElementById('lastName').value = '';
       document.getElementById('label').value = '';
+      labelAtOpen = null;
       document.getElementById('hideFromReport').checked = false;
       document.getElementById('grade').value = '';
       document.getElementById('age').value = '';
@@ -472,6 +480,8 @@
             age: document.getElementById('age').value.trim(),
             gender: document.getElementById('gender').value.trim(),
             homeLanguage: document.getElementById('homeLanguage').value.trim(),
+            labelAtOpen: labelAtOpen,
+            prefilled: prefilled,
             guardians: []
         };
 
@@ -517,7 +527,8 @@
                     age: sib.age || '',
                     gender: sib.gender || '',
                     homeLanguage: sib.homeLanguage || '',
-                    guardians: data.guardians 
+                    labelAtOpen: sib.label || data.labelAtOpen,
+                    guardians: data.guardians
                 };
                 payloads.push(sibData);
             });

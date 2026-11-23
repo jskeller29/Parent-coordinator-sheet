@@ -78,7 +78,9 @@ var IDM_STEPS = [
     // studentCol: the "<n> students" part of the "completed!" message (release check 3.1: the count looked wrong)
     keyCols: ["Student ID","Last Name","First Name"], studentCol: "Student ID",
     // The start page (owner 2026-11-14, release check 2.16): what each file is for
-    uses: "The one file the tracker needs: every student with their guardians, phones, emails, languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
+    uses: "The one file the tracker needs: every student with their guardians (2 per student, one phone and one email each), languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
+    // Shown on the step as "Good to know" (owner 2026-11-23: Insight's download has only 2 contacts)
+    note: "This file has 2 guardians per student, with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about them at the end of Input Data Mode, and in 👤 Student Overrides.",
     where: "TeachHub → Insight → Tools → Downloader → Guardian Contact Information",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
@@ -704,11 +706,16 @@ function idm_buildForLists() {
  */
 function idm_parentsToAddSummary() {
   try {
-    const found = findParentsToAdd_(SpreadsheetApp.getActiveSpreadsheet());
-    return { count: found.items.length, sample: found.items.slice(0, 3).map(it => it.name + " (" + it.student + ")") };
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const src = parentSources_(ss, true); // read once for both (Menus.gs)
+    const found = findParentsToAdd_(ss, false, src);
+    // + the phone numbers to check (owner 2026-11-23: the Student Data step says they're asked about here)
+    let phones = 0;
+    try { phones = findPhonesToCheck_(ss, false, src).items.length; } catch (e) { console.warn("Phone numbers to check (end of Input Data Mode): " + e.message); }
+    return { count: found.items.length, sample: found.items.slice(0, 3).map(it => it.name + " (" + it.student + ")"), phones: phones };
   } catch (e) {
     console.warn("Parents to add (end of Input Data Mode): " + e.message);
-    return { count: 0, sample: [] };
+    return { count: 0, sample: [], phones: 0 };
   }
 }
 
@@ -1466,7 +1473,7 @@ function idm_view_(ss, state, notice) {
     stepIndex: state.step,
     stepCount: IDM_STEPS.length,
     step: { key: step.key, zone: step.zone, required: step.required, howTo: step.howTo, manual: !!step.manual, lists: !!step.lists,
-            fileHint: step.fileHint || '' },
+            fileHint: step.fileHint || '', note: step.note || '' },
     // Step 5: your lists (+ whether the sidebar must build first, and how that build went)
     lists: step.lists ? od_listSummaries_(ss) : undefined,
     needsBuild: step.lists ? idm_listsNeedBuild_(ss, state) : false,
@@ -1997,12 +2004,16 @@ function od_index_(studentRows, guardianRows) {
     if (email) { person.emails.add(email); od_addTo_(idx.byEmail, email, person); }
     if (person.kids.indexOf(st) === -1) person.kids.push(st);
     if (st.persons.indexOf(person) === -1) st.persons.push(person);
+    return person;
   };
 
   guardianRows.forEach(g => {
     const st = idx.byOsis.get(normalizeOsis_(g.student_id));
     if (!st) return;
-    addPerson(st, stripTrailingParenthetical_(g.guardianOutput), normalizePhoneForMatch_(g.mobile), normalizeEmail_(g.email));
+    // The first number decides who the person is, as before; a 2nd / 3rd one (2026-11-23) also matches them
+    const phones = guardianPhones_(g).map(normalizePhoneForMatch_).filter(Boolean);
+    const person = addPerson(st, stripTrailingParenthetical_(g.guardianOutput), phones[0] || "", normalizeEmail_(g.email));
+    if (person) phones.slice(1).forEach(p => { if (!person.phones.has(p)) { person.phones.add(p); od_addTo_(idx.byPhone, p, person); } });
   });
   idx.students.forEach(st => {
     if (st.persons.length || !st.guardianText) return;
@@ -2019,7 +2030,7 @@ function od_indexFromSheet_(ss) {
   let guardianRows = [];
   if (raw && raw.getLastRow() > 1) {
     const overrides = getOverrideData_(ss);
-    guardianRows = buildGuardianObjects_(raw.getDataRange().getValues(), overrides.guardians);
+    guardianRows = buildGuardianObjects_(raw.getDataRange().getValues(), overrides.guardians, overrides.phones);
   }
   return od_index_(studentRows, guardianRows);
 }

@@ -1187,6 +1187,8 @@ function runBuildOnly() {
 }
 
 function openProgressBarSidebar() {
+  // Full Sync fills the clicker's own Google Contacts: say whose, once per person (Contacts Sync.gs)
+  if (!confirmFullSyncAccount_()) return;
   CacheService.getScriptCache().put('RUN_MODE', 'FULL_SYNC', 600);
   const html = htmlFromFile_('ProgressSidebar')
       .setTitle('Build & Sync Manager')
@@ -2075,6 +2077,7 @@ function manageNightlyTrigger_(disableSync) {
     if (disableSync) {
       props.deleteProperty(NIGHTLY_UID_KEY_);
       props.deleteProperty(NIGHTLY_UID_SET_KEY_);
+      props.deleteProperty(NIGHTLY_OWNER_EMAIL_KEY_);
       return;
     }
     const t = ScriptApp.newTrigger(syncFunctionName)
@@ -2286,6 +2289,53 @@ function openManageOverridesDialog() {
  * Triggered when the user clicks 'Save' in the HTML pop-up.
  * Bulk saves an array of student payloads, then hands off the heavy processing to a background trigger.
  */
+/**
+ * New / Edit Student (owner 2026-11-23, idea 7): an "Edit a student from ATS" save that only ADDS
+ * parents (the student and every ATS parent exactly as ATS has them, at least one new parent) is saved
+ * as an "Added Guardian" row, like the Add button in Parents to add: the build adds the new parents ON
+ * TOP of ATS, next month's ATS changes to the others still come in, and the row goes once ATS lists
+ * them (cleanRedundantOverrides). It used to be an Edit row: a frozen copy of the ATS parents that never
+ * cleaned itself up. Covers + Add another guardian, "Check and edit before adding" and Edit on an added
+ * parent's card. Returns the new parents, or null for a real edit (a field, a parent or the label
+ * changed, a parent taken out, nothing added, or the student isn't in ATS).
+ * atsRow = the student's Raw Data row (A:AE), as getAllStudentsForEdit filled the form from it.
+ */
+function addedGuardiansOnly_(p, atsRow) {
+  if (!p || toText_(p.entryType) !== "Edit Existing Student" || !atsRow) return null;
+  const same = (a, b) => toText_(a).toLowerCase().replace(/\s+/g, " ") === toText_(b).toLowerCase().replace(/\s+/g, " ");
+  const digits = v => toText_(v).replace(/\D/g, "");
+  const fields = [[p.firstName, atsRow[4]], [p.lastName, atsRow[3]], [p.classCode, atsRow[17]], [p.gender, atsRow[6]],
+                  [p.age, atsRow[7]], [p.grade, atsRow[16]], [p.homeLanguage, atsRow[18]]];
+  if (!fields.every(f => same(f[0], f[1]))) return null;
+  // The label the form showed (newer windows send it); else only an untouched "Current" / blank one
+  const labelAtOpen = p.labelAtOpen === undefined || p.labelAtOpen === null ? null : p.labelAtOpen;
+  if (labelAtOpen !== null ? !same(p.label, labelAtOpen) : !(toText_(p.label) === "" || same(p.label, "Current"))) return null;
+  const ats = [[19, 20, 21, 22, 23, 24], [25, 26, 27, 28, 29, 30]]
+    .map(c => ({ name: toText_(atsRow[c[0]]), relationship: toText_(atsRow[c[1]]), phone: toText_(atsRow[c[2]]),
+                 email: toText_(atsRow[c[3]]), language: toText_(atsRow[c[4]]) || toText_(atsRow[c[5]]) }))
+    .filter(g => g.name);
+  const form = (p.guardians || []).filter(g => g && toText_(g.name));
+  const used = new Set(), extras = [];
+  for (const g of form) {
+    const i = ats.findIndex((a, k) => !used.has(k) && same(a.name, g.name));
+    if (i === -1) { extras.push(g); continue; }
+    const a = ats[i];
+    used.add(i);
+    if (!same(a.relationship, g.relationship) || digits(a.phone) !== digits(g.phone) || !same(a.email, g.email) ||
+        !same(a.language, g.language)) return null; // an ATS parent changed
+  }
+  if (used.size !== ats.length || !extras.length) return null;
+  // A new parent with an ATS parent's name in another order is that parent changed, not a new one
+  if (extras.some(g => ats.some(a => sameNameExactly_(nameTokens_(a.name), nameTokens_(g.name))))) return null;
+  return extras;
+}
+
+/** "Added Guardian (NYCSA, by hand)" -> ["NYCSA", "by hand"]. */
+function addedGuardianSources_(type) {
+  const m = toText_(type).match(/\((.*)\)\s*$/);
+  return m ? m[1].split(",").map(s => s.trim()).filter(Boolean) : [];
+}
+
 function saveStudentOverrides(payloads) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -2293,6 +2343,31 @@ function saveStudentOverrides(payloads) {
   // New/Edit Student section of the Backend tab (index 0 = header row)
   const existingData = backendReadBlock_(ss, "OVERRIDES");
   const osisSet = new Set(payloads.map(p => toText_(p.osis)));
+
+  // 0. An edit that only ADDS parents to a student in ATS is saved as an "Added Guardian" row, like the
+  // Add button in Parents to add (owner 2026-11-23, addedGuardiansOnly_): the ATS parents stay live.
+  // The student's earlier Added Guardian rows give their sources ("NYCSA" ...) to the parents they had.
+  let atsById = null;
+  const atsRowFor = osis => {
+    if (!atsById) {
+      atsById = new Map();
+      const raw = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
+      if (raw && raw.getLastRow() >= 7) {
+        raw.getDataRange().getValues().forEach((r, i) => { if (i >= 6 && isRealStudentId_(r[2])) atsById.set(normalizeOsis_(r[2]), r); });
+      }
+    }
+    return atsById.get(normalizeOsis_(osis)) || null;
+  };
+  const addedBefore = new Map(); // normalized OSIS -> { sources, names (token lists) } of its Added Guardian rows
+  for (let i = 1; i < existingData.length; i++) {
+    const r = existingData[i];
+    if (!isAddedGuardianType_(r[1]) || !isRealStudentId_(r[2])) continue;
+    const k = normalizeOsis_(r[2]);
+    const e = addedBefore.get(k) || { sources: [], names: [] };
+    addedGuardianSources_(r[1]).forEach(s => { if (e.sources.indexOf(s) === -1) e.sources.push(s); });
+    for (let g = 0; g < 5; g++) { const n = toText_(r[10 + g * 6]); if (n) e.names.push(nameTokens_(n)); }
+    addedBefore.set(k, e);
+  }
 
   // 1. DUPLICATE REMOVAL (only this section's cells shift up; other Backend sections stay put)
   const dupIdxs = [];
@@ -2306,21 +2381,40 @@ function saveStudentOverrides(payloads) {
   const rowsToAppend = payloads.map(data => {
       // Expanded to 42 columns to support Label and Hide From Report
       const row = new Array(42).fill("");
-      row[0] = dateStr;           
-      row[1] = data.entryType;    
-      row[2] = data.osis;         
-      row[3] = data.lastName;     
-      row[4] = data.firstName;    
-      row[5] = data.gender;       
-      row[6] = data.age;          
-      row[7] = data.grade;        
-      row[8] = data.classCode;    
-      row[9] = data.homeLanguage; 
+      const ats = atsRowFor(data.osis);
+      const extras = addedGuardiansOnly_(data, ats);
+      let guardians = data.guardians;
+      row[0] = dateStr;
+      row[1] = data.entryType;
+      row[2] = data.osis;
+      row[3] = data.lastName;
+      row[4] = data.firstName;
+      row[5] = data.gender;
+      row[6] = data.age;
+      row[7] = data.grade;
+      row[8] = data.classCode;
+      row[9] = data.homeLanguage;
+      if (extras) {
+        // Only the new parents, as the Add button writes them (the student itself stays ATS)
+        const before = addedBefore.get(normalizeOsis_(data.osis)) || { sources: [], names: [] };
+        const sources = before.sources.slice();
+        const pre = data.prefilled && toText_(data.prefilled.name) ? data.prefilled : null; // "Check and edit before adding"
+        extras.forEach(g => {
+          if (before.names.some(t => sameNameExactly_(t, nameTokens_(g.name)))) return; // its earlier row's sources
+          const from = pre && sameNameExactly_(nameTokens_(pre.name), nameTokens_(g.name)) && Array.isArray(pre.sources) && pre.sources.length
+            ? pre.sources.map(toText_) : ["by hand"];
+          from.forEach(s => { if (s && sources.indexOf(s) === -1) sources.push(s); });
+        });
+        row[1] = ADDED_GUARDIAN_TYPE_ + " (" + sources.join(", ") + ")";
+        row[3] = toText_(ats[3]); row[4] = toText_(ats[4]); row[8] = toText_(ats[17]);
+        row[5] = ""; row[6] = ""; row[7] = ""; row[9] = "";
+        guardians = extras;
+      }
 
       // Guardians Section (Up to 5)
-      for (let i = 0; i < data.guardians.length; i++) {
+      for (let i = 0; i < guardians.length; i++) {
         if (i >= 5) break;
-        const g = data.guardians[i];
+        const g = guardians[i];
         const baseCol = 10 + (i * 6);
         row[baseCol] = g.name;
         row[baseCol + 1] = g.relationship;
@@ -2332,7 +2426,7 @@ function saveStudentOverrides(payloads) {
       }
       
       // Save Label & Stealth Mode
-      row[40] = data.label;
+      row[40] = extras ? "" : data.label; // an added parent changes no status
       row[41] = data.hideFromReport;
 
       return row;
@@ -2556,8 +2650,10 @@ function openNewStudentFromHome(osis, guardian) {
   up.setProperty('OVERRIDES_FROM_HOME', '1');
   if (osis) up.setProperty('PREFILL_OSIS', String(osis)); else up.deleteProperty('PREFILL_OSIS');
   if (guardian && guardian.name) {
+    // sources ("NYCSA" ...): the saved Added Guardian row says where the parent came from
+    const sources = (Array.isArray(guardian.sources) ? guardian.sources : []).map(toText_).filter(Boolean).slice(0, 5);
     up.setProperty('PREFILL_GUARDIAN', JSON.stringify({ name: toText_(guardian.name), relationship: toText_(guardian.relationship),
-      phone: toText_(guardian.phone), email: toText_(guardian.email) }));
+      phone: toText_(guardian.phone), email: toText_(guardian.email), sources: sources }));
   } else up.deleteProperty('PREFILL_GUARDIAN');
   openNewStudentDialog();
 }
@@ -2606,18 +2702,20 @@ function parentsSkipped_() {
 }
 
 /**
- * { items, skipped }: items = the parents to add, one per student + person, sorted by student:
- * { key, osis, student, studentFirst, studentLast, cls, name, relationship, phone, email, sources }.
- * skipped = how many were left out because "Not new" was clicked for them (all: true = keep them in).
+ * Every parent the other sources name for a student we have (shared by Parents to add and Phone numbers to
+ * check, owner 2026-11-23): NYCSA rows (OSIS + guardian; cell / home / work), Parent Square rows (the parent
+ * + the students' names; phone, 2nd phone, email) and Your Lists with a guardian column. null = no Student
+ * Data. rows: { st (student info), rawName, info { relationship, phones, email }, source, kinds (one label per
+ * phone), matchedOnly }. listMatched: also a guardian list's rows matched to one of our guardians
+ * (matchedOnly: true; only the numbers check reads them, Parents to add never did).
  */
-function findParentsToAdd_(ss, all) {
-  const out = { items: [], skipped: 0 };
+function parentSources_(ss, listMatched) {
   const raw = ss.getSheetByName("Raw Data") || ss.getSheetByName("RAW Data");
-  if (!raw || raw.getLastRow() < 7) return out;
+  if (!raw || raw.getLastRow() < 7) return null;
   const rawData = raw.getDataRange().getValues();
   const overrides = getOverrideData_(ss);
   const studentMap = buildStudentMap_(rawData, overrides.students);
-  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians, overrides.phones);
   const guardiansOf = groupGuardiansByStudent_(guardianRows);
 
   // The students: by OSIS, and by the last part of their name (Parent Square names students, no OSIS)
@@ -2639,45 +2737,15 @@ function findParentsToAdd_(ss, all) {
     }
   });
 
-  const items = new Map();
-  const consider = (st, rawName, info, source) => {
-    const tokens = nameTokens_(rawName);
-    if (tokens.length < 2) return;                        // a first name alone can't be added safely
-    if (sameNameExactly_(tokens, st.tokens)) return;      // the student's own account
-    const phones = (info.phones || []).map(normalizePhoneForMatch_).filter(Boolean);
-    const email = normalizeEmail_(info.email);
-    const known = (guardiansOf.get(st.id) || []).some(g => {
-      const gt = nameTokens_(g.guardianOutput);
-      if (namesMatch_(gt, tokens)) return true;
-      const sameContact = (phones.length && phones.indexOf(normalizePhoneForMatch_(g.mobile)) !== -1) ||
-                          (email && email === normalizeEmail_(g.email));
-      return !!sameContact && shareNameToken_(gt, tokens);
-    });
-    if (known) return;
-    const key = parentsToAddKey_(st.id, tokens);
-    let item = items.get(key);
-    if (!item) {
-      const guardians = guardiansOf.get(st.id) || [];
-      item = { key: key, osis: st.id, student: st.name, studentFirst: st.first, studentLast: st.last, cls: st.cls,
-               name: parentDisplayName_(rawName), relationship: "", phone: "", email: "", sources: [],
-               // the student's parents now (the card lists them), and the one this may be (owner 2026-11-18)
-               current: guardians.map(g => stripTrailingParenthetical_(g.guardianOutput)), maybe: null };
-      items.set(key, item);
-    }
-    const maybe = parentMaybeSame_(rawName, phones, email, guardiansOf.get(st.id) || []);
-    if (maybe && (!item.maybe || maybe.pct > item.maybe.pct)) item.maybe = maybe;
-    if (!item.relationship && info.relationship) item.relationship = properCase_(info.relationship);
-    if (!item.phone && phones.length) item.phone = formatPhone_(phones[0]) || phones[0];
-    if (!item.email && email) item.email = toText_(info.email);
-    if (item.sources.indexOf(source) === -1) item.sources.push(source);
-  };
-
+  const rows = [];
+  const push = (st, rawName, info, source, kinds, matchedOnly) =>
+    rows.push({ st: st, rawName: rawName, info: info, source: source, kinds: kinds || [], matchedOnly: !!matchedOnly });
   for (let i = 6; i < rawData.length; i++) {
     const r = rawData[i];
     // NYCSA (AP:BF): the student's OSIS and the guardian's first / last name
     const nyStudent = students.get(normalizeOsis_(r[46]));
     const nyName = (toText_(r[49]) + " " + toText_(r[50])).trim();
-    if (nyStudent && nyName) consider(nyStudent, nyName, { relationship: toText_(r[55]), phones: [r[54], r[52], r[53]], email: "" }, "NYCSA");
+    if (nyStudent && nyName) push(nyStudent, nyName, { relationship: toText_(r[55]), phones: [r[54], r[52], r[53]], email: "" }, "NYCSA", ["cell", "home", "work"]);
     // Parent Square (AG:AN): the parent's name and the names of their students
     const psName = toText_(r[32]);
     const psStudents = nameTokens_(r[33]);
@@ -2687,7 +2755,7 @@ function findParentsToAdd_(ss, all) {
         if (seen.has(st.id)) return;
         seen.add(st.id);
         if (set.has(st.tokens[0]) && set.has(st.tokens[st.tokens.length - 1])) {
-          consider(st, psName, { relationship: "", phones: [r[35], r[36]], email: toText_(r[34]) }, "Parent Square");
+          push(st, psName, { relationship: "", phones: [r[35], r[36]], email: toText_(r[34]) }, "Parent Square", ["phone", "2nd phone"]);
         }
       }));
     }
@@ -2708,27 +2776,206 @@ function findParentsToAdd_(ss, all) {
           od_matchAll_(list.setup, table.rows, idx).forEach(res => {
             const c = res.cells;
             if (!c || !c.guardian) return;
+            const info = { relationship: "", phones: [c.phone], email: c.email };
             let st = null;
             if (list.setup.by === "guardian") {
-              if (res.status !== "none") return; // matched to a guardian, or waiting for your pick
+              if (res.status === "ok") {
+                // Matched to one of our guardians: their number may differ (numbers check only)
+                const person = listMatched ? idx.pByKey.get(res.target) : null;
+                (person ? person.kids : []).forEach(k => { const s = students.get(k.key); if (s) push(s, c.guardian.raw, info, label, [list.name], true); });
+                return;
+              }
+              if (res.status !== "none") return; // waiting for your pick
               if (c.osis) st = idx.byOsis.get(normalizeOsis_(c.osis)) || null;
               if (!st && c.name) { const m = idx.byNameKey.get(od_tokenKey_(c.name.tokens)) || []; if (m.length === 1) st = m[0]; }
             } else if (res.status === "ok") {
               st = idx.byOsis.get(res.target) || null;
             }
-            const info = st ? students.get(st.key) : null;
-            if (info) consider(info, c.guardian.raw, { relationship: "", phones: [c.phone], email: c.email }, label);
+            const s = st ? students.get(st.key) : null;
+            if (s) push(s, c.guardian.raw, info, label, [list.name]);
           });
         } catch (e) { console.warn("Parents to add: list \"" + list.name + "\" skipped: " + e.message); }
       });
     }
   } catch (e) { console.warn("Parents to add: your lists skipped: " + e.message); }
+  return { rows: rows, guardiansOf: guardiansOf };
+}
+
+/**
+ * The student's guardian a source's parent is (null = not one of them, a parent to add): the same name
+ * (any order, a 2+ part subset), else the same phone / email and a shared name part.
+ * phones = the source's numbers as digits (normalizePhoneForMatch_).
+ */
+function knownGuardianFor_(guardians, tokens, phones, email) {
+  const byName = guardians.find(g => namesMatch_(nameTokens_(g.guardianOutput), tokens));
+  if (byName) return byName;
+  return guardians.find(g => {
+    const sameContact = (phones.length && guardianPhones_(g).some(x => phones.indexOf(normalizePhoneForMatch_(x)) !== -1)) ||
+                        (email && email === normalizeEmail_(g.email));
+    return !!sameContact && shareNameToken_(nameTokens_(g.guardianOutput), tokens);
+  }) || null;
+}
+
+/**
+ * { items, skipped }: items = the parents to add, one per student + person, sorted by student:
+ * { key, osis, student, studentFirst, studentLast, cls, name, relationship, phone, email, sources }.
+ * skipped = how many were left out because "Not new" was clicked for them (all: true = keep them in).
+ * src = parentSources_(ss, ...) when the caller has it already (getOverridesHome reads the sources once).
+ */
+function findParentsToAdd_(ss, all, src) {
+  const out = { items: [], skipped: 0 };
+  src = src || parentSources_(ss, false);
+  if (!src) return out;
+  const guardiansOf = src.guardiansOf;
+
+  const items = new Map();
+  const consider = (st, rawName, info, source) => {
+    const tokens = nameTokens_(rawName);
+    if (tokens.length < 2) return;                        // a first name alone can't be added safely
+    if (sameNameExactly_(tokens, st.tokens)) return;      // the student's own account
+    const phones = (info.phones || []).map(normalizePhoneForMatch_).filter(Boolean);
+    const email = normalizeEmail_(info.email);
+    if (knownGuardianFor_(guardiansOf.get(st.id) || [], tokens, phones, email)) return;
+    const key = parentsToAddKey_(st.id, tokens);
+    let item = items.get(key);
+    if (!item) {
+      const guardians = guardiansOf.get(st.id) || [];
+      item = { key: key, osis: st.id, student: st.name, studentFirst: st.first, studentLast: st.last, cls: st.cls,
+               name: parentDisplayName_(rawName), relationship: "", phone: "", email: "", sources: [],
+               // the student's parents now (the card lists them), and the one this may be (owner 2026-11-18)
+               current: guardians.map(g => stripTrailingParenthetical_(g.guardianOutput)), maybe: null };
+      items.set(key, item);
+    }
+    const maybe = parentMaybeSame_(rawName, phones, email, guardiansOf.get(st.id) || []);
+    if (maybe && (!item.maybe || maybe.pct > item.maybe.pct)) item.maybe = maybe;
+    if (!item.relationship && info.relationship) item.relationship = properCase_(info.relationship);
+    if (!item.phone && phones.length) item.phone = formatPhone_(phones[0]) || phones[0];
+    if (!item.email && email) item.email = toText_(info.email);
+    if (item.sources.indexOf(source) === -1) item.sources.push(source);
+  };
+  src.rows.forEach(x => { if (!x.matchedOnly) consider(x.st, x.rawName, x.info, x.source); });
 
   const skipped = new Set(all ? [] : parentsSkipped_());
   const lastOf = it => { const t = nameTokens_(it.student); return t.length ? t[t.length - 1] : ""; };
   items.forEach(it => { if (skipped.has(it.key)) out.skipped++; else out.items.push(it); });
   out.items.sort((a, b) => compareNatural_(lastOf(a), lastOf(b)) || compareNatural_(a.student, b.student) || compareNatural_(a.name, b.name));
   return out;
+}
+
+// ======================================================================
+// PHONE NUMBERS TO CHECK (owner 2026-11-23, idea 4)
+// A parent we have whom Parent Square, NYCSA or one of Your Lists has with a number we don't: one card
+// per parent + number on the 👤 Student Overrides page (siblings together). Only when NONE of that
+// source's numbers is one we have (NYCSA's home / work numbers next to the cell we have would only be
+// noise). "Add as a 2nd number" / "Use it instead" write Backend PHONES rows (Build.gs applies them; a
+// row goes once ATS has the number); "Not needed" hides one for good (document property
+// PHONES_TO_CHECK_SKIPPED). Nothing changes by itself: which number is right can't be known (Parent
+// Square's numbers are often an older copy of ATS's).
+// ======================================================================
+var PHONES_SKIPPED_KEY_ = "PHONES_TO_CHECK_SKIPPED";
+
+function phonesSkipped_() {
+  try { return JSON.parse(PropertiesService.getDocumentProperties().getProperty(PHONES_SKIPPED_KEY_) || "[]") || []; }
+  catch (e) { return []; }
+}
+
+/**
+ * { items, skipped }: { key, guardian, relationship, phone, kinds, sources, current (their numbers now),
+ * students: [{ osis, name }], alike: { name (as the source spells it), pct, why } | null }, sorted by student.
+ */
+function findPhonesToCheck_(ss, all, src) {
+  const out = { items: [], skipped: 0 };
+  src = src || parentSources_(ss, true);
+  if (!src) return out;
+  const items = new Map();
+  src.rows.forEach(x => {
+    const tokens = nameTokens_(x.rawName);
+    if (tokens.length < 2) return;                       // a first name alone: not sure enough
+    if (sameNameExactly_(tokens, x.st.tokens)) return;   // the student's own account
+    const numbers = [];                                  // { phone, kind }
+    (x.info.phones || []).forEach((v, i) => phonesFromCell_(v).forEach(p => {
+      if (!numbers.some(n => n.phone === p)) numbers.push({ phone: p, kind: x.kinds[i] || "" });
+    }));
+    if (!numbers.length) return;
+    const digits = numbers.map(n => normalizePhoneForMatch_(n.phone));
+    const email = normalizeEmail_(x.info.email);
+    const g = knownGuardianFor_(src.guardiansOf.get(x.st.id) || [], tokens, digits, email);
+    if (!g) return;                                       // a new parent: Parents to add has them
+    const have = guardianPhones_(g).map(normalizePhoneForMatch_);
+    if (digits.some(d => have.indexOf(d) !== -1)) return; // the source has a number we have: nothing to check
+    const gName = stripTrailingParenthetical_(g.guardianOutput);
+    const gTokens = nameTokens_(gName);
+    numbers.forEach(n => {
+      const key = gTokens.slice().sort().join(" ") + "|" + normalizePhoneForMatch_(n.phone);
+      let it = items.get(key);
+      if (!it) {
+        it = { key: key, guardian: gName, relationship: toText_(g.relationship), phone: n.phone, kinds: [], sources: [],
+               current: guardianPhones_(g), students: [], alike: null };
+        items.set(key, it);
+      }
+      if (!it.students.some(s => s.osis === x.st.id)) it.students.push({ osis: x.st.id, name: x.st.name });
+      if (it.sources.indexOf(x.source) === -1) it.sources.push(x.source);
+      const kind = n.kind && x.source.indexOf(n.kind) === -1 ? x.source + " (" + n.kind + ")" : x.source;
+      if (it.kinds.indexOf(kind) === -1) it.kinds.push(kind);
+      // The source spells the parent another way: how alike they are (Parents to add's scoring)
+      if (!it.alike && !sameNameExactly_(tokens, gTokens)) {
+        const m = parentMaybeSame_(x.rawName, digits, email, [g]);
+        it.alike = { name: parentDisplayName_(x.rawName), pct: m ? m.pct : null, why: m ? m.why : "" };
+      }
+    });
+  });
+  const skipped = new Set(all ? [] : phonesSkipped_());
+  const lastOf = it => { const t = nameTokens_((it.students[0] || {}).name || ""); return t.length ? t[t.length - 1] : ""; };
+  items.forEach(it => { if (skipped.has(it.key)) out.skipped++; else out.items.push(it); });
+  out.items.sort((a, b) => compareNatural_(lastOf(a), lastOf(b)) || compareNatural_((a.students[0] || {}).name || "", (b.students[0] || {}).name || "") ||
+    compareNatural_(a.guardian, b.guardian) || compareNatural_(a.phone, b.phone));
+  return out;
+}
+
+/**
+ * "Add as a 2nd number" (use "add") / "Use it instead" (use "instead") for the ticked cards: one Backend
+ * PHONES row per student + parent, then a build (unless rebuilds are paused), like Add in Parents to add.
+ */
+function savePhoneNumbers(keys, use) {
+  keys = (Array.isArray(keys) ? keys : []).map(String);
+  use = use === "instead" ? "instead" : "add";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const picked = findPhonesToCheck_(ss, true).items.filter(it => keys.indexOf(it.key) !== -1);
+  if (!picked.length) return { saved: 0, building: false, home: getOverridesHome() };
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "MM/dd/yyyy");
+  const rows = [];
+  picked.forEach(it => it.students.forEach(s => rows.push([s.osis, it.guardian, it.phone, use, it.sources.join(", "), today])));
+  const sheet = getBackendSheet_(ss);
+  const b = BACKEND_BLOCKS.PHONES;
+  backendBlockReady_(sheet, b, true);
+  const header = sheet.getRange(BACKEND_HEADER_ROW, b.col, 1, b.width);
+  if (!header.getValues()[0].some(v => String(v).trim() !== "")) header.setValues([PHONES_HEADERS_]);
+  backendAppendRows_(ss, "PHONES", rows);
+  SpreadsheetApp.flush();
+  const settings = getSettings();
+  const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
+  if (!paused) runBuildOnly();
+  else ss.toast("Saved. Your sheets get the numbers at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  return { saved: picked.length, building: !paused, home: getOverridesHome() };
+}
+
+/** "Not needed": these numbers aren't offered again. */
+function skipPhoneNumbers(keys) {
+  const list = phonesSkipped_();
+  (Array.isArray(keys) ? keys : []).map(String).forEach(k => {
+    const i = list.indexOf(k);
+    if (i !== -1) list.splice(i, 1);
+    list.push(k);
+  });
+  while (list.length && JSON.stringify(list).length > 8500) list.shift(); // a property holds about 9 KB
+  PropertiesService.getDocumentProperties().setProperty(PHONES_SKIPPED_KEY_, JSON.stringify(list));
+  return getOverridesHome();
+}
+
+/** "Show them again": every "Not needed" number is offered again. */
+function unskipPhoneNumbers() {
+  PropertiesService.getDocumentProperties().deleteProperty(PHONES_SKIPPED_KEY_);
+  return getOverridesHome();
 }
 
 /**
@@ -2748,7 +2995,7 @@ function parentMaybeSame_(rawName, phones, email, guardians) {
     let score = od_nameScore_(cand, gp);
     const firstAlike = od_firstScore_(cand.first, gp.first) >= 0.9;
     const lastAlike = od_bestPair_(cand.lastTokens.length ? cand.lastTokens : cand.tokens, gp.lastTokens.length ? gp.lastTokens : gp.tokens) >= 0.9;
-    const contact = (phones.length && phones.indexOf(normalizePhoneForMatch_(g.mobile)) !== -1) || (email && email === normalizeEmail_(g.email));
+    const contact = (phones.length && guardianPhones_(g).some(x => phones.indexOf(normalizePhoneForMatch_(x)) !== -1)) || (email && email === normalizeEmail_(g.email));
     const why = [];
     if (firstAlike && !lastAlike) { score = Math.max(score, 0.6); why.push("same first name, another last name"); }
     else if (score >= 0.75) why.push("a close spelling");
@@ -2762,11 +3009,19 @@ function parentMaybeSame_(rawName, phones, email, guardians) {
 /** The main page: parents to add, your changes, whether builds are paused. */
 function getOverridesHome() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let found = { items: [], skipped: 0 }, error = "";
-  try { found = findParentsToAdd_(ss); }
+  let found = { items: [], skipped: 0 }, phones = { items: [], skipped: 0 }, error = "", phonesError = "";
+  let src = null;
+  try { src = parentSources_(ss, true); } // read once for both sections
   catch (e) { console.warn("Parents to add: " + e.message); error = e.message; }
+  if (!error) {
+    try { found = findParentsToAdd_(ss, false, src); }
+    catch (e) { console.warn("Parents to add: " + e.message); error = e.message; }
+    try { phones = findPhonesToCheck_(ss, false, src); }
+    catch (e) { console.warn("Phone numbers to check: " + e.message); phonesError = e.message; }
+  }
   const settings = getSettings();
   return { toAdd: found.items, skipped: found.skipped, changes: getOverridesList(), error: error,
+           phones: phones.items, phonesSkipped: phones.skipped, phonesError: phonesError,
            paused: settings.disableRebuilds === true || settings.disableRebuilds === 'true' };
 }
 
@@ -3467,6 +3722,12 @@ function ma_migrateSimpleSheets(url) {
   part("New / Edit Student changes", () => {
     const overrides = readBackendBlockFromOtherSpreadsheet_(oldSS, "OVERRIDES");
     if (overrides.length > 1) backendWriteBlock_(newSS, "OVERRIDES", overrides);
+  });
+
+  // Phone numbers added in 👤 Student Overrides (2026-11-23; an older tracker has none)
+  part("Phone numbers you added", () => {
+    const phones = readBackendBlockFromOtherSpreadsheet_(oldSS, "PHONES");
+    if (phones.length > 1) backendWriteBlock_(newSS, "PHONES", phones);
   });
 
   part("Events", () => {

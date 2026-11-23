@@ -1051,6 +1051,7 @@ function resetDerivedSheets_(ss) {
   // Your Lists (Input Data.gs, part 2): the setups and their Additional Information go with the list tabs
   backendClearBlock_(ss, "ADDL_INFO", BACKEND_HEADER_ROW);
   backendClearBlock_(ss, "OWN_LISTS", BACKEND_HEADER_ROW);
+  backendClearBlock_(ss, "PHONES", BACKEND_HEADER_ROW + 1); // numbers added in 👤 Student Overrides (header kept)
   // The Backend copy of the Student List (autofill, sibling groups included) goes with the Student List
   backendClearBlock_(ss, "STUDENT_LIST", BACKEND_HEADER_ROW + 1); // header kept: BX:CD is the owner's Sheets Table
 
@@ -1133,6 +1134,13 @@ function resetContactLogFormatting() {
     .whenFormulaSatisfied('=AND($B2<>"", $G2="")')
     .setBackground("#990000")
     .setRanges([rangeG2G]).build());
+
+  // 4b. Method missing (J2:J): a row with a Date but no Method stays light red until one is
+  // picked (owner 2026-11-23). It has to live here: this function replaces every Contact Log
+  // rule (every reset and the 10 PM run), so a rule added by hand would be gone the next day.
+  // The Date fills itself as soon as a row is started, so the row being typed shows it too.
+  // (One rule, made in Edits.gs, which every build also adds when it is missing.)
+  rules.push(methodMissingRule_(sheet));
 
   // (The old "Yes - Important" bold rule on N is gone: that value is now
   // "Followup Needed - ASAP", which has its own dropdown color. Owner 2026-11-12.)

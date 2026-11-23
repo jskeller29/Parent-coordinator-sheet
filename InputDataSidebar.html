@@ -162,6 +162,8 @@
       <b id="howToTitle">Where to get it</b>
       <ol id="howTo" style="overflow-wrap:anywhere"></ol>
     </div>
+    <!-- "Good to know" (IDM_STEPS note; Student Data: Insight has only 2 guardians per student) -->
+    <div class="notice hidden" id="stepNote" style="margin:10px 0"><b>Good to know</b><div id="stepNoteText" style="margin-top:3px"></div></div>
 
     <div class="card" id="uploadCard">
       <b>Option 1: Upload the file (easiest)</b>
@@ -411,6 +413,8 @@
     // which file to pick (owner 2026-11-13; server text from IDM_STEPS)
     $('fileHint').innerHTML = v.step.fileHint ? 'The right file: ' + v.step.fileHint + '.' : '';
     $('fileHint').className = v.step.fileHint ? '' : 'hidden';
+    $('stepNoteText').textContent = v.step.note || '';
+    show('stepNote', !!v.step.note);
     $('tabName').textContent = '"' + v.tabName + '"';
     var manual = !!v.step.manual;
     var listsStep = !!v.step.lists;
@@ -660,19 +664,32 @@
   }
 
   function showParentsToAdd(r) {
-    if (!r || !r.count || $('doneView').classList.contains('hidden')) return;
-    $('parentsTitle').textContent = r.count === 1 ? '1 parent to add?' : r.count + ' parents to add?';
-    var sample = r.sample || [], more = r.count - sample.length;
-    $('parentsText').textContent = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents') +
-      ' who aren\'t in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
-      '. Add the ones who are guardians, so they show in the Student List, Parents List, the phone contacts and the Person Spoke With list.';
+    if (!r || (!r.count && !r.phones) || $('doneView').classList.contains('hidden')) return;
+    var phones = r.phones || 0;
+    var numbers = phones === 1 ? '1 phone number to check' : phones + ' phone numbers to check';
+    $('parentsTitle').textContent = r.count ? (r.count === 1 ? '1 parent to add?' : r.count + ' parents to add?') + (phones ? ' And ' + numbers + '.' : '')
+                                            : (phones === 1 ? '1 phone number to check?' : phones + ' phone numbers to check?');
+    var text = '';
+    if (r.count) {
+      var sample = r.sample || [], more = r.count - sample.length;
+      text = (r.count === 1 ? 'Parent Square, NYCSA or one of your lists has a parent' : 'Parent Square, NYCSA or your lists have ' + r.count + ' parents') +
+        ' who aren\'t in your Student Data: ' + sample.join(', ') + (more > 0 ? ' and ' + more + ' more' : '') +
+        '. Add the ones who are guardians, so they show in the Student List, Parents List, the phone contacts and the Person Spoke With list.';
+    }
+    if (phones) text += (text ? ' ' : '') + (phones === 1
+      ? 'A parent you already have has another number in Parent Square, NYCSA or your lists: add it as a 2nd number, or use it instead.'
+      : 'Parent Square, NYCSA or your lists have ' + phones + ' other numbers for parents you already have: add them as 2nd numbers, or use them instead.');
+    $('parentsText').textContent = text;
+    parentsBtnLabel = r.count ? 'Review and add them' : 'Review them';
+    $('parentsBtn').textContent = parentsBtnLabel;
     show('parentsCard', true);
   }
+  var parentsBtnLabel = 'Review and add them';
   function reviewParents() {
     $('parentsBtn').disabled = true; $('parentsBtn').textContent = 'Opening…';
     google.script.run
-      .withSuccessHandler(function () { $('parentsBtn').disabled = false; $('parentsBtn').textContent = 'Review and add them'; })
-      .withFailureHandler(function (e) { $('parentsBtn').disabled = false; $('parentsBtn').textContent = 'Review and add them'; alert('Could not open Student Overrides: ' + (e && e.message ? e.message : e)); })
+      .withSuccessHandler(function () { $('parentsBtn').disabled = false; $('parentsBtn').textContent = parentsBtnLabel; })
+      .withFailureHandler(function (e) { $('parentsBtn').disabled = false; $('parentsBtn').textContent = parentsBtnLabel; alert('Could not open Student Overrides: ' + (e && e.message ? e.message : e)); })
       .openManageOverridesDialog();
   }
 

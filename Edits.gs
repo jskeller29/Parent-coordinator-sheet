@@ -1421,6 +1421,88 @@ function applyTypeDropdownColors() {
   contactLog.setConditionalFormatRules([...typeRules, ...otherRules]);
 }
 
+/**
+ * Contact Log "Method missing" color (owner 2026-11-23): a row with a Date but no Method (J) is
+ * light red until a Method is picked. resetContactLogFormatting (every 10 PM run) draws it with
+ * the other rules; every build also adds it when the Contact Log doesn't have it, so a sheet whose
+ * nightly run is off gets it too. One read; it writes only when the rule is missing, and a rule
+ * someone recolored by hand (same formula) is left alone.
+ */
+var METHOD_MISSING_FORMULA_ = '=AND($B2<>"", $J2="")';
+
+function methodMissingRule_(sheet) {
+  return SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(METHOD_MISSING_FORMULA_)
+    .setBackground(SHEET_LOOK_.missingMethod)
+    .setRanges([sheet.getRange("J2:J" + sheet.getMaxRows())]).build();
+}
+
+function hasMethodMissingRule_(rules) {
+  const want = METHOD_MISSING_FORMULA_.replace(/\s+/g, "");
+  return rules.some(rule => {
+    try {
+      const c = rule.getBooleanCondition();
+      return !!c && String((c.getCriteriaValues() || [])[0] || "").replace(/\s+/g, "") === want;
+    } catch (e) { return false; }
+  });
+}
+
+/** Returns true when the rule was added. */
+function ensureMethodMissingRule_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) return false;
+  const rules = sheet.getConditionalFormatRules();
+  if (hasMethodMissingRule_(rules)) return false;
+  rules.push(methodMissingRule_(sheet));
+  sheet.setConditionalFormatRules(rules);
+  return true;
+}
+
+// ======================================================================
+// METHOD 2 CHOICES (owner 2026-11-23): Contact Log column K's dropdown = the fixed choices below +
+// every Method 2 already typed above END, so the list grows by itself. ONE formula in Backend CQ3
+// (BACKEND_BLOCKS.METHOD2), written by every build when it is missing. The dropdown on K is set BY
+// HAND in the Contact Log table: ='Backend'!$CQ$3:$CQ with "Show a warning" (DEPLOY.md). To change
+// the fixed choices, edit the formula in CQ3 on the sheet: a formula there that reads Contact Log K
+// is kept as it is.
+// ======================================================================
+var METHOD2_FIXED_CHOICES_ = ["Call", "Text", "Email", "Voicemail", "Meeting", "In School"];
+
+function method2ChoicesFormula_() {
+  const fixed = METHOD2_FIXED_CHOICES_.map(c => '"' + c + '"').join(", ");
+  return "=ARRAYFORMULA(LET(endRow, IFERROR(MATCH(TRUE, TRIM('Contact Log'!E:E)=\"END\", 0), 3), " +
+    "typed, TRIM(INDEX('Contact Log'!K:K, 2):INDEX('Contact Log'!K:K, MAX(2, endRow - 1))), " +
+    "all, UNIQUE(VSTACK(" + fixed + ", typed)), FILTER(all, all <> \"\")))";
+}
+
+/** "added" | "kept" | "unblocked" | "skipped: ..." (never throws on a sheet that has something else there). */
+function ensureMethod2ChoicesOnBackend_(ss) {
+  const b = BACKEND_BLOCKS.METHOD2;
+  const sh = getBackendSheet_(ss);
+  backendBlockReady_(sh, b, true);
+  const header = sh.getRange(BACKEND_HEADER_ROW, b.col);
+  if (String(header.getValue()).trim() === "") header.setValue("Method 2").setFontWeight("bold");
+  const first = BACKEND_HEADER_ROW + 1;
+  const cell = sh.getRange(first, b.col);
+  const have = String(cell.getFormula() || "");
+  if (have && /Contact Log'?!\$?K/i.test(have)) {
+    // Kept (one changed by hand too); a list blocked by something typed under it (#REF!) is freed
+    if (String(cell.getDisplayValue()).trim() !== "#REF!") return "kept";
+    const below = sh.getMaxRows() - first;
+    if (below > 0) sh.getRange(first + 1, b.col, below, 1).clearContent();
+    return "unblocked";
+  }
+  const where = "Backend " + columnLetter_(b.col) + first;
+  if (have) return "skipped: " + where + " holds another formula";
+  // Empty: written only when nothing was typed in that column either (never over someone's values)
+  const n = Math.max(1, sh.getLastRow() - BACKEND_HEADER_ROW);
+  if (sh.getRange(first, b.col, n, 1).getValues().some(r => String(r[0]).trim() !== "")) {
+    return "skipped: " + where + " and below hold values";
+  }
+  cell.setFormula(method2ChoicesFormula_());
+  return "added";
+}
+
 function toggleHideFilter_(sheet, endRow) {
   if (!endRow || endRow < 3) return;
   const isChecked = sheet.getRange(endRow, 15).getValue();
@@ -2218,7 +2300,7 @@ function updateContactAndPhoneOnly() {
 
   const overrides = getOverrideData_(ss);
   const studentMap = buildStudentMap_(rawData, overrides.students);
-  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians, overrides.phones);
   const masterTableData = getExistingMasterTable_(ss);
 
   // buildPhoneContactsData_ requires these two indexes (args 6 & 7). Without them

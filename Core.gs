@@ -251,7 +251,14 @@ var BACKEND_BLOCKS = {
   // Person Spoke With choices (2026-11-14, Edits.gs ensureSpokeWithChoices_): NOT a table. ONE formula in
   // CF2 puts each Contact Log row n's guardians on Backend row n (CF:CO), so column D's dropdown can read
   // 'Backend'!$CF2:$CO2. Never written by the backend* helpers; the build keeps the formula.
-  SPOKE_WITH: { col: 84, width: 10, title: "PERSON SPOKE WITH CHOICES (automatic: row n = Contact Log row n)", legacy: null, grow: true, formulaOnly: true }
+  SPOKE_WITH: { col: 84, width: 10, title: "PERSON SPOKE WITH CHOICES (automatic: row n = Contact Log row n)", legacy: null, grow: true, formulaOnly: true },
+  // Method 2 choices (owner 2026-11-23, Edits.gs ensureMethod2ChoicesOnBackend_): ONE formula in CQ3 lists
+  // the fixed choices + every Method 2 typed in the Contact Log; column K's dropdown reads 'Backend'!$CQ$3:$CQ
+  // (set by hand in the Contact Log table). Never written by the backend* helpers.
+  METHOD2: { col: 95, width: 1, title: "METHOD 2 CHOICES (automatic: Contact Log K)", legacy: null, grow: true, formulaOnly: true },
+  // Phone numbers from 👤 Student Overrides → Phone numbers to check (owner 2026-11-23, Build.gs
+  // readPhoneChanges_): OSIS | Guardian | Number | Use (add / instead) | From | Date
+  PHONES: { col: 97, width: 6, title: "PHONE NUMBERS (Student Overrides: added / used instead)", legacy: null, grow: true }
 };
 
 // Fixed cells inside the Version section (old "Version" tab, moved down one row)
@@ -808,6 +815,35 @@ function formatPhone_(value) {
   return "";
 }
 
+/**
+ * Every phone number in one cell, each "(xxx) xxx-xxxx", no repeats (owner 2026-11-23, idea 5: several
+ * numbers per parent). A cell with one number reads exactly as formatPhone_ always did; a cell with two
+ * ("718-555-0101 / 917-555-0144", "7185550101 9175550144") used to give the parent no number at all.
+ * Anything that isn't a 10-digit number (or 11 starting with 1) is left out, as before.
+ */
+function phonesFromCell_(value) {
+  const one = formatPhone_(value);
+  if (one) return [one];
+  const text = toText_(value);
+  if (!text) return [];
+  const out = [];
+  const re = /(?:\+?1[\s.\-]*)?\(?\d{3}\)?[\s.\-]*\d{3}[\s.\-]*\d{4}/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const f = formatPhone_(m[0]);
+    if (f && out.indexOf(f) === -1) out.push(f);
+  }
+  return out;
+}
+
+/** A guardian object's numbers (Build.gs buildGuardianObject_): its phones list, or its one mobile. */
+function guardianPhones_(g) {
+  if (!g) return [];
+  if (Array.isArray(g.phones)) return g.phones.slice();
+  const one = toText_(g.mobile);
+  return one ? [one] : [];
+}
+
 /* =========================
    OSIS MATCHING (shared)
    Tokenize a cell into whole OSIS numbers and match EXACTLY, so a short id can
@@ -997,6 +1033,7 @@ const SHEET_LOOK_ = {
   },
   input: "#fff2cc",            // a cell you type in (PCAR's own dates): the Raw Data paste boxes' yellow
   workshopRow: "#e6f1ea",      // Contact Log rows whose Method (J) is "Workshop" (C:O, resetContactLogFormatting): pale green, was #b6d7a8
+  missingMethod: "#f4cccc",    // Contact Log Method (J) left blank on a row that has a Date (resetContactLogFormatting; owner 2026-11-23): light red
   danger: { fill: "#f8e9e7", text: "#a3312a" },   // delete boxes (Styles.html --danger-soft / --danger)
   // Contact Log Type column (L): one text color per type in Type List order (Backend BL),
   // the same after every reset and 10 PM run (they used to be random and changed every

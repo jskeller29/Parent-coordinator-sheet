@@ -477,13 +477,23 @@ function phoneContactsRowReader_(headers) {
   const idxNotes = idx("Notes", 33);
   const idxOrgName = idx("Organization Name", 22);
   const idxOrgTitle = idx("Organization Department", 23);
+  // A parent's 2nd / 3rd number and email (2026-11-23, idea 5). Only by header: a Phone Contacts tab
+  // without these columns has none, so nothing changes for it.
+  const extraPhones = [["Phone 2 - Type", "Phone 2 - Value"], ["Phone 3 - Type", "Phone 3 - Value"]]
+    .map(p => [headers.indexOf(p[0]), headers.indexOf(p[1])]).filter(p => p[1] !== -1);
+  const extraEmails = ["E-mail 2 - Value", "E-mail 3 - Value"].map(h => headers.indexOf(h)).filter(i => i !== -1);
+  const filled = v => String(v === null || v === undefined ? "" : v).trim() !== "";
 
   return row => {
     const parentName = row[idxFirst];
+    const extra = {
+      phones: extraPhones.filter(p => filled(row[p[1]])).map(p => ({ value: row[p[1]], type: p[0] !== -1 ? row[p[0]] : "" })),
+      emails: extraEmails.filter(i => filled(row[i])).map(i => row[i])
+    };
     return {
       parentName: parentName,
       nameKey: contactNameKey_(parentName, row[idxLast]),
-      upsert: (directoryResourceName, index) => searchAndUpsertSingleContact(parentName, row[idxLast], row[idxEmail], row[idxPhone], row[idxPhoneLabel], row[idxNotes], row[idxOrgName], row[idxOrgTitle], directoryResourceName, index)
+      upsert: (directoryResourceName, index) => searchAndUpsertSingleContact(parentName, row[idxLast], row[idxEmail], row[idxPhone], row[idxPhoneLabel], row[idxNotes], row[idxOrgName], row[idxOrgTitle], directoryResourceName, index, extra)
     };
   };
 }
@@ -495,7 +505,9 @@ function phoneContactsRowReader_(headers) {
 // not be saved, or null for a row without a name. A Google "limit reached" error
 // is thrown so the sync can pause (it used to be swallowed).
 // ==========================================
-function searchAndUpsertSingleContact(parentName, studentNames, email, phone, phoneLabel, notes, orgName, orgTitle, directoryResourceName = null, index = null) {
+// extra (2026-11-23): { phones: [{ value, type }], emails: [value] } = the row's 2nd / 3rd number and email,
+// written after the first ones. A row without them builds exactly the contact it always did.
+function searchAndUpsertSingleContact(parentName, studentNames, email, phone, phoneLabel, notes, orgName, orgTitle, directoryResourceName = null, index = null, extra = null) {
   const fullName = String(parentName || "").trim();
   const fNameStr = String(studentNames || "").trim(); // STRICT: We now track the student name
   if (!fullName) return null;
@@ -558,6 +570,21 @@ function searchAndUpsertSingleContact(parentName, studentNames, email, phone, ph
     if (phone && String(phone).trim() !== "") {
       const pLabel = String(phoneLabel || "").trim();
       contactData.phoneNumbers.push({ value: String(phone), type: pLabel !== "" ? pLabel : 'mobile' });
+    }
+    // The 2nd / 3rd number and email (no repeats of the ones already there)
+    if (extra) {
+      const digitsOf = v => String(v || "").replace(/\D/g, "").replace(/^1(\d{10})$/, "$1");
+      (extra.phones || []).forEach(p => {
+        const value = String(p && p.value !== undefined ? p.value : "").trim();
+        if (!value || contactData.phoneNumbers.some(x => digitsOf(x.value) === digitsOf(value))) return;
+        const type = String((p && p.type) || phoneLabel || "").trim();
+        contactData.phoneNumbers.push({ value: value, type: type !== "" ? type : 'mobile' });
+      });
+      (extra.emails || []).forEach(e => {
+        const value = String(e || "").trim();
+        if (!value || contactData.emailAddresses.some(x => String(x.value).toLowerCase().trim() === value.toLowerCase())) return;
+        contactData.emailAddresses.push({ value: value, type: 'home' });
+      });
     }
 
     // Already exactly like the row (and in the label): nothing to write
@@ -642,4 +669,79 @@ function EMERGENCY_STOP_SYNC(isSilent) {
 function RESTART_SYNC() {
   EMERGENCY_STOP_SYNC(true); 
   startResilientSync();
+}
+
+// ======================================================================
+// WHOSE GOOGLE CONTACTS GET THE FAMILIES (owner 2026-11-23, "phone sync must be on the DOE phone only")
+// The 10 PM sync runs as the person who owns the sheet's nightly job (usually whoever ran Initial
+// Setup; Build.gs ONE NIGHTLY JOB PER SHEET), and 🧱 Full Sync runs as whoever clicks it. That
+// account's Google Contacts get every family, and every phone or computer signed in to it shows them.
+// So ⚙️ Settings says whose account it is when phone sync is turned on (and warns more strongly when
+// it isn't a DOE account), and Full Sync asks once per person and account (every time for a non-DOE
+// account). The address is read through the Drive permission the tool already has (who owns My
+// Drive): no new permission. Nothing here can see which PHONE is signed in: it is a reminder.
+// ======================================================================
+var DOE_ACCOUNT_DOMAIN_ = "schools.nyc.gov";
+var NIGHTLY_OWNER_EMAIL_KEY_ = "NIGHTLY_OWNER_EMAIL"; // doc property: the nightly job's account (Build.gs remembers it)
+var FULL_SYNC_OK_KEY_ = "FULL_SYNC_OK_FOR";           // user property: the DOE account this person said yes for
+
+/** The address of the Google account running this code, lower case; "" when Drive can't say. */
+function myAccountEmail_() {
+  try {
+    const owner = DriveApp.getRootFolder().getOwner();
+    return owner ? String(owner.getEmail() || "").trim().toLowerCase() : "";
+  } catch (e) { return ""; }
+}
+
+/** true / false; null when the address is unknown. */
+function isDoeAccount_(email) {
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return null;
+  return e.slice(-(DOE_ACCOUNT_DOMAIN_.length + 1)) === "@" + DOE_ACCOUNT_DOMAIN_;
+}
+
+/** Build.gs rememberNightlyTrigger_: the nightly job's account (it runs as its maker). */
+function rememberNightlyOwnerEmail_(props) {
+  const email = myAccountEmail_();
+  if (email) props.setProperty(NIGHTLY_OWNER_EMAIL_KEY_, email);
+  else props.deleteProperty(NIGHTLY_OWNER_EMAIL_KEY_);
+}
+
+/**
+ * ⚙️ Settings (phone sync turned on, or on when it opens): whose Google Contacts the nightly sync fills.
+ * { me, target, nightlyIsMine, doe (true / false / null = unknown), domain }. target = "" when that
+ * account is someone else's and its address isn't known yet (it is remembered at its next nightly run).
+ */
+function getPhoneSyncAccount() {
+  const props = PropertiesService.getDocumentProperties();
+  const me = myAccountEmail_();
+  let nightlyIsMine = true;
+  try {
+    // Another person's nightly job that still runs keeps the job (manageNightlyTrigger_ makes none for me)
+    const owned = props.getProperty(NIGHTLY_UID_KEY_);
+    if (owned && nightlyOwnerAlive_(props)) nightlyIsMine = ScriptApp.getProjectTriggers().some(t => t.getUniqueId() === owned);
+  } catch (e) { nightlyIsMine = true; }
+  const target = nightlyIsMine ? me : String(props.getProperty(NIGHTLY_OWNER_EMAIL_KEY_) || "");
+  return { me: me, target: target, nightlyIsMine: nightlyIsMine, doe: isDoeAccount_(target), domain: DOE_ACCOUNT_DOMAIN_ };
+}
+
+/**
+ * 🧱 Full Sync (openProgressBarSidebar): it fills the Google Contacts of whoever clicks it. Asks once per
+ * person and DOE account, every time for an account that isn't DOE (or can't be read). false = stopped.
+ */
+function confirmFullSyncAccount_() {
+  const me = myAccountEmail_();
+  const doe = isDoeAccount_(me);
+  const up = PropertiesService.getUserProperties();
+  if (doe === true && up.getProperty(FULL_SYNC_OK_KEY_) === me) return true;
+  const ui = SpreadsheetApp.getUi();
+  const who = me || "the Google account you are using now";
+  const text = (doe === false ? "⚠️ " + me + " is not a DOE (@" + DOE_ACCOUNT_DOMAIN_ + ") account.\n\n" : "") +
+    "Full Sync puts every family's contact (names, phone numbers and notes) into the Google Contacts of " + who +
+    ". Every phone or computer signed in to that account shows them.\n\n" +
+    "Only go on with your DOE (@" + DOE_ACCOUNT_DOMAIN_ + ") Google account, on a DOE phone. Never a personal account or a personal phone.\n\n" +
+    "Turning phone sync off later does not remove them: in Google Contacts, open the \"School Directory\" label, select all, and delete.\n\nGo on?";
+  if (ui.alert("Before you sync", text, ui.ButtonSet.YES_NO) !== ui.Button.YES) return false;
+  if (doe === true) up.setProperty(FULL_SYNC_OK_KEY_, me);
+  return true;
 }

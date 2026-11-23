@@ -86,7 +86,7 @@ function buildAllDerivedSheetsRun_() {
 
   // --- Step 1: Build Core Data Maps in Memory ---
   const studentMap = buildStudentMap_(rawData, overrides.students);
-  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians);
+  const guardianRows = buildGuardianObjects_(rawData, overrides.guardians, overrides.phones);
   const siblingMap = buildSiblingMap_(studentMap, guardianRows);
   const parentSquareIndex = buildParentSquareIndex_(rawData);
   const nycsaIndex = buildNYCSAIndex_(rawData);
@@ -245,6 +245,13 @@ function buildAllDerivedSheetsRun_() {
   // Person Spoke With choices (Contact Log R:AA, Edits.gs): put the formula back if Migration or a
   // deleted row 2 took it, or free its list if a pasted row blocks it. Never stops a build.
   try { ensureSpokeWithChoices_(ss); } catch (e) { console.warn("Person Spoke With choices skipped: " + e.message); }
+  // Contact Log: the light red "Method missing" color, when a sheet doesn't have it yet (Edits.gs)
+  try { ensureMethodMissingRule_(ss); } catch (e) { console.warn("Method missing color skipped: " + e.message); }
+  // ...and the Method 2 choices list column K's dropdown reads (Backend CQ, Edits.gs)
+  try {
+    const m2 = ensureMethod2ChoicesOnBackend_(ss);
+    if (m2 !== "kept") console.log("Method 2 choices (Backend): " + m2);
+  } catch (e) { console.warn("Method 2 choices skipped: " + e.message); }
 
   // Baby-proofing (Sheet Lock.gs): (re)protect the tabs and retake the header /
   // END bar / PCAR snapshots now that the headers are fresh. Never blocks a build.
@@ -294,6 +301,9 @@ var NIGHTLY_TAKEOVER_DAYS_ = 3;
 function rememberNightlyTrigger_(props, uid) {
   props.setProperty(NIGHTLY_UID_KEY_, String(uid));
   props.setProperty(NIGHTLY_UID_SET_KEY_, String(Date.now()));
+  // Whose Google Contacts the nightly phone sync fills (⚙️ Settings says it; Contacts Sync.gs). This
+  // always runs as the trigger's maker (its own save, its first run, or Initial Setup's person).
+  try { rememberNightlyOwnerEmail_(props); } catch (e) { /* only shown in Settings */ }
 }
 
 /** The remembered nightly trigger ran (or was made) within NIGHTLY_TAKEOVER_DAYS_. */
@@ -325,6 +335,10 @@ function nightlyTriggerShouldRun_(e) {
       console.warn("Nightly sync: trigger " + uid + " took over from " + owned + " (no run for " + NIGHTLY_TAKEOVER_DAYS_ + " days).");
     }
     props.setProperty(NIGHTLY_LAST_RUN_KEY_, String(Date.now()));
+    // A sheet set up before 2026-11-23 learns the nightly job's account at its next run (Contacts Sync.gs)
+    if (!props.getProperty(NIGHTLY_OWNER_EMAIL_KEY_)) {
+      try { rememberNightlyOwnerEmail_(props); } catch (err) { /* only shown in Settings */ }
+    }
     if (props.getProperty('disableNightlySync') === 'true') {
       console.log("Nightly sync: off in Settings (Rebuild sheets), nothing done.");
       return false;
@@ -688,6 +702,9 @@ function cleanRedundantOverrides() {
     deletedOsisList.push(osis); 
   }
 
+  // Phone numbers added in 👤 Student Overrides that ATS has now go too (PHONE NUMBERS above)
+  try { cleanRedundantPhoneChanges_(ss, rawData); } catch (e) { console.warn("Phone numbers cleanup skipped: " + e.message); }
+
   if (deletedOsisList.length > 0) {
     let displayList = deletedOsisList.length > 5 
         ? deletedOsisList.slice(0, 5).join(", ") + ` (+${deletedOsisList.length - 5} more)`
@@ -762,7 +779,8 @@ function getOverrideData_(ss) {
     }
   });
 
-  return { students: overrideStudents, guardians: overrideGuardians };
+  // + the numbers added in 👤 Student Overrides (buildGuardianObjects_'s third argument)
+  return { students: overrideStudents, guardians: overrideGuardians, phones: readPhoneChanges_(ss) };
 }
 
 /** Entry Type of an added-guardian row: "Added Guardian (NYCSA)", "Added Guardian (Parent Square, 🚌 Bus Routes)". */
@@ -835,7 +853,73 @@ function buildStudentMap_(rawData, overrideStudents) {
 /* =========================
    BASE BUILDERS
 ========================= */
-function buildGuardianObjects_(rawData, overrideGuardians) {
+/* =========================
+   PHONE NUMBERS FROM 👤 STUDENT OVERRIDES (owner 2026-11-23, idea 4)
+   "Phone numbers to check" (Menus.gs) writes one row per student + parent in the Backend PHONES section:
+   OSIS | Guardian | Number | Use ("add" = one more number, "instead" = in place of the others) | From |
+   Date. buildGuardianObjects_ applies them to that parent's numbers, so every tab built from guardians
+   (Parents List, Phone Contacts, the phone sync) has them; the Directory stays ATS only. A row goes by
+   itself once ATS has that number (cleanRedundantPhoneChanges_), like an added parent once ATS lists them.
+========================= */
+var PHONES_HEADERS_ = ["OSIS", "Guardian", "Number", "Use", "From", "Date"];
+
+function readPhoneChanges_(ss) {
+  let rows = [];
+  try { rows = backendReadBlock_(ss, "PHONES").slice(1); } catch (e) { return []; }
+  return rows.map(r => ({ osis: toText_(r[0]), guardian: toText_(r[1]), phone: formatPhone_(r[2]),
+                          use: toText_(r[3]).toLowerCase() === "instead" ? "instead" : "add", from: toText_(r[4]) }))
+    .filter(c => isRealStudentId_(c.osis) && c.guardian && c.phone);
+}
+
+/** The rows in order (oldest first): "instead" makes that number the only one, "add" adds it at the end. */
+function applyPhoneChanges_(guardianRows, changes) {
+  if (!changes || !changes.length) return guardianRows;
+  const byOsis = new Map();
+  changes.forEach(c => {
+    const k = normalizeOsis_(c.osis);
+    if (!byOsis.has(k)) byOsis.set(k, []);
+    byOsis.get(k).push(c);
+  });
+  guardianRows.forEach(g => {
+    const list = byOsis.get(normalizeOsis_(g.student_id));
+    if (!list) return;
+    const tokens = nameTokens_(stripTrailingParenthetical_(g.guardianOutput));
+    list.forEach(c => {
+      if (!sameNameExactly_(tokens, nameTokens_(c.guardian))) return;
+      const phones = guardianPhones_(g);
+      g.phones = c.use === "instead" ? [c.phone] : (phones.indexOf(c.phone) === -1 ? phones.concat([c.phone]) : phones);
+      g.mobile = g.phones[0] || "";
+    });
+  });
+  return guardianRows;
+}
+
+/** cleanRedundantOverrides: a row whose number ATS has now goes ("instead": ATS's first number is it). */
+function cleanRedundantPhoneChanges_(ss, rawData) {
+  const rows = backendReadBlock_(ss, "PHONES");
+  if (rows.length < 2) return 0;
+  const ats = new Map(); // normalized OSIS -> [{ tokens, phones }]
+  for (let i = 6; i < rawData.length; i++) {
+    const r = rawData[i];
+    if (!isRealStudentId_(r[2])) continue;
+    ats.set(normalizeOsis_(r[2]), [[19, 21], [25, 27]]
+      .map(c => ({ tokens: nameTokens_(toText_(r[c[0]])), phones: phonesFromCell_(r[c[1]]) })).filter(x => x.tokens.length));
+  }
+  const gone = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const phone = formatPhone_(r[2]);
+    if (!phone) continue;
+    const g = (ats.get(normalizeOsis_(r[0])) || []).find(x => sameNameExactly_(x.tokens, nameTokens_(toText_(r[1]))));
+    if (!g) continue;
+    if (toText_(r[3]).toLowerCase() === "instead" ? g.phones[0] === phone : g.phones.indexOf(phone) !== -1) gone.push(i);
+  }
+  if (gone.length) backendDeleteRows_(ss, "PHONES", gone);
+  return gone.length;
+}
+
+// phoneChanges (2026-11-23): getOverrideData_(ss).phones, the numbers added in 👤 Student Overrides
+function buildGuardianObjects_(rawData, overrideGuardians, phoneChanges) {
   const out = [];
   const atsById = new Map(); // ATS guardians of the students that also have added guardians
 
@@ -863,7 +947,7 @@ function buildGuardianObjects_(rawData, overrideGuardians) {
     guardianList.forEach(g => { if (!guardianListHas_(ats, g)) out.push(g); });
   }
 
-  return out;
+  return applyPhoneChanges_(out, phoneChanges);
 }
 
 function buildGuardianObject_(studentId, fullName, relationship, spokenLanguage, writtenLanguage, email, phone) {
@@ -882,13 +966,16 @@ function buildGuardianObject_(studentId, fullName, relationship, spokenLanguage,
     relTag = relTag ? `${relTag} - ${language}` : language;
   }
 
+  // Every number in the phone cell (Core.gs phonesFromCell_); mobile = the first, as before
+  const phones = phonesFromCell_(phone);
   return {
     student_id: studentId,
     guardianOutput: properCase_(name) + (relTag ? ` (${relTag})` : ""),
     relationship: properCase_(relationship),
     language: language,
     email: toText_(email),
-    mobile: formatPhone_(phone)
+    mobile: phones[0] || "",
+    phones: phones
   };
 }
 
@@ -946,7 +1033,6 @@ function buildSiblingMap_(studentMap, guardianRows) {
     if (!guardianName) continue; 
 
     const email = normalizeEmail_(g.email);
-    const phone = normalizePhoneForMatch_(g.mobile);
 
     if (email) {
       const emailKey = `${guardianName}|${email}`;
@@ -954,11 +1040,12 @@ function buildSiblingMap_(studentMap, guardianRows) {
       nameEmailMap.get(emailKey).add(id);
     }
 
-    if (phone) {
+    // Every number the guardian has (one, as before, unless the cell held several; 2026-11-23)
+    guardianPhones_(g).map(normalizePhoneForMatch_).filter(Boolean).forEach(phone => {
       const phoneKey = `${guardianName}|${phone}`;
       if (!namePhoneMap.has(phoneKey)) namePhoneMap.set(phoneKey, new Set());
       namePhoneMap.get(phoneKey).add(id);
-    }
+    });
   }
 
   const rowsByStudent = new Map();
@@ -978,7 +1065,6 @@ function buildSiblingMap_(studentMap, guardianRows) {
       if (!guardianName) continue;
 
       const email = normalizeEmail_(g.email);
-      const phone = normalizePhoneForMatch_(g.mobile);
 
       if (email) {
         const emailKey = `${guardianName}|${email}`;
@@ -991,7 +1077,7 @@ function buildSiblingMap_(studentMap, guardianRows) {
         }
       }
 
-      if (phone) {
+      guardianPhones_(g).map(normalizePhoneForMatch_).filter(Boolean).forEach(phone => {
         const phoneKey = `${guardianName}|${phone}`;
         if (namePhoneMap.has(phoneKey)) {
           namePhoneMap.get(phoneKey).forEach(otherId => {
@@ -1000,7 +1086,7 @@ function buildSiblingMap_(studentMap, guardianRows) {
             }
           });
         }
-      }
+      });
     }
 
     siblingMap.set(id, Array.from(siblings.values()).sort().join(", "));
@@ -2025,7 +2111,7 @@ function buildParentsDividedData_(ss, guardianRows, siblingMap, parentSquareInde
       g.relationship,
       g.language,
       g.email,
-      g.mobile,
+      guardianPhones_(g).join(", "), // every number (one, as before, unless there are more; 2026-11-23)
       siblingMap.get(g.student_id) || "",
       getParentsSquareStatus_(g, parentSquareIndex),
       getNYCSAStatus_(g, otherGuardian, nycsaIndex),
@@ -2142,7 +2228,7 @@ function formatDirectoryAuto_(sheet) {
 
 function formatGuardianDirectoryLine_(g) {
   const left = g.guardianOutput;
-  const parts = [toText_(g.email), toText_(g.mobile)].filter(Boolean);
+  const parts = [toText_(g.email)].concat(guardianPhones_(g)).filter(Boolean);
   if (!left) return "";
   if (parts.length === 0) return left;
   return `${left} - ${parts.join(", ")}`;
@@ -2179,27 +2265,49 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
     guardiansByStudentId.get(g.student_id).push(g);
   }
 
-  const groupedGuardians = new Map();
+  // One contact per parent (owner 2026-11-23, idea 5): guardian rows with the same name that share a
+  // number or an email are one person, whichever child's record they come from (a different number on
+  // each child's record used to make two contacts), and the contact gets all their numbers / emails.
+  // Rows of the same name with no number and no email group together, as before. (Before: one group per
+  // name + email + number; every row it grouped is grouped the same way now.)
+  const groups = [];                 // in first-seen order (the old Map's order)
+  const groupsByName = new Map();    // lower-case name -> its groups
+  const shares = (grp, phones, email) =>
+    phones.some(p => grp.phones.indexOf(p) !== -1) ||
+    (!!email && grp.emails.some(e => e.toLowerCase() === email.toLowerCase())) ||
+    (!email && !phones.length && grp.bare);
 
   for (const g of guardianRows) {
     const id = g.student_id;
     const master = masterMap.get(id) || [];
     const student = studentMap.get(id) || { student: "", classCode: "", site: "", teachers: "" };
     const guardianName = stripTrailingParenthetical_(g.guardianOutput);
+    const nameKey = guardianName.toLowerCase();
+    const phones = guardianPhones_(g);
+    const email = toText_(g.email);
 
-    const key = `${guardianName.toLowerCase()}|${toText_(g.email).toLowerCase()}|${toText_(g.mobile)}`;
-
-    if (!groupedGuardians.has(key)) {
-      groupedGuardians.set(key, {
-        guardianName: guardianName,
-        relationship: toText_(g.relationship),
-        email: toText_(g.email),
-        phone: toText_(g.mobile),
-        students: []
-      });
+    const sameName = groupsByName.get(nameKey) || [];
+    const matches = sameName.filter(grp => shares(grp, phones, email));
+    let group = matches[0];
+    if (!group) {
+      group = { guardianName: guardianName, relationship: toText_(g.relationship), emails: [], phones: [],
+                bare: false, students: [], order: groups.length };
+      groups.push(group);
+      sameName.push(group);
+      groupsByName.set(nameKey, sameName);
     }
-
-    const group = groupedGuardians.get(key);
+    // A row that links two groups (one shares a number, the other an email) makes them one
+    matches.slice(1).forEach(other => {
+      other.phones.forEach(p => { if (group.phones.indexOf(p) === -1) group.phones.push(p); });
+      other.emails.forEach(e => { if (!group.emails.some(x => x.toLowerCase() === e.toLowerCase())) group.emails.push(e); });
+      group.students.push(...other.students);
+      group.bare = group.bare || other.bare;
+      other.merged = true;
+      sameName.splice(sameName.indexOf(other), 1);
+    });
+    phones.forEach(p => { if (group.phones.indexOf(p) === -1) group.phones.push(p); });
+    if (email && !group.emails.some(e => e.toLowerCase() === email.toLowerCase())) group.emails.push(email);
+    if (!email && !phones.length) group.bare = true;
 
     let classDisplay = toText_(student.classCode);
     if (student.teachers && toText_(student.teachers).trim() !== "") {
@@ -2240,7 +2348,8 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
     });
   }
 
-  for (const group of groupedGuardians.values()) {
+  for (const group of groups) {
+    if (group.merged) continue; // joined to another group above
     const studentNames = group.students.map(s => s.studentName).join(", ");
     const osisList = group.students.map(s => s.osis).join(", ");
     const finalNotes = group.students.map(s => s.block).join("\n\n---\n");
@@ -2271,9 +2380,13 @@ function buildPhoneContactsData_(ss, studentMap, guardianRows, masterTable, comb
     
     row[1]  = `(${group.relationship}) ${group.guardianName}`.trim();
     row[3]  = `| Student: ${studentNames} |`;
-    row[11] = group.email;
+    row[11] = group.emails[0] || "";
+    row[13] = group.emails[1] || "";   // E-mail 2 / 3 - Value (a parent with more than one; 2026-11-23)
+    row[15] = group.emails[2] || "";
     row[16] = phoneLabels;
-    row[17] = group.phone;
+    row[17] = group.phones[0] || "";
+    if (group.phones[1]) { row[18] = phoneLabels; row[19] = group.phones[1]; } // Phone 2 / 3 (same label)
+    if (group.phones[2]) { row[20] = phoneLabels; row[21] = group.phones[2]; }
     row[22] = orgNames;
     row[33] = finalNotes;
     row[34] = "School Directory";
