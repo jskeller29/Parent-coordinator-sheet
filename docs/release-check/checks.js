@@ -91,7 +91,7 @@ const stages = [
       { id: "s2-08", title: "Student Data: the note, then the file",
         do: ["Read the \"Good to know\" box on the Student Data step.",
              "Upload file → pick \"1 - Student Data (ATS).xlsx\" from the test files."],
-        see: ["\"Good to know\": the file has 2 guardians per student, with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists, and you're asked about them at the end of Input Data Mode and in 👤 Student Overrides.",
+        see: ["\"Good to know\": the file has 2 guardians per student, usually with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists, and you're asked about them at the end of Input Data Mode and in 👤 Student Overrides.",
               "Right after you pick the file: \"Got your file. Moving it to Raw Data…\" at the top of the panel and on the sheet.",
               "The next step opens with a green box at the top: \"Student Data (ATS) completed!\" and \"18 rows moved to Raw Data (18 students). Next: Parent Square.\""],
         fixed: "New on 11/23 (your idea 2): the \"Good to know\" box. The rest is as in round 2." },
@@ -252,7 +252,16 @@ const stages = [
         see: ["The end screen asks \"3 parents to add?\": Abe Simpson (Bart Simpson), Patty Bouvier (Bart Simpson), Abe Simpson (Lisa Simpson). (Selma is not there: you added her in 1.18.)",
               "\"Review and add them\" opens 👤 Student Overrides with the three under Parents to add, each saying where it came from (Parent Square / NYCSA). Homer and Marge are not there: ATS has them.",
               "Nothing is added until you tick and click Add (4.13)."],
-        fixed: "New on 11/18 (your idea): a parent Parent Square, NYCSA or your lists have, but ATS doesn't." }
+        fixed: "New on 11/18 (your idea): a parent Parent Square, NYCSA or your lists have, but ATS doesn't." },
+      { id: "n3-14", isNew: true, title: "A new version of a list",
+        do: ["🚀 App Menu → 📥 Input Data Mode → click Your Lists in the bar at the top. On Bus Routes click Paste new version. Paste nothing: click ← Back to Input Data Mode.",
+             "Paste new version again and upload \"5a - Your Lists - Bus Routes (student list).xlsx\" (the file from 1.13: Bart on R12, Lisa in it). Click ← Back to Input Data Mode before Save.",
+             "Paste new version once more, upload the same file and go through the steps to Save. Back to Input Data Mode → Finish Input Data Mode → Build my sheets. In the build report, click \"Bus Routes: what changed\"."],
+        see: ["While a new version waits, the side panel says your sheets keep using the version you have until you save the new one, and the Bus Routes card says \"A new version isn't saved yet, so your sheets still use this one.\"",
+              "After each ← Back the card has its counts again, and the list's tab is as you left it in 1.19 (Bart on R14, no Lisa): Edit setup shows it.",
+              "After Save, View → Hidden sheets has no \"Bus Routes (old version)\" tab. The report lists \"Changed: Bart Simpson: Route R14 → R12\" and \"New on the list: Lisa Simpson\"."],
+        why: "A tester found that Paste new version emptied the list at the click: a build before the paste (the 10 PM one) put \"No bus\" on every student and their phone contacts, and \"what changed\" said everyone dropped off.",
+        fixed: "11/23, found by the testers." }
     ]
   },
   {
@@ -296,7 +305,14 @@ const stages = [
               "Wednesday's Person Spoke With lists Morticia, Gomez and Grandmama; the other row lists only its own. The Override Report lists Grandmama as Guardian: [Not in ATS] → Added from: by hand.",
               "Pugsley (class changed too) is \"Edited\": a real edit stays an edit, as before."],
         why: "Saved as an added parent, Wednesday's ATS parents keep updating from ATS (a new phone in next month's file still comes in). An edit keeps the student as you saved it.",
-        fixed: "New on 11/23 (your idea 7): a save that only adds a parent was an Edit before. (Round 2's \"a student with 3 guardians\" check, now with this.)" }
+        fixed: "New on 11/23 (your idea 7): a save that only adds a parent was an Edit before. (Round 2's \"a student with 3 guardians\" check, now with this.)" },
+      { id: "n3-15", isNew: true, title: "A student's status stays",
+        do: ["👤 Student Overrides → ✨ New / Edit Student → Edit a student from ATS → Louise Belcher. In Status / label type \"Moved, new address pending\". Save, and let the build run.",
+             "Open Louise again, + Add another guardian (any name and phone), Save, and let the build run. Then open 🗂️ Student Overrides."],
+        see: ["After both builds the Student List's Status for Louise says \"Moved, new address pending\".",
+              "Your changes lists Louise as Edited, with the guardian you added."],
+        why: "Two testers found it: a change of only the status was undone by the next build, and adding a parent later turned the edit into an \"Added guardian\" and lost the status.",
+        fixed: "11/23, found by the testers." }
     ]
   },
   {
@@ -631,7 +647,12 @@ const stages = [
         see: ["Phone sync is still off: nothing was saved."] },
       { id: "b-22", breakit: true, title: "Delete a list you watch",
         do: ["📥 Input Data Mode → Your Lists → 🗑️ on a list with \"Tell me what changed\" → Finish → Build my sheets."],
-        see: ["The build finishes, with no \"what changed\" line for the deleted list."] }
+        see: ["The build finishes, with no \"what changed\" line for the deleted list."] },
+      { id: "b-23", breakit: true, title: "Paste new version, then close the panel",
+        do: ["📥 Input Data Mode → Your Lists → Paste new version on a list. Close the side panel with its X.",
+             "🚀 App Menu → 🏗️ Build Sheets Only. Then 🚀 App Menu → 📥 Input Data Mode → Finish Input Data Mode."],
+        see: ["The build keeps the list's column in the Student List as it was.",
+              "After Finish the list's tab has its rows again, and View → Hidden sheets has no \"(old version)\" tab."] }
     ]
   }
 ];
@@ -656,8 +677,11 @@ module.exports = {
   retestTitle: "New and fixed since round 2",
   // What changed since round 2, newest first (each links to its checks)
   fixes: [
+    { text: "11/23, found by three testers (a power user, a typical user and a careless one went through this version first): Your Lists \"Paste new version\" keeps your list until you save the new one. It emptied the list at the click, so a build before the paste put \"No bus\" on every student and their phone contacts.", checks: ["n3-14", "b-23"] },
+    { text: "11/23, found by the testers: a Status / label set in New / Edit Student was undone by the next build, or lost when a parent was added later.", checks: ["n3-15"] },
+    { text: "11/23, found by the testers: Phone numbers to check offered the replaced number right back after \"Use it instead\" and kept only one of several numbers for a parent; Find a Family missed numbers typed with +1 or an extension and showed only 8 families. Smaller: a Your Lists file was taken at the Parent Square step, an OSIS with a stray character couldn't be opened, the Override Report's phones and sources.", checks: ["n3-08", "n3-10", "n3-06", "n3-12"] },
     { text: "11/23, your idea 1: 🔍 Find a Family (🚀 App Menu): one search box for a name (typos too), OSIS, phone or email; the family's card with parents, follow-ups, Student Info and notes; Edit student; a popup that can become a side panel. (Logging a contact from it comes with the logging UI, later.)", checks: ["n3-06", "n3-12"] },
-    { text: "11/23, idea 2: the Student Data step says it has only 2 guardians per student, one phone and one email each (\"Good to know\").", checks: ["s2-08"] },
+    { text: "11/23, idea 2: the Student Data step says it has only 2 guardians per student, usually one phone and one email each (\"Good to know\").", checks: ["s2-08"] },
     { text: "11/23, idea 3: Your Lists asks \"What is this list for?\": a list can be only for finding parents and phone numbers (nothing on your sheets).", checks: ["n3-01", "n3-03"] },
     { text: "11/23, idea 4: 👤 Student Overrides → Phone numbers to check: another number Parent Square, NYCSA or a list has for a parent you have. Add as a 2nd number, Use it instead or Not needed; a saved number can be deleted under Your changes.", checks: ["n3-08", "n3-10", "n3-11"] },
     { text: "11/23, idea 5: a parent can have several numbers: the Parents List and Find a Family list them all, and Phone Contacts makes ONE contact per parent with Phone 1 to 3 (a different number per child made two contacts).", checks: ["n3-09", "s6-3"] },

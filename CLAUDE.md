@@ -205,6 +205,20 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
     backendBlockRange_ on ADDL_INFO clear it (a write clears first). Keyed by spreadsheet ID: the owner's "copy, then
     load fake data on the copy" builds the copy with this script's cache. od_buildOutputs_ clears ADDL_INFO when there
     are no lists (no-op if never written).
+  - NEW VERSION (tester fix 2026-11-23): "Paste new version" (od_repasteList) first copies the list's tab to a hidden
+    "<tab> (old version)" tab (od_keepOldVersion_: saved lists only, once: a second click keeps the first copy;
+    setup.oldVersion = { tabId, updated, title }), then empties the tab for the paste. Until the new version is SAVED
+    (od_saveList -> od_dropOldVersion_) every reader uses the saved one (od_savedTab_ / od_oldVersionTab_):
+    od_buildOutputs_ (then writes no ✔ Matched columns on the list's tab), parentSources_ (Parents to add / Phone numbers
+    to check), od_migrateLists_ (copies it under the list's own tab name, drops oldVersion) and Rollover's archive (its
+    list copies are shown: a PDF leaves hidden tabs out). Not saved = put back (od_restoreOldVersion_: the copy's used
+    range by Range.copyTo, frozen rows, the band's name, updated / title): ← Back to Input Data Mode
+    (od_backToInputMode), Edit setup (od_openList) and the end of Input Data Mode (idm_cleanup_ ->
+    od_restoreUnsavedVersions_). od_deleteList deletes the copy too; resets delete it (not in KEEP_TABS_). Step 5's card
+    (od_listSummaries_ waiting) and the paste view (list.keptOld) say the old one is still used. Before, the click emptied
+    the tab: a build before the paste (10 PM, an override save) wrote the not-on-list text for every student and "Tell
+    me what changed" said everyone dropped off. A new version without a column you kept: od_setupView_'s missing (those
+    headers) / changed (a column that finds the person is gone: guesses again) replace "Same columns as last time".
   - Resets: list tabs are deleted by deleteLegacySheets_ (not in KEEP_TABS_); resetDerivedSheets_ clears ADDL_INFO +
     OWN_LISTS. Migration carries them over (owner 2026-11-12): ma_migrateSimpleSheets (step 4 "Copy events, student
     changes and your lists") calls od_migrateLists_: each old list tab is copied (copyTo, same name) with its setup and
@@ -549,6 +563,9 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   ManageOverridesDialog, NewStudentDialog, SettingsDialog, ProgressSidebar, YourListsSidebar (pages); ADD the page
   FindFamily; owner sheet also z_MINE. Same manifests. Then Build Sheets Only once and DEPLOY.md step 10 (Method 2
   dropdown by hand: 'Backend'!$CQ$3:$CQ, Show a warning) on the master template and the owner's sheet.
+- The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
+  Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, YourListsSidebar (pages) on
+  every sheet (master template too). No new files, no new permissions, nothing to do by hand.
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
@@ -591,7 +608,7 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   parent with numbers none of which we have -> one card per parent + number (siblings together, % alike when spelled
   differently). Student Overrides page: third section (ticks; Add as a 2nd number / Use it instead (confirm) / Not
   needed; PHONES_TO_CHECK_SKIPPED). savePhoneNumbers writes Backend PHONES (CS:CX: OSIS | Guardian | Number | Use
-  add/instead | From | Date) + a build. getOverrideData_ returns phones (readPhoneChanges_, doc cache PHONE_CHANGES_<id>,
+  add / "instead of <the numbers ATS had>" | From | Date; see THREE TESTERS) + a build. getOverrideData_ returns phones (readPhoneChanges_, doc cache PHONE_CHANGES_<id>,
   cleared by every PHONES write in Core.gs); buildGuardianObjects_(raw, guardians, phones) applies them
   (applyPhoneChanges_; not the Directory). cleanRedundantPhoneChanges_ (in cleanRedundantOverrides) drops a row ATS has
   caught up with. Your changes lists the saved numbers (savedPhoneChanges_: one card per parent + number + use,
@@ -610,7 +627,8 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   popup (460x640) or a side panel; the page's "Open as side panel / Open as popup" (findFamilySwitch) opens the other
   with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
   getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
-  OSIS, phone digits, email. getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
+  OSIS, phone digits (a leading 1 / +1 and an extension are dropped), email; the first 20 matches, then "N more".
+  getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
   FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyEditStudent opens New / Edit Student filled in.
   NO "Log a contact" (owner 2026-11-23: the logging-a-contact UI is a future update): the card's Log a contact /
   Log a contact with them buttons and findFamilyLogContact (the OSIS in the first empty Contact Log row, then
@@ -618,6 +636,52 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   160a224 if that update wants it.
 - Own ideas not built (owner may ask): "Remove the school contacts from this Google account" (deletes contacts),
   emails in Phone numbers to check.
+
+THREE TESTERS (owner 2026-11-23: "have three agents test: 1 smart agent who does complicated things, 1 standard typical
+user, then one stupid user who may click out and do unexpected things"). Each ran the real code on the fake sheet
+(tests/lib/tracker.js is the same setup) and the real pages in Chromium; every finding was run again before fixing;
+tests in tests/test_testers.js. Fixed (branch claude/determined-euler-vq9la3):
+- PHONE NUMBERS TO CHECK, "Use it instead": the Use cell is "instead of <the numbers ATS had>" (phoneChangeUse_,
+  Build.gs; an older bare "instead" row still reads). An instead row whose parent ATS now lists with a number it
+  didn't have is ignored (phoneChangeStale_: ATS changed since) and cleanRedundantPhoneChanges_ deletes it. Several
+  rows for one parent all count (applyPhoneChanges_ per guardian: the instead numbers replace ATS's, the add numbers
+  follow); savePhoneNumbers deletes the earlier rows of the same student + parent when the new one is "instead". The
+  parent is found by name fit (phoneChangeNameFit_: same name, or every part of the saved name, e.g. ATS added a
+  middle name), not only the exact name. ATS's own numbers count as known (g.atsPhones, atsPhonesByStudent_), so the
+  number just replaced (NYCSA still has it) isn't offered back. Every build clears the PHONE_CHANGES cache first (a
+  row deleted by hand on the Backend counts at the next build).
+- "Not needed" / "Not new" lists are split over doc properties KEY, KEY_1 .. KEY_7, 8,500 characters each
+  (readSkipList_ / writeSkipList_ / addToSkipList_ / clearSkipList_, Menus.gs). One property dropped the oldest past
+  8.5 KB: 81 of 423 "Not new" parents came back at a 1,500-student school.
+- New / Edit Student: a student with an Edit / New row stays one when a save only adds a parent (editedBefore; its
+  label, hide and fields stay; it became an Added Guardian row and the label was lost); "Check and edit before adding"
+  with a changed phone puts the source's number on the Phone numbers to check skip list; "Sync to all siblings" sends
+  prefilled for every sibling (their rows said "by hand"); the OSIS box drops spaces / dashes but takes only digits,
+  6+ (a stray ' was saved and the student could not be opened); the search list escapes names and passes the OSIS by
+  data-osis.
+- cleanRedundantOverrides (Build.gs) keeps an Edit row with a label other than Current, "hide from report", or a
+  class / grade / age / gender / language / guardian relationship that differs from ATS (it compared names, phones and
+  emails only: a label-only edit was deleted at the next build; pre-existing).
+- phonesFromCell_ (Core.gs): a number is a whole run of digits (a 10-digit piece of a longer run, e.g. an extension
+  and the next number typed together, is not a phone); exactly 20 digits = two numbers typed together.
+- Find a Family: see idea 1 (+1, extensions, 20 + "N more"); Edit student greys for 1.5 s (a double click opened two).
+- Input Data Mode: the Parent Square step needs one of Students / Registered? / SIS Synced / Record Created (IDM_STEPS
+  mustHaveOne, idm_findHeader_): a Your Lists PTA file (Email + Phone) passed minMatch 2 and replaced Parent Square.
+- Student Overrides page: no Student Data yet = "Load your data first" (getOverridesHome noData); a save or delete from
+  an out-of-date window says nothing happened ("Nothing to save", "Already deleted"); parentMaybeSame_ calls a
+  one-letter difference "a close spelling" (it said "another last name" for Adams / Addams).
+- Your Lists: NEW VERSION (in the Your Lists section).
+- Contacts sync (shared): the Edited count and its log compare every phone and email (only the first ones were, so a
+  changed 2nd number was written but counted "Edited: 0"); one number + one email logs exactly as before.
+- Override Report: phones as phonesFromCell_ shows them, and compared that way (a format-only difference showed as a
+  change); an Added Guardian row with several parents names its sources once ("These parents were added from: ...";
+  each parent got every source, so one typed by hand read "Added from: Parent Square, by hand").
+- Wording: the Student Data export "usually" has one number per parent (Good to know, the step's uses, the Phone
+  numbers to check intro, the User Guide): several numbers in one ATS cell are read now.
+- Method 2 "skipped" (values typed in Backend CQ) is a console.warn, so 🐞 Debug toasts show it.
+Not changed: a Parent Square 2nd phone / NYCSA home or work number is not offered when that source's first number is
+one we have (idea 4 as specified: a parent with numbers none of which we have); the Build panel doesn't show the Method
+2 "skipped" (offered to the owner).
 
 RELEASE CHECK ROUND 2 NOTES (the owner's notes on the round 2 page, 2026-11-17; fixed / built 2026-11-18, tests/test_round3.js;
 deploy: see the 2026-11-18 line under Deploying):
@@ -1297,6 +1361,9 @@ Workflow:
   logs every formatting call in ss._log and keeps fills, merges, widths, rules); render_sidebars.js = optional Playwright screenshots.
   lib/load.js loads the .gs files into one Node context with fake Apps Script services. Run them before every push
   and add a test for logic you change; they don't cover sheet reads / writes / dialogs (try those on a copy).
+  lib/tracker.js (2026-11-23) = a whole new school's tracker after Initial Setup with the real code (newTracker():
+  idmUpload(files...) through Input Data Mode, build(), tab(name)) for end-to-end tests (test_testers.js); the fake
+  sheet copies tabs (sheet.copyTo) and ranges (range.copyTo without a paste type) and keeps frozen rows.
 - TEST DATA (test-data/, 2026-11-12): fake exports for every Input Data Mode step (ATS incl. a "next month" file with
   2 new / 1 left and a broken one with cut-off numbers, Parent Square, NYCSA, Site and Class) and 4 Your Lists files
   (bus routes = student list with title rows / typos / initials / wrong OSIS, PTA = guardian list, field trip =

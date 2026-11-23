@@ -41,6 +41,9 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 Contacts Sync, Regenerate and the pages InputDataSidebar, ManageOverridesDialog, NewStudentDialog,
 SettingsDialog, ProgressSidebar, YourListsSidebar; **add** the page **FindFamily** (new). Your sheet: also
 z_MINE. No new permissions (same manifests). Then do step 10 below once.
+The testers' fixes from the same day are in these same files, so there is nothing more to paste. If you
+already pasted the 10 ideas before them, re-paste Core, Build, Menus, Input Data, Contacts Sync and the pages
+FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, YourListsSidebar.
 
 ## 3. After pasting
 1. Save, then reload the spreadsheet.
