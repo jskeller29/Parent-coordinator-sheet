@@ -250,13 +250,15 @@
             return;
         }
 
+        // The OSIS goes through data-osis (an OSIS or a name with a ' or < broke the click / the list: release check round 3)
+        const esc = v => String(v === null || v === undefined ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         let html = '';
         matches.forEach(s => {
             const gName = s.guardians.length > 0 ? s.guardians.map(g=>g.name).join(', ') : "No Guardian";
             html += `
-            <div class="res" onclick="selectSearchResult('${s.osis}')">
-                <div class="nm">${s.lastName}, ${s.firstName} <span class="os">${s.osis}</span></div>
-                <div class="meta">Parent(s): ${gName} · Class ${s.classCode}</div>
+            <div class="res" data-osis="${esc(s.osis)}" onclick="selectSearchResult(this.dataset.osis)">
+                <div class="nm">${esc(s.lastName)}, ${esc(s.firstName)} <span class="os">${esc(s.osis)}</span></div>
+                <div class="meta">Parent(s): ${esc(gName)} · Class ${esc(s.classCode)}</div>
             </div>`;
         });
 
@@ -498,9 +500,12 @@
             }
         }
 
-        // Every reader skips an OSIS with fewer than 6 digits, so such a student would never show up
-        if (data.osis.replace(/\D/g, '').length < 6) {
-            alert("Please check the OSIS: it needs at least 6 digits (a student's OSIS usually has 9).");
+        // Every reader skips an OSIS with fewer than 6 digits, so such a student would never show up. Numbers only:
+        // spaces and dashes are taken out ("876-543-219"), anything else is refused (a stray ' was saved and built)
+        const osisDigits = data.osis.replace(/[\s\-]/g, '');
+        if (/^\d+$/.test(osisDigits)) { data.osis = osisDigits; document.getElementById('osis').value = osisDigits; }
+        if (!/^\d+$/.test(osisDigits) || osisDigits.length < 6) {
+            alert("Please check the OSIS: numbers only, at least 6 digits (a student's OSIS usually has 9).");
             btn.disabled = false;
             btn.innerHTML = 'Save student';
             btn.classList.remove('opacity-75');

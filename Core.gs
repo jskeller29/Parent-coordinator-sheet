@@ -831,12 +831,18 @@ function formatPhone_(value) {
 function phonesFromCell_(value) {
   const one = formatPhone_(value);
   if (one) return [one];
-  const text = toText_(value);
+  let text = toText_(value);
   if (!text) return [];
+  // A number is a whole run of digits (release check round 3: "27185550104" gave "(271) 855-5010" and an extension
+  // ran into the next number): a match next to another digit is left out, as such cells were before. Two numbers
+  // typed together with nothing between them (exactly 20 digits) are still read as two.
+  text = text.replace(/\d{20}/g, (m, i, all) =>
+    /\d/.test(all.charAt(i - 1)) || /\d/.test(all.charAt(i + 20)) ? m : m.slice(0, 10) + " " + m.slice(10));
   const out = [];
   const re = /(?:\+?1[\s.\-]*)?\(?\d{3}\)?[\s.\-]*\d{3}[\s.\-]*\d{4}/g;
   let m;
   while ((m = re.exec(text)) !== null) {
+    if (/\d/.test(text.charAt(m.index - 1)) || /\d/.test(text.charAt(m.index + m[0].length))) { re.lastIndex = m.index + 1; continue; }
     const f = formatPhone_(m[0]);
     if (f && out.indexOf(f) === -1) out.push(f);
   }

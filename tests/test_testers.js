@@ -194,4 +194,61 @@ const homerKey = t => t.g.findPhonesToCheck_(t.ss).items.find(it => it.guardian 
   eq(g.parentMaybeSame_("Patty Simpson", [], "", [G("Patty Bouvier")]).why, "same first name, another last name");
   console.log("page messages and wording: ok");
 }
+{
+  // Phone numbers are whole runs of digits: no made-up number from a typo or an extension (the 24 messy formats
+  // the careless tester tried read as before)
+  const g = loadProject();
+  const read = v => g.phonesFromCell_(v);
+  eq(read("27185550104"), [], "11 digits not starting with 1: left out, as before");
+  eq(read("718-555-0107 ext 1234 9175550108"), ["(718) 555-0107", "(917) 555-0108"], "the extension doesn't eat the next number");
+  eq(read("71855501019175550144"), ["(718) 555-0101", "(917) 555-0144"], "two typed together (20 digits) are still two");
+  eq(read("7185550101917555014"), [], "19 digits: none");
+  eq(read("OSIS 123456789 718-555-0101"), ["(718) 555-0101"]);
+  eq(read("+1 (718) 555-0101"), ["(718) 555-0101"]);
+  eq(read("1-718-555-0101 x12"), ["(718) 555-0101"]);
+  eq(read("718-555-0101 / 917-555-0144 / 646-555-0111"), ["(718) 555-0101", "(917) 555-0144", "(646) 555-0111"]);
+  eq(read(17185550101), ["(718) 555-0101"]);
+  console.log("phone numbers as whole digit runs: ok");
+}
+{
+  // Input Data Mode: a list with only "Email" and "Phone" is not Parent Square (it replaced the real data)
+  const g = loadProject();
+  const pta = parseCsv(fs.readFileSync(path.join(ROOT, 'test-data', '5b - Your Lists - PTA Members (guardian list).csv'), 'utf8'));
+  const found = g.idm_findHeader_(pta);
+  assert(!found || found.step.key !== "ps", "the PTA list is not taken as Parent Square: " + (found && found.step.key));
+  const ps = parseCsv(fs.readFileSync(path.join(ROOT, 'test-data', '2 - Parent Square.csv'), 'utf8'));
+  eq(g.idm_findHeader_(ps).step.key, "ps", "the real Parent Square export still is");
+  console.log("Parent Square needs one of its own columns: ok");
+}
+{
+  // The clean-up kept only rows that differ from ATS in names / phones / emails: a label, the class or "hide from
+  // the report" alone was deleted at the next build
+  const t = tracker("2 - Parent Square.csv");
+  const formOf = osis => {
+    const s0 = JSON.parse(JSON.stringify(t.g.getAllStudentsForEdit().find(x => x.osis === osis)));
+    return { entryType: "Edit Existing Student", osis: s0.osis, classCode: s0.classCode, firstName: s0.firstName, lastName: s0.lastName,
+      label: s0.label, hideFromReport: false, grade: s0.grade, age: s0.age, gender: s0.gender, homeLanguage: s0.homeLanguage,
+      labelAtOpen: s0.label || "Current", prefilled: null, guardians: s0.guardians };
+  };
+  let f = formOf("123456789"); f.label = "Moved"; t.g.saveStudentOverrides([f]);
+  f = formOf("567891234"); f.classCode = "Y99"; t.g.saveStudentOverrides([f]);
+  f = formOf("234567891"); f.hideFromReport = true; t.g.saveStudentOverrides([f]);
+  f = formOf("245678912"); t.g.saveStudentOverrides([f]); // saved with nothing changed: ATS has it all
+  t.g.cleanRedundantOverrides();
+  eq(t.g.backendReadBlock_(t.ss, "OVERRIDES").slice(1).filter(r => String(r[2]).trim()).map(r => String(r[2])).sort(),
+    ["123456789", "234567891", "567891234"], "the label, the class and the hidden row stay; only the unchanged one goes");
+  console.log("the clean-up keeps a label or a field change: ok");
+}
+{
+  // Find a Family: a phone with +1 / 1- or an extension is found; more than 20 results say how many more; the OSIS
+  // goes through data-osis (an OSIS with ' broke the click), in New / Edit Student's list too
+  const ff = fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8');
+  assert(/digitsOnly && qd\.length === 11 && qd\.charAt\(0\) === '1'/.test(ff) && /function dropExtension/.test(ff), "country code and extension");
+  assert(/var SHOW_RESULTS = 20/.test(ff) && /more families'\) \+ ' match/.test(ff), "how many more");
+  assert(/onclick="pick\(this\.dataset\.osis\)"/.test(ff) && !/pick\(\\'' \+ esc/.test(ff), "pick by data-osis");
+  assert(/busy = true;\s*google\.script\.run\.withSuccessHandler/.test(ff), "Edit student once per click");
+  const ns = fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8');
+  assert(/onclick="selectSearchResult\(this\.dataset\.osis\)"/.test(ns) && /\$\{esc\(s\.lastName\)\}/.test(ns), "New / Edit Student's list");
+  console.log("Find a Family / New Student search fixes: ok");
+}
 console.log("tester findings: ok");

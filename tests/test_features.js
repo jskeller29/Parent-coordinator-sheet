@@ -345,7 +345,7 @@ const { makeSpreadsheet, fakeSpreadsheetApp } = require('./lib/fakesheet');
   const load = settings.slice(settings.indexOf('// ---------- 1. Load the current settings'));
   assert(/setBusy\(true\)/.test(load.slice(0, 600)) && /withFailureHandler/.test(load.slice(0, 1200)), 'Settings: Save is off until the settings have loaded');
   const ns = fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8');
-  assert(/replace\(\/\\D\/g, ''\)\.length < 6/.test(ns), 'New Student: an OSIS with fewer than 6 digits is caught');
+  assert(/osisDigits\.length < 6/.test(ns) && /numbers only, at least 6 digits/.test(ns), 'New Student: an OSIS with fewer than 6 digits, or not only numbers, is caught');
   const mo = fs.readFileSync(path.join(ROOT, 'ManageOverridesDialog.html'), 'utf8');
   assert(/withFailureHandler[\s\S]*deleteOverride/.test(mo), 'Manage Overrides: a failed delete is shown');
   const ev = fs.readFileSync(path.join(ROOT, 'Edits.gs'), 'utf8');

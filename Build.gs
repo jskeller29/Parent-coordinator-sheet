@@ -637,6 +637,7 @@ function cleanRedundantOverrides() {
       
       guardians.push({
         name: name,
+        rel: String(row[base + 1] || "").trim().toLowerCase(),
         phone: String(row[base + 2] || "").trim(),
         email: String(row[base + 3] || "").trim(),
         lang: String(row[base + 4] || "").trim() 
@@ -675,6 +676,17 @@ function cleanRedundantOverrides() {
 
     const rRow = rawMap.get(osis);
 
+    // Only the same information as ATS makes the row redundant (release check round 3: a row that only set the
+    // Status label, the class or another field was deleted here, so the change came undone at the next build).
+    // A label other than "Current" and "hide from the report" are never in ATS; a field left empty isn't a change.
+    const label = String(oRow[40] || "").trim();
+    if (label && label.toLowerCase() !== "current") continue;
+    if (String(oRow[41]).trim().toLowerCase() === "true") continue;
+    const normField = v => String(v === null || v === undefined ? "" : v).trim().toLowerCase().replace(/\s+/g, " ");
+    const fieldChanged = [[8, 17], [7, 16], [6, 7], [5, 6], [9, 18]] // class, grade, age, gender, home language
+      .some(c => normField(oRow[c[0]]) !== "" && normField(oRow[c[0]]) !== normField(rRow[c[1]]));
+    if (fieldChanged) continue;
+
     const newStudentName = `${String(oRow[4] || "").trim()} ${String(oRow[3] || "").trim()}`.trim();
     const oldStudentName = `${String(rRow[4] || "").trim()} ${String(rRow[3] || "").trim()}`.trim();
     if (newStudentName.toLowerCase() !== oldStudentName.toLowerCase()) continue; 
@@ -696,7 +708,7 @@ function cleanRedundantOverrides() {
     let contactChanged = false;
     newGuardians.forEach(ng => {
       const og = oldGuardians.find(g => g.name.toLowerCase() === ng.name.toLowerCase());
-      if (og && (og.phone !== ng.phone || og.email !== ng.email || og.lang !== ng.lang)) {
+      if (og && (og.phone !== ng.phone || og.email !== ng.email || og.lang !== ng.lang || (ng.rel && og.rel !== ng.rel))) {
         contactChanged = true;
       }
     });

@@ -96,6 +96,9 @@ var IDM_STEPS = [
     key: 'ps', tab: 'Parent Square Data', short: 'Parent Square', zone: 'Parent Square', required: false,
     col: 33, stampCell: 'AG1', stampPrefix: 'Parent Square - DATE UPDATED: ', minMatch: 2,
     headers: ["Name","Students","Email","Phone","Secondary Phone","Record Created","Registered?","SIS Synced"],
+    // and one column only Parent Square has: "Email" + "Phone" alone let a PTA list in, which replaced the real
+    // Parent Square data (release check round 3)
+    mustHaveOne: ["Students","Registered?","SIS Synced","Record Created"],
     numberCols: ["Phone","Secondary Phone"],
     keyCols: ["Name","Students","Email","Phone"],
     uses: "Which parents have joined Parent Square. Shows in Parents List, and the build report lists the new sign-ups.",
@@ -879,6 +882,7 @@ function idm_findHeader_(values) {
     IDM_STEPS.forEach(step => {
       if (!step.headers) return;
       const count = step.headers.filter(h => cells[idm_norm_(h)]).length;
+      if (step.mustHaveOne && !step.mustHaveOne.some(h => cells[idm_norm_(h)])) return;
       if (count >= step.minMatch && (!best || count > best.count)) best = { step: step, row: i, count: count };
     });
   }

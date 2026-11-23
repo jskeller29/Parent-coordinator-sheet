@@ -58,6 +58,7 @@
     <div id="loading" class="state"><div class="spinner"></div>Loading the families…</div>
     <div id="results" class="res hidden" role="listbox" aria-label="Families found"></div>
     <div id="none" class="state hidden">Nobody found. Try part of the name, or the last 4 digits of the phone number.</div>
+    <p id="more" class="hint hidden" style="margin:6px 2px 0"></p>
     <div id="fam" class="fam hidden"></div>
   </div>
 
@@ -124,12 +125,16 @@
         ENTRIES.push({ kind: 'parent', osis: p.osis, toks: words(p.name), name: p.name, p: p, phones: p.phones.map(digits), email: plain(p.email) });
       });
     }
+    // The query without a phone extension at its end ("x12", "ext. 12"): searching "(718) 555-0102 x12" finds the number
+    function dropExtension(q) { return String(q).replace(/\s*(?:x|ext\.?|extension)\s*\d{1,6}\s*$/i, ''); }
     function search(q) {
+      q = dropExtension(q);
       var qd = digits(q), qp = plain(q).trim();
       var hits = {}; // OSIS -> { score, why }
       var add = function (osis, score, why) { if (!hits[osis] || hits[osis].score < score) hits[osis] = { score: score, why: why }; };
       if (!qp) return [];
       var digitsOnly = qd.length >= 3 && qd.length >= qp.replace(/[\s()+.\-]/g, '').length;
+      if (digitsOnly && qd.length === 11 && qd.charAt(0) === '1') qd = qd.slice(1); // +1 / 1- in front: the US country code
       if (digitsOnly) {
         ENTRIES.forEach(function (e) {
           if (e.kind === 'student' && e.osis.indexOf(qd) !== -1) add(e.osis, e.osis === qd ? 9 : 6, 'OSIS ' + e.osis);
@@ -149,18 +154,22 @@
         });
       }
       return Object.keys(hits).map(function (o) { return { osis: o, score: hits[o].score, why: hits[o].why }; })
-        .sort(function (a, b) { return b.score - a.score || BY[a.osis].st.name.localeCompare(BY[b.osis].st.name); })
-        .slice(0, 8);
+        .sort(function (a, b) { return b.score - a.score || BY[a.osis].st.name.localeCompare(BY[b.osis].st.name); });
     }
+    var SHOW_RESULTS = 20; // the rest: "N more: type more of the name" (it showed 8 and never said there were more)
     function renderResults() {
       var q = $('q').value;
-      var list = q.trim() ? search(q) : [];
+      var all = q.trim() ? search(q) : [];
+      var list = all.slice(0, SHOW_RESULTS);
       show('none', !!q.trim() && !list.length);
       show('results', list.length > 0);
+      var more = all.length - list.length;
+      $('more').textContent = more > 0 ? (more === 1 ? '1 more family' : more + ' more families') + ' match: type more of the name, or part of a phone number.' : '';
+      show('more', more > 0);
       $('results').innerHTML = list.map(function (r, i) {
         var s = BY[r.osis].st;
         var sub = (r.why === 'Student' ? 'OSIS ' + s.osis + (s.cls ? ' · ' + s.cls : '') : r.why);
-        return '<button type="button" role="option" data-osis="' + esc(r.osis) + '" class="' + (r.osis === picked ? 'on' : '') + '" onclick="pick(\'' + esc(r.osis) + '\')">' +
+        return '<button type="button" role="option" data-osis="' + esc(r.osis) + '" class="' + (r.osis === picked ? 'on' : '') + '" onclick="pick(this.dataset.osis)">' +
           '<span class="rn">' + esc(s.name) + '</span><span class="rs">' + esc(sub) + '</span></button>';
       }).join('');
     }
@@ -229,7 +238,9 @@
     // ---------- actions ----------
     function editStudent() {
       if (!picked || busy) return;
-      google.script.run.withFailureHandler(onFail).findFamilyEditStudent(picked);
+      busy = true;
+      google.script.run.withSuccessHandler(function () { setTimeout(function () { busy = false; }, 1500); })
+        .withFailureHandler(onFail).findFamilyEditStudent(picked);
     }
     function switchMode() {
       var other = mode === 'panel' ? 'popup' : 'panel';
