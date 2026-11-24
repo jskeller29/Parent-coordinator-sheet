@@ -68,8 +68,16 @@ const eq = (a, b, m) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a === u
   assert.strictEqual(be.getRange(3, b.col).getFormula(), f, "the formula in CQ3");
   assert.strictEqual(g.ensureMethod2ChoicesOnBackend_(ss), "kept", "the next build keeps it");
 
+  // The owner's new defaults (2026-11-24), in this order; a sheet with the OLD built-in formula gets them
+  eq(g.METHOD2_FIXED_CHOICES_, ["Call", "Email", "Text", "Parents Square", "In School"]);
+  assert(f.includes('VSTACK("Call", "Email", "Text", "Parents Square", "In School", typed)'), "fixed choices first, then the typed ones");
+  be.getRange(3, b.col).setFormula(g.method2ChoicesFormula_(g.METHOD2_OLD_FIXED_CHOICES_));
+  assert.strictEqual(g.ensureMethod2ChoicesOnBackend_(ss), "updated", "the old built-in list is replaced");
+  assert.strictEqual(be.getRange(3, b.col).getFormula(), f);
+  assert.strictEqual(g.ensureMethod2ChoicesOnBackend_(ss), "kept");
+
   // Changed by hand (other fixed choices): kept as it is
-  const mine = f.replace('"Voicemail", ', '"Voicemail", "Home Visit", ');
+  const mine = f.replace('"Text", ', '"Text", "Home Visit", ');
   be.getRange(3, b.col).setFormula(mine);
   assert.strictEqual(g.ensureMethod2ChoicesOnBackend_(ss), "kept");
   assert.strictEqual(be.getRange(3, b.col).getFormula(), mine, "your own list stays");

@@ -1510,10 +1510,13 @@ function ensureFollowupNewerRule_(ss) {
 // the fixed choices, edit the formula in CQ3 on the sheet: a formula there that reads Contact Log K
 // is kept as it is.
 // ======================================================================
-var METHOD2_FIXED_CHOICES_ = ["Call", "Text", "Email", "Voicemail", "Meeting", "In School"];
+// Always first in the list, whatever is typed (owner 2026-11-24; was Call, Text, Email, Voicemail, Meeting, In School)
+var METHOD2_FIXED_CHOICES_ = ["Call", "Email", "Text", "Parents Square", "In School"];
+// The first list: a CQ3 still holding exactly that built-in formula is replaced by the new one at the next build
+var METHOD2_OLD_FIXED_CHOICES_ = ["Call", "Text", "Email", "Voicemail", "Meeting", "In School"];
 
-function method2ChoicesFormula_() {
-  const fixed = METHOD2_FIXED_CHOICES_.map(c => '"' + c + '"').join(", ");
+function method2ChoicesFormula_(choices) {
+  const fixed = (choices || METHOD2_FIXED_CHOICES_).map(c => '"' + c + '"').join(", ");
   return "=ARRAYFORMULA(LET(endRow, IFERROR(MATCH(TRUE, TRIM('Contact Log'!E:E)=\"END\", 0), 3), " +
     "typed, TRIM(INDEX('Contact Log'!K:K, 2):INDEX('Contact Log'!K:K, MAX(2, endRow - 1))), " +
     "all, UNIQUE(VSTACK(" + fixed + ", typed)), FILTER(all, all <> \"\")))";
@@ -1529,6 +1532,12 @@ function ensureMethod2ChoicesOnBackend_(ss) {
   const first = BACKEND_HEADER_ROW + 1;
   const cell = sh.getRange(first, b.col);
   const have = String(cell.getFormula() || "");
+  // The old built-in list (not changed by hand): the new fixed choices
+  const bare = f => String(f).replace(/\s+/g, "");
+  if (have && bare(have) === bare(method2ChoicesFormula_(METHOD2_OLD_FIXED_CHOICES_))) {
+    cell.setFormula(method2ChoicesFormula_());
+    return "updated";
+  }
   if (have && /Contact Log'?!\$?K/i.test(have)) {
     // Kept (one changed by hand too); a list blocked by something typed under it (#REF!) is freed
     if (String(cell.getDisplayValue()).trim() !== "#REF!") return "kept";
