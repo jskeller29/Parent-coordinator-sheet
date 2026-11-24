@@ -150,6 +150,19 @@ function makeSheet(ss, name) {
       }
       s._maxCols += n; s._logSheet('insertColumnsAfter', [a, n]); return p;
     },
+    insertColumns: (a, n) => { // new empty columns before column a; the cells from a on move right
+      n = n || 1;
+      const shift = m => {
+        const moved = new Map();
+        m.forEach((v, k) => { const [rr, cc] = k.split(',').map(Number); moved.set(cc < a ? k : rr + ',' + (cc + n), v); });
+        m.clear(); moved.forEach((v, k) => m.set(k, v));
+      };
+      [cells, s._formulas, s._dv, s._notes, s._bg].forEach(shift);
+      const hidden = Array.from(s._hiddenCols); s._hiddenCols.clear();
+      hidden.forEach(c => s._hiddenCols.add(c < a ? c : c + n));
+      s._merges = s._merges.map(m => (m.c >= a ? Object.assign({}, m, { c: m.c + n }) : m));
+      s._maxCols += n; s._logSheet('insertColumns', [a, n]); return p;
+    },
     deleteRows: (a, n) => { s._maxRows -= n; return p; },
     deleteColumns: (a, n) => { // the cells to the right move left, like Sheets (values, formulas, rules, notes, fills)
       const shift = m => {

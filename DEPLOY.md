@@ -23,7 +23,7 @@ A file from an older version left in the project = the project won't load
 |---|---|---|
 | **Scripts** | Core, Build, Edits, Menus, Input Data, Contacts Sync, Sheet Lock, Regenerate, Z#ContactLog | same |
 | **Your scripts** | z_MINE, z_ContactLogDebug, z_InputDataDebug, z_NewCopy | **none** (never copy these) |
-| **Pages** | Styles, SettingsDialog, ProgressSidebar, NewStudentDialog, ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog, InputDataSidebar, YourListsSidebar, GettingStartedSidebar, FindFamily, Z#ContactLogSidebar | same |
+| **Pages** | Styles, SettingsDialog, ProgressSidebar, NewStudentDialog, ManageOverridesDialog, RolloverWizard, MigrationUI, VersionDialog, InputDataSidebar, YourListsSidebar, GettingStartedSidebar, FindFamily, EventsSidebar, Z#ContactLogSidebar | same |
 | **Your pages** | z_ContactLogDebugSidebar | **none** |
 | **Manifest** (`appsscript.json`) | contents of `App Scripts (Mine).Json` | contents of `App Scripts (General).Json` |
 
@@ -45,6 +45,9 @@ The testers' fixes from the same day, the Student List's new Home Language colum
 Follow-up color (11/24: Core, Edits, Build, Regenerate) are in these same files, so there is nothing more to paste. If you
 already pasted the 10 ideas before them, re-paste Core, Build, Menus, Input Data, Contacts Sync and the pages
 FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar, YourListsSidebar.
+
+**Events + Settings tabs + the report at night (2026-11-24):** re-paste the scripts Edits, Menus, Build and the
+page SettingsDialog; **add** the page **EventsSidebar** (new). Every sheet (master template too). Nothing by hand.
 
 ## 3. After pasting
 1. Save, then reload the spreadsheet.

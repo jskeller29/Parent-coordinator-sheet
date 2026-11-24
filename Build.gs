@@ -277,8 +277,32 @@ function buildAllDerivedSheetsRun_() {
   // Welcome tab goes (Menus.gs; at the END, so a build that fails half way leaves the guide there)
   try { welcomeTabAfterBuild_(ss); } catch (e) { console.warn("Welcome tab: " + e.message); }
 
+  // The Students Override Report is made on request; with the nightly rebuild off, the next build
+  // deletes it (with it on, the 10 PM run does: nightlyMasterSyncLocked_). Owner 2026-11-24.
+  if (PropertiesService.getDocumentProperties().getProperty('disableNightlySync') === 'true') deleteOverrideReport_(ss);
+
   // "This tracker pauses itself when brought into a newer one" (read by the newer one's Migration)
   markTrackerCode_(ss);
+}
+
+/**
+ * Deletes the "Students Override Report" tab (owner 2026-11-24: it is made when asked for,
+ * 👤 Student Overrides → Create the Override Report, and should not linger). Someone on it
+ * is moved to the Contact Log first. Never throws; true = deleted.
+ */
+function deleteOverrideReport_(ss) {
+  try {
+    const report = ss.getSheetByName("Students Override Report");
+    if (!report) return false;
+    const others = ss.getSheets().filter(sh => sh.getSheetId() !== report.getSheetId() && !sh.isSheetHidden());
+    if (!others.length) return false; // Sheets keeps at least one tab showing
+    if (ss.getActiveSheet().getSheetId() === report.getSheetId()) {
+      const log = ss.getSheetByName("Contact Log");
+      ((log && !log.isSheetHidden()) ? log : others[0]).activate();
+    }
+    ss.deleteSheet(report);
+    return true;
+  } catch (e) { console.warn("Students Override Report not deleted: " + e.message); return false; }
 }
 
 /** Nightly trigger: full rebuild, Contact Log formatting, then (if opted in) the phone sync. */
@@ -553,6 +577,7 @@ function nightlyMasterSyncLocked_() {
     }
     buildAllDerivedSheets();
     resetContactLogFormatting();
+    deleteOverrideReport_(ss); // made on request, gone by the morning (owner 2026-11-24)
 
     const props = PropertiesService.getDocumentProperties();
     const syncToPhones = props.getProperty('syncToPhones') === 'true';

@@ -140,16 +140,19 @@ var TAB_VISIBILITY = [
   { key: 'showCombined',       sheets: ["Combined Contact Tracking"], def: true  },
   { key: 'showPcar',           sheets: ["PCAR"],                      def: true  },
   { key: 'showDirectory',      sheets: ["Directory"],                 def: true  },
-  { key: 'showRawData',        sheets: ["Raw Data", "RAW Data"],      def: false },
+  { key: 'showRawData',        sheets: ["Raw Data", "RAW Data"],      def: false, inSettings: false }, // Input Data Mode shows it
   { key: 'showMasterTable',    sheets: ["Student List", "Master Table"], def: false }, // was "Master Table" (renamed on first use)
   { key: 'phoneContacts',      sheets: ["Phone Contacts"],            def: false },
   { key: 'parentsDivided',     sheets: ["Parents List", "Parents Divided"], def: false }, // was "Parents Divided" (renamed on first use)
   { key: 'notesTab',           sheets: ["Notes"],                     def: false },
-  { key: 'showEvents',         sheets: ["Events"],                    def: false },
+  { key: 'showEvents',         sheets: ["Events"],                    def: false, inSettings: false }, // New Event / View Events show it, the Events panel hides it
   { key: 'sendOut',            sheets: ["Send Out"],                  def: false },
-  { key: 'showOverrideReport', sheets: ["Students Override Report"],  def: false },
-  { key: 'showNewStudents',    sheets: ["New Students"],              def: false }
+  { key: 'showOverrideReport', sheets: ["Students Override Report"],  def: false, inSettings: false }, // made on request, deleted again at night
+  { key: 'showNewStudents',    sheets: ["New Students"],              def: false, ownerOnly: true }  // the owner's sheet only (z_MINE.gs)
 ];
+// inSettings: false (owner 2026-11-24) = not in ⚙️ Settings → Tabs & columns: its own tools show / hide it, so a
+// Settings save, the tabs shown after the first build / Input Data Mode and rememberTabChoices_ leave it alone (any
+// value saved before is ignored). ownerOnly: in Settings on the owner's sheet only (getOwnerHooks_).
 
 // Hour of the nightly rebuild / phone sync trigger (22 = 10 PM in the script's time
 // zone; Apps Script runs it some time in that hour). Initial Setup and every
@@ -463,6 +466,7 @@ function buildMenus_(realOpen) {
     // 2. The Events Menu
     ui.createMenu('📆 Events')
       .addItem('📋 New Event', 'createNewEventTable')
+      .addItem('👁️ View Events', 'openViewEventsDialog')
       .addToUi();
 
     // 3. Contact Log menu — optional module (Z#ContactLog.gs). Guarded so the
@@ -671,14 +675,14 @@ function zg_links_() {
 const ZG_TABS = [
   { name: "👋 Welcome", type: "",
     what: "Your next steps. Start with 🚀 App Menu → 📥 Input Data Mode. This tab goes away by itself once your sheets are built." },
-  { name: "Raw Data", alt: "RAW Data", type: "data", settings: true,
+  { name: "Raw Data", alt: "RAW Data", type: "data", where: "🚀 App Menu → 📥 Input Data Mode (or View → Hidden sheets → Raw Data)",
     what: "Where your student data lives: ATS (columns A to AE), Parent Square (AG to AN), NYCSA (AP to BF), and your sites and classes (BH to BI). Row 1 of each part shows when it was last updated. Input Data Mode puts the data in for you." },
   { name: "Contact Log", type: "type", settings: true,
     what: "Your daily log of every parent contact. Type the parent's name in column C and the student and OSIS fill in, along with the date, the # and the follow-up." },
   { name: "Notes", type: "type", settings: true,
     what: "Notes about a student that you always want to see first. They show at the top of that student's notes in Combined Contact Tracking." },
-  { name: "Events", type: "type", settings: true,
-    what: "Attendance for your events and workshops. Make a table with 📆 Events → 📋 New Event, then add the parents who came." },
+  { name: "Events", type: "type", where: "📆 Events → 📋 New Event or 👁️ View Events",
+    what: "Attendance for your events and workshops. Make a table with 📆 Events → 📋 New Event, then add the parents who came. Only that event shows; 📆 Events → 👁️ View Events picks which ones show. Click Done in the Events panel to build and hide the tab." },
   { name: "Send Out", type: "type", settings: true,
     what: "Messages and flyers you sent to families and how many you reached. They count toward your PCAR." },
   { name: "PCAR", type: "report", settings: true,
@@ -693,8 +697,8 @@ const ZG_TABS = [
     what: "Your family directory, from ATS only: each student, OSIS, site, class and how to reach their parents." },
   { name: "Phone Contacts", type: "built", settings: true,
     what: "The contact list your phone sync sends to Google Contacts (⚙️ Settings → Contacts & sync)." },
-  { name: "Students Override Report", type: "built", settings: true,
-    what: "The student changes you made with 👤 Student Overrides." }
+  { name: "Students Override Report", type: "built", where: "👤 Student Overrides → Create the Override Report",
+    what: "The student changes you made with 👤 Student Overrides. Made when you ask for it; deleted again at the 10 PM rebuild (or at the next build when the nightly rebuild is off)." }
 ];
 
 // ----------------------------------------------------------------------
@@ -1125,7 +1129,7 @@ function zg_hiddenTabs_(ss) {
     .map(t => ({
       name: t.sheet.getName(),
       what: t.info.what,
-      where: t.info.settings ? "⚙️ Settings → Tabs & columns" : "View → Hidden sheets → " + t.sheet.getName()
+      where: t.info.where || (t.info.settings ? "⚙️ Settings → Tabs & columns" : "View → Hidden sheets → " + t.sheet.getName())
     }));
 }
 
@@ -1517,6 +1521,7 @@ function rememberTabChoices_(ss) {
   if (!log || log.isSheetHidden() || !studentListIsBuilt_(ss)) return [];
   const vals = {}, changed = [];
   TAB_VISIBILITY.forEach(function(t) {
+    if (t.inSettings === false) return; // not a Settings choice (Raw Data, Events, the report)
     let sh = null;
     t.sheets.forEach(function(n) { if (!sh && byName[n]) sh = byName[n]; });
     if (!sh) return;
@@ -1961,10 +1966,14 @@ function getSettings() {
   // --- Tab visibility (TAB_VISIBILITY): saved value, else the tab's default ---
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   settings.tabsPresent = {};
+  const isOwner = !!getOwnerHooks_();
   TAB_VISIBILITY.forEach(function(t) {
     const v = props.getProperty(t.key);
-    settings[t.key] = (v === null || v === '') ? t.def : v === 'true';
-    settings.tabsPresent[t.key] = t.sheets.some(function(name) { return !!ss.getSheetByName(name); });
+    const managed = t.inSettings === false;
+    settings[t.key] = (managed || v === null || v === '') ? t.def : v === 'true';
+    // A tab this sheet doesn't have, a tab its own tools show / hide, the owner's New Students elsewhere: no row in Settings
+    settings.tabsPresent[t.key] = !managed && (!t.ownerOnly || isOwner)
+      && t.sheets.some(function(name) { return !!ss.getSheetByName(name); });
   });
   return settings;
 }
@@ -1977,7 +1986,8 @@ function updateVisualSettings_(settings, columnsOnly) {
   // into "can't hide every sheet" while a tab to show is still hidden.
   // columnsOnly: Initial Setup on a new copy (its tabs wait behind the Welcome tab). ---
   const wantShown = function(t) { return (settings[t.key] === undefined) ? t.def : settings[t.key] === true; };
-  const ordered = columnsOnly ? [] : TAB_VISIBILITY.filter(wantShown).concat(TAB_VISIBILITY.filter(function(t) { return !wantShown(t); }));
+  const inSettings = TAB_VISIBILITY.filter(function(t) { return t.inSettings !== false; }); // Raw Data, Events, the report: their tools decide
+  const ordered = columnsOnly ? [] : inSettings.filter(wantShown).concat(inSettings.filter(function(t) { return !wantShown(t); }));
   ordered.forEach(function(t) {
     t.sheets.forEach(function(sheetName) {
       try {
