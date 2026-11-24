@@ -34,7 +34,7 @@ function cl_isOpenFollowup_(v) { return CLQ_OPEN_FOLLOWUPS.indexOf(String(v || "
 function buildContactLogMenu_() {
   SpreadsheetApp.getUi().createMenu("📇 Contact Log")
     .addItem("➕ New Interaction", "openNewInteraction")
-    .addItem("🔔 Manage Notes / Follow-ups", "openManageNotes")
+    .addItem("📝 Manage Notes / Follow-ups", "openManageNotes") // 📝, not 🔔 (= Check for Updates; owner 2026-11-24)
     .addToUi();
 }
 

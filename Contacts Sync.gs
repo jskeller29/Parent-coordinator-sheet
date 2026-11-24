@@ -9,7 +9,7 @@
 // 5. RESILIENT SIDEBAR BACKEND
 // ==========================================
 function startResilientSync() {
-  return runAction_("Full Sync", () => startResilientSyncRun_());
+  return runAction_("Build + Sync Contacts", () => startResilientSyncRun_());
 }
 
 function startResilientSyncRun_() {
@@ -30,7 +30,7 @@ function startResilientSyncRun_() {
   // the run as 'killed' with the error, so the sidebar says what went wrong and the
   // next Full Sync starts normally (before, a crash left 'building' for 6 hours).
   try {
-    withBuildLock_("Full Sync", () => startResilientSyncLocked_(cache));
+    withBuildLock_("Build + Sync Contacts", () => startResilientSyncLocked_(cache));
   } catch (e) {
     console.error("Full Sync failed: " + (e.stack || e.message));
     cache.put('SYNC_UI_STATE', JSON.stringify({ phase: 'killed', error: e.message || String(e) }), 21600);
@@ -396,7 +396,7 @@ function syncToGoogleContactsRun_() {
     // Over half: removed only when confirmed. "No" at the start (or no one to ask) stays no; a check
     // that wasn't needed at the start (the numbers changed since) is asked now, if someone is here.
     const ok = decision !== "blocked" && askMassDeletion_(ss, staleEntries.length, index.labelCount);
-    if (!ok) note = "Skipped removing " + staleEntries.length + " contacts (over half of the list). Run Full Sync and answer Yes to remove them.";
+    if (!ok) note = "Skipped removing " + staleEntries.length + " contacts (over half of the list). Run 🧱 Build + Sync Contacts and answer Yes to remove them.";
   }
   const deleteNow = staleEntries.length > 0 && !note;
   const deletedCount = deleteNow ? staleEntries.length : 0;
@@ -673,7 +673,7 @@ function RESTART_SYNC() {
 // ======================================================================
 // WHOSE GOOGLE CONTACTS GET THE FAMILIES (owner 2026-11-23, "phone sync must be on the DOE phone only")
 // The 10 PM sync runs as the person who owns the sheet's nightly job (usually whoever ran Initial
-// Setup; Build.gs ONE NIGHTLY JOB PER SHEET), and 🧱 Full Sync runs as whoever clicks it. That
+// Setup; Build.gs ONE NIGHTLY JOB PER SHEET), and 🧱 Build + Sync Contacts (Full Sync) runs as whoever clicks it. That
 // account's Google Contacts get every family, and every phone or computer signed in to it shows them.
 // So ⚙️ Settings says whose account it is when phone sync is turned on (and warns more strongly when
 // it isn't a DOE account), and Full Sync asks once per person and account (every time for a non-DOE
@@ -725,7 +725,7 @@ function getPhoneSyncAccount() {
 }
 
 /**
- * 🧱 Full Sync (openProgressBarSidebar): it fills the Google Contacts of whoever clicks it. Asks once per
+ * 🧱 Build + Sync Contacts (Full Sync, openProgressBarSidebar): it fills the Google Contacts of whoever clicks it. Asks once per
  * person and DOE account, every time for an account that isn't DOE (or can't be read). false = stopped.
  */
 function confirmFullSyncAccount_() {
@@ -736,7 +736,7 @@ function confirmFullSyncAccount_() {
   const ui = SpreadsheetApp.getUi();
   const who = me || "the Google account you are using now";
   const text = (doe === false ? "⚠️ " + me + " is not a DOE (@" + DOE_ACCOUNT_DOMAIN_ + ") account.\n\n" : "") +
-    "Full Sync puts every family's contact (names, phone numbers and notes) into the Google Contacts of " + who +
+    "Build + Sync Contacts puts every family's contact (names, phone numbers and notes) into the Google Contacts of " + who +
     ". Every phone or computer signed in to that account shows them.\n\n" +
     "Only go on with your DOE (@" + DOE_ACCOUNT_DOMAIN_ + ") Google account, on a DOE phone. Never a personal account or a personal phone.\n\n" +
     "Turning phone sync off later does not remove them: in Google Contacts, open the \"School Directory\" label, select all, and delete.\n\nGo on?";

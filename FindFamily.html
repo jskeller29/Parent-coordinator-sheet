@@ -4,7 +4,7 @@
   <base target="_top">
   <?!= include_('Styles') ?>
   <style>
-    /* 🔍 Find a Family (owner 2026-11-23): a popup that can become a side panel (Menus.gs FIND A FAMILY) */
+    /* 👪 Families → 🔍 Find a Family (owner 2026-11-23): a popup that can become a side panel (Menus.gs FIND A FAMILY) */
     html, body { height: 100%; }
     body { display: flex; flex-direction: column; overflow: hidden; }
     .ff-top { padding: 12px 14px 6px; flex-shrink: 0; position: relative; z-index: 2; }
@@ -269,7 +269,7 @@
         mode = DATA.as === 'panel' ? 'panel' : 'popup';
         $('modeBtn').textContent = mode === 'panel' ? 'Open as popup' : 'Open as side panel';
         show('loading', false);
-        if (DATA.notBuilt) { say('Build your sheets first (🚀 App Menu → 🏗️ Build Sheets Only), then search here.', 'warn'); return; }
+        if (DATA.notBuilt) { say('Build your sheets first (🚀 App Menu → 🏗️ Build Sheets), then search here.', 'warn'); return; }
         buildIndex();
         $('q').disabled = false;
         $('q').placeholder = 'Search student, parent, OSIS, phone or email…';

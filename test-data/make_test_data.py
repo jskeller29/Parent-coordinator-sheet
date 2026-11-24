@@ -80,14 +80,14 @@ write("2 - Parent Square", PS_H, ps)
 # 3. NYCSA ("Students with Non-NYCSA Account")
 write("3 - NYCSA (Students with Non-NYCSA Account)", NY_H, ny)
 
-# 2b / 3b. A parent your Student Data (ATS) doesn't have (👤 Student Overrides → Parents to add, 2026-11-18):
+# 2b / 3b. A parent your Student Data (ATS) doesn't have (🗂️ Family Changes → Parents to add, 2026-11-18):
 # Abe Simpson in Parent Square for Bart and Lisa, Patty Bouvier as Bart's third guardian in NYCSA (ATS lists two)
 PS_EXTRA = ["Simpson, Abe", "Bart Simpson, Lisa Simpson", "ABE.SIMPSON@gmail.com", "(343) 434-3434", "", "Nov 12, 2026", "Yes", "No"]
 NY_EXTRA = ["M094", "75", "P.S. M094", "Y41", "6", "123456789", "BART", "SIMPSON", "PATTY", "BOUVIER", "No", "", "", "4545454545", "AUNT", "Custodial User", "B11111C9"]
 write("2b - Parent Square - a parent not in ATS", PS_H, ps + [PS_EXTRA])
 write("3b - NYCSA - a third guardian", NY_H, ny + [NY_EXTRA])
 
-# 2c. New numbers for parents ATS already has (👤 Student Overrides → Phone numbers to check, 2026-11-23):
+# 2c. New numbers for parents ATS already has (🗂️ Family Changes → Phone numbers to check, 2026-11-23):
 # Homer Simpson has a new number on both his rows (Bart and Lisa: one card), and Parent Square spells Morticia
 # "Adams" with a new number on Wednesday's row only (a card that says how alike the names are; Pugsley's row
 # is unchanged, so after "Add as a 2nd number" she is one phone contact with both numbers)

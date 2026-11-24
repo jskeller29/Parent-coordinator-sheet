@@ -27,14 +27,41 @@ Files (shared = every school's sheet):
 - Edits.gs: installedOnEdit, ghost typists (Contact Log / Notes / Events), Raw Data paste clean-up, quick updates
   (updateSingleOsisDelta_ / updateOsisDeltas_ / updateContactAndPhoneOnly), Events tables. (The temporary
   🐞 Contact Log Debug sidebar is the owner's test file z_ContactLogDebug.gs, see below.)
-- Menus.gs: onOpen menus, setup, 👋 Welcome tab (new copies, see below), Getting Started (welcome + checklist, see
-  below), Settings, Student Overrides + report, Rollover, Migration, Version Check, data update reminder, links,
-  🔍 Find a Family (+ FindFamily.html, 2026-11-23, see THE OWNER'S 10 IDEAS).
+- Menus.gs: onOpen menus (layout "2+", see MENUS below), setup, 👋 Welcome tab (new copies, see below), Getting
+  Started (welcome + checklist, see below), Settings, Student Overrides (= 🗂️ Family Changes) + report, Rollover,
+  Migration, Version Check, data update reminder, links, 🔍 Find a Family (+ FindFamily.html, 2026-11-23, see THE
+  OWNER'S 10 IDEAS).
+
+MENUS (layout "2+", owner 2026-11-24: "the App Menu is clogged"; picked from 4 options; Menus.gs MENUS block under
+buildMenus_, tests/test_menus.js). Naming rules: short labels, no explanation in brackets (the window explains), the
+label = the title of the window it opens, one emoji = one meaning, rare items one level down (addSubMenu), no custom
+menu named "Help" in the bar (ours sit right after Google's Help). Only labels / places moved: every item runs the same
+function as before (handler names kept).
+  Before setup: 🚀 App Menu → 🚨 Initial Setup (Run Once) (unchanged).
+  Before the first build (only 🚀 App Menu): ✅ Getting Started, 📥 Input Data Mode, 🏗️ Build Sheets, ---, 📦 Bring Over
+  Last Year's Tracker (was 🔄 Import Old Data; = the wizard's title), ❓ Help ▸ (📖 User Guide, 🐞 Report a Bug, 🔔 Check
+  for Updates).
+  Built: 🚀 App Menu: ✅ Getting Started (only until the checklist is finished: guideFinished_ = ZG_AUTO_OPEN off or doc
+  property ZG_GUIDE_DONE, set once by zg_rememberDone_ when all 4 steps are done (guideOnOpen_, zg_getState, which then
+  redraws the menus); then first in ❓ Help), 📥 Input Data Mode, 🏗️ Build Sheets (was "Build Sheets Only (No Push to
+  Google Contacts)"), 🧱 Build + Sync Contacts (was "Full Sync (Build + Push to Google Contacts)"; phone sync on), ---,
+  ⚙️ Settings, ❓ Help ▸ (helpSubMenu_), 🧰 More ▸ (🔓 Unlock Layout / 🔒 Lock Layout, was Unlock / Lock Sheet; 🎓 End of
+  Year Rollover, was 🔄). 👪 Families (was 👤 Student Overrides): 🔍 Find a Family (moved from the App Menu), ✨ New / Edit
+  Student, 🗂️ Family Changes (was "🗂️ Student Overrides (parents to add, changes, report)"; the page's title is "Family
+  Changes", its sections Parents to add / Phone numbers to check / Your changes). 📆 Events: unchanged. 📇 Contact Log
+  (Z#): 📝 Manage Notes / Follow-ups (was 🔔). 🐞 Contact Log Debug (owner test file): in z_MINE's 🐞 Debug menu; without
+  z_MINE (a test copy) at the end of 🧰 More ▸ (❓ Help ▸ before the first build), addContactLogDebugFallback_.
+  zg_finishSetup on a built sheet redraws the menus (onOpen) and names ❓ Help. Clone check clears ZG_GUIDE_DONE.
+  Sidebar titles follow the labels: "Build Sheets" / "Build + Sync Contacts" (were Build Sheets / Build & Sync Manager).
+  Not renamed (internal or stored): handler / function names, the Backend PHONES title "(Student Overrides: ...)", the
+  "Students Override Report" tab and "Create the Override Report", Regenerate.gs, existing Sheet Lock descriptions.
+  The fake UI (tests/lib/fakesheet.js) records entries ({ label, fn } / { sep } / { sub }), inUi and isSub.
+  Release check round 3: every check's paths use the new names + n3-18 "The new menus" (end of stage sn); republished.
 - Input Data.gs: Input Data Mode (part 1) + Your Lists (part 2), see below.
 - Contacts Sync.gs: Google Contacts sync (syncToGoogleContacts, searchAndUpsertSingleContact), Full Sync endpoints,
   EMERGENCY_STOP_SYNC / RESTART_SYNC.
 - Sheet Lock.gs: "baby-proofing" (see SHEET LOCK below): Google warning-only protections + toggleSheetLock
-  (App Menu "🔓 Unlock Sheet" / "🔒 Lock Sheet").
+  (🚀 App Menu → 🧰 More → "🔓 Unlock Layout" / "🔒 Lock Layout"; was Unlock / Lock Sheet until 2026-11-24).
 - Regenerate.gs: reset / fake-data tools (resetToDisplayMode, resetAndLoadFakeData) and Contact Log formatting.
   Owner asked to keep it as is (not moved, not cleaned); change it only when the owner asks (e.g. KEEP_TABS_).
   Student List rename (owner's request): KEEP_TABS_ says "Student List", deleteLegacySheets_ calls
@@ -61,7 +88,7 @@ Files (shared = every school's sheet):
   (Edits.gs, filter box only: its list is the page). Pages define no search style of their own (test_round4.js runs
   the script on a stand-in page and checks the pages). Reopening a list on a click in the box stays each page's own.
 - Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool (➕ New Interaction /
-  🔔 Manage Notes / Follow-ups); left as is. It is the ONLY Z# file left: the owner keeps it as Z# for later
+  📝 Manage Notes / Follow-ups; its emoji was 🔔 until 2026-11-24, the only change); left as is. It is the ONLY Z# file left: the owner keeps it as Z# for later
   (2026-11-11, when every other Z# file was coalesced into the shared files).
   "Z#" = a temporary file for trying out a new feature: no other code may rely on Z# files (the only link is the
   guarded `if (typeof buildContactLogMenu_ === "function")` line in onOpen, a no-op without the file).
@@ -247,8 +274,8 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
 
 - Getting Started (Menus.gs section GETTING STARTED + GettingStartedSidebar.html; was Z#Guide.gs): "✅ Getting Started"
   (bare-bones version, owner's pick 2026-11-05; a full tour / tab pop-ups / Start Here tab / header notes were proposed
-  and NOT built). Called from Menus.gs: addGuideMenuItems_ (both 🚀 App Menus), showGuideWelcome_
-  (runInitialSetupWrapper, instead of showWelcomeDialog on new-user copies; "📖 Open User Guide" still opens
+  and NOT built). Called from Menus.gs: addGuideMenuItems_ (both 🚀 App Menus; in ❓ Help once finished, see MENUS),
+  showGuideWelcome_ (runInitialSetupWrapper, instead of showWelcomeDialog on new-user copies; "📖 User Guide" still opens
   showWelcomeDialog), guideOnOpen_ (checkVersionOnOpen, in a try/catch).
   Welcome pop-up after setup: 4 steps, "Start with Input Data Mode", video / guide
   links. Checklist sidebar: 1 load data (ticks when Raw Data A1 has a real date; also shows Parent Square AG1, NYCSA
@@ -260,8 +287,8 @@ removed, so these files are now REQUIRED (a missing one = onOpen error / no menu
   top of the GETTING STARTED section (empty = "link coming soon").
 
 - 🐞 Contact Log Debug (z_ContactLogDebug.gs + z_ContactLogDebugSidebar.html since 2026-11-12, owner's testing only;
-  was Z#ContactLogDebug.gs, then briefly the end of Edits.gs): TEMPORARY sidebar (🚀 App Menu, both menus, the 2
-  guarded `typeof addContactLogDebugMenuItem_` lines in buildMenus_). Delete both z_ files for schools: no menu item,
+  was Z#ContactLogDebug.gs, then briefly the end of Edits.gs): TEMPORARY sidebar (🐞 Debug menu, z_MINE.gs; on a copy
+  without z_MINE, 🚀 App Menu's last submenu: addContactLogDebugFallback_; both typeof-guarded). Delete both z_ files for schools: no menu item,
   and the Core.gs recorder never turns on. Live list of runs (Contact Log / Notes / Events
   edits, row deletes) with each step's ms since the script started (⏱ ghost typist incl. data read vs write+paint,
   auto-fill, notes sync, Combined row written, search bar); "Check search bar" snapshot (settings, triggers, END,
@@ -621,6 +648,11 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.
 - One search look (2026-11-24): re-paste Edits (script) and Styles, FindFamily, NewStudentDialog, YourListsSidebar
   (pages) on every sheet (master template too). Nothing by hand, no new files.
+- New menus "2+" (2026-11-24, later; see MENUS): re-paste Menus, Build, Edits, Input Data, Contacts Sync, Sheet Lock,
+  Z#ContactLog (scripts) and FindFamily, GettingStartedSidebar, InputDataSidebar, NewStudentDialog, ProgressSidebar,
+  VersionDialog, YourListsSidebar (pages) on every sheet (master template too); owner sheet also z_MINE,
+  z_ContactLogDebug, z_NewCopy. (Core, Styles, ManageOverridesDialog: comments only.) Reload once (the old 👤 Student
+  Overrides menu stays until then). User Guide Doc by hand (Part 2 "The menus" rewritten; paths everywhere).
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
@@ -691,7 +723,7 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   LIST_WATCH (CZ:DC: Tab ID | Key | Who | Values JSON; OD_WATCH_MARK_ row = copied once) and compares with the last
   build's (od_watchChanges_: new on the list / dropped off / changed values, only labels in both copies, HTML-escaped);
   BUILD_REPORT_LOGS.listChanges -> ProgressSidebar "<list>: what changed". The first build after ticking only copies.
-- 1 FIND A FAMILY (Menus.gs FIND A FAMILY + FindFamily.html): 🚀 App Menu → 🔍 Find a Family (full menu). A modeless
+- 1 FIND A FAMILY (Menus.gs FIND A FAMILY + FindFamily.html): 👪 Families → 🔍 Find a Family (was 🚀 App Menu until 2026-11-24). A modeless
   popup (460x640) or a side panel; the page's "Open as side panel / Open as popup" (findFamilySwitch) opens the other
   with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
   getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
@@ -822,8 +854,8 @@ deploy: see the 2026-11-18 line under Deploying):
   - PARENTS TO ADD on the end screen: idm_parentsToAddSummary (count + 3 names; a separate call once the end screen
     shows) -> a card, "Review and add them" opens 👤 Student Overrides.
 - STUDENT OVERRIDES MAIN PAGE (owner's idea; ManageOverridesDialog.html rewritten: same file and handler
-  openManageOverridesDialog, 640x680, title "Student Overrides"; menu "🗂️ Student Overrides (parents to add, changes,
-  report)" + "✨ New / Edit Student"; the "📄 Override Report" item is gone, it is a button on the page): getOverridesHome
+  openManageOverridesDialog, 640x680, title "Family Changes" since 2026-11-24 (was "Student Overrides"); menu
+  👪 Families → "🗂️ Family Changes" + "✨ New / Edit Student" (see MENUS); the "📄 Override Report" item is gone, it is a button on the page): getOverridesHome
   = { toAdd, skipped, changes, paused, error }. Parents to add (tick, Add, Not new, "Check and edit before adding", Show
   them again), Your changes (getOverridesList now adds kind new / edit / added, source, guardians, hidden; Edit /
   Delete), footer Create the Override Report (closes the page) / Close / New / Edit Student. New / Edit Student:
@@ -1140,8 +1172,8 @@ needed a reload. Getting Started texts: step 2 "Build your sheets (Input Data Mo
   (UrlFetchApp); the update check uses the Sheets permission (openById). Keep this list in step with the manifest.
 - Initial Setup starts with ScriptApp.requireAllScopes(FULL) (granular consent: an unticked permission is asked for
   again before anything runs; typeof-guarded).
-- Getting-started 🚀 App Menu order: ✅ Getting Started, 📥 Input Data Mode, 🏗️ Build Sheets Only, ---, Import Old Data,
-  User Guide, Report a Bug, Updates. showWelcomeDialog's "Next steps" point at Getting Started (was "paste into the
+- Getting-started 🚀 App Menu order: ✅ Getting Started, 📥 Input Data Mode, 🏗️ Build Sheets, ---, 📦 Bring Over Last
+  Year's Tracker, ❓ Help ▸ (User Guide, Report a Bug, Updates) since 2026-11-24 (MENUS). showWelcomeDialog's "Next steps" point at Getting Started (was "paste into the
   RAW Data tab"). Getting Started links: zg_links_() fills empty DOCUMENT links with the User Guide (download data:
   DATA_GUIDE_URL); an empty VIDEO link is left out (no more "coming soon").
 - docs (2026-11-12): Part 1 rewritten for this path, plus Settings labels, Follow-up values, search bar position,

@@ -22,8 +22,8 @@
 // Warning-only protections never block scripts. Ours carry a description
 // starting with SHEET_LOCK_TAG, so applySheetLocks_ can find and redo them
 // (end of every build, Initial Setup, new / deleted event, Override Report).
-// App Menu "🔓 Unlock Sheet" removes them (doc property SHEET_LOCK_OFF) for
-// layout changes; "🔒 Lock Sheet" puts them back.
+// 🚀 App Menu → 🧰 More → "🔓 Unlock Layout" removes them (doc property SHEET_LOCK_OFF)
+// for layout changes; "🔒 Lock Layout" puts them back (was Unlock / Lock Sheet until 2026-11-24).
 // Shared code: works the same with or without z_MINE.gs.
 // ======================================================================
 
@@ -61,15 +61,15 @@ function toggleSheetLock() {
 
   if (isSheetLockOn_()) {
     const resp = ui.alert(
-      "🔓 Unlock the sheet?",
+      "🔓 Unlock the layout?",
       "This removes the 'are you sure?' warnings on the headers, the Contact Log END bar, PCAR and the built tabs." +
-      "\n\nUse it only to change the layout, then come back here and click '🔒 Lock Sheet'.",
+      "\n\nUse it only to change the layout, then come back to 🚀 App Menu → 🧰 More and click 🔒 Lock Layout.",
       ui.ButtonSet.YES_NO
     );
     if (resp !== ui.Button.YES) return;
     props.setProperty(SHEET_LOCK_OFF_KEY, "true");
     removeSheetLocks_(ss);
-    ss.toast("The sheet is unlocked. Lock it again from the App Menu when you're done.", "🔓 Unlocked", 6);
+    ss.toast("The layout is unlocked. Lock it again when you're done: 🚀 App Menu → 🧰 More → 🔒 Lock Layout.", "🔓 Unlocked", 6);
   } else {
     props.deleteProperty(SHEET_LOCK_OFF_KEY);
     applySheetLocks_(ss);
@@ -108,7 +108,7 @@ function desiredSheetLocks_(sheet, name) {
   // 2026-11-05). A range covers the grid as it is now; the build re-runs this,
   // so rows a build adds are covered again right after.
   if (SHEET_LOCK_BUILT_TABS.indexOf(name) !== -1) {
-    range(1, 1, maxR, maxC, "built automatically (🏗️ Build Sheets Only rewrites it)");
+    range(1, 1, maxR, maxC, "built automatically (🏗️ Build Sheets rewrites it)");
   } else if (name === SHEET_LOCK_PCAR) {
     // Everything except H2:I2, as 4 blocks around it
     const inp = SHEET_LOCK_PCAR_INPUT, what = "PCAR formulas (only H2:I2 are yours to change)";

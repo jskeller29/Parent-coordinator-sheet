@@ -49,11 +49,17 @@ FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressS
 **Events + Settings tabs + the report at night (2026-11-24):** re-paste the scripts Edits, Menus, Build and the
 page SettingsDialog; **add** the page **EventsSidebar** (new). Every sheet (master template too). Nothing by hand.
 
+**New menus (2026-11-24, later):** re-paste the scripts Menus, Build, Edits, Input Data, Contacts Sync,
+Sheet Lock, Z#ContactLog and the pages FindFamily, GettingStartedSidebar, InputDataSidebar, NewStudentDialog,
+ProgressSidebar, VersionDialog, YourListsSidebar. Your sheet: also z_MINE, z_ContactLogDebug, z_NewCopy. Every
+sheet (master template too). Nothing by hand; reload once so the old 👤 Student Overrides menu goes away. User
+Guide Doc: the menu names changed (Part 2 "The menus" is new; docs/PC_Tracker_User_Guide.docx has it all).
+
 ## 3. After pasting
 1. Save, then reload the spreadsheet.
 2. Run any menu item and **approve the permissions** if asked. Until you do, your nightly
    and edit triggers stop with "authorization required".
-3. **🚀 App Menu → 🏗️ Build Sheets Only** once. It fills the Backend student copy
+3. **🚀 App Menu → 🏗️ Build Sheets** once. It fills the Backend student copy
    (BX:CD), writes the Student List from row 1, and refreshes the notes.
 4. Open **⚙️ Settings** and click Save once (sets the 10 PM nightly job and remembers it).
 5. Your sheet only: **🐞 Debug → 🔧 Fix Dropdown Criteria** once (dropdowns made by hand).
@@ -66,7 +72,7 @@ page SettingsDialog; **add** the page **EventsSidebar** (new). Every sheet (mast
 9. Master template and your sheet: the **Person Spoke With** dropdown, once, by hand (a script can't
    change a Table's dropdown column). Contact Log → Person Spoke With column → Data validation →
    **Dropdown (from a range)** `='Backend'!$CF2:$CO2` (a 2 on BOTH ends, no `$` before them), Advanced options →
-   **Show a warning** (other people can still be typed). Then **🏗️ Build Sheets Only** once more.
+   **Show a warning** (other people can still be typed). Then **🏗️ Build Sheets** once more.
    The build in step 3 already wrote the list on the hidden Backend tab (CF2: row n = Contact Log row n).
    The next build sees the dropdown reads the Backend and takes the old formula out of Contact Log **R2**:
    that is what lets **Delete table row** work again, and deleting / inserting Contact Log rows can't
@@ -78,7 +84,7 @@ page SettingsDialog; **add** the page **EventsSidebar** (new). Every sheet (mast
    they get it with next year's copy of the template; until then their build adds no columns after P.
 
 10. Master template and your sheet: the **Method 2** dropdown, once, by hand (2026-11-23; a script can't change a
-   Table's dropdown column). First **🏗️ Build Sheets Only** once: it writes the list on the hidden Backend tab
+   Table's dropdown column). First **🏗️ Build Sheets** once: it writes the list on the hidden Backend tab
    (column **CQ**: your fixed choices first, then every Method 2 already typed). Then Contact Log → **Method 2**
    column (K) → Data validation → **Dropdown (from a range)** `='Backend'!$CQ$3:$CQ`, Advanced options →
    **Show a warning** (NOT "Reject the input": a new choice can only join the list after it is typed once).

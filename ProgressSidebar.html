@@ -70,7 +70,7 @@
 
       <div id="buildSection">
         <div class="grp-head"><div class="eyebrow" id="buildHead">Build sheets</div><div class="time" id="buildTime"></div></div>
-        <p class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and your Student Overrides.</p>
+        <p class="build-intro">Rebuilds every generated tab from Raw Data (ATS), the Contact Log, Events and the changes you made in 👪 Families.</p>
         <!-- the shared progress bar (Styles.html pcBar), the same one every build shows -->
         <div id="buildBar" style="margin-bottom:12px"></div>
         <ul class="cl" id="stepList"></ul>
@@ -235,7 +235,7 @@
       };
 
       // A build's state stays saved after it ends until a panel that watched it to the end clears it.
-      // A panel closed early left "done" behind, and the next Build Sheets Only then showed "done" at
+      // A panel closed early left "done" behind, and the next Build Sheets then showed "done" at
       // once with that older build's report (release check 3.1). So: clear it, then start, then watch.
       function startFreshBuild() {
         google.script.run

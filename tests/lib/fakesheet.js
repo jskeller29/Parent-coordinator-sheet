@@ -237,11 +237,18 @@ function fakeSpreadsheetApp(ss) {
   const builder = () => new Proxy({}, { get(t, k) { return k === 'build' ? () => ({}) : () => builder(); } });
   const ui = { _alerts: [], _menus: [], ButtonSet: {}, Button: {},
     alert: (...a) => { ui._alerts.push(a.map(String).join(" | ")); }, showSidebar() {}, showModalDialog() {},
+    // Every createMenu (submenus too) is in _menus. items = the function names added (as before);
+    // entries = what shows, in order: { label, fn } / { sep: true } / { sub: <menu> }; inUi = addToUi
+    // was called; isSub = added with addSubMenu. A submenu's own items are not in its parent's items.
     createMenu: name => {
-      const m = { name: name, items: [] };
+      const m = { name: name, items: [], entries: [], inUi: false, isSub: false };
       ui._menus.push(m);
       const p = new Proxy(m, { get(t, k) {
-        if (k === 'addItem') return (label, fn) => { m.items.push(fn); return p; };
+        if (k === 'addItem') return (label, fn) => { m.items.push(fn); m.entries.push({ label: String(label), fn: fn }); return p; };
+        if (k === 'addSeparator') return () => { m.entries.push({ sep: true }); return p; };
+        if (k === 'addSubMenu') return sub => { const s = sub && sub.__menu; if (s) { s.isSub = true; m.entries.push({ sub: s }); } return p; };
+        if (k === 'addToUi') return () => { m.inUi = true; };
+        if (k === '__menu') return m;
         return (k in t) ? t[k] : () => p;
       } });
       return p;

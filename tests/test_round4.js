@@ -922,7 +922,7 @@ function familySheet() {
     assert.strictEqual(in1.value, 'Simpson, Bart (123456789)x', "only while the box still shows the pick");
   }
 
-  // Edit student: New / Edit Student with the student filled in (not "back to Student Overrides")
+  // Edit student: New / Edit Student with the student filled in (not "back to Family Changes")
   let opened = 0;
   g.openNewStudentDialog = () => { opened++; };
   user.setProperty("OVERRIDES_FROM_HOME", "1");
@@ -930,7 +930,7 @@ function familySheet() {
   eq([opened, user.getProperty("PREFILL_OSIS"), user.getProperty("OVERRIDES_FROM_HOME")], [1, "123456789", null]);
   // In the full menu
   const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
-  assert(/menu\.addItem\("🔍 Find a Family", "openFindFamily"\)/.test(menus), "🚀 App Menu → 🔍 Find a Family");
+  assert(/\.addItem\('🔍 Find a Family', 'openFindFamily'\)/.test(menus), "👪 Families → 🔍 Find a Family (moved from the 🚀 App Menu 2026-11-24; tests/test_menus.js)");
   console.log("1 find a family (server): ok");
 }
 

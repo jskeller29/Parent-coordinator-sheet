@@ -2848,7 +2848,7 @@ function showEventTables(keys) {
 // ==============================================================
 // Opens after 📋 New Event and 👁️ View Events. Typing in an event only fills the row in
 // (watchEventsSheet_); the panel says so and has "Done: build and close Events" (hides the
-// Events tab, then the Build sidebar runs 🏗️ Build Sheets Only, which puts the attendance
+// Events tab, then the Build sidebar runs 🏗️ Build Sheets, which puts the attendance
 // into the notes / Combined Contact Tracking / PCAR) and "Close Events, build later" (the
 // 10 PM rebuild does it). The Events tab is hidden whenever no event is being filled in
 // (not in ⚙️ Settings → Tabs & columns any more).
@@ -2890,14 +2890,14 @@ function hideEventsTab_(ss) {
 
 /**
  * The panel's buttons. build = true: hides the Events tab and opens the Build sidebar
- * (🏗️ Build Sheets Only, in place of this panel). false: hides the tab, the panel closes.
+ * (🏗️ Build Sheets, in place of this panel). false: hides the tab, the panel closes.
  */
 function eventsFinish(build) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   hideEventsTab_(ss);
   if (build) { runBuildOnly(); return { building: true }; }
   const nightlyOff = PropertiesService.getDocumentProperties().getProperty('disableNightlySync') === 'true';
-  ss.toast(nightlyOff ? "Your events go into the notes at the next 🏗️ Build Sheets Only." : "Your events go into the notes at tonight's rebuild, or at the next 🏗️ Build Sheets Only.", "📆 Events closed", 6);
+  ss.toast(nightlyOff ? "Your events go into the notes at the next 🏗️ Build Sheets." : "Your events go into the notes at tonight's rebuild, or at the next 🏗️ Build Sheets.", "📆 Events closed", 6);
   return { building: false };
 }
 
@@ -3182,7 +3182,7 @@ function watchEventsSheet_(e) {
 
   // FAST EVENTS (owner 2026-11-24): an edit only fills the row in (the typist above). The
   // Backend Event Log, the notes, Combined Contact Tracking and the PCAR get the attendance
-  // at the next build: the Events panel's "Done: build" (EventsSidebar), 🏗️ Build Sheets Only or
+  // at the next build: the Events panel's "Done: build" (EventsSidebar), 🏗️ Build Sheets or
   // the 10 PM rebuild (buildBackendEventLogData_ reads every table). Before, every edit re-read
   // every table, rewrote the Backend Event Log and the students' notes.
   // Left: a family already in this table is taken out again (one read of its OSIS column).
@@ -3230,7 +3230,7 @@ function deleteEventTable_(e, sheet, tableStartCol) {
   } catch (err) { console.warn("Events not shown after the delete: " + err.message); }
   try { applySheetLocks_(e.source, ["Events"]); } catch (err) { console.warn("Sheet lock skipped: " + err.message); }
 
-  ui.alert("✅ Event Removed", "The event has been deleted. It leaves the notes and the PCAR at the next build (Done: build in the Events panel, 🏗️ Build Sheets Only, or tonight's rebuild)."
+  ui.alert("✅ Event Removed", "The event has been deleted. It leaves the notes and the PCAR at the next build (Done: build in the Events panel, 🏗️ Build Sheets, or tonight's rebuild)."
     + (showedNewest ? "\n\nShowing \"" + showedNewest + "\" now. To see other events: 📆 Events → 👁️ View Events." : ""), ui.ButtonSet.OK);
 }
 

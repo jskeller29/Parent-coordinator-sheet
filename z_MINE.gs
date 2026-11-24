@@ -73,6 +73,8 @@ function ownerAddMenus_(ui) {
     .addItem("🎨 Apply Sheet Style (colors + fonts)", "ownerMenuApplySheetStyle")
     .addSeparator()
     .addItem(`🐞 Toggle Debug (now ${ownerDebugOn_() ? "ON" : "OFF"})`, "ownerMenuToggleDebug");
+  // z_ContactLogDebug.gs (owner testing): here, not in the 🚀 App Menu (menu layout "2+", 2026-11-24)
+  if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(menu);
   // z_NewCopy.gs (owner only): what to change in a new copy of this sheet
   if (typeof ownerMenuNewCopyChecklist === "function") menu.addSeparator().addItem("📋 New Copy Checklist", "ownerMenuNewCopyChecklist");
   menu.addToUi();

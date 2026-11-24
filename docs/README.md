@@ -36,7 +36,7 @@ paragraphs, `- ` and `1. ` lists (a continued line is indented), tables, and the
 
 ## Putting it in Google Drive
 
-The tracker's 📖 Open User Guide link is the **Version Tracker's "Document" column (F)**:
+The tracker's 📖 User Guide link is the **Version Tracker's "Document" column (F)**:
 the newest dated row with a link there. Paste the new guide's link in the row of the release
 that brings it (leave it blank in a release that keeps the same guide). When the tracker has
 no Document link (or a sheet can't read it), the newest file in the guide folder is used
@@ -64,7 +64,7 @@ rename a heading in both places.
 | Heading in the guide | Where it is | Link in 📌 YOUR LINKS | The button that opens it |
 |---|---|---|---|
 | How to download your data | Part 1, Step 5: Load your data | `downloadDataDoc` | Welcome pop-up "How to download your data"; Getting Started step 1 "Guide: how to download your data" |
-| What Build Sheets does | Part 2, Build and Full Sync | `buildDoc` | Getting Started step 2 "Guide: what Build Sheets does" |
+| What Build Sheets does | Part 2, Build Sheets and Build + Sync Contacts | `buildDoc` | Getting Started step 2 "Guide: what Build Sheets does" |
 | What each setting does | Part 2, Settings | `settingsDoc` | Getting Started step 3 "Guide: what each setting does" |
 | How to log a parent contact | Part 2, The Contact Log | `contactLogDoc` | Getting Started step 4 "Guide: how to log a parent contact" |
 
@@ -89,8 +89,8 @@ since the Doc was made):
 **B. The same Doc, by hand** (keeps its link):
 
 1. Type each heading at the place in the table: rename "Where to get each export" to "How
-   to download your data", and add the others as new lines (Build and Full Sync also gets
-   "What Full Sync does" above its second paragraph).
+   to download your data", and add the others as new lines (Build Sheets and Build + Sync Contacts
+   also gets "What Build + Sync Contacts does" above its second paragraph).
 2. Make each one a Heading 3: click in the line, then pick Heading 3 in the style box
    (where it says Normal text). The outline on the left lists it now; the Contents page only
    if you type a line there too.

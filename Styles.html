@@ -125,7 +125,7 @@
   .opacity-75 { opacity: .75; }
 
   /* The one progress bar (owner 2026-11-14, release check 2.12: "the same progress bar every time a build
-     runs"): Build Sheets / Full Sync, Input Data Mode's build, Migration's last step, Student Overrides, setup.
+     runs"): Build Sheets / Build + Sync Contacts, Input Data Mode's build, Migration's last step, Family Changes, setup.
      Drawn by pcBar() below. */
   .pbar { display: flex; flex-direction: column; gap: 5px; }
   .pbar .pb-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; }
@@ -216,7 +216,7 @@
   }
 
   /**
-   * Follows a build that another call is running (Input Data Mode, Migration, Student Overrides): asks
+   * Follows a build that another call is running (Input Data Mode, Migration, Family Changes): asks
    * getSyncStatus every 2 s and moves the bar. Steps reported before this build started are ignored
    * (the step of the LAST build stays in the cache). Returns { stop() }.
    */

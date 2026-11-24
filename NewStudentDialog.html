@@ -85,8 +85,8 @@
     </div>
 
     <div class="dfoot">
-      <!-- Back to the 👤 Student Overrides main page (owner 2026-11-17: "allow back and forth") -->
-      <button type="button" class="btn txt" id="backBtn" onclick="backHome()" title="Parents to add, your changes and the report">← Student Overrides</button>
+      <!-- Back to the 🗂️ Family Changes main page (owner 2026-11-17: "allow back and forth") -->
+      <button type="button" class="btn txt" id="backBtn" onclick="backHome()" title="Parents to add, phone numbers to check, your changes and the report">← Family Changes</button>
       <label class="cbx" for="hideFromReport"><input type="checkbox" id="hideFromReport"><span>Hide this change from the Override Report</span></label>
       <span class="sp"></span>
       <button type="button" class="btn sec" onclick="closeDialog()">Cancel</button>
@@ -103,7 +103,7 @@
     // Globals for sibling tracking
     let currentSiblings = [];
     let isSyncingSiblings = false;
-    // Opened from the 👤 Student Overrides main page: Save goes back there (getNewStudentPrefill)
+    // Opened from the 🗂️ Family Changes main page: Save goes back there (getNewStudentPrefill)
     let fromHome = false;
     // The Status / label the form was filled with (saveStudentOverrides: a save that only adds a
     // parent is stored as an "Added Guardian" row; a changed label makes it a real edit)
@@ -211,7 +211,7 @@
     function backHome() {
         const b = document.getElementById('backBtn');
         b.disabled = true;
-        google.script.run.withFailureHandler(err => { b.disabled = false; alert("Could not open Student Overrides: " + err.message); })
+        google.script.run.withFailureHandler(err => { b.disabled = false; alert("Could not open Family Changes: " + err.message); })
             .openManageOverridesDialog(); // replaces this window
     }
 

@@ -80,7 +80,7 @@ var IDM_STEPS = [
     // The start page (owner 2026-11-14, release check 2.16): what each file is for
     uses: "The one file the tracker needs: every student with their guardians (2 per student, usually one phone and one email each), languages and class. The Student List, Directory, Parents List and Phone Contacts are built from it.",
     // Shown on the step as "Good to know" (owner 2026-11-23: Insight's download has only 2 contacts)
-    note: "This file has 2 guardians per student, usually with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about them at the end of Input Data Mode, and in 👤 Student Overrides.",
+    note: "This file has 2 guardians per student, usually with one phone and one email each. Other parents and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about them at the end of Input Data Mode, and in 👪 Families → 🗂️ Family Changes.",
     where: "TeachHub → Insight → Tools → Downloader → Guardian Contact Information",
     howTo: [
       "Go to <b>TeachHub</b> and sign in.",
@@ -586,7 +586,7 @@ function idm_finishLists() {
 // Your Lists matches each row to the Student List (+ Raw Data guardians), so on
 // a new sheet (Student List never built) or after data was moved to Raw Data in
 // this run, step 5 builds the sheets first. The sidebar calls idm_buildForLists
-// when the view says needsBuild. It builds like 🏗️ Build Sheets Only, but inside
+// when the view says needsBuild. It builds like 🏗️ Build Sheets, but inside
 // this sidebar: the user stays on the temp tab, and any tab the build made or
 // showed is hidden again (and shown at the end with the others). Tried once per
 // change: a failed build is reported on the lists card, not retried in a loop.
@@ -704,7 +704,7 @@ function idm_buildForLists() {
 /**
  * The end screen (owner 2026-11-17: "ask if you want to add that parent at the end of Input Data Mode"):
  * how many parents Parent Square / NYCSA / your lists have that your Student Data doesn't (Menus.gs
- * findParentsToAdd_), and the first few names. The card's button opens 👤 Student Overrides, where
+ * findParentsToAdd_), and the first few names. The card's button opens 🗂️ Family Changes, where
  * they are added (or marked "not new"). Read only; never stops the end screen.
  */
 function idm_parentsToAddSummary() {
@@ -734,7 +734,7 @@ function idm_goToTempSheet() {
   });
 }
 
-/** Last screen: run the normal Build Sheets Only (opens the Build sidebar). */
+/** Last screen: run the normal 🏗️ Build Sheets (opens the Build sidebar). */
 function idm_build() {
   idm_deleteLeftoverTab_();
   runBuildOnly();
@@ -1684,7 +1684,7 @@ var OD_HEADER_WORDS_ = /osis|student|name|first|last|parent|guardian|mother|fath
 
 function od_emptySetup_() {
   // purpose (owner 2026-11-23, idea 3): "info" = its values go on the sheets and phones (as before);
-  // "contacts" = only to find parents and phone numbers to add (👤 Student Overrides), nothing on the sheets
+  // "contacts" = only to find parents and phone numbers to add (🗂️ Family Changes), nothing on the sheets
   return { v: 1, ready: false, by: "student", roles: {}, vars: [], picks: {}, headers: [], title: "", stats: null,
            view: od_defaultView_(true), icon: OD_DEFAULT_ICON, purpose: "info",
            watch: false }; // "Tell me what changed" after each build (idea 6, owner 2026-11-23)
@@ -3463,7 +3463,7 @@ function od_matchPreview(p) {
     const input = od_cleanSetupInput_(p || {}, table.headers);
     const setup = Object.assign({}, w.list.setup, input);
     const idx = od_indexFromSheet_(ss);
-    if (!idx.students.length) return { error: "The Student List is empty. Build the sheets once (🏗️ Build Sheets Only), then come back." };
+    if (!idx.students.length) return { error: "The Student List is empty. Build the sheets once (🏗️ Build Sheets), then come back." };
     const results = od_matchAll_(setup, table.rows, idx);
     const by = setup.by;
     const label = (row, cells) => {

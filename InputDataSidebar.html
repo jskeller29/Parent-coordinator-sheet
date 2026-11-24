@@ -229,12 +229,12 @@
     <div class="card"><div id="summary"></div></div>
     <div class="muted">Your tabs are back.<span id="buildHint"> Build the sheets now so the Student List, Directory and the other tabs use the new data.</span><span id="builtHint" class="hidden"> Your sheets are already built with the new data.</span></div>
     <!-- Parents Parent Square / NYCSA / your lists have that your Student Data doesn't (owner 2026-11-17):
-         asked here, added on 👤 Student Overrides -->
+         asked here, added on 🗂️ Family Changes -->
     <div id="parentsCard" class="card hidden">
       <b id="parentsTitle">Parents to add</b>
       <div class="muted" id="parentsText" style="margin-top:3px"></div>
       <div class="row"><button id="parentsBtn" onclick="reviewParents()">Review and add them</button></div>
-      <div class="muted" style="margin-top:6px">Or later: 👤 Student Overrides → 🗂️ Student Overrides.</div>
+      <div class="muted" style="margin-top:6px">Or later: 👪 Families → 🗂️ Family Changes.</div>
     </div>
     <!-- Lists changed after step 5's build (release check 2.16): say why it needs another build -->
     <div id="listsBuildHint" class="warnline hidden">You changed your lists after the sheets were built. Build again to put them in the Student List, Parents List and the phone contacts.</div>
@@ -689,7 +689,7 @@
     $('parentsBtn').disabled = true; $('parentsBtn').textContent = 'Opening…';
     google.script.run
       .withSuccessHandler(function () { $('parentsBtn').disabled = false; $('parentsBtn').textContent = parentsBtnLabel; })
-      .withFailureHandler(function (e) { $('parentsBtn').disabled = false; $('parentsBtn').textContent = parentsBtnLabel; alert('Could not open Student Overrides: ' + (e && e.message ? e.message : e)); })
+      .withFailureHandler(function (e) { $('parentsBtn').disabled = false; $('parentsBtn').textContent = parentsBtnLabel; alert('Could not open Family Changes: ' + (e && e.message ? e.message : e)); })
       .openManageOverridesDialog();
   }
 

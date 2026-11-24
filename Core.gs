@@ -256,7 +256,7 @@ var BACKEND_BLOCKS = {
   // the fixed choices + every Method 2 typed in the Contact Log; column K's dropdown reads 'Backend'!$CQ$3:$CQ
   // (set by hand in the Contact Log table). Never written by the backend* helpers.
   METHOD2: { col: 95, width: 1, title: "METHOD 2 CHOICES (automatic: Contact Log K)", legacy: null, grow: true, formulaOnly: true },
-  // Phone numbers from 👤 Student Overrides → Phone numbers to check (owner 2026-11-23, Build.gs
+  // Phone numbers from 🗂️ Family Changes → Phone numbers to check (owner 2026-11-23, Build.gs
   // readPhoneChanges_): OSIS | Guardian | Number | Use (add / instead) | From | Date
   PHONES: { col: 97, width: 6, title: "PHONE NUMBERS (Student Overrides: added / used instead)", legacy: null, grow: true },
   // Your Lists "Tell me what changed" (owner 2026-11-23, Input Data.gs od_buildOutputs_): the last build's copy of

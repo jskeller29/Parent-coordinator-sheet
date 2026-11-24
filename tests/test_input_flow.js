@@ -416,7 +416,7 @@ function listsSheet() {
   console.log("nightly on a new copy: skipped: ok");
 }
 {
-  // Clicking 🏗️ Build Sheets Only (menu or checklist) before loading anything: a plain note, no empty build
+  // Clicking 🏗️ Build Sheets (menu or checklist) before loading anything: a plain note, no empty build
   const ss = makeSpreadsheet(TABS);
   ss.getSheetByName("Backend").hideSheet();
   const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
@@ -1162,7 +1162,7 @@ function listsSheet() {
   g.onOpen();
   const f = order.indexOf('filter');
   assert(f > 0 && order.filter(x => x === 'filter').length === 1, 'set-up sheet: the filter is still re-made, once');
-  ['menu:🚀 App Menu', 'menu:👤 Student Overrides', 'menu:📆 Events'].forEach(m =>
+  ['menu:🚀 App Menu', 'menu:👪 Families', 'menu:📆 Events'].forEach(m =>
     assert(order.indexOf(m) !== -1 && order.indexOf(m) < f, m + ' before the filter'));
   console.log("the 🚀 App Menu first when a sheet opens: ok");
 }

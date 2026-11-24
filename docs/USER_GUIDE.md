@@ -11,7 +11,7 @@
 Setting up and using the Parent Coordinator Tracker
 
 Made by a parent coordinator for parent coordinators. This is not an official DOE document.
-Questions: use 🚀 App Menu → 🐞 Report a Bug, or email jacob.keller@p94m.org.
+Questions: use 🚀 App Menu → ❓ Help → 🐞 Report a Bug, or email jacob.keller@p94m.org.
 
 <!--
   START HERE box. Update BOTH links at every release, at the same time as the Version Tracker row:
@@ -56,7 +56,7 @@ The same template is for everyone. If you used the tracker last year, you bring 
 data over during setup.
 
 Want to see one filled in first? "See an example tracker" (the box at the top of this guide,
-the 👋 Welcome tab, and 🚀 App Menu → 📖 Open User Guide) opens a tracker with made-up students. Look around in it,
+the 👋 Welcome tab, and 🚀 App Menu → ❓ Help → 📖 User Guide) opens a tracker with made-up students. Look around in it,
 but keep your real work in your own copy.
 
 ## Part 1: Setting up
@@ -89,7 +89,7 @@ tracker can show anything, so here is what each permission is for, in Google's w
 
 | Google's wording | What the tracker uses it for |
 |---|---|
-| See, edit, create and delete all your Google Sheets spreadsheets | Building and updating the tabs in this tracker. It also reads the shared Version Tracker sheet to tell you about a new version, and opens last year's tracker when you use Import Old Data. |
+| See, edit, create and delete all your Google Sheets spreadsheets | Building and updating the tabs in this tracker. It also reads the shared Version Tracker sheet to tell you about a new version, and opens last year's tracker when you use Bring Over Last Year's Tracker. |
 | See, edit, download and permanently delete your contacts | Only the phone sync, which is off until you turn it on in Settings. It only adds, changes and removes contacts in its own "School Directory" label. |
 | See, edit, create and delete all of your Google Drive files | Saving your end-of-year PDF archive next to the tracker, finding the newest User Guide and template links, and finding your old tracker when you bring it over. |
 | Connect to an external service | Only the end-of-year PDF, which it downloads from Google's own export page. |
@@ -139,7 +139,7 @@ The checklist opens on the right after setup and ticks each step off by itself:
 
 It opens each time you open the sheet until all four are done, or until you click
 Finish setup at the bottom of it. You can always reopen it from 🚀 App Menu → ✅ Getting
-Started. If you close Input Data Mode half way, it opens again by itself the next time
+Started (once it is finished, it moves to 🚀 App Menu → ❓ Help). If you close Input Data Mode half way, it opens again by itself the next time
 you open the sheet, or from 🚀 App Menu → 📥 Input Data Mode.
 Below the steps, "This tab" explains the tab you are on, and after your first build
 "Hidden tabs" lists the tabs you can turn on.
@@ -177,7 +177,7 @@ what is on the tab, brings your tabs back and builds.
 
 If Parent Square, NYCSA or one of your lists has a parent who isn't in your Student Data
 (ATS lists only two guardians), the end of Input Data Mode asks whether to add them.
-Review and add them opens 👤 Student Overrides (below).
+Review and add them opens 👪 Families → 🗂️ Family Changes (below).
 
 #### How to download your data
 
@@ -191,7 +191,7 @@ Student Data (required), from ATS / Insight:
 
 This file has 2 guardians per student, usually with one phone and one email each. Other parents
 and phone numbers come from Parent Square, NYCSA and your own lists: you're asked about
-them at the end of Input Data Mode, and in 👤 Student Overrides.
+them at the end of Input Data Mode, and in 👪 Families → 🗂️ Family Changes.
 
 Parent Square (optional):
 
@@ -242,7 +242,7 @@ The first screen of a list asks what it is for. Show its info is the four steps 
 Only find parents and phone numbers to add is for a list of parents with their child's
 name or OSIS (contact cards, a sign-in sheet): nothing from it goes on your sheets, it
 has only the Columns and Match steps, and the parents it has that your Student Data
-doesn't, and other numbers for the parents you have, show in 👤 Student Overrides.
+doesn't, and other numbers for the parents you have, show in 👪 Families → 🗂️ Family Changes.
 
 On the Variables step, tick Tell me what changed at each build to see, in the Build
 panel's report, who is new on the list, who dropped off and which values changed (a new
@@ -255,8 +255,8 @@ bus route, a form now returned). The first build after you tick it only takes a 
 
 #### Fixing a student's details
 
-ATS can lag behind real enrollment. Everything about it is on one page: 👤 Student
-Overrides → 🗂️ Student Overrides.
+ATS can lag behind real enrollment. Everything about it is on one page: 👪 Families →
+🗂️ Family Changes.
 
 - Parents to add: parents Parent Square, NYCSA or your lists have for a student who
   aren't one of the student's guardians in ATS, with where each one came from. Tick the
@@ -274,7 +274,7 @@ Overrides → 🗂️ Student Overrides.
   and Delete, and every phone number you saved under Phone numbers to check. Delete on a
   number undoes it: the old number comes back at the next build.
 - Create the Override Report, and New / Edit Student, at the bottom. New / Edit Student
-  has a "← Student Overrides" button back to the page.
+  has a "← Family Changes" button back to the page.
 
 Use ✨ New / Edit Student to add a student who isn't in ATS yet, or to fix a name or a
 parent's phone. To add a parent, pick the student, click + Add another guardian and save:
@@ -289,12 +289,12 @@ data only. An override removes itself once ATS has the same information.
 ### Step 6: Build the sheets
 
 Input Data Mode builds your sheets for you. After new data, overrides or lists, build
-again with 🚀 App Menu → 🏗️ Build Sheets Only. A side panel shows each step as it
+again with 🚀 App Menu → 🏗️ Build Sheets. A side panel shows each step as it
 runs, then a short report: new students, discharged students, and families who signed
 up for NYCSA or ParentSquare. Click a number to see the names.
 
-After the first build, the full menus appear: ⚙️ Settings, 👤 Student Overrides and
-📆 Events. If you don't see them, reload the page.
+After the first build, the full menus appear: 👪 Families and 📆 Events next to the
+🚀 App Menu, and ⚙️ Settings in it. If you don't see them, reload the page.
 
 > [!NOTE]
 > Raw Data is the only tab you paste exports into. Everything the tracker builds is
@@ -304,25 +304,32 @@ After the first build, the full menus appear: ⚙️ Settings, 👤 Student Over
 
 ### The menus
 
-The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and 📆 Events.
+The tracker adds three menus after Help: 🚀 App Menu, 👪 Families and 📆 Events. An item
+with ▸ opens a small list of its own.
 
 | 🚀 App Menu item | What it does |
 |---|---|
-| 🔍 Find a Family | Search a student, a parent, an OSIS, a phone number or an email (below). |
-| 🧱 Full Sync | Builds the sheets and updates your Google Contacts. Shows only when the phone sync is on. |
-| 🏗️ Build Sheets Only | Rebuilds every tab from your data without touching Google Contacts. |
+| ✅ Getting Started | The setup checklist. Once it is finished, it moves into ❓ Help. |
 | 📥 Input Data Mode | Loads new exports, Site / Class and your lists (Part 1, Step 5). |
-| ✅ Getting Started | The setup checklist. |
+| 🏗️ Build Sheets | Rebuilds every tab from your data without touching Google Contacts. |
+| 🧱 Build + Sync Contacts | Builds the sheets and updates your Google Contacts. Shows only when the phone sync is on. |
 | ⚙️ Settings | Which tabs show, when sheets rebuild, the phone sync and more (below). |
-| 📖 Open User Guide | A short welcome window with a link to this guide. |
-| 🐞 Report a Bug | A short form for anything broken or confusing. |
-| 🔔 Check for Updates | Checks for a newer version of the tracker. |
-| 🔄 End of Year Rollover | Archives the year and freezes the sheet (Part 3). |
+| ❓ Help ▸ | 📖 User Guide (a short welcome window with a link to this guide), 🐞 Report a Bug (a short form for anything broken or confusing) and 🔔 Check for Updates (a newer version of the tracker). |
+| 🧰 More ▸ | 🔓 Unlock Layout (turns off the "are you sure?" warnings on headers and built tabs while you change the layout; 🔒 Lock Layout turns them back on) and 🎓 End of Year Rollover (archives the year and freezes the sheet, Part 3). |
 
-| 👤 Student Overrides item | What it does |
+| 👪 Families item | What it does |
 |---|---|
-| 🗂️ Student Overrides | One page: parents to add (from Parent Square, NYCSA and your lists), your changes with Edit and Delete, and the Override Report (a tab comparing ATS with your changes). |
+| 🔍 Find a Family | Search a student, a parent, an OSIS, a phone number or an email (below). |
 | ✨ New / Edit Student | Add a student who isn't in ATS, or correct a name, phone, email, language, grade or up to five guardians. You can also give a student a status label or hide them from the report. |
+| 🗂️ Family Changes | One page: parents to add and phone numbers to check (from Parent Square, NYCSA and your lists), your changes with Edit and Delete, and the Override Report (a tab comparing ATS with your changes). |
+
+| 📆 Events item | What it does |
+|---|---|
+| 📋 New Event | Adds an attendance table for a new event (below). |
+| 👁️ View Events | Picks which events show on the Events tab (below). |
+
+Before your first build, only the 🚀 App Menu shows, with ✅ Getting Started, 📥 Input Data
+Mode, 🏗️ Build Sheets, 📦 Bring Over Last Year's Tracker and ❓ Help.
 
 ### The tabs
 
@@ -383,11 +390,11 @@ Below the END bar is a search box. Type a student's OSIS or name to see their
 communications before you call.
 
 If you get "Could not find … in the Student List", that student isn't in the sheets yet.
-Run 🏗️ Build Sheets Only and try again.
+Run 🏗️ Build Sheets and try again.
 
 ### Find a Family
 
-🚀 App Menu → 🔍 Find a Family opens a search window. Type a student's or a parent's
+👪 Families → 🔍 Find a Family opens a search window. Type a student's or a parent's
 name (the spelling doesn't have to be exact), an OSIS, part of a phone number or an
 email. Pick a result to see the student, every parent with their numbers and email,
 Parent Square and NYCSA, open follow-ups, Student Info from your lists, and the notes.
@@ -438,28 +445,28 @@ Open 🚀 App Menu → ⚙️ Settings. Choose a section on the left, then click
 | Student data | Purge discharged students | Deletes discharged students from the Student List for good. |
 
 Reset to defaults puts every setting back. Your settings are saved in the sheet, and
-Import Old Data brings them into next year's copy.
+Bring Over Last Year's Tracker brings them into next year's copy.
 
-### Build and Full Sync
+### Build Sheets and Build + Sync Contacts
 
 #### What Build Sheets does
 
-🏗️ Build Sheets Only works inside the spreadsheet: it rebuilds the Student List,
+🏗️ Build Sheets works inside the spreadsheet: it rebuilds the Student List,
 Directory, Combined Contact Tracking and the other tabs from your data.
 
-#### What Full Sync does
+#### What Build + Sync Contacts does
 
-🧱 Full Sync does a build and then updates your Google Contacts. It keeps a "School
+🧱 Build + Sync Contacts does a build and then updates your Google Contacts. It keeps a "School
 Directory" label in your contacts matching the Phone Contacts tab: it adds new parents,
 updates changed ones and removes those who left. A side panel shows the progress. You
 can close it; the sync keeps going. Large schools may take more than one run, and it
 picks up where it stopped. With the phone sync on, the nightly run does the same.
 
-Full Sync puts the contacts into the Google account of whoever clicks it, so it asks
+Build + Sync Contacts puts the contacts into the Google account of whoever clicks it, so it asks
 first and names that account. Use only your DOE Google account, on your DOE phone.
 
 > [!IMPORTANT]
-> Change a parent's number in the sheet (👤 Student Overrides), not on the phone. Every
+> Change a parent's number in the sheet (👪 Families), not on the phone. Every
 > sync rewrites each contact the way the sheet has it, so a number typed on the phone is
 > gone the next night. Turning the phone sync off doesn't remove the contacts: in Google
 > Contacts, open the School Directory label, select all and delete.
@@ -470,7 +477,7 @@ first and names that account. Use only your DOE Google account, on your DOE phon
 
 Use this at the start of a new school year, and also to move to a new version in the
 middle of the year. Choose "No, bring over last year's tracker" in the window after Initial
-Setup, or open 🚀 App Menu → 🔄 Import Old Data before your first build. The wizard lists
+Setup, or open 🚀 App Menu → 📦 Bring Over Last Year's Tracker before your first build. The wizard lists
 the trackers it finds in your Google Drive: click yours, or paste its link if it isn't
 listed, then click Bring it over. It goes through six steps:
 
@@ -498,8 +505,8 @@ Your old sheet's tabs are only read, never changed. Keep it until you have check
 ### Updates
 
 When you open the sheet, the tracker checks at most every few hours whether a newer
-version is out, and shows what changed. You can also check with 🚀 App Menu → 🔔 Check
-for Updates. In that window you can dismiss the update for now, dismiss it until a
+version is out, and shows what changed. You can also check with 🚀 App Menu → ❓ Help →
+🔔 Check for Updates. In that window you can dismiss the update for now, dismiss it until a
 newer one comes out, ask to hear about major updates only, or stop the automatic check.
 
 An update doesn't change your current sheet. To move to a new version:
@@ -512,7 +519,7 @@ An update doesn't change your current sheet. To move to a new version:
 
 ### End of Year Rollover
 
-When the school year is over, run 🚀 App Menu → 🔄 End of Year Rollover. It:
+When the school year is over, run 🚀 App Menu → 🧰 More → 🎓 End of Year Rollover. It:
 
 - saves a PDF archive of your Contact Log, Combined Contact Tracking and your lists in
   the same Drive folder as the tracker,
@@ -544,7 +551,7 @@ These are the only times the tracker looks outside your sheet:
 
 - The update check reads a shared, view-only Version Tracker sheet. It sends nothing
   about your students.
-- Import Old Data lists the trackers in your Drive by name, and opens only the one you
+- Bring Over Last Year's Tracker lists the trackers in your Drive by name, and opens only the one you
   pick.
 - A bug report sends only what you type into the form.
 
@@ -558,8 +565,8 @@ share it.
 1. Before a call, look the student up in the search box below the Contact Log's END bar.
 2. After a contact, type the name or OSIS in a new row and fill in the notes and the
    follow-up.
-3. To fix a name or phone, or add a missing student, use 👤 Student Overrides → ✨ New /
-   Edit Student.
+3. To fix a name or phone, or add a missing student, use 👪 Families → ✨ New / Edit
+   Student.
 4. When you download a new export, load it with 📥 Input Data Mode.
 5. For a big batch of entries, set Settings → Live updates → Rebuild sheets to "Only when
    I click Build", then build once at the end.
@@ -583,12 +590,12 @@ share it.
 | Google keeps asking for permission | Setup needs every permission. Tick Select all, then Continue. |
 | "Action Blocked" when you type | Setup hasn't run yet. Run 🚨 Initial Setup (Run Once). |
 | The directory looks wrong after a paste | Load the export again with 📥 Input Data Mode, or paste values only, then build. |
-| "Could not find … in the Student List" | Run 🏗️ Build Sheets Only, then try again. |
+| "Could not find … in the Student List" | Run 🏗️ Build Sheets, then try again. |
 | "Background Sync in Progress" | A build or sync is running. Wait for it to finish before entering data. |
-| The update check misses a new version | Use 🔔 Check for Updates. If it still says you're up to date, report it. |
-| The phone sync stopped or made duplicates | Open 🧱 Full Sync and click Restart run. The next full run tidies the label. |
+| The update check misses a new version | Use 🚀 App Menu → ❓ Help → 🔔 Check for Updates. If it still says you're up to date, report it. |
+| The phone sync stopped or made duplicates | Open 🧱 Build + Sync Contacts and click Restart run. The next full run tidies the label. |
 | A list row says "not found" | That person isn't in the Student List. Add them with ✨ New / Edit Student, build, then open the list again from Input Data Mode, or pick the student by hand. |
-| Anything else | 🚀 App Menu → 🐞 Report a Bug, or email jacob.keller@p94m.org. |
+| Anything else | 🚀 App Menu → ❓ Help → 🐞 Report a Bug, or email jacob.keller@p94m.org. |
 
 ### Things to avoid
 

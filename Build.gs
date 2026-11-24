@@ -287,7 +287,7 @@ function buildAllDerivedSheetsRun_() {
 
 /**
  * Deletes the "Students Override Report" tab (owner 2026-11-24: it is made when asked for,
- * 👤 Student Overrides → Create the Override Report, and should not linger). Someone on it
+ * 👪 Families → 🗂️ Family Changes → Create the Override Report, and should not linger). Someone on it
  * is moved to the Contact Log first. Never throws; true = deleted.
  */
 function deleteOverrideReport_(ss) {
@@ -561,7 +561,7 @@ function nightlyMasterSyncRun_() {
       const why = String((e && e.message) || e).slice(0, 300);
       PropertiesService.getDocumentProperties().setProperty(NIGHTLY_FAILED_KEY_,
         (e && e.buildBusy ? "Last night's rebuild didn't run: " : "Last night's rebuild didn't finish: ") + why +
-        " Run 🚀 App Menu → 🏗️ Build Sheets Only to bring the tabs up to date.");
+        " Run 🚀 App Menu → 🏗️ Build Sheets to bring the tabs up to date.");
     } catch (err) { /* the message only */ }
   }
 }
@@ -611,7 +611,7 @@ function getBuildLogData() {
 }
 
 function startBuildOnlyProcess() {
-  return runAction_("Build Sheets Only", () => startBuildOnlyProcessRun_());
+  return runAction_("Build Sheets", () => startBuildOnlyProcessRun_());
 }
 
 function startBuildOnlyProcessRun_() {
@@ -637,7 +637,7 @@ function startBuildOnlyProcessRun_() {
 
     // First build on a new sheet: the full menus now, not after a reload (Menus.gs)
     try {
-      if (refreshMenusAfterFirstBuild_()) ss.toast("Your full 🚀 App Menu is ready (⚙️ Settings, 👤 Student Overrides, 📆 Events). Don't see it? Reload the page.", "🎉 Sheets built", 15);
+      if (refreshMenusAfterFirstBuild_()) ss.toast("Your full menus are ready (🚀 App Menu, 👪 Families, 📆 Events). Don't see them? Reload the page.", "🎉 Sheets built", 15);
     } catch (e) { console.warn("Menus not refreshed: " + e.message); }
   } catch(e) { 
     console.error("Build failed: " + (e.stack || e.message));
@@ -750,7 +750,7 @@ function cleanRedundantOverrides() {
     deletedOsisList.push(osis); 
   }
 
-  // Phone numbers added in 👤 Student Overrides that ATS has now go too (PHONE NUMBERS above)
+  // Phone numbers added in 🗂️ Family Changes that ATS has now go too (PHONE NUMBERS above)
   try { cleanRedundantPhoneChanges_(ss, rawData); } catch (e) { console.warn("Phone numbers cleanup skipped: " + e.message); }
 
   if (deletedOsisList.length > 0) {
@@ -769,7 +769,7 @@ function cleanRedundantOverrides() {
 function getOverrideData_(ss) {
   const overrideStudents = new Map();
   const overrideGuardians = new Map();
-  // "Added Guardian" rows (👤 Student Overrides → Parents to add, 2026-11-18): guardians found in Parent
+  // "Added Guardian" rows (🗂️ Family Changes → Parents to add, 2026-11-18): guardians found in Parent
   // Square / NYCSA / a list, added ON TOP of the student's ATS guardians (the ATS ones stay live, so a
   // new phone in next month's ATS still comes in). Their list is marked addToAts for buildGuardianObjects_.
   const added = new Map();
@@ -828,7 +828,7 @@ function getOverrideData_(ss) {
     }
   });
 
-  // + the numbers added in 👤 Student Overrides (buildGuardianObjects_'s third argument)
+  // + the numbers added in 🗂️ Family Changes (buildGuardianObjects_'s third argument)
   return { students: overrideStudents, guardians: overrideGuardians, phones: readPhoneChanges_(ss) };
 }
 
@@ -1057,7 +1057,7 @@ function cleanRedundantPhoneChanges_(ss, rawData) {
   return gone.length;
 }
 
-// phoneChanges (2026-11-23): getOverrideData_(ss).phones, the numbers added in 👤 Student Overrides
+// phoneChanges (2026-11-23): getOverrideData_(ss).phones, the numbers added in 🗂️ Family Changes
 function buildGuardianObjects_(rawData, overrideGuardians, phoneChanges) {
   const out = [];
   const atsById = new Map(); // ATS guardians of the students that also have added guardians

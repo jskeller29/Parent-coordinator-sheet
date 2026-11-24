@@ -385,7 +385,7 @@ function parentsSheet() {
   const idm = fs.readFileSync(path.join(ROOT, 'InputDataSidebar.html'), 'utf8');
   assert(/idm_parentsToAddSummary\(\)/.test(idm) && /openManageOverridesDialog\(\)/.test(idm), 'end of Input Data Mode asks');
   const menus = fs.readFileSync(path.join(ROOT, 'Menus.gs'), 'utf8');
-  assert(/addItem\('🗂️ Student Overrides \(parents to add, changes, report\)', 'openManageOverridesDialog'\)/.test(menus), 'menu: the main page first');
+  assert(/addItem\('🗂️ Family Changes', 'openManageOverridesDialog'\)/.test(menus), 'menu: 👪 Families → 🗂️ Family Changes (the main page; was Student Overrides)');
   // prefill: read once
   const g = loadProject();
   const up = { m: {}, getProperty(k) { return k in this.m ? this.m[k] : null; }, setProperty(k, v) { this.m[k] = String(v); }, deleteProperty(k) { delete this.m[k]; } };

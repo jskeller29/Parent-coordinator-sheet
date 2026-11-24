@@ -172,7 +172,7 @@
     <div class="muted" id="doneHint"></div>
     <div class="row hidden" id="doneBackRow"><button class="primary" onclick="leave()">← Back to Input Data Mode</button></div>
     <div class="row hidden" id="buildRow"><button class="primary" onclick="buildNow()">Build sheets now</button></div>
-    <div class="row hidden" id="overridesRow"><button class="primary" onclick="openOverrides()">Open Student Overrides</button></div>
+    <div class="row hidden" id="overridesRow"><button class="primary" onclick="openOverrides()">Open Family Changes</button></div>
   </div>
 
   <div class="footer">
@@ -518,8 +518,8 @@
         // A list only for finding parents finds them through their child (typical-user tester 2026-11-23: a parent
         // with no child on the row was told to add a student)
         var advice = purpose === 'contacts'
-          ? ' Parents are found through their child: check the child\'s name or OSIS on that row of your list. A child not in ATS yet can be added with 👤 Student Overrides → New / Edit Student.'
-          : (match.by === 'student' ? ' New and not in ATS yet? Add them with 👤 Student Overrides → New / Edit Student and build, then open this list again.' : '');
+          ? ' Parents are found through their child: check the child\'s name or OSIS on that row of your list. A child not in ATS yet can be added with 👪 Families → ✨ New / Edit Student.'
+          : (match.by === 'student' ? ' New and not in ATS yet? Add them with 👪 Families → ✨ New / Edit Student and build, then open this list again.' : '');
         html += '<div class="q">' + esc(a.reason) + '.' + advice + '</div>' +
           (opts.length ? '<div class="alt">Closest ' + (match.by === 'guardian' ? 'guardians' : 'on the Student List') + '</div>' + opts.map(function (o) { return optRow(a, o); }).join('') : '') +
           '<div class="row" style="margin-top:6px"><button class="small soft" onclick="pickOpen(' + a.i + ')">Search the ' + (match.by === 'guardian' ? 'guardians' : 'Student List') + '</button><button class="small" onclick="decide(' + a.i + ',\'skip\')">Skip</button></div>';
@@ -719,7 +719,7 @@
     };
     return '<div class="card"><b>What is this list for?</b>' +
       opt('info', 'Show its info', 'Bus routes, trip forms, PTA: on the phone contacts and as a Student List or Parents List column.') +
-      opt('contacts', 'Only find parents and phone numbers to add', 'A parent list with their child\'s name or OSIS. Nothing shows on your sheets: new parents and other numbers go to 👤 Student Overrides for you to check.') +
+      opt('contacts', 'Only find parents and phone numbers to add', 'A parent list with their child\'s name or OSIS. Nothing shows on your sheets: new parents and other numbers go to 👪 Families → 🗂️ Family Changes for you to check.') +
       '</div>';
   }
   function renderPurpose() { $('purposePaste').innerHTML = purposeHtml('Paste'); $('purposeSetup').innerHTML = purposeHtml('Setup'); }
@@ -742,7 +742,7 @@
     // During Input Data Mode the build comes at its end (a build now would run with the other tabs hidden)
     var contacts = v.purpose === 'contacts';
     $('doneHint').textContent = contacts
-      ? 'Nothing from this list goes on your sheets. Parents it has that your Student Data doesn\'t, and other phone numbers for the parents you have, show in 👤 Student Overrides (Parents to add, Phone numbers to check)' +
+      ? 'Nothing from this list goes on your sheets. Parents it has that your Student Data doesn\'t, and other phone numbers for the parents you have, show in 👪 Families → 🗂️ Family Changes (Parents to add, Phone numbers to check)' +
         (v.inputMode ? ', and at the end of Input Data Mode.' : '.')
       : v.inputMode
       ? 'The Student List / Parents List columns and the phone contacts get it at the next build: go back, finish Input Data Mode, then build.'

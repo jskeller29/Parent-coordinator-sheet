@@ -62,7 +62,7 @@
       <button id="dismissNowBtn" class="btn sec" onclick="dismissForNow()">Dismiss for now</button>
       <button id="dismissBtn" class="btn pri" onclick="dismissUpdate()">Dismiss this update</button>
     </div>
-    <p class="hint">You can always check yourself: 🚀 App Menu → 🔔 Check for Updates (shows all updates)</p>
+    <p class="hint">You can always check yourself: 🚀 App Menu → ❓ Help → 🔔 Check for Updates (shows all updates)</p>
   </div>
 
   <script>
@@ -236,7 +236,7 @@
     function boot() {
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
         showErrorBox('Preview mode',
-          'This dialog only works inside Google Sheets. Open it from the sheet via 🚀 App Menu → 🔔 Check for Updates.');
+          'This dialog only works inside Google Sheets. Open it from the sheet via 🚀 App Menu → ❓ Help → 🔔 Check for Updates.');
         return;
       }
 

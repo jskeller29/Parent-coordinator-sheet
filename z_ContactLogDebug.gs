@@ -2,8 +2,10 @@
 // FILE: z_ContactLogDebug.gs (+ z_ContactLogDebugSidebar.html)
 // Owner's testing only (2026-11-12, owner's request): DELETE BOTH z_ContactLogDebug
 // files on the copies that go to schools / the master template; then the
-// "🐞 Contact Log Debug" menu item is simply not there (the two lines in
-// buildMenus_, Menus.gs, check typeof first) and nothing else changes.
+// "🐞 Contact Log Debug" menu item is simply not there (z_MINE.gs's 🐞 Debug menu and
+// addContactLogDebugFallback_ in Menus.gs check typeof first) and nothing else changes.
+// Its item is in the 🐞 Debug menu; on a test copy without z_MINE.gs, at the end of the
+// 🚀 App Menu's 🧰 More ▸ (❓ Help ▸ before the first build).
 // (Was the trial file Z#ContactLogDebug.gs, then the end of Edits.gs.)
 //
 // TEMPORARY "🐞 Contact Log Debug" sidebar (owner's request 2026-11-05): shows,

@@ -1,7 +1,7 @@
 // ======================================================================
 // FILE: Menus.gs
 // PURPOSE: Menus, first-time setup, and the server side of every dialog:
-// Getting Started (welcome + checklist), Settings, Student Overrides (+ report),
+// Getting Started (welcome + checklist), Settings, Student Overrides = 👪 Families (+ report),
 // End of Year Rollover, Migration Wizard, Version Check, the data update
 // reminder, and the template / User Guide links.
 // ======================================================================
@@ -36,7 +36,7 @@
 //                          "Get the latest version" in 🔔 Check for Updates)
 //   column E "Example"     a filled-in example tracker (made-up students): a "See an
 //                          example tracker" button on the Welcome tab, the welcome
-//                          pop-up, 📖 Open User Guide and Getting Started (empty = no button)
+//                          pop-up, 📖 User Guide and Getting Started (empty = no button)
 //   column F "Document"    the User Guide
 // The newest dated row with a link in that column counts (leave it blank in a release
 // that keeps the same link). Columns are found by their header name. Not filled in /
@@ -68,7 +68,7 @@ const GUIDE_LINKS = {
   guideDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit?usp=sharing",
 
   // 📄 What Build Sheets does.           Shows on: Getting Started step 2.
-  //    Link to the User Guide heading "What Build Sheets does" (Part 2, Build and Full Sync).
+  //    Link to the User Guide heading "What Build Sheets does" (Part 2, Build Sheets and Build + Sync Contacts).
   buildDoc: "https://docs.google.com/document/d/18xJfQbFeolNTZ4Ap1GYdtaPtFAWWy3Gv/edit#bookmark=id.jk93e9512ti",
 
   // 📄 What each setting does.           Shows on: Getting Started step 3.
@@ -86,12 +86,12 @@ const GUIDE_LINKS = {
 
 // 📖 The User Guide FOLDER (the BACKUP): when the Version Tracker has no
 //    "Document" link, the NEWEST file in it is the User Guide link everywhere
-//    (📖 Open User Guide, the Welcome tab, Getting Started).
+//    (📖 User Guide, the Welcome tab, Getting Started).
 const GUIDE_FOLDER_ID = "1zhH2cD-ecIPHKCLhWPEptXW0LQ2T12MB";
 
 // 📋 The template FOLDER (the BACKUP): when the Version Tracker has no "Blank
 //    Copy" link, the newest file with "(BLANK)" in its name is the "make a copy"
-//    link (End of Year Rollover, 📖 Open User Guide).
+//    link (End of Year Rollover, 📖 User Guide).
 const TEMPLATE_FOLDER_ID = "1goKFrxDJOSAPxp1HUXETX2dns5c6HXk2";
 
 // 🐞 The bug report form (🐞 Report a Bug, the Welcome tab, Getting Started Help).
@@ -321,7 +321,7 @@ function buildMenus_(realOpen) {
       // dismissals/preferences from the template never leak into copies.
       'VERSION_LAST_SEEN', 'VERSION_LAST_SEEN_DATE', 'VERSION_DISMISS_FOREVER', 'VERSION_MAJORS_ONLY', 'VERSION_LAST_CHECK',
       // A copy never starts half way through Input Data Mode, or with the checklist "finished"
-      'INPUT_DATA_MODE_STATE', 'INPUT_DATA_MODE_DELETE_TAB', 'ZG_AUTO_OPEN'
+      'INPUT_DATA_MODE_STATE', 'INPUT_DATA_MODE_DELETE_TAB', 'ZG_AUTO_OPEN', 'ZG_GUIDE_DONE'
     ].forEach(k => {
       if (prop(k) === null) return; // only the ones this copy has (each delete is a call)
       props.deleteProperty(k);
@@ -404,17 +404,17 @@ function buildMenus_(realOpen) {
     props.setProperty('FULL_MENU_UNLOCKED', 'false'); // Mark as locked
     // Using the EXACT SAME "🚀 App Menu" name allows us to overwrite the Setup button 
     // instantly without forcing the user to refresh the page!
-    // New-user order (2026-11-12): the checklist, its first two steps, then the rest
-    const getStartedMenu = ui.createMenu("🚀 App Menu"); 
+    // New-user order (2026-11-12): the checklist, its first two steps, then the rest.
+    // Menu layout "2+" (owner 2026-11-24, see MENUS below buildMenus_): short labels, help in ❓ Help ▸
+    const getStartedMenu = ui.createMenu("🚀 App Menu");
     addGuideMenuItems_(getStartedMenu);          // ✅ Getting Started (below)
     addInputDataModeMenuItem_(getStartedMenu);   // Input Data.gs
-    getStartedMenu.addItem("🏗️ Build Sheets Only", "runBuildOnly"); 
+    getStartedMenu.addItem("🏗️ Build Sheets", "runBuildOnly");
     getStartedMenu.addSeparator();
-    getStartedMenu.addItem("🔄 Import Old Data", "openMigrationWizard");
-    getStartedMenu.addItem("📖 Open User Guide", "showWelcomeDialog");
-    getStartedMenu.addItem("🐞 Report a Bug", "reportABug");
-    getStartedMenu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
-    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(getStartedMenu); // owner test file z_ContactLogDebug.gs
+    getStartedMenu.addItem("📦 Bring Over Last Year's Tracker", "openMigrationWizard");
+    const help = helpSubMenu_(ui, false);
+    addContactLogDebugFallback_(help);           // owner test file, when there's no 🐞 Debug menu
+    getStartedMenu.addSubMenu(help);
     getStartedMenu.addToUi();
 
     // =======================================================
@@ -429,47 +429,43 @@ function buildMenus_(realOpen) {
     // ✅ FULLY POPULATED STATE: Data exists and is built, unlock all menus!
     props.setProperty('FULL_MENU_UNLOCKED', 'true'); // Mark as explicitly unlocked
     const syncToPhones = prop('syncToPhones') === 'true';
+    // ✅ Getting Started: at the top while its checklist is still work to do, then in ❓ Help
+    const guideDone = guideFinished_(prop);
 
+    // 1. 🚀 App Menu: loading data, building, settings, help, rare tools
     const menu = ui.createMenu("🚀 App Menu");
-    menu.addItem("🔍 Find a Family", "openFindFamily"); // search a family (owner 2026-11-23)
-    // Only show Full Sync if they have Phone Syncing enabled!
-    if (syncToPhones) {
-      menu.addItem("🧱 Full Sync (Build + Push to Google Contacts)", "openProgressBarSidebar");
-    }
-    
-    menu.addItem("🏗️ Build Sheets Only (No Push to Google Contacts)", "runBuildOnly"); 
+    if (!guideDone) addGuideMenuItems_(menu);
     addInputDataModeMenuItem_(menu);   // Input Data.gs
-    menu.addSeparator(); 
-    addGuideMenuItems_(menu);          // ✅ Getting Started (below)
-    menu.addItem("⚙️ Settings", "openSettingsDialog"); 
-    menu.addItem("📖 Open User Guide", "showWelcomeDialog");
-    menu.addItem("🐞 Report a Bug", "reportABug");
-    menu.addItem("🔔 Check for Updates", "manualCheckForUpdates"); // 🆕
-    if (typeof addContactLogDebugMenuItem_ === "function") addContactLogDebugMenuItem_(menu); // owner test file z_ContactLogDebug.gs
-    // Sheet Lock.gs: turn the baby-proofing off for layout changes, then back on
-    menu.addItem(isSheetLockOn_() ? "🔓 Unlock Sheet (change headers / layout)" : "🔒 Lock Sheet", "toggleSheetLock");
-    
-    // --- NEW: END OF YEAR ROLLOVER ---
+    menu.addItem("🏗️ Build Sheets", "runBuildOnly");
+    // Only with phone sync on (⚙️ Settings): build, then the families into Google Contacts
+    if (syncToPhones) menu.addItem("🧱 Build + Sync Contacts", "openProgressBarSidebar");
     menu.addSeparator();
-    menu.addItem("🔄 End of Year Rollover", "openRolloverWizard");
-    // ---------------------------------
-    
+    menu.addItem("⚙️ Settings", "openSettingsDialog");
+    menu.addSubMenu(helpSubMenu_(ui, guideDone));
+    // 🧰 More: rare items that change a lot, one level down so nobody clicks them by accident
+    const more = ui.createMenu("🧰 More");
+    // Sheet Lock.gs: turn the baby-proofing off for layout changes, then back on
+    more.addItem(isSheetLockOn_() ? "🔓 Unlock Layout" : "🔒 Lock Layout", "toggleSheetLock");
+    more.addItem("🎓 End of Year Rollover", "openRolloverWizard");
+    addContactLogDebugFallback_(more);   // owner test file, when there's no 🐞 Debug menu
+    menu.addSubMenu(more);
     menu.addToUi();
 
-    // --- STUDENT OVERRIDES MENU ---
-    // One main page (owner 2026-11-17): parents to add, your changes, the report, New / Edit Student
-    ui.createMenu('👤 Student Overrides') 
-    .addItem('🗂️ Student Overrides (parents to add, changes, report)', 'openManageOverridesDialog') 
-    .addItem('✨ New / Edit Student', 'openNewStudentDialog') 
-    .addToUi();
+    // 2. 👪 Families (was 👤 Student Overrides; owner 2026-11-24): find a family, change a
+    //    student, review parents / numbers to add and your changes (+ the Override Report)
+    ui.createMenu('👪 Families')
+      .addItem('🔍 Find a Family', 'openFindFamily')
+      .addItem('✨ New / Edit Student', 'openNewStudentDialog')
+      .addItem('🗂️ Family Changes', 'openManageOverridesDialog')
+      .addToUi();
 
-    // 2. The Events Menu
+    // 3. The Events Menu
     ui.createMenu('📆 Events')
       .addItem('📋 New Event', 'createNewEventTable')
       .addItem('👁️ View Events', 'openViewEventsDialog')
       .addToUi();
 
-    // 3. Contact Log menu — optional module (Z#ContactLog.gs). Guarded so the
+    // 4. Contact Log menu — optional module (Z#ContactLog.gs). Guarded so the
     //    app works unchanged if that file isn't included.
     if (typeof buildContactLogMenu_ === "function") buildContactLogMenu_();
   }
@@ -503,12 +499,46 @@ function buildMenus_(realOpen) {
       if (state.phase === 'building' || state.phase === 'syncing' || state.phase === 'paused' || state.phase === 'quota') {
         SpreadsheetApp.getUi().alert(
           "📡 Background Sync in Progress", 
-          "The system is currently running a background sync.\n\nPlease do not enter new data until it finishes to prevent saving errors. Click '🚀 App Menu' -> '🧱 Full Sync' to view live progress.", 
+          "The system is currently running a background sync.\n\nPlease do not enter new data until it finishes to prevent saving errors. Click 🚀 App Menu → 🧱 Build + Sync Contacts to see how far it is.", 
           SpreadsheetApp.getUi().ButtonSet.OK
         );
       }
     }
   } catch(e) { console.error(e); }
+}
+
+// ======================================================================
+// MENUS (layout "2+", owner 2026-11-24: "the App Menu is clogged"; was 12 items in one list)
+// Naming rules: short labels with no explanation in brackets (the window explains), the
+// label = the title of the window it opens, one emoji = one meaning, rare items one level down.
+//   🚀 App Menu: ✅ Getting Started (until its checklist is finished, guideFinished_), 📥 Input
+//     Data Mode, 🏗️ Build Sheets, 🧱 Build + Sync Contacts (phone sync on), ───, ⚙️ Settings,
+//     ❓ Help ▸ (✅ Getting Started once finished, 📖 User Guide, 🐞 Report a Bug, 🔔 Check for
+//     Updates), 🧰 More ▸ (🔓 Unlock Layout / 🔒 Lock Layout, 🎓 End of Year Rollover)
+//   👪 Families: 🔍 Find a Family, ✨ New / Edit Student, 🗂️ Family Changes
+//   📆 Events: 📋 New Event, 👁️ View Events
+// Before the first build: ✅ Getting Started, 📥 Input Data Mode, 🏗️ Build Sheets, ───,
+// 📦 Bring Over Last Year's Tracker, ❓ Help ▸. No custom menu is named "Help" at the top: ours
+// sit right after Google's own Help menu. Only the labels moved: every item runs the same function.
+// ======================================================================
+
+/** ❓ Help ▸ (both 🚀 App Menus). withGuide: ✅ Getting Started is here once its checklist is finished. */
+function helpSubMenu_(ui, withGuide) {
+  const help = ui.createMenu("❓ Help");
+  if (withGuide) addGuideMenuItems_(help);
+  help.addItem("📖 User Guide", "showWelcomeDialog");
+  help.addItem("🐞 Report a Bug", "reportABug");
+  help.addItem("🔔 Check for Updates", "manualCheckForUpdates");
+  return help;
+}
+
+/**
+ * The owner's test file z_ContactLogDebug.gs: its item is in the 🐞 Debug menu (z_MINE.gs); on a test
+ * copy without z_MINE.gs (no Debug menu) it goes at the end of this submenu. Nothing on a school's sheet.
+ */
+function addContactLogDebugFallback_(submenu) {
+  if (typeof addContactLogDebugMenuItem_ !== "function" || getOwnerHooks_()) return;
+  addContactLogDebugMenuItem_(submenu);
 }
 
 /**
@@ -568,8 +598,8 @@ function showWelcomeDialog() {
     <div class="note-dlg">
       <h1>Welcome to the PC Tracker</h1>
       <p>This system builds your directory, tracks your parent interactions, and compiles your PCAR data for you.</p>
-      <p><b>Next steps:</b> open <b>🚀 App Menu → ✅ Getting Started</b>. Its checklist walks you through loading your student data (📥 Input Data Mode), building your sheets, your settings and your first parent contact.</p>
-      <p>Moving from last year's tracker? Use <b>🚀 App Menu → 🔄 Import Old Data</b>.</p>
+      <p><b>Next steps:</b> open <b>✅ Getting Started</b> (🚀 App Menu; in ❓ Help once its checklist is done). Its checklist walks you through loading your student data (📥 Input Data Mode), building your sheets, your settings and your first parent contact.</p>
+      <p>Moving from last year's tracker? Before you build your sheets, use <b>🚀 App Menu → 📦 Bring Over Last Year's Tracker</b>.</p>
       <div class="foot">
         ${links.exampleUrl ? `<a class="btn sec" href="${links.exampleUrl}" target="_blank" rel="noopener">See an example tracker</a>` : ``}
         <a class="btn pri" href="${guideUrl}" target="_blank" rel="noopener">Read the User Guide</a>
@@ -580,7 +610,7 @@ function showWelcomeDialog() {
           <a class="btn sec" href="${links.blankCopyUrl}" target="_blank" rel="noopener">Make a new copy</a>
         </div>
       </div>
-      <p class="hint">You can open this again any time from <b>🚀 App Menu → 📖 Open User Guide</b>.</p>
+      <p class="hint">You can open this again any time from <b>🚀 App Menu → ❓ Help → 📖 User Guide</b>.</p>
     </div>
   `;
 
@@ -602,12 +632,13 @@ function showWelcomeDialog() {
 //     "Open this by itself" is unticked. Closing it is always fine.
 //   - "This tab" panel in the same sidebar: what the tab you're on is for, and
 //     which tabs are hidden and where to turn them on.
-// Called from: buildMenus_ (addGuideMenuItems_, both 🚀 App Menus),
+// Called from: buildMenus_ (addGuideMenuItems_, both 🚀 App Menus; in ❓ Help once finished),
 // runInitialSetupWrapper (showGuideWelcome_, instead of showWelcomeDialog;
-// "📖 Open User Guide" still opens showWelcomeDialog) and checkVersionOnOpen
+// "📖 User Guide" still opens showWelcomeDialog) and checkVersionOnOpen
 // (guideOnOpen_, installable on open).
 // State (document properties; they don't travel with copies, so every new copy
-// starts fresh): ZG_AUTO_OPEN ("off"), ZG_SETTINGS_SEEN ("true").
+// starts fresh): ZG_AUTO_OPEN ("off"), ZG_SETTINGS_SEEN ("true"), ZG_GUIDE_DONE ("true": all four
+// done once; with ZG_AUTO_OPEN off it moves ✅ Getting Started into ❓ Help, guideFinished_).
 // ======================================================================
 
 // LINKS: GUIDE_LINKS is in the 📌 YOUR LINKS box at the top of this file.
@@ -630,11 +661,11 @@ function linkList_() {
     ({ kind: "tracker", name: col(key, name), what: what, where: where, url: t[key] || "", empty: empty });
   return [
     trackerRow("blank", "Blank Copy", "Blank copy (the /copy link people make their tracker from)",
-      "📖 Open User Guide (Make a new copy), 🔔 Check for Updates, End of Year Rollover", "Not set: the template folder's newest (BLANK) file"),
+      "📖 User Guide (Make a new copy), 🔔 Check for Updates, End of Year Rollover", "Not set: the template folder's newest (BLANK) file"),
     trackerRow("example", "Example", "Example tracker (made-up students)",
-      "📖 Open User Guide, Welcome pop-up, 👋 Welcome tab, Getting Started (Help)", "Not set: no button"),
+      "📖 User Guide, Welcome pop-up, 👋 Welcome tab, Getting Started (Help)", "Not set: no button"),
     trackerRow("guide", "Document", "User Guide",
-      "📖 Open User Guide, 👋 Welcome tab, Getting Started", "Not set: the guide folder's newest file"),
+      "📖 User Guide, 👋 Welcome tab, Getting Started", "Not set: the guide folder's newest file"),
     { kind: "video", name: "setupVideo", what: "Setting up a new copy", where: "👋 Welcome tab, Getting Started (Help)", url: L.setupVideo },
     { kind: "video", name: "downloadDataVideo", what: "How to download your data", where: "Welcome pop-up, Getting Started (step 1, Help)", url: L.downloadDataVideo },
     { kind: "doc", name: "downloadDataDoc", what: "How to download / update your data", where: "Welcome pop-up, Getting Started (step 1)", url: L.downloadDataDoc, heading: GUIDE_LINK_HEADINGS_.downloadDataDoc },
@@ -697,8 +728,8 @@ const ZG_TABS = [
     what: "Your family directory, from ATS only: each student, OSIS, site, class and how to reach their parents." },
   { name: "Phone Contacts", type: "built", settings: true,
     what: "The contact list your phone sync sends to Google Contacts (⚙️ Settings → Contacts & sync)." },
-  { name: "Students Override Report", type: "built", where: "👤 Student Overrides → Create the Override Report",
-    what: "The student changes you made with 👤 Student Overrides. Made when you ask for it; deleted again at the 10 PM rebuild (or at the next build when the nightly rebuild is off)." }
+  { name: "Students Override Report", type: "built", where: "👪 Families → 🗂️ Family Changes → Create the Override Report",
+    what: "The student changes you made in 👪 Families. Made when you ask for it; deleted again at the 10 PM rebuild (or at the next build when the nightly rebuild is off)." }
 ];
 
 // ----------------------------------------------------------------------
@@ -773,7 +804,7 @@ function showGuideWelcome_(opts) {
           <span>Copies your Contact Log, events, student changes, lists and settings from your old tracker. Your old tracker isn't changed.</span>
         </button>
       </div>
-      <p class="hint">You can do the other one later: 🚀 App Menu → 🔄 Import Old Data, or ✅ Getting Started.</p>
+      <p class="hint">You can do the other one later: 🚀 App Menu → 📦 Bring Over Last Year's Tracker, or ✅ Getting Started.</p>
     </div>
     <div class="note-dlg hidden" id="fresh">
       <h1>Load your student data</h1>
@@ -879,7 +910,7 @@ function showGuideWelcome_(opts) {
         document.querySelector('#oldBtn b').textContent = 'Opening…';
         google.script.run
           .withFailureHandler(function (e) {
-            alert('Could not open the Migration Wizard: ' + e.message + ' Use 🚀 App Menu → 🔄 Import Old Data.');
+            alert('Could not open the Migration Wizard: ' + e.message + ' Use 🚀 App Menu → 📦 Bring Over Last Year\'s Tracker.');
             ['freshBtn', 'oldBtn'].forEach(function (id) { document.getElementById(id).disabled = false; });
             document.querySelector('#oldBtn b').textContent = "No, bring over last year's tracker";
           })
@@ -908,8 +939,31 @@ function guideOnOpen_() {
   if (props.getProperty('SETUP_COMPLETE') !== 'true') return;
   if (props.getProperty('INPUT_DATA_MODE_STATE')) { openInputDataMode(); return; }
   if (props.getProperty('ZG_AUTO_OPEN') === 'off') return;
-  if (zg_checklist_(SpreadsheetApp.getActiveSpreadsheet()).allDone) return;
+  const checklist = zg_checklist_(SpreadsheetApp.getActiveSpreadsheet());
+  if (checklist.allDone) { zg_rememberDone_(checklist); return; } // the menu item moves into ❓ Help at the next open
   openGuideChecklist();
+}
+
+/**
+ * ✅ Getting Started sits at the top of the 🚀 App Menu until its checklist is finished, then in
+ * ❓ Help (menu layout "2+", owner 2026-11-24): finished = "Finish setup" was clicked (ZG_AUTO_OPEN =
+ * off) or all four steps were done once (ZG_GUIDE_DONE, zg_rememberDone_). prop = buildMenus_'s
+ * reader over its ONE property read, so the open makes no extra call for it.
+ */
+var ZG_GUIDE_DONE_KEY_ = 'ZG_GUIDE_DONE';
+function guideFinished_(prop) {
+  return prop('ZG_AUTO_OPEN') === 'off' || prop(ZG_GUIDE_DONE_KEY_) === 'true';
+}
+
+/** Every step done: remembered once (true the first time, so the caller can redraw the menus). */
+function zg_rememberDone_(checklist) {
+  if (!checklist || !checklist.allDone) return false;
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    if (props.getProperty(ZG_GUIDE_DONE_KEY_) === 'true') return false;
+    props.setProperty(ZG_GUIDE_DONE_KEY_, 'true');
+    return true;
+  } catch (e) { console.warn("Getting Started done: " + e.message); return false; }
 }
 
 // ----------------------------------------------------------------------
@@ -925,8 +979,11 @@ function openGuideChecklist() {
 function zg_getState() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const props = PropertiesService.getDocumentProperties();
+  const checklist = zg_checklist_(ss);
+  // All four done for the first time: ✅ Getting Started moves into ❓ Help now (the "all set" note says so)
+  if (zg_rememberDone_(checklist)) { try { onOpen(); } catch (e) { console.warn("Menus not redrawn: " + e.message); } }
   return {
-    checklist: zg_checklist_(ss),
+    checklist: checklist,
     autoOpen: props.getProperty('ZG_AUTO_OPEN') !== 'off',
     tab: zg_activeTab(),
     hiddenTabs: zg_hiddenTabs_(ss),
@@ -984,10 +1041,15 @@ function zg_action(name) {
 function zg_finishSetup() {
   PropertiesService.getDocumentProperties().setProperty('ZG_AUTO_OPEN', 'off');
   const ui = SpreadsheetApp.getUi();
+  // Built: ✅ Getting Started moves into ❓ Help (guideFinished_); before the first build it stays on top
+  const built = studentListIsBuilt_(SpreadsheetApp.getActiveSpreadsheet());
   ui.alert("✅ Setup finished",
     "This checklist won't open by itself any more.\n\n" +
-    "You can always open it again: 🚀 App Menu → ✅ Getting Started.\n" +
-    "The User Guide is there too: 🚀 App Menu → 📖 Open User Guide.", ui.ButtonSet.OK);
+    (built ? "You can always open it again: 🚀 App Menu → ❓ Help → ✅ Getting Started.\n" +
+             "The User Guide is there too: 🚀 App Menu → ❓ Help → 📖 User Guide."
+           : "You can always open it again: 🚀 App Menu → ✅ Getting Started.\n" +
+             "The User Guide is in 🚀 App Menu → ❓ Help → 📖 User Guide."), ui.ButtonSet.OK);
+  if (built) { try { onOpen(); } catch (e) { console.warn("Menus not redrawn: " + e.message); } }
   return true;
 }
 
@@ -1077,7 +1139,7 @@ function zg_buildStep_(ss, props, links) {
   const needed = built ? props.getProperty(BUILD_NEEDED_KEY_) : null;
   const step = { id: "build", title: "Build your sheets", done: built && !needed,
     text: "Input Data Mode builds them for you before Your Lists (step 5). Fills the Student List, Directory, Combined Contact Tracking and the other tabs from your data. The rest of the menus appear after the first build.",
-    buttons: [{ action: "build", label: "Build Sheets Only", primary: true }],
+    buttons: [{ action: "build", label: "Build Sheets", primary: true }],
     links: [{ label: "Guide: what Build Sheets does", url: links.buildDoc }] };
   if (needed) {
     step.title = "Build your sheets again";
@@ -1186,17 +1248,17 @@ function reportABug() {
 function runBuildOnly() {
   CacheService.getScriptCache().put('RUN_MODE', 'BUILD_ONLY', 600);
   const html = htmlFromFile_('ProgressSidebar')
-      .setTitle('Build Sheets Manager')
+      .setTitle('Build Sheets')
       .setWidth(320);
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
 function openProgressBarSidebar() {
-  // Full Sync fills the clicker's own Google Contacts: say whose, once per person (Contacts Sync.gs)
+  // 🧱 Build + Sync Contacts (Full Sync) fills the clicker's own Google Contacts: say whose, once per person (Contacts Sync.gs)
   if (!confirmFullSyncAccount_()) return;
   CacheService.getScriptCache().put('RUN_MODE', 'FULL_SYNC', 600);
   const html = htmlFromFile_('ProgressSidebar')
-      .setTitle('Build & Sync Manager')
+      .setTitle('Build + Sync Contacts')
       .setWidth(320);
   SpreadsheetApp.getUi().showSidebar(html);
 }
@@ -1354,7 +1416,7 @@ function runInitialSetupSteps_(ss, props) {
 }
 
 /**
- * The first build unlocks the full menus (⚙️ Settings, 👤 Student Overrides, 📆 Events):
+ * The first build unlocks the full menus (⚙️ Settings, 👪 Families, 📆 Events):
  * repaint them right away instead of at the next reload. Called after Build Sheets
  * Only and when Input Data Mode has ended (in its separate tab-delete call, because
  * buildMenus_ also deletes the mode's leftover tab). True when the menus were redrawn.
@@ -1715,7 +1777,7 @@ function welcomeDoneRows_(opts) {
      "It takes your ATS, Parent Square and NYCSA files one at a time (upload the file or paste it), then your sites and classes, " +
      "and builds your sheets for you. Download your files first: the links below show how."],
     ["Bringing over last year's tracker instead?",
-     "🚀 App Menu → 🔄 Import Old Data copies your Contact Log, events, student changes and settings from it. Your old tracker isn't changed."],
+     "🚀 App Menu → 📦 Bring Over Last Year's Tracker copies your Contact Log, events, student changes and settings from it. Your old tracker isn't changed."],
     ["Closed a window by accident?",
      "Nothing is lost. 🚀 App Menu → ✅ Getting Started shows your checklist, and 📥 Input Data Mode picks up where you left off."]
   ];
@@ -2283,17 +2345,17 @@ function openNewStudentDialog() {
 }
 
 /**
- * 👤 Student Overrides' ONE main page (owner 2026-11-17, release check round 2 idea; was "Manage
- * Overrides"): parents to add (Parent Square / NYCSA / your lists have them, your Student Data
+ * 🗂️ Family Changes (👪 Families menu; was "Student Overrides" until 2026-11-24): the ONE main page
+ * (owner 2026-11-17, release check round 2 idea; was "Manage Overrides"): parents to add (Parent Square / NYCSA / your lists have them, your Student Data
  * doesn't), your student changes (Edit / Delete), the Override Report, and New / Edit Student, which
- * comes back here (its "← Student Overrides" button, and after Save when it was opened from here).
+ * comes back here (its "← Family Changes" button, and after Save when it was opened from here).
  */
 function openManageOverridesDialog() {
   const html = htmlFromFile_('ManageOverridesDialog')
-      .setTitle('Student Overrides')
+      .setTitle('Family Changes')
       .setWidth(640)
       .setHeight(680);
-  SpreadsheetApp.getUi().showModalDialog(html, 'Student Overrides');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Family Changes');
 }
 
 /**
@@ -2466,7 +2528,7 @@ function saveStudentOverrides(payloads) {
   const isPaused = (settings.disableRebuilds === true || settings.disableRebuilds === 'true');
 
   if (!isPaused) {
-      // Build is ON: open the same progress sidebar the "Build Sheets Only"
+      // Build is ON: open the same progress sidebar the "🏗️ Build Sheets"
       // menu item uses. Its build-only process runs the full rebuild, which
       // integrates the new/edited override. The dialog closes on success
       // (see NewStudentDialog.html), revealing the sidebar behind it.
@@ -2697,9 +2759,9 @@ function getNewStudentPrefill() {
 // ======================================================================
 // PARENTS TO ADD (owner 2026-11-17, release check round 2 idea)
 // A parent that Parent Square, NYCSA or one of Your Lists has for a student, who isn't one of that
-// student's guardians in your Student Data (ATS + 👤 Student Overrides): ATS lists 2 guardians, so a
+// student's guardians in your Student Data (ATS + 👪 Families): ATS lists 2 guardians, so a
 // third one, a stepparent or a grandparent the school added in Parent Square shows up here. Shown on the
-// 👤 Student Overrides page and offered at the end of 📥 Input Data Mode. Nothing is added by itself:
+// 🗂️ Family Changes page and offered at the end of 📥 Input Data Mode. Nothing is added by itself:
 // "Add" writes an "Added Guardian (<where from>)" row in New / Edit Student, which the build adds ON
 // TOP of the ATS guardians (getOverrideData_, Build.gs; once ATS lists them too the row goes away,
 // cleanRedundantOverrides). "Not new" hides one for good (document property PARENTS_TO_ADD_SKIPPED).
@@ -2942,7 +3004,7 @@ function findParentsToAdd_(ss, all, src) {
 // ======================================================================
 // PHONE NUMBERS TO CHECK (owner 2026-11-23, idea 4)
 // A parent we have whom Parent Square, NYCSA or one of Your Lists has with a number we don't: one card
-// per parent + number on the 👤 Student Overrides page (siblings together). Only when NONE of that
+// per parent + number on the 🗂️ Family Changes page (siblings together). Only when NONE of that
 // source's numbers is one we have (NYCSA's home / work numbers next to the cell we have would only be
 // noise). "Add as a 2nd number" / "Use it instead" write Backend PHONES rows (Build.gs applies them; a
 // row goes once ATS has the number); "Not needed" hides one for good (document property
@@ -3051,7 +3113,7 @@ function savePhoneNumbers(keys, use) {
   const settings = getSettings();
   const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
   if (!paused) runBuildOnly();
-  else ss.toast("Saved. Your sheets get the numbers at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  else ss.toast("Saved. Your sheets get the numbers at the next build (rebuilds are paused in ⚙️ Settings).", "🗂️ Family Changes", 6);
   return { saved: picked.length, building: !paused, home: getOverridesHome() };
 }
 
@@ -3116,7 +3178,7 @@ function deletePhoneChanges(keys) {
   const settings = getSettings();
   const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
   if (!paused) runBuildOnly();
-  else ss.toast("Deleted. Your sheets get the old numbers back at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  else ss.toast("Deleted. Your sheets get the old numbers back at the next build (rebuilds are paused in ⚙️ Settings).", "🗂️ Family Changes", 6);
   return { removed: idxs.length, building: !paused, home: getOverridesHome() };
 }
 
@@ -3239,7 +3301,7 @@ function addParentsAsGuardians(keys) {
   const settings = getSettings();
   const paused = settings.disableRebuilds === true || settings.disableRebuilds === 'true';
   if (added && !paused) runBuildOnly(); // the Build panel opens on the right, as for every override change
-  else if (added) ss.toast("Saved. Your sheets get the new parents at the next build (rebuilds are paused in ⚙️ Settings).", "👤 Student Overrides", 6);
+  else if (added) ss.toast("Saved. Your sheets get the new parents at the next build (rebuilds are paused in ⚙️ Settings).", "🗂️ Family Changes", 6);
   return { added: added, noRoom: noRoom, building: !!(added && !paused), home: getOverridesHome() };
 }
 
@@ -3882,7 +3944,7 @@ function ma_migrateSimpleSheets(url) {
     if (overrides.length > 1) backendWriteBlock_(newSS, "OVERRIDES", overrides);
   });
 
-  // Phone numbers added in 👤 Student Overrides (2026-11-23; an older tracker has none)
+  // Phone numbers added in 🗂️ Family Changes (2026-11-23; an older tracker has none)
   part("Phone numbers you added", () => {
     const phones = readBackendBlockFromOtherSpreadsheet_(oldSS, "PHONES");
     if (phones.length > 1) backendWriteBlock_(newSS, "PHONES", phones);
@@ -4313,7 +4375,7 @@ function migrateStudentList_(oldSS, newSS) {
 /**
  * STEP 6: Final Rebuild. url (the old tracker): its Student List history comes first
  * (migrateStudentList_). If the build fails, that copy is taken out again, so the tracker
- * doesn't look built (full menus, no 🔄 Import Old Data) and Try Again starts this step over.
+ * doesn't look built (full menus, no 📦 Bring Over Last Year's Tracker) and Try Again starts this step over.
  */
 function ma_finish(url) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4426,7 +4488,7 @@ function checkVersionOnOpenRun_() {
 }
 
 /**
- * Menu item: 🚀 App Menu -> 🔔 Check for Updates
+ * Menu item: 🚀 App Menu → ❓ Help → 🔔 Check for Updates
  * Manual checks bypass the throttle AND "Dismiss Forever", and ALWAYS open
  * the dialog (even when caught up) so the Major-only / all-updates toggle is
  * always reachable.
@@ -5025,7 +5087,7 @@ function resetVersionCheckState() {
 //   (Version Tracker: trackerLinks_, the newest dated row with a link in that column.)
 //
 // WHEN THEY ARE LOOKED UP
-//   Only when something needs one (📖 Open User Guide, Getting Started, the welcome
+//   Only when something needs one (📖 User Guide, Getting Started, the welcome
 //   pop-up, Rollover), then remembered 6 hours (script cache). Looked up fresh by the
 //   nightly run, 🔔 Check for Updates (it reads the tracker anyway), 🔗 My Links and
 //   Reset to Display Mode. Never in the simple onOpen (it can't read other files).
@@ -5044,7 +5106,7 @@ function resetVersionCheckState() {
 
 // The Drive folders that hold the labeled template files (TEMPLATE_FOLDER_ID) and
 // the User Guide (GUIDE_FOLDER_ID: its NEWEST file, a PDF or a Google Doc, is the
-// "Open User Guide" link): both in the 📌 YOUR LINKS box at the top of this file.
+// "User Guide" link): both in the 📌 YOUR LINKS box at the top of this file.
 
 // How long a successful folder scan is cached (script cache) before re-scanning.
 const TEMPLATE_LINKS_CACHE_SECONDS = 6 * 60 * 60; // 6 hours
