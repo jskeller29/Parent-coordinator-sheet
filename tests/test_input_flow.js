@@ -1070,7 +1070,7 @@ function listsSheet() {
 
   // getSettings: one read, same answers (missing = default, saved values win)
   const g = fresh.g, dp = g.PropertiesService.getDocumentProperties();
-  dp.setProperty('typeCol', 'true'); dp.setProperty('showRawData', 'true'); dp.deleteProperty('autoNotes');
+  dp.setProperty('typeCol', 'true'); dp.setProperty('notesTab', 'true'); dp.deleteProperty('autoNotes');
   let reads = 0, readAll = 0;
   const get = dp.getProperty, getAll = dp.getProperties;
   dp.getProperty = k => { reads++; return get(k); };
@@ -1081,7 +1081,7 @@ function listsSheet() {
   assert.strictEqual(s.typeCol, true, 'a saved value');
   assert.strictEqual(s.autoNotes, true, 'a missing value = its default');
   assert.strictEqual(s.syncToPhones, false);
-  assert.strictEqual(s.showRawData, true, 'a tab shown in Settings');
+  assert.strictEqual(s.notesTab, true, 'a tab shown in Settings');
   assert.strictEqual(s.showContactLog, true, 'a tab never saved = its default');
   assert.strictEqual(s.dataReminder, 'week');
   console.log("faster Initial Setup (no Sheet Lock on a new copy, one settings write / read): ok");
@@ -1095,14 +1095,14 @@ function listsSheet() {
   const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) }, noTrialFiles: true });
   g.isAutoMigrateOn_ = () => false; g.zg_safeGuideLink_ = () => ""; g.zg_safeExampleLink_ = () => "";
   const dp = g.PropertiesService.getDocumentProperties();
-  dp.setProperty('syncToPhones', 'true'); dp.setProperty('showRawData', 'true');
+  dp.setProperty('syncToPhones', 'true'); dp.setProperty('notesTab', 'true');
   g.saveSettingsToVersionSheet_(ss);                                    // what a reset saves into the template
   assert.strictEqual(g.loadSettingsFromVersionSheet_().syncToPhones, 'true', 'the template says sync on');
-  dp.deleteProperty('syncToPhones'); dp.deleteProperty('showRawData');  // a copy starts with no properties
+  dp.deleteProperty('syncToPhones'); dp.deleteProperty('notesTab');  // a copy starts with no properties
   g.onOpen({ source: ss });
   g.runInitialSetup_();
   assert.strictEqual(g.__props.syncToPhones, 'false', 'phone sync starts off on a new copy');
-  assert.strictEqual(g.__props.showRawData, 'true', 'the other saved settings still come along');
+  assert.strictEqual(g.__props.notesTab, 'true', 'the other saved settings still come along');
   assert.strictEqual(g.getSettings().syncToPhones, false);
   console.log("Initial Setup: phone sync starts off even when the template says on: ok");
 }

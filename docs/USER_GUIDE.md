@@ -208,8 +208,8 @@ NYCSA (optional):
 
 #### Pasting into Raw Data yourself
 
-You can also paste an export straight into the Raw Data tab (turn it on in Settings →
-Tabs & columns): Student Data into cell A5, Parent Square into AG6, NYCSA into AP2.
+You can also paste an export straight into the Raw Data tab (show it with View → Hidden
+sheets → Raw Data): Student Data into cell A5, Parent Square into AG6, NYCSA into AP2.
 
 > [!IMPORTANT]
 > Paste values only, with Ctrl+Shift+V or Edit → Paste special → Values only. A normal
@@ -336,13 +336,15 @@ The tracker adds its menus after Help: 🚀 App Menu, 👤 Student Overrides and
 | Parents List | One row per guardian, with Parent Square and NYCSA sign-up. Useful for mail merges. | No |
 | Phone Contacts | What the phone sync sends to Google Contacts. | No |
 | Notes | Notes you always want at the top of a student's history. | No |
-| Events | Attendance for events and workshops. | No |
+| Events | Attendance for events and workshops. Shows while you fill in an event (📆 Events). | No |
 | Send Out | Messages and flyers you sent, for the PCAR. | No |
-| Raw Data | Your exports: ATS, Parent Square, NYCSA, sites and classes. | No |
+| Raw Data | Your exports: ATS, Parent Square, NYCSA, sites and classes. Input Data Mode fills it in. | No |
+| Students Override Report | Made when you click Create the Override Report; deleted again at the 10 PM rebuild (or at the next build when the nightly rebuild is off). | No |
 | 📥 your lists | One tab per list from Your Lists, with the icon you picked (📥 unless you picked another). | No |
 | Backend | The tracker's own settings and data. Leave it alone, except the Type List in column BL. | No, always hidden |
 
-Turn tabs on or off in ⚙️ Settings → Tabs & columns. Hidden tabs keep updating. A tab you
+Turn tabs on or off in ⚙️ Settings → Tabs & columns. Events, Raw Data and the Students Override
+Report are not there: their own tools show them. Hidden tabs keep updating. A tab you
 show or hide by hand (View → Hidden sheets, or right-click a tab → Hide sheet) is kept that
 way: Settings takes it over the next time it opens.
 
@@ -408,6 +410,11 @@ the PCAR.
 When you make a new event, only its table shows; the other events are hidden, not deleted.
 To see other events, click 📆 Events → 👁️ View Events, tick one, several or all of them
 (Select all), and click Show. The search box finds an event by name, type or date.
+
+The Events panel opens on the right while you fill in an event. To keep typing fast, a row
+only fills itself in: the attendance goes into the notes, Combined Contact Tracking and the
+PCAR when you build. When you are done, click **Done: build and close Events** (the Events tab
+hides and your sheets build), or **Close Events, build later** (the 10 PM rebuild does it).
 
 ### Settings
 

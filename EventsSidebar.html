@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include_('Styles') ?>
+  <style>
+    body { padding: 14px 14px 20px; }
+    .wrap { display: flex; flex-direction: column; gap: 14px; }
+    .ev { border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 11px; }
+    .ev + .ev { margin-top: 6px; }
+    .ev b { display: block; }
+    .ev .help { margin-top: 1px; }
+    ul.tips { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; }
+    ul.tips li + li { margin-top: 4px; }
+    .btns { display: flex; flex-direction: column; gap: 8px; }
+    .more { display: flex; gap: 14px; flex-wrap: wrap; }
+    .box { padding: 10px 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Filling in</div>
+      <div id="events" style="margin-top:6px"><div class="hint">Loading…</div></div>
+      <div class="more" style="margin-top:8px">
+        <button type="button" class="link" id="viewBtn">View other events</button>
+        <button type="button" class="link" id="newBtn">New event</button>
+        <button type="button" class="link" id="refreshBtn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="lab" style="margin:0">How to fill it in</div>
+      <ul class="tips">
+        <li>Type an OSIS, a student or a guardian: the rest of the row fills in.</li>
+        <li>Paste a column of OSIS numbers, or several in one cell separated by commas.</li>
+        <li># of Indv starts at 1. Change it when more people came.</li>
+      </ul>
+    </div>
+
+    <div class="notice" id="buildNote">
+      To keep typing fast, attendance goes into the notes, Combined Contact Tracking and the PCAR when you build.
+      <span id="nightlyText"></span>
+    </div>
+
+    <div class="btns">
+      <button type="button" class="btn pri wide" id="doneBtn">Done: build and close Events</button>
+      <button type="button" class="btn sec wide" id="laterBtn">Close Events, build later</button>
+    </div>
+    <div class="notice err hidden" id="err"></div>
+  </div>
+
+  <script>
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function fail(err) {
+      $('err').textContent = 'Something went wrong: ' + (err && err.message ? err.message : err);
+      $('err').classList.remove('hidden');
+      busy(false);
+    }
+    function busy(on, label) {
+      ['doneBtn', 'laterBtn', 'viewBtn', 'newBtn', 'refreshBtn'].forEach(function (id) { $(id).disabled = on; });
+      $('doneBtn').textContent = on && label ? label : 'Done: build and close Events';
+    }
+    function draw(p) {
+      if (!p.showing.length) {
+        $('events').innerHTML = '<div class="hint">' + (p.total ? 'No event is showing. Click View other events to pick one.' : 'No events yet. Click New event to make one.') + '</div>';
+      } else {
+        $('events').innerHTML = p.showing.map(function (t) {
+          var bits = [t.type, t.date].filter(Boolean);
+          bits.push(t.rows + (t.rows === 1 ? ' row' : ' rows') + ' filled in');
+          return '<div class="ev"><b>' + esc(t.name) + '</b><div class="help">' + esc(bits.join(' · ')) + '</div></div>';
+        }).join('');
+      }
+      $('viewBtn').style.display = p.total > p.showing.length ? '' : 'none';
+      $('nightlyText').textContent = p.nightlyOff
+        ? 'Your nightly rebuild is off, so build when you are done.'
+        : 'Tonight’s 10 PM rebuild does it too.';
+      $('laterBtn').style.display = p.tabShown ? '' : 'none';
+      $('doneBtn').textContent = p.tabShown ? 'Done: build and close Events' : 'Build now';
+    }
+    function load() {
+      google.script.run.withSuccessHandler(draw).withFailureHandler(fail).getEventsPanel();
+    }
+
+    $('refreshBtn').addEventListener('click', load);
+    $('viewBtn').addEventListener('click', function () { google.script.run.withFailureHandler(fail).openViewEventsDialog(); });
+    $('newBtn').addEventListener('click', function () { google.script.run.withFailureHandler(fail).createNewEventTable(); });
+    $('doneBtn').addEventListener('click', function () {
+      busy(true, 'Starting the build…');
+      // The Build sidebar takes this panel's place
+      google.script.run.withFailureHandler(fail).eventsFinish(true);
+    });
+    $('laterBtn').addEventListener('click', function () {
+      busy(true);
+      google.script.run.withSuccessHandler(function () { google.script.host.close(); }).withFailureHandler(fail).eventsFinish(false);
+    });
+    load();
+  </script>
+</body>
+</html>

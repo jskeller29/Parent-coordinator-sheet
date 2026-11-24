@@ -358,9 +358,29 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   all; Show = showEventTables(keys [{ col, name }]: found at its column with the same name, else by name, since
   tables move when an event is added / deleted) -> shows those, hides the rest, goes to the first, toast. Deleting
   the only table showing (the red box) shows the newest one left and the alert says so. Only hidden: the build,
-  notes and PCAR read hidden columns as before. NOTES WRAP (owner 2026-11-24): each table's Notes column (6th) wraps
+  notes and PCAR read hidden columns as before.
+  FAST EVENTS (owner 2026-11-24, later): an Events edit (watchEventsSheet_) only runs the ghost typist, then
+  removeDuplicateEventRows_ (same OSIS twice in THIS table: later row cleared + "Duplicate Removed"; one read of its OSIS
+  column). The old reconciliation sweep (every table read, Backend Event Log rewritten, updateOsisDeltas_ = notes) and the
+  row-1 rename interceptor are GONE; installedOnEdit no longer clears the notes cache for Events. The Backend Event Log,
+  notes, Combined, PCAR get events at the next build (buildBackendEventLogData_ reads the tab) or the 10 PM run; the
+  Contact Log's quick notes read the Backend Event Log, so they show the last build's events. Row 1 = only the red
+  delete box (deleteEventTable_, before the "enough rows" check: an empty table can now be deleted; no Backend write).
+  EVENTS PANEL (EventsSidebar.html, Edits.gs 2c): opened by the New Event and View Events dialogs after their call
+  succeeds (openEventsSidebar); getEventsPanel (showing tables, total, tabShown, nightlyOff); "Done: build and close
+  Events" = eventsFinish(true): hideEventsTab_ (user moved to the Contact Log) + runBuildOnly (the Build sidebar takes the
+  panel's place); "Close Events, build later" = eventsFinish(false) + toast. buildEventTable / showEventTables show a
+  hidden Events tab. NOTES WRAP (owner 2026-11-24): each table's Notes column (6th) wraps
   from the header row down (wrapEventNotesAt_, in styleEventTableAt_; wrapAllEventNotes_ on New Event and View
   Events' Show, so older tables get it too). Not tried on a real sheet yet.
+- SETTINGS TABS (owner 2026-11-24): TAB_VISIBILITY inSettings: false for Raw Data, Events, Students Override Report
+  (their tools show them: Input Data Mode, New Event / View Events + the Events panel, Create the Override Report):
+  getSettings returns the default for them (a saved value is ignored) with tabsPresent false (no row; the 3 rows are
+  also gone from SettingsDialog.html); updateVisualSettings_ and rememberTabChoices_ skip them. New Students: ownerOnly
+  (a row only when getOwnerHooks_). ZG_TABS where: says where each of the 3 comes from (zg_hiddenTabs_).
+- OVERRIDE REPORT AT NIGHT (owner 2026-11-24): deleteOverrideReport_ (Build.gs; user on it -> Contact Log first; never
+  throws) runs in nightlyMasterSyncLocked_ after the build, and at the end of every build while disableNightlySync is
+  'true'. Regenerate's fake data still makes one (gone the first night).
 - Contact Log Follow-up (N): the 6 options, EXACT text (owner's screenshot 2026-11-12): "No Followup Needed",
   "Followup Needed", "Followup Needed - ASAP", "Followed up / Resolved", "Skipped / Newer Interaction", "Waiting for
   Response". Code writes only these (auto-fill default, Migration map, Z#ContactLog, fake data); tests/test_fixes.js
@@ -581,6 +601,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   (master template too); the next build (or the 10 PM run) draws it. Nothing by hand.
 - Events one at a time + 👁️ View Events + Notes wrap (2026-11-24): re-paste Edits and Menus on every sheet (master template too).
   Nothing by hand, no new files or permissions.
+- Fast events + Events panel + Settings tabs + the report at night (2026-11-24, later): re-paste Edits, Menus, Build
+  (scripts) and SettingsDialog (page); ADD the page EventsSidebar. Every sheet (master template too).
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,
   YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.

@@ -131,8 +131,7 @@ function handleEdit_(e) {
 
   // --- TRIGGER THE EVENTS GHOST TYPIST & BACKEND ---
   if (sheetName === "Events") {
-    clearNotesSourcesCache_();
-    watchEventsSheet_(e);
+    watchEventsSheet_(e); // fills the row in only; the Backend Event Log / notes wait for the build
     return; 
   }
 
@@ -2574,12 +2573,17 @@ function createNewEventTable() {
           const formattedDate = parts[1] + '/' + parts[2] + '/' + parts[0];
 
           google.script.run
-            .withSuccessHandler(function () { google.script.host.close(); })
+            .withSuccessHandler(openPanel)
             .withFailureHandler(function (err) {
               alert('The event table could not be made: ' + (err && err.message ? err.message : err));
               btn.disabled = false; btn.innerText = 'Create table';
             })
             .buildEventTable(name, loc, formattedDate, type);
+        }
+        // The Events panel (EventsSidebar): fill-in tips + "Done: build and close Events"
+        function openPanel() {
+          google.script.run.withSuccessHandler(function () { google.script.host.close(); })
+            .withFailureHandler(function () { google.script.host.close(); }).openEventsSidebar();
         }
       </script>
     </div>
@@ -2599,6 +2603,7 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
     sheet = ss.insertSheet("Events");
   }
   
+  if (sheet.isSheetHidden()) sheet.showSheet(); // hidden while no event is being filled in (EventsSidebar)
   sheet.activate(); 
 
   // Insert 7 columns on the far left (6 data + 1 spacer)
@@ -2793,7 +2798,10 @@ function openViewEventsDialog() {
         if (!keys.length) return;
         showBtn.disabled = true; showBtn.textContent = 'Showing…';
         google.script.run
-          .withSuccessHandler(function () { google.script.host.close(); })
+          .withSuccessHandler(function () {
+            google.script.run.withSuccessHandler(function () { google.script.host.close(); })
+              .withFailureHandler(function () { google.script.host.close(); }).openEventsSidebar();
+          })
           .withFailureHandler(function (err) {
             alert('The events could not be shown: ' + (err && err.message ? err.message : err));
             draw();
@@ -2826,10 +2834,69 @@ function showEventTables(keys) {
   if (!cols.length) throw new Error("Those events are no longer on the Events tab. Close this window and open 👁️ View Events again.");
   showOnlyEventTables_(sheet, cols);
   try { wrapAllEventNotes_(sheet); } catch (e) { console.warn("Event notes not wrapped: " + e.message); }
+  if (sheet.isSheetHidden()) sheet.showSheet();
   sheet.activate();
   sheet.setActiveRange(sheet.getRange(1, Math.min.apply(null, cols)));
   ss.toast(cols.length === list.length ? "Showing every event." : "Showing " + cols.length + " of " + list.length + " events.", "👁️ View Events", 4);
   return { shown: cols.length, total: list.length };
+}
+
+// ==============================================================
+// 2c. THE EVENTS PANEL (EventsSidebar.html; owner 2026-11-24)
+// ==============================================================
+// Opens after 📋 New Event and 👁️ View Events. Typing in an event only fills the row in
+// (watchEventsSheet_); the panel says so and has "Done: build and close Events" (hides the
+// Events tab, then the Build sidebar runs 🏗️ Build Sheets Only, which puts the attendance
+// into the notes / Combined Contact Tracking / PCAR) and "Close Events, build later" (the
+// 10 PM rebuild does it). The Events tab is hidden whenever no event is being filled in
+// (not in ⚙️ Settings → Tabs & columns any more).
+
+function openEventsSidebar() {
+  SpreadsheetApp.getUi().showSidebar(htmlFromFile_('EventsSidebar').setTitle('Events').setWidth(320));
+}
+
+/** What the panel shows: the tables on screen, how many in all, whether tonight's rebuild runs. */
+function getEventsPanel() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Events");
+  const list = sheet ? eventTablesList_(sheet) : [];
+  const props = PropertiesService.getDocumentProperties();
+  return {
+    showing: list.filter(t => t.shown).map(t => ({ name: t.name, type: t.type, date: t.date, rows: t.rows })),
+    total: list.length,
+    tabShown: !!sheet && !sheet.isSheetHidden(),
+    nightlyOff: props.getProperty('disableNightlySync') === 'true'
+  };
+}
+
+/** Hides the Events tab (the user goes to the Contact Log first). Never throws. */
+function hideEventsTab_(ss) {
+  const sheet = ss.getSheetByName("Events");
+  if (!sheet || sheet.isSheetHidden()) return false;
+  try {
+    if (ss.getActiveSheet().getSheetId() === sheet.getSheetId()) {
+      const log = ss.getSheetByName("Contact Log");
+      const to = (log && !log.isSheetHidden()) ? log
+        : ss.getSheets().filter(sh => sh.getSheetId() !== sheet.getSheetId() && !sh.isSheetHidden())[0];
+      if (!to) return false; // Sheets can't hide the last tab showing
+      to.activate();
+    }
+    sheet.hideSheet();
+    return true;
+  } catch (e) { console.warn("Events tab not hidden: " + e.message); return false; }
+}
+
+/**
+ * The panel's buttons. build = true: hides the Events tab and opens the Build sidebar
+ * (🏗️ Build Sheets Only, in place of this panel). false: hides the tab, the panel closes.
+ */
+function eventsFinish(build) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  hideEventsTab_(ss);
+  if (build) { runBuildOnly(); return { building: true }; }
+  const nightlyOff = PropertiesService.getDocumentProperties().getProperty('disableNightlySync') === 'true';
+  ss.toast(nightlyOff ? "Your events go into the notes at the next 🏗️ Build Sheets Only." : "Your events go into the notes at tonight's rebuild, or at the next 🏗️ Build Sheets Only.", "📆 Events closed", 6);
+  return { building: false };
 }
 
 /**
@@ -2949,13 +3016,19 @@ function watchEventsSheet_(e) {
   const row = range.getRow();
   const col = range.getColumn();
 
-  const maxRows = sheet.getLastRow();
-  const maxCols = sheet.getLastColumn();
-  if (maxRows < 3 || maxCols < 6) return;
-
   // Tables are 7 columns wide (6 data + 1 spacer)
   const tableStartCol = Math.floor((col - 1) / 7) * 7 + 1;
   const relativeCol = col - tableStartCol; // 0=OSIS, 1=Guardian, 2=Attendee, 3=Student, 4=#Indv, 5=Notes/Box
+
+  // Row 1: the red delete box. A new name / type / date needs nothing now: the next build reads it.
+  if (row === 1) {
+    if (relativeCol === 5 && range.getNumRows() === 1 && range.getNumColumns() === 1) deleteEventTable_(e, sheet, tableStartCol);
+    return;
+  }
+
+  const maxRows = sheet.getLastRow();
+  const maxCols = sheet.getLastColumn();
+  if (maxRows < 3 || maxCols < 6) return;
   
   // 1. GHOST TYPIST LOGIC (Runs instantly before anything else)
   const tEventsTypist = Date.now();
@@ -3105,178 +3178,58 @@ function watchEventsSheet_(e) {
   SpreadsheetApp.flush(); 
   clDbg_("⏱ Events typist " + (Date.now() - tEventsTypist) + " ms (painted)");
 
+  // FAST EVENTS (owner 2026-11-24): an edit only fills the row in (the typist above). The
+  // Backend Event Log, the notes, Combined Contact Tracking and the PCAR get the attendance
+  // at the next build: the Events panel's "Done: build" (EventsSidebar), 🏗️ Build Sheets Only or
+  // the 10 PM rebuild (buildBackendEventLogData_ reads every table). Before, every edit re-read
+  // every table, rewrote the Backend Event Log and the students' notes.
+  // Left: a family already in this table is taken out again (one read of its OSIS column).
+  if (row >= 3 && relativeCol <= 3) removeDuplicateEventRows_(sheet, tableStartCol, maxRows);
+}
+
+/**
+ * The same OSIS twice in one event table: the later row is cleared and the user is told
+ * (as before). Several OSIS in one cell ("111, 222") count one by one.
+ */
+function removeDuplicateEventRows_(sheet, tableStartCol, maxRows) {
+  if (maxRows < 4) return;
+  const osisCol = sheet.getRange(3, tableStartCol, maxRows - 2, 1).getDisplayValues();
+  const seen = {}, dupRows = [];
+  osisCol.forEach((r, i) => {
+    const list = String(r[0]).split(',').map(o => o.trim()).filter(Boolean);
+    if (!list.length) return;
+    if (list.some(o => seen[o])) { dupRows.push(i + 3); return; }
+    list.forEach(o => { seen[o] = true; });
+  });
+  if (!dupRows.length) return;
+  dupRows.forEach(r => sheet.getRange(r, tableStartCol, 1, 6).clearContent());
+  const ui = SpreadsheetApp.getUi();
+  ui.alert("⚠️ Duplicate Removed", "This family is already logged for this event. The duplicate has been removed.", ui.ButtonSet.OK);
+}
+
+/** The red box in row 1 was ticked: asks, then deletes that event's 7 columns. */
+function deleteEventTable_(e, sheet, tableStartCol) {
+  const range = e.range;
+  if (String(e.value).toUpperCase() !== "TRUE") return;
   const eventName = String(sheet.getRange(1, tableStartCol).getValue()).trim();
-  if (!eventName) return; 
-  const category = String(sheet.getRange(1, tableStartCol + 2).getValue()).trim() || "Other";
-  const dateString = sheet.getRange(1, tableStartCol + 4).getValue();
-  let eventDate = new Date(dateString);
-  if (isNaN(eventDate)) eventDate = new Date(); 
-  const fDateString = Utilities.formatDate(eventDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  if (!eventName) return;
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert("⚠️ Delete Event", `Are you sure you want to completely delete the event "${eventName}"?\n\nIts attendance leaves the notes at the next build.`, ui.ButtonSet.YES_NO);
+  if (response !== ui.Button.YES) { range.uncheck(); return; }
 
-  // =======================================================
-  // 2. DELETE EVENT LOGIC (Red Checkbox)
-  // =======================================================
-  if (row === 1 && relativeCol === 5) {
-    if (String(e.value).toUpperCase() === "TRUE") {
-      const ui = SpreadsheetApp.getUi();
-      const response = ui.alert("⚠️ Delete Event", `Are you sure you want to completely delete the event "${eventName}"?\n\nThis will permanently delete all logs associated with it from the backend.`, ui.ButtonSet.YES_NO);
-      
-      if (response === ui.Button.YES) {
-        sheet.deleteColumns(tableStartCol, 7);
-        SpreadsheetApp.flush();
-        // Every other event hidden (one at a time, 👁️ View Events): show the newest one, so
-        // the tab isn't left with no table on it
-        let showedNewest = "";
-        try {
-          const left = eventTablesList_(sheet);
-          if (left.length && !left.some(t => t.shown)) { showOnlyEventTables_(sheet, [left[0].col]); showedNewest = left[0].name; }
-        } catch (err) { console.warn("Events not shown after the delete: " + err.message); }
-        try { applySheetLocks_(e.source, ["Events"]); } catch (err) { console.warn("Sheet lock skipped: " + err.message); }
-        
-        const freshData = buildBackendEventLogData_(e.source);
-        backendWriteBlock_(e.source, "EVENT_LOG", freshData);
-        ui.alert("✅ Event Removed", "The event has been deleted. To push this deletion to the Contact Tracker, click 'Build Sheets Only' in your App Menu."
-          + (showedNewest ? "\n\nShowing \"" + showedNewest + "\" now. To see other events: 📆 Events → 👁️ View Events." : ""), ui.ButtonSet.OK);
-        return; 
-      } else {
-        range.uncheck(); 
-        return; 
-      }
-    } else {
-      return; 
-    }
-  }
+  sheet.deleteColumns(tableStartCol, EVENT_TABLE_WIDTH);
+  SpreadsheetApp.flush();
+  // Every other event hidden (one at a time, 👁️ View Events): show the newest one, so
+  // the tab isn't left with no table on it
+  let showedNewest = "";
+  try {
+    const left = eventTablesList_(sheet);
+    if (left.length && !left.some(t => t.shown)) { showOnlyEventTables_(sheet, [left[0].col]); showedNewest = left[0].name; }
+  } catch (err) { console.warn("Events not shown after the delete: " + err.message); }
+  try { applySheetLocks_(e.source, ["Events"]); } catch (err) { console.warn("Sheet lock skipped: " + err.message); }
 
-  // =======================================================
-  // 3. RENAME / DATE CHANGE INTERCEPTOR 
-  // =======================================================
-  if (row === 1) {
-      const oldValue = String(e.oldValue || "").trim();
-      if (oldValue && oldValue !== "undefined") {
-          e.source.toast("Rebuilding event data...", "⚙️ Syncing", 3);
-          const freshData = buildBackendEventLogData_(e.source);
-          backendWriteBlock_(e.source, "EVENT_LOG", freshData);
-          let affected = new Set();
-          for(let r = 1; r < freshData.length; r++) {
-             if (String(freshData[r][1]).trim() === eventName) affected.add(String(freshData[r][3]).trim());
-          }
-          SpreadsheetApp.flush();
-          updateOsisDeltas_(Array.from(affected).filter(Boolean));
-          return; 
-      }
-  }
-
-  // =======================================================
-  // 4. THE ABSOLUTE RECONCILIATION SWEEP
-  // =======================================================
-  const allTableData = sheet.getRange(1, 1, maxRows, maxCols).getValues();
-  const frontendRecords = new Map(); 
-  const rowsToClear = []; 
-
-  for (let c = 0; c < maxCols; c += 7) {
-      const tName = String(allTableData[0][c] || "").trim();
-      if (!tName) continue;
-
-      const tDateStr = allTableData[0][c + 4];
-      let tDate = new Date(tDateStr);
-      if (isNaN(tDate)) tDate = new Date();
-      const tDateString = Utilities.formatDate(tDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-
-      if (tName === eventName && tDateString === fDateString) {
-          for (let r = 2; r < maxRows; r++) { 
-              let rOsisRaw = String(allTableData[r][c] || "").trim();
-              if (!rOsisRaw) continue; 
-
-              let rGuardian = String(allTableData[r][c + 1] || "").trim();
-              let rAttendee = String(allTableData[r][c + 2] || "").trim();
-              let rStudentRaw = String(allTableData[r][c + 3] || "").trim(); 
-              
-              // ⚡ THE ZERO FIX: Evaluates the literal raw cell value!
-              let rawNumCell = allTableData[r][c + 4];
-              let rNum = 1; 
-              if (String(rawNumCell).trim() !== "") {
-                  rNum = Number(rawNumCell);
-              }
-
-              let rNotes = String(allTableData[r][c + 5] || "").trim();
-
-              const osisArray = rOsisRaw.split(',').map(o => o.trim()).filter(o => o !== "");
-              const nameArray = rStudentRaw.split(',').map(n => n.trim()).filter(n => n !== "");
-
-              for (let j = 0; j < osisArray.length; j++) {
-                  let singleOsis = osisArray[j];
-                  let singleName = nameArray[j] !== undefined ? nameArray[j] : rStudentRaw;
-                  let assignedNum = (j === 0) ? rNum : ""; 
-
-                  if (frontendRecords.has(singleOsis)) {
-                      rowsToClear.push({ row: r + 1, col: c + 1 }); 
-                  } else {
-                      frontendRecords.set(singleOsis, {
-                         guardian: rGuardian,
-                         attendee: rAttendee,
-                         student: singleName,
-                         numIndv: assignedNum,
-                         notes: rNotes,
-                         synced: false 
-                      });
-                  }
-              }
-          }
-      }
-  }
-
-  if (rowsToClear.length > 0) {
-      SpreadsheetApp.getUi().alert("⚠️ Duplicate Removed", "This family is already logged for this event. The duplicate has been removed.", SpreadsheetApp.getUi().ButtonSet.OK);
-      rowsToClear.forEach(target => sheet.getRange(target.row, target.col, 1, 6).clearContent());
-  }
-
-  // Backend tab's Event Log section (index 0 = header row)
-  const backendData = backendReadBlock_(e.source, "EVENT_LOG");
-  const affectedOsisNumbers = new Set(); 
-
-  for (let i = backendData.length - 1; i > 0; i--) {
-      let bEventName = String(backendData[i][1]).trim();
-      let bDate = backendData[i][0];
-      
-      let bDateString = "";
-      if (bDate instanceof Date) {
-        bDateString = Utilities.formatDate(bDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-      } else if (bDate) {
-        let parsedBDate = new Date(bDate);
-        if (!isNaN(parsedBDate)) bDateString = Utilities.formatDate(parsedBDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
-      }
-
-      if (bEventName === eventName && bDateString === fDateString) {
-         let bOsis = String(backendData[i][3]).trim();
-
-         if (frontendRecords.has(bOsis)) {
-           let fData = frontendRecords.get(bOsis);
-           
-           if (backendData[i][4] != fData.student || backendData[i][5] != fData.guardian || backendData[i][6] != fData.attendee || backendData[i][7] != fData.numIndv || backendData[i][8] != fData.notes) {
-              backendBlockRange_(e.source, "EVENT_LOG", i, 4, 1, 5).setValues([[fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]]);
-              affectedOsisNumbers.add(bOsis);
-           }
-           fData.synced = true; 
-         } else {
-           backendDeleteRows_(e.source, "EVENT_LOG", [i]);
-           affectedOsisNumbers.add(bOsis);
-         }
-      }
-  }
-
-  const newRows = [];
-  for (let [fOsis, fData] of frontendRecords.entries()) {
-     if (!fData.synced) {
-        newRows.push([eventDate, eventName, category, fOsis, fData.student, fData.guardian, fData.attendee, fData.numIndv, fData.notes]);
-        affectedOsisNumbers.add(fOsis);
-     }
-  }
-  backendAppendRows_(e.source, "EVENT_LOG", newRows);
-  
-  backendSortBlock_(e.source, "EVENT_LOG", [{col: 0, ascending: false}, {col: 1, ascending: true}]);
-
-  SpreadsheetApp.flush(); 
-  updateOsisDeltas_(Array.from(affectedOsisNumbers).filter(Boolean));
+  ui.alert("✅ Event Removed", "The event has been deleted. It leaves the notes and the PCAR at the next build (Done: build in the Events panel, 🏗️ Build Sheets Only, or tonight's rebuild)."
+    + (showedNewest ? "\n\nShowing \"" + showedNewest + "\" now. To see other events: 📆 Events → 👁️ View Events." : ""), ui.ButtonSet.OK);
 }
 
 /** First Student List row whose OSIS is exactly `osis`, from studentLookupRows_ (data rows only). */
