@@ -358,7 +358,9 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   all; Show = showEventTables(keys [{ col, name }]: found at its column with the same name, else by name, since
   tables move when an event is added / deleted) -> shows those, hides the rest, goes to the first, toast. Deleting
   the only table showing (the red box) shows the newest one left and the alert says so. Only hidden: the build,
-  notes and PCAR read hidden columns as before. Not tried on a real sheet yet.
+  notes and PCAR read hidden columns as before. NOTES WRAP (owner 2026-11-24): each table's Notes column (6th) wraps
+  from the header row down (wrapEventNotesAt_, in styleEventTableAt_; wrapAllEventNotes_ on New Event and View
+  Events' Show, so older tables get it too). Not tried on a real sheet yet.
 - Contact Log Follow-up (N): the 6 options, EXACT text (owner's screenshot 2026-11-12): "No Followup Needed",
   "Followup Needed", "Followup Needed - ASAP", "Followed up / Resolved", "Skipped / Newer Interaction", "Waiting for
   Response". Code writes only these (auto-fill default, Migration map, Z#ContactLog, fake data); tests/test_fixes.js
@@ -577,7 +579,7 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - Student List Home Language (2026-11-23, later): Build.gs only (re-paste it on every sheet), then Build Sheets Only.
 - Orange Follow-up when a newer contact exists (2026-11-24): re-paste Core, Edits, Build, Regenerate on every sheet
   (master template too); the next build (or the 10 PM run) draws it. Nothing by hand.
-- Events one at a time + 👁️ View Events (2026-11-24): re-paste Edits and Menus on every sheet (master template too).
+- Events one at a time + 👁️ View Events + Notes wrap (2026-11-24): re-paste Edits and Menus on every sheet (master template too).
   Nothing by hand, no new files or permissions.
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,

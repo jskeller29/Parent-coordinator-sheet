@@ -4,6 +4,7 @@
 //  - showEventTables (View Events' Show button) shows the ticked ones and hides the rest,
 //    one call per run of tables; finds a table by name when tables moved since the window opened
 //  - deleting the only table showing shows the newest one left
+//  - every table's Notes column wraps its text
 //  - the View Events window gets the list as JSON that can't close its <script>
 const assert = require('assert');
 const { loadProject } = require('./lib/load');
@@ -43,6 +44,12 @@ assert.deepStrictEqual(hidden(), range(8, 14), "New Event: both older tables hid
 assert(!ev.isColumnHiddenByUser(1), "the new table shows");
 const hides = ss._log.filter(c => c.tab === "Events" && c.fn === "hideColumns").slice(-1)[0];
 assert.deepStrictEqual(plain(hides.args), [8, 14], "two tables side by side = one hideColumns call");
+
+// Notes column wraps (header row down), on every table
+const wraps = ss._log.filter(c => c.tab === "Events" && c.fn === "setWrap");
+[6, 13, 20].forEach(col => assert(wraps.some(c => c.col === col && c.row === 2 && c.nc === 1 && c.args[0] === true
+  && c.nr === ev.getMaxRows() - 1), "Notes column " + col + " wraps"));
+assert(!wraps.some(c => c.col % 7 !== 6), "only the Notes columns wrap");
 
 // ---------------------------------------------------------------- the list
 const list = plain(g.eventTablesList_(ev));
