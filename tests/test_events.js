@@ -49,11 +49,12 @@ assert(!ev.isColumnHiddenByUser(1), "the new table shows");
 const hides = ss._log.filter(c => c.tab === "Events" && c.fn === "hideColumns").slice(-1)[0];
 assert.deepStrictEqual(plain(hides.args), [8, 14], "two tables side by side = one hideColumns call");
 
-// Notes column wraps (header row down), on every table
-const wraps = ss._log.filter(c => c.tab === "Events" && c.fn === "setWrap");
-[6, 13, 20].forEach(col => assert(wraps.some(c => c.col === col && c.row === 2 && c.nc === 1 && c.args[0] === true
-  && c.nr === ev.getMaxRows() - 1), "Notes column " + col + " wraps"));
-assert(!wraps.some(c => c.col % 7 !== 6), "only the Notes columns wrap");
+// Notes column CLIPS (header row down), on every table (owner 2026-11-24: "clip instead of wrap")
+const clips = ss._log.filter(c => c.tab === "Events" && c.fn === "setWrapStrategy");
+[6, 13, 20].forEach(col => assert(clips.some(c => c.col === col && c.row === 2 && c.nc === 1 && c.args[0] === "CLIP"
+  && c.nr === ev.getMaxRows() - 1), "Notes column " + col + " clips"));
+assert(!clips.some(c => c.col % 7 !== 6), "only the Notes columns clip");
+assert(!ss._log.some(c => c.tab === "Events" && c.fn === "setWrap" && c.args[0] === true), "nothing on Events is set to wrap");
 
 // ---------------------------------------------------------------- the list
 const list = plain(g.eventTablesList_(ev));

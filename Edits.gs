@@ -2644,7 +2644,7 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
   try {
     sheet.showColumns(1, EVENT_TABLE_WIDTH);
     showOnlyEventTables_(sheet, [1]);
-    wrapAllEventNotes_(sheet); // older tables' Notes wrap too
+    clipAllEventNotes_(sheet); // older tables' Notes clip too
     sheet.setActiveRange(sheet.getRange(3, 1));
   } catch (e) { console.warn("Other events not hidden: " + e.message); }
 
@@ -2835,7 +2835,7 @@ function showEventTables(keys) {
   });
   if (!cols.length) throw new Error("Those events are no longer on the Events tab. Close this window and open 👁️ View Events again.");
   showOnlyEventTables_(sheet, cols);
-  try { wrapAllEventNotes_(sheet); } catch (e) { console.warn("Event notes not wrapped: " + e.message); }
+  try { clipAllEventNotes_(sheet); } catch (e) { console.warn("Event notes not clipped: " + e.message); }
   if (sheet.isSheetHidden()) sheet.showSheet();
   sheet.activate();
   sheet.setActiveRange(sheet.getRange(1, Math.min.apply(null, cols)));
@@ -2923,18 +2923,22 @@ function styleEventTableAt_(sheet, c, maxRows) {
   sheet.getRange(2, c, 1, 6).setValues([EVENT_TABLE_HEADERS]).setFontWeight("bold")
     .setBackground(T.subHeader).setFontColor(T.subHeaderText);
   [100, 150, 150, 150, 80, 200, 30].forEach((w, i) => sheet.setColumnWidth(c + i, w)); // OSIS, Guardian(s), Parent Attendee, Student, # of Indv, Notes, spacer
-  wrapEventNotesAt_(sheet, c, maxRows);
+  clipEventNotesAt_(sheet, c, maxRows);
 }
 
-/** The Notes column of the table at column c wraps its text (owner 2026-11-24), header row down. */
-function wrapEventNotesAt_(sheet, c, maxRows) {
-  if (maxRows >= 2) sheet.getRange(2, c + 5, maxRows - 1, 1).setWrap(true);
+/**
+ * The Notes column of the table at column c CLIPS its text, header row down (owner 2026-11-24, "clip
+ * instead of wrap"; it wrapped earlier that day): a long note is cut at the cell's edge, so rows stay
+ * one line tall and the note never spills into the spacer / next table. Click the cell to read it all.
+ */
+function clipEventNotesAt_(sheet, c, maxRows) {
+  if (maxRows >= 2) sheet.getRange(2, c + 5, maxRows - 1, 1).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 }
 
-/** Every table's Notes column wraps (tables made before 2026-11-24 too). One call per table. */
-function wrapAllEventNotes_(sheet) {
+/** Every table's Notes column clips (tables made before, incl. ones set to wrap, too). One call per table. */
+function clipAllEventNotes_(sheet) {
   const maxRows = sheet.getMaxRows();
-  eventTableStarts_(sheet).forEach(c => wrapEventNotesAt_(sheet, c, maxRows));
+  eventTableStarts_(sheet).forEach(c => clipEventNotesAt_(sheet, c, maxRows));
 }
 
 /**

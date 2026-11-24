@@ -55,6 +55,10 @@ ProgressSidebar, VersionDialog, YourListsSidebar. Your sheet: also z_MINE, z_Con
 sheet (master template too). Nothing by hand; reload once so the old 👤 Student Overrides menu goes away. User
 Guide Doc: the menu names changed (Part 2 "The menus" is new; docs/PC_Tracker_User_Guide.docx has it all).
 
+**Events Notes clip (2026-11-24, later):** re-paste the script Edits (every sheet, master template too). Each event
+table's Notes column now clips long notes (one line per row) instead of wrapping; older tables change the next time
+you make a 📋 New Event or Show events in 👁️ View Events. Nothing by hand.
+
 ## 3. After pasting
 1. Save, then reload the spreadsheet.
 2. Run any menu item and **approve the permissions** if asked. Until you do, your nightly

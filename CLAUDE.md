@@ -410,9 +410,11 @@ Owner-only file (in the repo, deployed ONLY to the owner's own sheet): z_MINE.gs
   succeeds (openEventsSidebar); getEventsPanel (showing tables, total, tabShown, nightlyOff); "Done: build and close
   Events" = eventsFinish(true): hideEventsTab_ (user moved to the Contact Log) + runBuildOnly (the Build sidebar takes the
   panel's place); "Close Events, build later" = eventsFinish(false) + toast. buildEventTable / showEventTables show a
-  hidden Events tab. NOTES WRAP (owner 2026-11-24): each table's Notes column (6th) wraps
-  from the header row down (wrapEventNotesAt_, in styleEventTableAt_; wrapAllEventNotes_ on New Event and View
-  Events' Show, so older tables get it too). Not tried on a real sheet yet.
+  hidden Events tab. NOTES CLIP (owner 2026-11-24, "clip instead of wrap"; it wrapped earlier the
+  same day): each table's Notes column (6th) is set to CLIP from the header row down (setWrapStrategy CLIP,
+  clipEventNotesAt_, in styleEventTableAt_; clipAllEventNotes_ on New Event and View Events' Show, so older tables,
+  incl. ones set to wrap, get it too): rows stay one line, a note never spills into the spacer / next table.
+  Not tried on a real sheet yet.
 - SETTINGS TABS (owner 2026-11-24): TAB_VISIBILITY inSettings: false for Raw Data, Events, Students Override Report
   (their tools show them: Input Data Mode, New Event / View Events + the Events panel, Create the Override Report):
   getSettings returns the default for them (a saved value is ignored) with tabsPresent false (no row; the 3 rows are
@@ -653,6 +655,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   VersionDialog, YourListsSidebar (pages) on every sheet (master template too); owner sheet also z_MINE,
   z_ContactLogDebug, z_NewCopy. (Core, Styles, ManageOverridesDialog: comments only.) Reload once (the old 👤 Student
   Overrides menu stays until then). User Guide Doc by hand (Part 2 "The menus" rewritten; paths everywhere).
+- Events Notes clip instead of wrap (2026-11-24, later): re-paste Edits on every sheet (master template too). The next
+  New Event or View Events → Show sets every table's Notes column to clip. Nothing by hand.
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
