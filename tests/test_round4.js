@@ -884,3 +884,50 @@ function familySheet() {
   assert.deepStrictEqual(h2.slice(7, 10), ["Last Interaction", "Home Language", "Route"], "a list column follows Home Language: " + JSON.stringify(h2));
   console.log("Student List: Home Language from ATS (New / Edit Student wins, kept after leaving): ok");
 }
+
+// ---------------------------------------------------------------- Contact Log: an open Follow-up with a newer contact is orange (owner 2026-11-24)
+{
+  const ss = makeSpreadsheet(["Contact Log", "Backend"]);
+  const g = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(ss) } });
+  const cl = ss.getSheetByName("Contact Log");
+  const L = g.__get("SHEET_LOOK_");
+  // The formula as checked with a formula engine on sample rows (newer contact below / above, an older one logged
+  // later, same-day pairs, a long time fraction, text OSIS, the lookup box under END): change it only with a new check
+  const VERIFIED = '=IF(OR(TRIM($N2)="Followup Needed", TRIM($N2)="Followup Needed - ASAP", TRIM($N2)="Waiting for Response", ' +
+    'TRIM($N2)="Need to respond", TRIM($N2)="Waiting - Check Up"), IF(AND($E2<>"", ISNUMBER($B2)), COUNTIFS($E$2:$E, $E2, $B$2:$B, ' +
+    '">"&($B2+1/86400)) + COUNTIFS($E3:$E, $E2, $B3:$B, ">="&($B2-1/86400)) > 0))';
+  assert.strictEqual(g.__get("FOLLOWUP_NEWER_FORMULA_"), VERIFIED, "the checked formula");
+  // Open = what the hide rule keeps showing (Regenerate.gs getContactLogHideFormula_)
+  const hide = g.getContactLogHideFormula_();
+  g.__get("FOLLOWUP_OPEN_VALUES_").forEach(v => assert(hide.toLowerCase().indexOf('trim($n2)<>"' + v.toLowerCase() + '"') !== -1, v + " is open for the hide rule too"));
+  const isOrange = r => r._st.formula === VERIFIED;
+
+  // The 10 PM redraw draws it once, on N2:N, before the Workshop color (so it wins on a Workshop row)
+  g.resetContactLogFormatting();
+  const all = cl._cf;
+  const rules = all.filter(isOrange);
+  assert.strictEqual(rules.length, 1, "drawn once");
+  assert.strictEqual(rules[0]._st.bg, L.followupNewer, "orange");
+  assert.strictEqual(L.followupNewer, "#f6b26b");
+  const rg = rules[0]._st.ranges[0];
+  eq([rg.getRow(), rg.getColumn(), rg.getNumColumns(), rg.getLastRow()], [2, 14, 1, cl.getMaxRows()], "on N2:N (to the bottom)");
+  const workshop = all.findIndex(r => r._st.formula === '=$J2="Workshop"');
+  assert(all.indexOf(rules[0]) < workshop, "before the Workshop color");
+  assert(all.some(r => r._st.formula === '=AND($B2<>"", $J2="")'), "the red Method rule is still there");
+
+  // A build adds it when missing (first), once; a recolored one is kept; no Contact Log = nothing
+  cl._cf = cl._cf.filter(r => !isOrange(r));
+  const others = cl._cf.length, writes = cl._cfWrites;
+  assert.strictEqual(g.ensureFollowupNewerRule_(ss), true, "added when missing");
+  assert(isOrange(cl._cf[0]), "first in the list");
+  assert.strictEqual(cl._cf.length, others + 1, "no other rule lost");
+  assert.strictEqual(g.ensureFollowupNewerRule_(ss), false, "the next build: nothing to do");
+  assert.strictEqual(cl._cfWrites, writes + 1, "one write in all");
+  cl._cf[0]._st.bg = "#ff9900";
+  assert.strictEqual(g.ensureFollowupNewerRule_(ss), false, "a recolored rule is kept");
+  const g2 = loadProject({ extra: { SpreadsheetApp: fakeSpreadsheetApp(makeSpreadsheet(["Backend"])) } });
+  assert.strictEqual(g2.ensureFollowupNewerRule_(g2.SpreadsheetApp.getActiveSpreadsheet()), false);
+  const build = fs.readFileSync(path.join(ROOT, 'Build.gs'), 'utf8');
+  assert(/try \{ ensureFollowupNewerRule_\(ss\); \} catch/.test(build), "every build checks it");
+  console.log("Contact Log: open Follow-up with a newer contact is orange: ok");
+}

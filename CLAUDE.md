@@ -40,6 +40,8 @@ Files (shared = every school's sheet):
   min(9, columns)), and resetContactLogFormatting's Workshop rows (J = "Workshop", C:O) are pale green
   SHEET_LOOK_.workshopRow #e6f1ea (was solid #b6d7a8). 2026-11-23 (owner's ideas): resetContactLogFormatting also
   draws the light red Method rule (methodMissingRule_), resetDerivedSheets_ clears Backend PHONES and LIST_WATCH.
+  2026-11-24 (owner): resetContactLogFormatting also draws the orange newer-contact rule (followupNewerRule_), before
+  the Workshop color.
 - Styles.html: the one shared look ("District": navy #183e69, Source Sans 3 text, Source Serif 4 headings,
   checkbox-style switches, 3px corners) for every dialog and sidebar. HTML files pull it in with
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
@@ -564,6 +566,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
   FindFamily; owner sheet also z_MINE. Same manifests. Then Build Sheets Only once and DEPLOY.md step 10 (Method 2
   dropdown by hand: 'Backend'!$CQ$3:$CQ, Show a warning) on the master template and the owner's sheet.
 - Student List Home Language (2026-11-23, later): Build.gs only (re-paste it on every sheet), then Build Sheets Only.
+- Orange Follow-up when a newer contact exists (2026-11-24): re-paste Core, Edits, Build, Regenerate on every sheet
+  (master template too); the next build (or the 10 PM run) draws it. Nothing by hand.
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,
   YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.
@@ -573,6 +577,17 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   =AND($B2<>"", $J2="") on J2:J. resetContactLogFormatting (Regenerate.gs, the 10 PM run) draws it
   (methodMissingRule_, Edits.gs); every build adds it when missing (ensureMethodMissingRule_: one read, a recolored
   rule with the same formula is kept). A rule added by hand would be wiped by the 10 PM redraw: put rules in code.
+- ORANGE FOLLOW-UP (owner 2026-11-24, not one of the 10 but the same kind of rule): Contact Log N is orange
+  (SHEET_LOOK_.followupNewer #f6b26b) while it is an open follow-up (FOLLOWUP_OPEN_VALUES_: Followup Needed, ... -
+  ASAP, Waiting for Response + the old Need to respond / Waiting - Check Up, the hide rule's list) and the same student
+  (E) has a NEWER interaction: a date at least a second later anywhere, or the same date further down
+  (FOLLOWUP_NEWER_FORMULA_, Edits.gs: two COUNTIFS; IF so the counts run only on open rows). Only the older row; rows
+  under END have no date and never count. The second of slack is on purpose: Sheets turns a date-time into text with
+  ~15 digits, so "later than my own date" could count the row itself. The formula was checked with HyperFormula
+  (scratchpad, not a repo dependency: GPL) on 14 sample rows (newer below / above, an older contact logged later,
+  same-day pairs, a long time fraction, text OSIS, the lookup box); test_round4.js pins its exact text. Drawn by
+  resetContactLogFormatting before the Workshop color, and every build adds it when missing (ensureFollowupNewerRule_,
+  first in the list). Column J red for a dated row with no Method = idea 9 below (the owner asked again 2026-11-24).
 - 10 METHOD 2 CHOICES: Backend CQ (BACKEND_BLOCKS.METHOD2, formulaOnly): CQ1 title, CQ2 "Method 2", CQ3
   method2ChoicesFormula_ (fixed METHOD2_FIXED_CHOICES_ + every K typed above END, UNIQUE). Every build:
   ensureMethod2ChoicesOnBackend_ writes it when missing, keeps any formula there that reads Contact Log K (the owner

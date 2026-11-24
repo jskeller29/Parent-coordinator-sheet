@@ -41,8 +41,8 @@ with tick boxes is in 🐞 Debug → 📋 New Copy Checklist.
 Contacts Sync, Regenerate and the pages InputDataSidebar, ManageOverridesDialog, NewStudentDialog,
 SettingsDialog, ProgressSidebar, YourListsSidebar; **add** the page **FindFamily** (new). Your sheet: also
 z_MINE. No new permissions (same manifests). Then do step 10 below once.
-The testers' fixes from the same day, and the Student List's new Home Language column (Build), are in these
-same files, so there is nothing more to paste. If you
+The testers' fixes from the same day, the Student List's new Home Language column (Build) and the orange
+Follow-up color (11/24: Core, Edits, Build, Regenerate) are in these same files, so there is nothing more to paste. If you
 already pasted the 10 ideas before them, re-paste Core, Build, Menus, Input Data, Contacts Sync and the pages
 FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar, YourListsSidebar.
 

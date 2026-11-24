@@ -1047,6 +1047,7 @@ const SHEET_LOOK_ = {
   input: "#fff2cc",            // a cell you type in (PCAR's own dates): the Raw Data paste boxes' yellow
   workshopRow: "#e6f1ea",      // Contact Log rows whose Method (J) is "Workshop" (C:O, resetContactLogFormatting): pale green, was #b6d7a8
   missingMethod: "#f4cccc",    // Contact Log Method (J) left blank on a row that has a Date (resetContactLogFormatting; owner 2026-11-23): light red
+  followupNewer: "#f6b26b",    // Contact Log Follow-up (N) still open while the student has a newer contact (owner 2026-11-24): orange
   danger: { fill: "#f8e9e7", text: "#a3312a" },   // delete boxes (Styles.html --danger-soft / --danger)
   // Contact Log Type column (L): one text color per type in Type List order (Backend BL),
   // the same after every reset and 10 PM run (they used to be random and changed every

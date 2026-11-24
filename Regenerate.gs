@@ -1123,6 +1123,11 @@ function resetContactLogFormatting() {
     .setBackground("#fce5cd")
     .setRanges([rangeA2B]).build());
 
+  // 2b. Newer contact (N2:N): an open Follow-up whose student has a newer interaction is orange
+  // (owner 2026-11-24; the rule is made in Edits.gs, which every build also adds when missing).
+  // Before the Workshop color, so it wins on a Workshop row too.
+  rules.push(followupNewerRule_(sheet));
+
   // 3. Workshop (C2:O) -> ⚡ Uses Col J (Method 1). Pale green (SHEET_LOOK_, Core.gs; owner 2026-11-12:
   // the solid #b6d7a8 across the row was the loudest thing in the log)
   rules.push(SpreadsheetApp.newConditionalFormatRule()

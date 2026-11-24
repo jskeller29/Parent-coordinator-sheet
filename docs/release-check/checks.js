@@ -321,7 +321,17 @@ const stages = [
               "The columns before it haven't moved (Status is still G, Last Interaction H), and a Your Lists column you keep comes after it.",
               "After the build, Gene Belcher says Spanish."],
         why: "Your request (11/23): the student's home language on the Student List, from ATS.",
-        fixed: "New on 11/23 (your request)." }
+        fixed: "New on 11/23 (your request)." },
+      { id: "n3-17", isNew: true, title: "An open follow-up turns orange when there's a newer contact",
+        do: ["In the Contact Log, find a row whose Follow-up says Followup Needed or Waiting for Response, and note its OSIS.",
+             "In the next empty row, log a new contact for that student (type the OSIS in column E) and pick a Method.",
+             "Then set the older row's Follow-up to Skipped / Newer Interaction."],
+        see: ["The older row's Follow-up cell turns orange; the new row's doesn't (it is the newest). Rows can already be orange in the fake data: an open follow-up whose student has a newer row.",
+              "A contact logged later with an OLDER date doesn't turn the newer row orange.",
+              "After Skipped / Newer Interaction (or Followed up / Resolved) the orange goes away.",
+              "The red on Method 1 (column J) is there while a dated row has no Method (1.23)."],
+        why: "Your request (11/24): an open follow-up that a newer contact may have answered stands out, so you can close it.",
+        fixed: "New on 11/24 (your request)." }
     ]
   },
   {
@@ -686,6 +696,7 @@ module.exports = {
   retestTitle: "New and fixed since round 2",
   // What changed since round 2, newest first (each links to its checks)
   fixes: [
+    { text: "11/24, your request: in the Contact Log, a Follow-up that still says Followup Needed or Waiting for Response turns orange once there's a newer contact for that student (only the older row).", checks: ["n3-17"] },
     { text: "11/23, your request: the Student List has a Home Language column (from the Student Data; a language typed in New / Edit Student wins).", checks: ["n3-16"] },
     { text: "11/23, found by three testers (a power user, a typical user and a careless one went through this version first): Your Lists \"Paste new version\" keeps your list until you save the new one. It emptied the list at the click, so a build before the paste put \"No bus\" on every student and their phone contacts.", checks: ["n3-14", "b-23"] },
     { text: "11/23, found by the testers: a Status / label set in New / Edit Student was undone by the next build, or lost when a parent was added later.", checks: ["n3-15"] },

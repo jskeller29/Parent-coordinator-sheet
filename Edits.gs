@@ -1458,6 +1458,50 @@ function ensureMethodMissingRule_(ss) {
   return true;
 }
 
+/**
+ * Contact Log "newer contact" color (owner 2026-11-24): a Follow-up (N) that is still open turns
+ * orange when the same student (OSIS, E) has a NEWER interaction in the log: a later date anywhere
+ * (at least a second later), or the same date further down. Only the older row turns orange, never
+ * the newest one; marking it "Skipped / Newer Interaction" or "Followed up / Resolved" clears it.
+ * Rows under END (the lookup box) have no date, so they never count. Open = the values the hide rule
+ * keeps showing (getContactLogHideFormula_, Regenerate.gs). The second of slack: Sheets turns a date
+ * with a time into text with ~15 digits, so "later than this row's own date" could count the row itself.
+ * Drawn like the Method color: resetContactLogFormatting (the 10 PM run), and every build when missing.
+ * Checked with a formula engine on sample rows (newer below / above, backdated, same-day pairs, text OSIS).
+ */
+var FOLLOWUP_OPEN_VALUES_ = ["Followup Needed", "Followup Needed - ASAP", "Waiting for Response", "Need to respond", "Waiting - Check Up"];
+var FOLLOWUP_NEWER_FORMULA_ = '=IF(OR(' + FOLLOWUP_OPEN_VALUES_.map(v => 'TRIM($N2)="' + v + '"').join(", ") + '), ' +
+  'IF(AND($E2<>"", ISNUMBER($B2)), COUNTIFS($E$2:$E, $E2, $B$2:$B, ">"&($B2+1/86400)) + ' +
+  'COUNTIFS($E3:$E, $E2, $B3:$B, ">="&($B2-1/86400)) > 0))';
+
+function followupNewerRule_(sheet) {
+  return SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied(FOLLOWUP_NEWER_FORMULA_)
+    .setBackground(SHEET_LOOK_.followupNewer)
+    .setRanges([sheet.getRange("N2:N" + sheet.getMaxRows())]).build();
+}
+
+function hasFollowupNewerRule_(rules) {
+  const want = FOLLOWUP_NEWER_FORMULA_.replace(/\s+/g, "");
+  return rules.some(rule => {
+    try {
+      const c = rule.getBooleanCondition();
+      return !!c && String((c.getCriteriaValues() || [])[0] || "").replace(/\s+/g, "") === want;
+    } catch (e) { return false; }
+  });
+}
+
+/** Returns true when the rule was added (first in the list, so it wins over the Workshop row color). */
+function ensureFollowupNewerRule_(ss) {
+  const sheet = ss.getSheetByName("Contact Log");
+  if (!sheet) return false;
+  const rules = sheet.getConditionalFormatRules();
+  if (hasFollowupNewerRule_(rules)) return false;
+  rules.unshift(followupNewerRule_(sheet));
+  sheet.setConditionalFormatRules(rules);
+  return true;
+}
+
 // ======================================================================
 // METHOD 2 CHOICES (owner 2026-11-23): Contact Log column K's dropdown = the fixed choices below +
 // every Method 2 already typed above END, so the list grows by itself. ONE formula in Backend CQ3

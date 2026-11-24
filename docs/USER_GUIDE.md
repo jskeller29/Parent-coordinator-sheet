@@ -362,7 +362,7 @@ Log every call, email, meeting and walk-in here, one row each.
 | Method 1 and Method 2 | How you reached the family, for the PCAR. Method 1 shows light red until you pick it. Method 2's list has the usual choices plus any you already typed: type a new one once and it joins the list. |
 | Type | Your own topic list (Attendance, Behavior …). Turn it on in Settings; edit the choices in the Backend tab, column BL. |
 | Event Description | What you talked about. |
-| Follow-up | No Followup Needed, Followup Needed, Followup Needed - ASAP, Followed up / Resolved, Skipped / Newer Interaction, or Waiting for Response. Fills in No Followup Needed if blank. |
+| Follow-up | No Followup Needed, Followup Needed, Followup Needed - ASAP, Followed up / Resolved, Skipped / Newer Interaction, or Waiting for Response. Fills in No Followup Needed if blank. An older row that still says Followup Needed or Waiting for Response turns orange once you log a newer contact for that student: mark it Followed up / Resolved or Skipped / Newer Interaction. |
 | Additional Notes | What happens next. Each line shows as a bullet under the date in the student's notes; start a new line (Alt+Enter, Mac ⌥+Enter) for another bullet. A "-" at the start of a line is left out. |
 | Hide | Tick it to leave the row out of Combined Contact Tracking and the phone contacts. It still counts for the PCAR. |
 

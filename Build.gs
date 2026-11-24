@@ -254,6 +254,8 @@ function buildAllDerivedSheetsRun_() {
   try { ensureSpokeWithChoices_(ss); } catch (e) { console.warn("Person Spoke With choices skipped: " + e.message); }
   // Contact Log: the light red "Method missing" color, when a sheet doesn't have it yet (Edits.gs)
   try { ensureMethodMissingRule_(ss); } catch (e) { console.warn("Method missing color skipped: " + e.message); }
+  // ...and the orange "a newer contact" color on Follow-up (N) (owner 2026-11-24, Edits.gs)
+  try { ensureFollowupNewerRule_(ss); } catch (e) { console.warn("Newer contact color skipped: " + e.message); }
   // ...and the Method 2 choices list column K's dropdown reads (Backend CQ, Edits.gs)
   try {
     const m2 = ensureMethod2ChoicesOnBackend_(ss);
