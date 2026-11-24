@@ -2633,8 +2633,201 @@ function buildEventTable(eventName, eventLoc, eventDate, eventType) {
     backendWriteBlock_(ss, "EVENT_LOG", [["Date", "Event Name", "Category", "OSIS", "Student Name", "Guardian(s)", "Parent Attendee", "# of Indv", "Notes"]]);
   }
 
+  // One event at a time (owner 2026-11-24): the new table shows, every other one is hidden
+  // (📆 Events → 👁️ View Events brings them back). Never stops the new table from being made.
+  try {
+    sheet.showColumns(1, EVENT_TABLE_WIDTH);
+    showOnlyEventTables_(sheet, [1]);
+    sheet.setActiveRange(sheet.getRange(3, 1));
+  } catch (e) { console.warn("Other events not hidden: " + e.message); }
+
   // The tables moved right: re-lock every table's header row (Sheet Lock.gs)
   try { applySheetLocks_(ss, ["Events"]); } catch (e) { console.warn("Sheet lock skipped: " + e.message); }
+}
+
+// ==============================================================
+// 2b. ONE EVENT AT A TIME + 👁️ VIEW EVENTS (owner 2026-11-24)
+// ==============================================================
+// 📋 New Event hides every other event table, so only the one being filled in shows.
+// 📆 Events → 👁️ View Events lists every table on the Events tab (one row per table:
+// name, type, date, place, how many rows filled in) to tick one, several or all; the
+// ticked ones show, the others are hidden. Only HIDDEN: nothing is moved or deleted, and
+// the build / notes / PCAR read hidden columns like any other. A table = 7 columns
+// (EVENT_TABLE_WIDTH) from column 1 with its name in row 1 (eventTableStarts_, Sheet Lock.gs).
+
+/** Every table on the Events tab, left to right (newest first: New Event adds at column A). */
+function eventTablesList_(sheet) {
+  const lastCol = sheet.getLastColumn(), lastRow = sheet.getLastRow();
+  if (lastCol < 1 || lastRow < 1) return [];
+  const vals = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const tz = Session.getScriptTimeZone();
+  const text = v => (v instanceof Date ? Utilities.formatDate(v, tz, "MM/dd/yyyy") : toText_(v));
+  const out = [];
+  for (let c = 1; c <= lastCol; c += EVENT_TABLE_WIDTH) {
+    const name = text(vals[0][c - 1]);
+    if (!name) continue;
+    let rows = 0;
+    for (let r = 2; r < vals.length; r++) { // OSIS, Guardian(s), Parent Attendee or Student filled = a row
+      if ([0, 1, 2, 3].some(i => c - 1 + i < lastCol && text(vals[r][c - 1 + i]))) rows++;
+    }
+    out.push({
+      col: c, name: name,
+      type: c + 1 < lastCol ? text(vals[0][c + 1]) : "",
+      place: c + 2 < lastCol ? text(vals[0][c + 2]) : "",
+      date: c + 3 < lastCol ? text(vals[0][c + 3]) : "",
+      rows: rows,
+      shown: !sheet.isColumnHiddenByUser(c)
+    });
+  }
+  return out;
+}
+
+/**
+ * Shows the tables starting at the columns in `cols`, hides every other table. One
+ * showColumns / hideColumns call per run of tables in the same state. Columns that are
+ * not part of a table (no name in row 1) are left as they are. Returns how many show.
+ */
+function showOnlyEventTables_(sheet, cols) {
+  const want = {};
+  (cols || []).forEach(c => { want[Number(c)] = true; });
+  const maxCols = sheet.getMaxColumns();
+  const starts = eventTableStarts_(sheet);
+  let run = null, shown = 0;
+  const flush = () => {
+    if (!run) return;
+    if (run.show) sheet.showColumns(run.from, run.to - run.from + 1);
+    else sheet.hideColumns(run.from, run.to - run.from + 1);
+    run = null;
+  };
+  starts.forEach(c => {
+    const show = !!want[c];
+    if (show) shown++;
+    const to = Math.min(c + EVENT_TABLE_WIDTH - 1, maxCols);
+    if (run && run.show === show && run.to === c - 1) run.to = to;
+    else { flush(); run = { show: show, from: c, to: to }; }
+  });
+  flush();
+  return shown;
+}
+
+/** 📆 Events → 👁️ View Events: tick the event tables to show. */
+function openViewEventsDialog() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Events");
+  const list = sheet ? eventTablesList_(sheet) : [];
+  const data = JSON.stringify(list).replace(/</g, "\\u003c");
+  const html = include_('Styles') + `
+    <style>
+      .ve { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 10px; height: 100vh; box-sizing: border-box; }
+      .ve p { margin: 0; color: var(--muted); font-size: 13px; }
+      .bar { display: flex; gap: 8px; align-items: center; }
+      .bar input[type=text] { flex: 1; }
+      .list { flex: 1; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+      .row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+      .row:last-child { border-bottom: 0; }
+      .row:hover { background: var(--panel); }
+      .row input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 auto; cursor: pointer; }
+      .nm { font-weight: 600; color: var(--ink); }
+      .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+      .empty { padding: 18px; color: var(--muted); text-align: center; }
+      .foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .foot .r { display: flex; gap: 8px; }
+    </style>
+    <div class="ve">
+      <p>Tick the events to show on the Events tab. The others are hidden, not deleted.</p>
+      <div class="bar">
+        <input type="text" id="find" placeholder="Search by name, type or date">
+        <button type="button" class="btn sec sm" id="allBtn">Select all</button>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="foot">
+        <span class="sub" id="count"></span>
+        <div class="r">
+          <button type="button" class="btn sec" onclick="google.script.host.close()">Cancel</button>
+          <button type="button" class="btn pri" id="showBtn">Show selected</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      const EVENTS = ${data};
+      const picked = {};
+      EVENTS.forEach(function (ev) { if (ev.shown) picked[ev.col] = true; });
+      const listEl = document.getElementById('list'), findEl = document.getElementById('find');
+      const allBtn = document.getElementById('allBtn'), showBtn = document.getElementById('showBtn');
+      function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+      function visible() {
+        const q = findEl.value.trim().toLowerCase();
+        return EVENTS.filter(function (ev) { return !q || [ev.name, ev.type, ev.date, ev.place].join(' ').toLowerCase().indexOf(q) !== -1; });
+      }
+      function draw() {
+        const vis = visible();
+        if (!EVENTS.length) listEl.innerHTML = '<div class="empty">No events yet. Make one with 📆 Events → 📋 New Event.</div>';
+        else if (!vis.length) listEl.innerHTML = '<div class="empty">No event matches your search.</div>';
+        else listEl.innerHTML = vis.map(function (ev) {
+          const bits = [ev.type, ev.date, ev.place].filter(Boolean);
+          bits.push(ev.rows + (ev.rows === 1 ? ' row' : ' rows') + ' filled in');
+          return '<label class="row"><input type="checkbox" data-col="' + ev.col + '"' + (picked[ev.col] ? ' checked' : '') + '>'
+            + '<div><div class="nm">' + esc(ev.name) + (ev.shown ? ' <span class="pill">showing now</span>' : '') + '</div>'
+            + '<div class="sub">' + esc(bits.join(' · ')) + '</div></div></label>';
+        }).join('');
+        const n = EVENTS.filter(function (ev) { return picked[ev.col]; }).length;
+        document.getElementById('count').textContent = EVENTS.length ? n + ' of ' + EVENTS.length + ' selected' : '';
+        showBtn.disabled = n === 0;
+        showBtn.textContent = n === EVENTS.length && n > 1 ? 'Show all ' + n : 'Show ' + (n === 1 ? '1 event' : n + ' events');
+        allBtn.textContent = vis.length && vis.every(function (ev) { return picked[ev.col]; }) ? 'Unselect all' : 'Select all';
+        allBtn.disabled = !vis.length;
+      }
+      listEl.addEventListener('change', function (e) {
+        const c = e.target.getAttribute('data-col');
+        if (c) { picked[c] = e.target.checked; draw(); }
+      });
+      findEl.addEventListener('input', draw);
+      allBtn.addEventListener('click', function () {
+        const vis = visible(), on = !vis.every(function (ev) { return picked[ev.col]; });
+        vis.forEach(function (ev) { picked[ev.col] = on; });
+        draw();
+      });
+      showBtn.addEventListener('click', function () {
+        const keys = EVENTS.filter(function (ev) { return picked[ev.col]; }).map(function (ev) { return { col: ev.col, name: ev.name }; });
+        if (!keys.length) return;
+        showBtn.disabled = true; showBtn.textContent = 'Showing…';
+        google.script.run
+          .withSuccessHandler(function () { google.script.host.close(); })
+          .withFailureHandler(function (err) {
+            alert('The events could not be shown: ' + (err && err.message ? err.message : err));
+            draw();
+          })
+          .showEventTables(keys);
+      });
+      draw();
+    </script>
+  `;
+  const ui = HtmlService.createHtmlOutput(html).setWidth(480).setHeight(560);
+  SpreadsheetApp.getUi().showModalDialog(ui, 'View Events');
+}
+
+/**
+ * View Events' Show button: keys = [{ col, name }] of the ticked tables. A table is found
+ * at its column with the same name; when tables moved since the window opened (an event
+ * added or deleted), by its name. Shows them, hides the rest, goes to the first one.
+ */
+function showEventTables(keys) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Events");
+  if (!sheet) throw new Error("There is no Events tab.");
+  const list = eventTablesList_(sheet);
+  const cols = [];
+  (keys || []).forEach(k => {
+    const name = toText_(k && k.name);
+    const hit = list.find(t => t.col === Number(k && k.col) && t.name === name) || list.find(t => t.name === name && cols.indexOf(t.col) === -1);
+    if (hit && cols.indexOf(hit.col) === -1) cols.push(hit.col);
+  });
+  if (!cols.length) throw new Error("Those events are no longer on the Events tab. Close this window and open 👁️ View Events again.");
+  showOnlyEventTables_(sheet, cols);
+  sheet.activate();
+  sheet.setActiveRange(sheet.getRange(1, Math.min.apply(null, cols)));
+  ss.toast(cols.length === list.length ? "Showing every event." : "Showing " + cols.length + " of " + list.length + " events.", "👁️ View Events", 4);
+  return { shown: cols.length, total: list.length };
 }
 
 /**
@@ -2917,11 +3110,19 @@ function watchEventsSheet_(e) {
       if (response === ui.Button.YES) {
         sheet.deleteColumns(tableStartCol, 7);
         SpreadsheetApp.flush();
+        // Every other event hidden (one at a time, 👁️ View Events): show the newest one, so
+        // the tab isn't left with no table on it
+        let showedNewest = "";
+        try {
+          const left = eventTablesList_(sheet);
+          if (left.length && !left.some(t => t.shown)) { showOnlyEventTables_(sheet, [left[0].col]); showedNewest = left[0].name; }
+        } catch (err) { console.warn("Events not shown after the delete: " + err.message); }
         try { applySheetLocks_(e.source, ["Events"]); } catch (err) { console.warn("Sheet lock skipped: " + err.message); }
         
         const freshData = buildBackendEventLogData_(e.source);
         backendWriteBlock_(e.source, "EVENT_LOG", freshData);
-        ui.alert("✅ Event Removed", "The event has been deleted. To push this deletion to the Contact Tracker, click 'Build Sheets Only' in your App Menu.", ui.ButtonSet.OK);
+        ui.alert("✅ Event Removed", "The event has been deleted. To push this deletion to the Contact Tracker, click 'Build Sheets Only' in your App Menu."
+          + (showedNewest ? "\n\nShowing \"" + showedNewest + "\" now. To see other events: 📆 Events → 👁️ View Events." : ""), ui.ButtonSet.OK);
         return; 
       } else {
         range.uncheck(); 

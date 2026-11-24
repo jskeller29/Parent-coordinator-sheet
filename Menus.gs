@@ -463,6 +463,7 @@ function buildMenus_(realOpen) {
     // 2. The Events Menu
     ui.createMenu('📆 Events')
       .addItem('📋 New Event', 'createNewEventTable')
+      .addItem('👁️ View Events', 'openViewEventsDialog')
       .addToUi();
 
     // 3. Contact Log menu — optional module (Z#ContactLog.gs). Guarded so the
@@ -678,7 +679,7 @@ const ZG_TABS = [
   { name: "Notes", type: "type", settings: true,
     what: "Notes about a student that you always want to see first. They show at the top of that student's notes in Combined Contact Tracking." },
   { name: "Events", type: "type", settings: true,
-    what: "Attendance for your events and workshops. Make a table with 📆 Events → 📋 New Event, then add the parents who came." },
+    what: "Attendance for your events and workshops. Make a table with 📆 Events → 📋 New Event, then add the parents who came. Only that event shows; 📆 Events → 👁️ View Events picks which ones show." },
   { name: "Send Out", type: "type", settings: true,
     what: "Messages and flyers you sent to families and how many you reached. They count toward your PCAR." },
   { name: "PCAR", type: "report", settings: true,

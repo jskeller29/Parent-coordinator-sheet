@@ -405,6 +405,10 @@ name or guardian name; you can paste a whole column, or several OSIS numbers in 
 separated by commas. Attendance shows in each student's Combined Contact Tracking and in
 the PCAR.
 
+When you make a new event, only its table shows; the other events are hidden, not deleted.
+To see other events, click 📆 Events → 👁️ View Events, tick one, several or all of them
+(Select all), and click Show. The search box finds an event by name, type or date.
+
 ### Settings
 
 Open 🚀 App Menu → ⚙️ Settings. Choose a section on the left, then click Save & apply.
