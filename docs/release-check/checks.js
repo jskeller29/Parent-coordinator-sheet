@@ -42,7 +42,7 @@ const stages = [
              "The one change by hand (DEPLOY.md step 10): Contact Log → click a cell in Method 2 (column K) → Data → Data validation → Dropdown (from a range) ='Backend'!$CQ$3:$CQ, Advanced options → Show a warning. Done. Person Spoke With not on ='Backend'!$CF2:$CO2 yet? Step 9 too.",
              "Then make your two test copies your usual way (🐞 Debug → 📦 Make Release Copies: the EXAMPLE is your fake-data copy, the BLANK your test template). In both: delete the z_ files and paste App Scripts (General).Json."],
         see: ["Saving shows no red error.",
-              "In both copies, the Contact Log's Method 2 dropdown lists Call, Email, Voicemail, Meeting, In School, Parents Square (the fake-data copy also has the ones its rows use, like Intake).",
+              "In both copies, the Contact Log's Method 2 dropdown lists Call, Email, Text, Voicemail, Meeting, In School, Parents Square (the fake-data copy also has the ones its rows use, like Intake).",
               "The light red Method color needed nothing by hand."],
         why: "A copy gets the code and the dropdowns of the sheet it is made from, so the dropdown is set once, before the copies.",
         fixed: "Round 3: this one step instead of part 1's set-up checks (you said you don't need to test making the copies)." }
@@ -200,7 +200,7 @@ const stages = [
         do: ["Open the Method 2 dropdown (column K) on a logged row.",
              "In another row's Method 2, type a choice that isn't listed (Zoom) and press Enter.",
              "Open the Method 2 dropdown on a third row."],
-        see: ["The list has Call, Email, Voicemail, Meeting, In School, Parents Square first.",
+        see: ["The list has Call, Email, Text, Voicemail, Meeting, In School, Parents Square first.",
               "Zoom is taken (a choice not on the list is allowed).",
               "A moment later Zoom is in every row's Method 2 list, with no build."],
         why: "The list is a formula on the hidden Backend tab (CQ3): the six choices, then every Method 2 already typed. To change the six, edit that formula: the build keeps it.",

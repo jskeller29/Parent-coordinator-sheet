@@ -69,8 +69,8 @@ const eq = (a, b, m) => assert.deepStrictEqual(JSON.parse(JSON.stringify(a === u
   assert.strictEqual(g.ensureMethod2ChoicesOnBackend_(ss), "kept", "the next build keeps it");
 
   // The owner's defaults (2026-11-24), in this order, before the typed ones
-  eq(g.METHOD2_FIXED_CHOICES_, ["Call", "Email", "Voicemail", "Meeting", "In School", "Parents Square"]);
-  assert(f.includes('VSTACK("Call", "Email", "Voicemail", "Meeting", "In School", "Parents Square", typed)'), "fixed choices first");
+  eq(g.METHOD2_FIXED_CHOICES_, ["Call", "Email", "Text", "Voicemail", "Meeting", "In School", "Parents Square"]);
+  assert(f.includes('VSTACK("Call", "Email", "Text", "Voicemail", "Meeting", "In School", "Parents Square", typed)'), "fixed choices first");
 
   // Changed by hand (other fixed choices): kept as it is
   const mine = f.replace('"Email", ', '"Email", "Home Visit", ');

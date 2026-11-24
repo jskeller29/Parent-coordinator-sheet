@@ -1510,7 +1510,7 @@ function ensureFollowupNewerRule_(ss) {
 // is kept as it is.
 // ======================================================================
 // Always first in the list, whatever is typed (owner 2026-11-24; was Call, Text, Email, Voicemail, Meeting, In School)
-var METHOD2_FIXED_CHOICES_ = ["Call", "Email", "Voicemail", "Meeting", "In School", "Parents Square"];
+var METHOD2_FIXED_CHOICES_ = ["Call", "Email", "Text", "Voicemail", "Meeting", "In School", "Parents Square"];
 
 function method2ChoicesFormula_() {
   const fixed = METHOD2_FIXED_CHOICES_.map(c => '"' + c + '"').join(", ");
