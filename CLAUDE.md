@@ -10,6 +10,11 @@ Branches:
   owner has tested it on a copy of the sheet and says to merge it into main (it is ahead of main, so the merge is
   a fast-forward).
 - Old claude/* session branches are deleted once everything in them is in main.
+- ALWAYS PUSH TO Test-Version (owner 2026-11-24, "always push to test version"): this is the owner's standing
+  permission. Every finished change goes to the session's own claude/* branch AND to Test-Version in the same step
+  (git push origin HEAD:Test-Version after the branch push; no asking first). Before that push, do the OTHER CLAUDE
+  SESSIONS check (Workflow below): fetch Test-Version, build on any commits another session pushed (merge / rebase,
+  never force-push, never overwrite them) and tell the owner. Never push to main without the owner saying so.
 
 Files (shared = every school's sheet):
 - Core.gs: Contact Log column constants, findEndRowInColumnE_, Student List lookup (getStudentListSheet_), Backend
