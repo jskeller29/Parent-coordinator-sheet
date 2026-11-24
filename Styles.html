@@ -140,6 +140,27 @@
   .pbar.fail .pb-fill { background: var(--danger); }
   .pbar.fail .pb-label { color: var(--danger); }
 
+  /* SEARCH (owner 2026-11-24: "search should look the same across all"): every search box is a .searchbox (light
+     blue, a .lab label, a text box). A search that picks one thing has its .results list in the box: it floats
+     under it, rows are .res (a <button type="button">: .nm name + .os OSIS, .meta line under it), notes .res-empty /
+     .res-more. The script below closes the list after a click on a row (the owner: "hide list after click"), on a
+     click outside the box and on Escape; ↓ / ↑ move through the rows, Enter picks the first one; after a pick
+     (the page writes it in the box and in the box's data-picked) typing starts a new search. Used by
+     Find a Family, New / Edit Student, Your Lists' "Search the Student List" and View Events (Edits.gs). */
+  .searchbox { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; position: relative; }
+  .searchbox .lab { color: var(--accent); }
+  .searchbox .sb-row { display: flex; gap: 8px; align-items: center; }
+  .searchbox .sb-row input { flex: 1; min-width: 0; }
+  .results { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 24px rgba(16,24,40,.16); max-height: 240px; overflow-y: auto; z-index: 50; }
+  .res { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--panel); background: #ffffff; padding: 9px 12px; font: inherit; line-height: 1.35; color: var(--ink); cursor: pointer; }
+  .res:last-child { border-bottom: 0; }
+  .res:hover, .res:focus, .res.on { background: var(--accent-soft); outline: none; }
+  .res .nm { display: block; font-weight: 600; }
+  .res .os { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
+  .res .meta { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
+  .res-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; }
+  .res-more { padding: 8px 12px; color: var(--muted); font-size: 12px; background: var(--panel); }
+
   ::-webkit-scrollbar { width: 9px; height: 9px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #c9d0da; border-radius: 5px; border: 2px solid #ffffff; }
@@ -214,4 +235,45 @@
     timer = setTimeout(poll, 700);
     return { stop: function () { stopped = true; if (timer) clearTimeout(timer); } };
   }
+
+  /**
+   * SEARCH (see .searchbox above): one way every search list behaves, for every .searchbox on the page (also ones
+   * drawn later). Listens on the document, so a page's own onclick on a row runs first, then its list closes.
+   * Opening the list again (a click in the box) is the page's own: what is in the box after a pick differs.
+   */
+  (function () {
+    if (typeof document === 'undefined') return; // (the offline tests run this script without a page)
+    function near(el, sel) { return el && el.closest ? el.closest(sel) : null; }
+    function rows(list) { return Array.prototype.slice.call(list.querySelectorAll('.res')); }
+    function isOpen(list) { return !!list && !list.classList.contains('hidden') && !!list.querySelector('.res, .res-empty'); }
+    function close(list) { if (list) list.classList.add('hidden'); }
+    document.addEventListener('click', function (ev) {
+      var box = near(ev.target, '.searchbox');
+      if (near(ev.target, '.results .res')) close(near(ev.target, '.results')); // a row picked: its list closes
+      Array.prototype.forEach.call(document.querySelectorAll('.searchbox .results'), function (l) { if (!box || !box.contains(l)) close(l); });
+    });
+    document.addEventListener('keydown', function (ev) {
+      var box = near(ev.target, '.searchbox');
+      if (!box || ev.defaultPrevented) return;
+      var list = box.querySelector('.results'), r = list ? rows(list) : [], i = r.indexOf(ev.target);
+      var t = ev.target;
+      // After a pick the box shows what was picked (the page sets data-picked to that text): a letter / Backspace
+      // starts a new search instead of editing that text
+      if (t.tagName === 'INPUT' && t.dataset.picked && t.value === t.dataset.picked && !ev.ctrlKey && !ev.metaKey && !ev.altKey &&
+          (ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete')) {
+        t.value = ''; delete t.dataset.picked;
+        if (ev.key.length !== 1) { ev.preventDefault(); t.dispatchEvent(new Event('input', { bubbles: true })); }
+        return;
+      }
+      if (t.tagName === 'INPUT') {
+        if (ev.key === 'Enter') { ev.preventDefault(); if (isOpen(list) && r[0]) r[0].click(); } // never sends a form
+        else if (ev.key === 'ArrowDown' && isOpen(list) && r[0]) { ev.preventDefault(); r[0].focus(); }
+        else if (ev.key === 'Escape' && isOpen(list)) { ev.preventDefault(); close(list); }
+      } else if (i !== -1) {
+        if (ev.key === 'ArrowDown' && r[i + 1]) { ev.preventDefault(); r[i + 1].focus(); }
+        else if (ev.key === 'ArrowUp') { ev.preventDefault(); (r[i - 1] || box.querySelector('input')).focus(); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); close(list); box.querySelector('input').focus(); }
+      }
+    });
+  })();
 </script>

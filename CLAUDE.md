@@ -47,6 +47,14 @@ Files (shared = every school's sheet):
   <?!= include_('Styles') ?> and are opened with htmlFromFile_(name) (Core.gs, = createTemplateFromFile().evaluate());
   dialogs built as strings in .gs (Welcome, Report a Bug, ATS reminder, Create Event) start with include_('Styles').
   No other <? ... ?> tags may appear in the HTML files. Z#ContactLogSidebar keeps its own style (left as is).
+  ONE SEARCH LOOK (owner 2026-11-24): Styles.html SEARCH = .searchbox (light blue, .lab label, text box; .sb-row for
+  a box + button) and, for a search that picks one, a .results list floating under it (.res buttons: .nm name + .os
+  OSIS, .meta line; .res-empty / .res-more), + a document-level script: a click on a .res closes its list (after the
+  row's own onclick), a click outside the box / Escape closes it, ↓ / ↑ / Enter (Enter in a search box never sends a
+  form), and a letter / Backspace in a box whose value = its data-picked (what the page wrote after a pick) starts a
+  new search. Used by Find a Family, New / Edit Student, Your Lists' "Search the Student List" picker and View Events
+  (Edits.gs, filter box only: its list is the page). Pages define no search style of their own (test_round4.js runs
+  the script on a stand-in page and checks the pages). Reopening a list on a click in the box stays each page's own.
 - Z#ContactLog.gs (+ Z#ContactLogSidebar.html): self-contained optional "📇 Contact Log" tool (➕ New Interaction /
   🔔 Manage Notes / Follow-ups); left as is. It is the ONLY Z# file left: the owner keeps it as Z# for later
   (2026-11-11, when every other Z# file was coalesced into the shared files).
@@ -606,8 +614,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,
   YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.
-- Find a Family search like New / Edit Student's (2026-11-24): re-paste the page FindFamily on every sheet (master
-  template too). Nothing else.
+- One search look (2026-11-24): re-paste Edits (script) and Styles, FindFamily, NewStudentDialog, YourListsSidebar
+  (pages) on every sheet (master template too). Nothing by hand, no new files.
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
@@ -683,14 +691,11 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
   getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
   OSIS, phone digits (a leading 1 / +1 and an extension are dropped), email; the first 20 matches, then "N more".
-  THE SEARCH BOX (owner 2026-11-24: "doesn't look like the other search", "clicking a name does nothing"): the same
-  look as New / Edit Student's (blue .searchbox with a label, a styled type="text" box: type="search" had no Styles.html
-  rule; the names in a .results list floating over the page, "Name OSIS" + "Parent(s): ... · Class" or the parent /
-  phone that matched, "Nobody found" / "N more" inside it). A pick closes the list, writes "Name (OSIS)" in the box
-  and shows the card right under it (it opened under up to 20 names, out of view, so a click seemed to do nothing);
-  a letter / Backspace in the box starts a new search, a click in it reopens the list, a click elsewhere / Escape
-  closes it. Checked in Chromium (stubbed google.script.run with the fake tracker's data); tests/test_round4.js
-  compares the shared CSS rules with NewStudentDialog's.
+  THE SEARCH BOX (owner 2026-11-24: "doesn't look like the other search", "the list stays and blocks everything",
+  "search should look same across all", "hide list after click"): see ONE SEARCH LOOK (Styles.html). Its box was
+  type="search" (no Styles.html rule) and the card opened under up to 20 names, out of view. Now a pick closes the
+  list, writes "Name (OSIS)" in the box (+ data-picked) and shows the card right under it; a click in the box
+  reopens the list for a typed search. Its list is taller (#results max-height).
   getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
   FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyEditStudent opens New / Edit Student filled in.
   NO "Log a contact" (owner 2026-11-23: the logging-a-contact UI is a future update): the card's Log a contact /

@@ -12,20 +12,10 @@
     .ff-mode .hint { margin: 0; }
     .ff-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
     .ff-body > * { flex-shrink: 0; }
-    /* The search box and its list: the same look as New / Edit Student's search (owner 2026-11-24). The list
-       floats over the page and closes on a pick, so the family card shows right under the box (it used to open
-       under a list of up to 20 names, out of view: "clicking a name does nothing"). */
-    .searchbox { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; position: relative; }
-    .searchbox .lab { color: var(--accent); }
-    .results { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 24px rgba(16,24,40,.16); max-height: min(440px, calc(100vh - 140px)); overflow-y: auto; z-index: 50; }
-    .res { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--panel); background: #ffffff; padding: 9px 12px; font: inherit; color: var(--ink); cursor: pointer; }
-    .res:last-child { border-bottom: 0; }
-    .res:hover, .res:focus, .res.on { background: var(--accent-soft); outline: none; }
-    .res .nm { display: block; font-weight: 600; }
-    .res .os { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
-    .res .meta { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
-    .res-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; }
-    .res-more { padding: 8px 12px; color: var(--muted); font-size: 12px; background: var(--panel); }
+    /* The search box and its list: the shared look (Styles.html SEARCH, owner 2026-11-24). The list floats over the
+       page and closes on a pick, so the family card shows right under the box (it used to open under a list of up
+       to 20 names, out of view: "the list stays and blocks everything"). Taller here: nothing else is under it. */
+    #results { max-height: min(440px, calc(100vh - 140px)); }
     .fam { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
     .fam h3 { margin: 0 0 2px; }
     .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
@@ -162,12 +152,10 @@
         .sort(function (a, b) { return b.score - a.score || BY[a.osis].st.name.localeCompare(BY[b.osis].st.name); });
     }
     var SHOW_RESULTS = 20; // the rest: "N more: type more of the name" (it showed 8 and never said there were more)
-    var shownLabel = '';   // the box's text after a pick ("Bart Simpson (123456789)"), like New / Edit Student
     function openList(on) { show('results', on); }
-    function resultButtons() { return Array.prototype.slice.call(document.querySelectorAll('#results .res')); }
     function renderResults() {
       var q = $('q').value;
-      if (!q.trim() || q === shownLabel) { openList(false); return; }
+      if (!q.trim() || q === $('q').dataset.picked) { openList(false); return; }
       var all = search(q);
       var list = all.slice(0, SHOW_RESULTS);
       var more = all.length - list.length;
@@ -192,13 +180,13 @@
       if (!BY[osis]) return;
       picked = osis;
       var s = BY[osis].st;
-      shownLabel = s.name + ' (' + s.osis + ')';
-      $('q').value = shownLabel;
+      // The box shows the family picked, like New / Edit Student (typing starts a new search: Styles.html SEARCH)
+      $('q').value = $('q').dataset.picked = s.name + ' (' + s.osis + ')';
       openList(false);
       show('startHint', false);
       renderFamily(null);
       $('body').scrollTop = 0;
-      $('q').focus(); // typing starts a new search (the keydown below empties the box first)
+      $('q').focus();
       detailsFor = osis;
       google.script.run.withSuccessHandler(function (d) { if (detailsFor === osis) renderFamily(d); })
         .withFailureHandler(function (e) { if (detailsFor === osis) renderFamily({ error: e && e.message ? e.message : String(e) }); })
@@ -266,36 +254,15 @@
       $('modeBtn').disabled = true;
       google.script.run.withSuccessHandler(function () { google.script.host.close(); })
         .withFailureHandler(function (e) { $('modeBtn').disabled = false; onFail(e); })
-        .findFamilySwitch(other, { q: $('q').value === shownLabel ? '' : $('q').value, osis: picked || '' });
+        .findFamilySwitch(other, { q: $('q').value === $('q').dataset.picked ? '' : $('q').value, osis: picked || '' });
     }
 
     // ---------- start ----------
     var timer = null;
     $('q').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(renderResults, 120); });
-    $('q').addEventListener('keydown', function (ev) {
-      var listOpen = !$('results').classList.contains('hidden');
-      // The box shows the family picked: a letter / Backspace starts a new search instead of editing that text
-      if (shownLabel && $('q').value === shownLabel && !ev.ctrlKey && !ev.metaKey && !ev.altKey &&
-          (ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete')) {
-        $('q').value = ''; shownLabel = '';
-        if (ev.key.length !== 1) { ev.preventDefault(); renderResults(); }
-        return;
-      }
-      if (ev.key === 'Enter') { ev.preventDefault(); var b = resultButtons()[0]; if (listOpen && b) b.click(); }
-      if (ev.key === 'ArrowDown') { var first = resultButtons()[0]; if (listOpen && first) { ev.preventDefault(); first.focus(); } }
-      if (ev.key === 'Escape' && listOpen) { ev.preventDefault(); openList(false); }
-    });
+    // (↓ / ↑ / Enter / Escape, closing the list, typing after a pick: Styles.html SEARCH, the same on every page)
     // Clicking back in the box opens the list again for what is typed there
     $('q').addEventListener('click', function () { if ($('results').classList.contains('hidden')) renderResults(); });
-    $('results').addEventListener('keydown', function (ev) {
-      var all = resultButtons(), i = all.indexOf(document.activeElement);
-      if (i === -1) return;
-      if (ev.key === 'ArrowDown' && all[i + 1]) { ev.preventDefault(); all[i + 1].focus(); }
-      if (ev.key === 'ArrowUp') { ev.preventDefault(); (all[i - 1] || $('q')).focus(); }
-      if (ev.key === 'Escape') { ev.preventDefault(); openList(false); $('q').focus(); }
-    });
-    // A click anywhere else closes the list (as in New / Edit Student)
-    document.addEventListener('click', function (ev) { if (!$('searchWrap').contains(ev.target)) openList(false); });
     function start() {
       google.script.run.withSuccessHandler(function (data) {
         DATA = data || { students: [], parents: [] };

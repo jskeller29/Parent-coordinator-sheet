@@ -2727,8 +2727,6 @@ function openViewEventsDialog() {
     <style>
       .ve { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 10px; height: 100vh; box-sizing: border-box; }
       .ve p { margin: 0; color: var(--muted); font-size: 13px; }
-      .bar { display: flex; gap: 8px; align-items: center; }
-      .bar input[type=text] { flex: 1; }
       .list { flex: 1; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius); }
       .row { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
       .row:last-child { border-bottom: 0; }
@@ -2742,9 +2740,12 @@ function openViewEventsDialog() {
     </style>
     <div class="ve">
       <p>Tick the events to show on the Events tab. The others are hidden, not deleted.</p>
-      <div class="bar">
-        <input type="text" id="find" placeholder="Search by name, type or date">
-        <button type="button" class="btn sec sm" id="allBtn">Select all</button>
+      <div class="searchbox"><!-- the look every search has (Styles.html SEARCH, owner 2026-11-24) -->
+        <label class="lab" for="find">Search events</label>
+        <div class="sb-row">
+          <input type="text" id="find" placeholder="Search by name, type or date" autocomplete="off">
+          <button type="button" class="btn sec sm" id="allBtn">Select all</button>
+        </div>
       </div>
       <div class="list" id="list"></div>
       <div class="foot">

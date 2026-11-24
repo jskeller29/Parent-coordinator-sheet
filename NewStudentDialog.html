@@ -10,16 +10,7 @@
     .stu-body > * { flex-shrink: 0; }
     .stu-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 22px 20px; display: flex; flex-direction: column; gap: 20px; }
     .sec-h { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 12px; }
-    .searchbox { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; position: relative; }
-    .searchbox .lab { color: var(--accent); }
-    .results { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 24px rgba(16,24,40,.16); max-height: 220px; overflow-y: auto; z-index: 50; }
-    .res { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--panel); }
-    .res:last-child { border-bottom: 0; }
-    .res:hover { background: var(--accent-soft); }
-    .res .nm { font-weight: 600; }
-    .res .os { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
-    .res .meta { color: var(--muted); font-size: 12px; margin-top: 1px; }
-    .res-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; }
+    /* The search box + its list: Styles.html SEARCH (one look for every search, owner 2026-11-24) */
     .gblock { display: block; }
     .addg { width: 100%; border: 1.5px dashed var(--line); background: #ffffff; border-radius: var(--radius); padding: 10px; display: flex; justify-content: center; font: 600 13px var(--font); color: var(--accent); cursor: pointer; }
     .addg:hover { border-color: var(--accent); background: var(--accent-soft); }
@@ -38,7 +29,7 @@
 
       <div id="selectStudentContainer" class="searchbox">
         <label class="lab" for="searchUniversal">Search to fill in the form</label>
-        <input type="text" id="searchUniversal" oninput="handleSearch()" autocomplete="off" disabled placeholder="Loading students…">
+        <input type="text" id="searchUniversal" oninput="handleSearch()" onclick="if (this.value !== this.dataset.picked) handleSearch()" autocomplete="off" disabled placeholder="Loading students…">
         <div id="searchResults" class="results hidden"></div>
       </div>
 
@@ -256,10 +247,10 @@
         matches.forEach(s => {
             const gName = s.guardians.length > 0 ? s.guardians.map(g=>g.name).join(', ') : "No Guardian";
             html += `
-            <div class="res" data-osis="${esc(s.osis)}" onclick="selectSearchResult(this.dataset.osis)">
-                <div class="nm">${esc(s.lastName)}, ${esc(s.firstName)} <span class="os">${esc(s.osis)}</span></div>
-                <div class="meta">Parent(s): ${esc(gName)} · Class ${esc(s.classCode)}</div>
-            </div>`;
+            <button type="button" class="res" data-osis="${esc(s.osis)}" onclick="selectSearchResult(this.dataset.osis)">
+                <span class="nm">${esc(s.lastName)}, ${esc(s.firstName)} <span class="os">${esc(s.osis)}</span></span>
+                <span class="meta">Parent(s): ${esc(gName)} · Class ${esc(s.classCode)}</span>
+            </button>`;
         });
 
         resultsContainer.innerHTML = html;
@@ -270,18 +261,14 @@
         const student = window.allStudents.find(s => s.osis === osis);
         if (!student) return;
 
-        document.getElementById('searchUniversal').value = `${student.lastName}, ${student.firstName} (${student.osis})`;
+        // The box shows who was picked; typing starts a new search (data-picked: Styles.html SEARCH)
+        const box = document.getElementById('searchUniversal');
+        box.value = box.dataset.picked = `${student.lastName}, ${student.firstName} (${student.osis})`;
         document.getElementById('searchResults').classList.add('hidden');
         autoFillStudent(osis);
     }
 
-    document.addEventListener('click', function(event) {
-        const container = document.getElementById('selectStudentContainer');
-        const results = document.getElementById('searchResults');
-        if (container && !container.contains(event.target)) {
-            if (results) results.classList.add('hidden');
-        }
-    });
+    // (a click outside the box, Escape, ↓ / ↑ / Enter: Styles.html SEARCH, the same on every page)
 
     function findSiblings(student) {
         if (!student || !student.guardians || student.guardians.length === 0) return [];

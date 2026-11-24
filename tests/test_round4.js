@@ -820,20 +820,106 @@ function familySheet() {
   assert.strictEqual(typeof g.findFamilyLogContact, "undefined", "no Log a contact endpoint");
   assert(!/Log a contact/.test(fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8')), "no Log a contact button");
 
-  // The search looks like New / Edit Student's (owner 2026-11-24): a styled text box in the blue search box, the
-  // names in a list that floats over the page and closes on a pick, so the family card shows right under the box
-  // (it opened under up to 20 names, out of view: "clicking a name does nothing"; type="search" had no styling)
+  // ONE SEARCH LOOK (owner 2026-11-24: "search should look same across all, including new / edit student", "hide list
+  // after click"): Styles.html has the search box + floating list and the script that closes the list after a click
+  // on a row; Find a Family, New / Edit Student, Your Lists' picker and View Events use it and define none of their
+  // own. Find a Family: a pick closes the list and shows the card at the top (it opened under up to 20 names, out of
+  // view: "the list stays and blocks everything"; its box was type="search", which Styles.html never styled).
   {
-    const ff = fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8');
-    const ns = fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8');
-    assert(!/type="search"/.test(ff) && /<div id="searchWrap" class="searchbox">[\s\S]*?<input type="text" id="q"[\s\S]*?<div id="results" class="results hidden"/.test(ff),
-      "text box + floating list inside the search box");
-    const rule = (html, sel) => { const m = html.match(new RegExp('\\n\\s*' + sel.replace(/[.()]/g, '\\$&') + ' \\{([^}]*)\\}')); return m && m[1].trim(); };
-    ['.searchbox', '.searchbox .lab', '.res .os', '.res-empty'].forEach(sel => assert.strictEqual(rule(ff, sel), rule(ns, sel), sel + " as in New / Edit Student"));
-    assert.strictEqual(rule(ff, '.results').replace(/max-height:[^;]*;/, ''), rule(ns, '.results').replace(/max-height:[^;]*;/, ''), ".results as in New / Edit Student (taller)");
+    const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const styles = read('Styles.html');
+    ['.searchbox {', '.searchbox .lab {', '.results {', '.res {', '.res .nm {', '.res .os {', '.res .meta {', '.res-empty {', '.res-more {']
+      .forEach(r => assert(styles.includes('\n  ' + r), "Styles.html " + r));
+    assert(/if \(near\(ev\.target, '\.results \.res'\)\) close\(/.test(styles), "a click on a row closes its list (every page)");
+    assert(/if \(!box \|\| !box\.contains\(l\)\) close\(l\)/.test(styles), "a click elsewhere closes it");
+    const viewEvents = (() => { const e = read('Edits.gs'); const a = e.indexOf('function openViewEventsDialog'); return e.slice(a, e.indexOf('\n}\n', a)); })();
+    const pages = { 'FindFamily.html': read('FindFamily.html'), 'NewStudentDialog.html': read('NewStudentDialog.html'),
+                    'YourListsSidebar.html': read('YourListsSidebar.html'), 'View Events': viewEvents };
+    Object.keys(pages).forEach(name => {
+      const html = pages[name];
+      assert(!/\n\s*\.(searchbox|results|res|res-empty|res-more)\b[^{\n]*\{/.test(html), name + " has no search style of its own");
+      assert(!/type="search"/.test(html), name + ": no unstyled type=search box");
+      assert(/class="searchbox"/.test(html), name + " uses the search box");
+    });
+    assert(/<div id="searchWrap" class="searchbox">[\s\S]*?<input type="text" id="q"[\s\S]*?<div id="results" class="results hidden"/.test(pages['FindFamily.html']), "Find a Family: box + list");
+    assert(/<button type="button" class="res" data-osis=/.test(pages['NewStudentDialog.html']), "New / Edit Student: rows are .res buttons");
+    assert(/class="res" data-target=/.test(pages['YourListsSidebar.html']) && /<div class="searchbox"[^>]*><label class="lab"/.test(pages['YourListsSidebar.html']), "Your Lists picker");
+    const ff = pages['FindFamily.html'];
     const pickFn = ff.slice(ff.indexOf('function pick(osis)'), ff.indexOf('function statusTag'));
-    assert(/openList\(false\)/.test(pickFn) && /\$\('q'\)\.value = shownLabel/.test(pickFn) && /\$\('body'\)\.scrollTop = 0/.test(pickFn), "a pick closes the list and shows the card at the top");
-    assert(/document\.addEventListener\('click'[^\n]*searchWrap[^\n]*openList\(false\)/.test(ff), "a click elsewhere closes the list");
+    assert(/openList\(false\)/.test(pickFn) && /\$\('q'\)\.value = \$\('q'\)\.dataset\.picked = /.test(pickFn) && /\$\('body'\)\.scrollTop = 0/.test(pickFn),
+      "a pick closes the list, shows the family in the box and the card at the top");
+    assert(/box\.value = box\.dataset\.picked = /.test(pages['NewStudentDialog.html']), "New / Edit Student: typing after a pick starts a new search too");
+
+    // The shared script runs: a small stand-in page with two search boxes
+    const listeners = {};
+    const doc = { activeElement: null, addEventListener: (t, f) => { (listeners[t] = listeners[t] || []).push(f); } };
+    const all = [];
+    const node = (tag, classes, parent) => {
+      const n = { tagName: tag, parent: parent || null, kids: [], dataset: {}, value: '', clicks: 0,
+        cls: new Set(classes),
+        classList: { add: c => n.cls.add(c), remove: c => n.cls.delete(c), contains: c => n.cls.has(c) },
+        contains: x => { for (let p = x; p; p = p.parent) if (p === n) return true; return false; },
+        closest: sel => {
+          const parts = sel.split(' ');
+          for (let p = n; p; p = p.parent) {
+            if (!p.cls.has(parts[parts.length - 1].slice(1))) continue;
+            if (parts.length === 1) return p;
+            for (let q = p.parent; q; q = q.parent) if (q.cls.has(parts[0].slice(1))) return p;
+          }
+          return null;
+        },
+        querySelectorAll: sel => all.filter(x => x !== n && n.contains(x) && sel.split(',').some(s => { s = s.trim(); return s === 'input' ? x.tagName === 'INPUT' : x.cls.has(s.slice(1)); })),
+        querySelector: sel => n.querySelectorAll(sel)[0] || null,
+        focus: () => { doc.activeElement = n; },
+        click: () => { n.clicks++; fire('click', { target: n }); },
+        dispatchEvent: ev => { n.lastEvent = ev.type; }
+      };
+      if (parent) parent.kids.push(n);
+      all.push(n);
+      return n;
+    };
+    const page = node('BODY', []);
+    doc.querySelectorAll = sel => all.filter(x => x.cls.has('results') && x.closest('.searchbox'));
+    const fire = (type, ev) => { ev.defaultPrevented = false; ev.preventDefault = () => { ev.defaultPrevented = true; };
+      (listeners[type] || []).forEach(f => f(ev)); return ev; };
+    const box1 = node('DIV', ['searchbox'], page), in1 = node('INPUT', [], box1), list1 = node('DIV', ['results'], box1);
+    const row1 = node('BUTTON', ['res'], list1), row2 = node('BUTTON', ['res'], list1);
+    const box2 = node('DIV', ['searchbox'], page), in2 = node('INPUT', [], box2), list2 = node('DIV', ['results'], box2);
+    node('BUTTON', ['res'], list2);
+    const other = node('DIV', ['fam'], page);
+    const vm2 = require('vm');
+    const sctx = { document: doc, Event: function (t) { this.type = t; }, setInterval: () => 1, clearInterval() {}, setTimeout() {}, Date, Math, String, Number, Array };
+    vm2.createContext(sctx);
+    vm2.runInContext(styles.slice(styles.indexOf('<script>') + 8, styles.indexOf('</script>')), sctx);
+    const open = l => !l.cls.has('hidden');
+    fire('click', { target: row2 });
+    eq([open(list1), open(list2)], [false, false], "a click on a row closes its list (and the other box's)");
+    list1.cls.delete('hidden');
+    fire('click', { target: in1 });
+    assert(open(list1), "a click in the box keeps its list");
+    fire('click', { target: other });
+    assert(!open(list1), "a click elsewhere closes it");
+    list1.cls.delete('hidden');
+    let ev = fire('keydown', { target: in1, key: 'ArrowDown' });
+    assert(ev.defaultPrevented && doc.activeElement === row1, "↓ goes to the first row");
+    ev = fire('keydown', { target: row1, key: 'ArrowDown' });
+    assert(doc.activeElement === row2, "↓ again: the next row");
+    ev = fire('keydown', { target: row2, key: 'Escape' });
+    assert(!open(list1) && doc.activeElement === in1, "Escape closes it, back to the box");
+    list1.cls.delete('hidden');
+    ev = fire('keydown', { target: in1, key: 'Enter' });
+    assert(ev.defaultPrevented && row1.clicks === 1 && !open(list1), "Enter picks the first row (and never sends a form)");
+    ev = fire('keydown', { target: in1, key: 'Enter' });
+    assert(ev.defaultPrevented && row1.clicks === 1, "Enter with the list closed does nothing");
+    in1.value = in1.dataset.picked = 'Simpson, Bart (123456789)';
+    fire('keydown', { target: in1, key: 'h' });
+    eq([in1.value, in1.dataset.picked], ['', undefined], "a letter after a pick starts a new search");
+    in1.value = in1.dataset.picked = 'Simpson, Bart (123456789)';
+    ev = fire('keydown', { target: in1, key: 'Backspace' });
+    assert(in1.value === '' && ev.defaultPrevented && in1.lastEvent === 'input', "Backspace after a pick empties the box");
+    in1.value = 'Simpson, Bart (123456789)x';
+    fire('keydown', { target: in1, key: 'h' });
+    assert.strictEqual(in1.value, 'Simpson, Bart (123456789)x', "only while the box still shows the pick");
   }
 
   // Edit student: New / Edit Student with the student filled in (not "back to Student Overrides")
