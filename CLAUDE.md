@@ -624,9 +624,9 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   resetContactLogFormatting before the Workshop color, and every build adds it when missing (ensureFollowupNewerRule_,
   first in the list). Column J red for a dated row with no Method = idea 9 below (the owner asked again 2026-11-24).
 - 10 METHOD 2 CHOICES: Backend CQ (BACKEND_BLOCKS.METHOD2, formulaOnly): CQ1 title, CQ2 "Method 2", CQ3
-  method2ChoicesFormula_ (fixed METHOD2_FIXED_CHOICES_ = Call, Email, Text, Parents Square, In School since 2026-11-24, VSTACK'd
-  before every K typed above END, UNIQUE; a CQ3 holding exactly the first built-in list's formula, METHOD2_OLD_FIXED_CHOICES_,
-  is replaced: "updated"). Every build:
+  method2ChoicesFormula_ (fixed METHOD2_FIXED_CHOICES_ = Call, Email, Voicemail, Meeting, In School, Parents Square since
+  2026-11-24, VSTACK'd before every K typed above END, UNIQUE; an existing CQ3 formula is kept: the owner deletes the old
+  one by hand). Every build:
   ensureMethod2ChoicesOnBackend_ writes it when missing, keeps any formula there that reads Contact Log K (the owner
   can change the fixed choices on the sheet), frees a #REF! (clears under it), never writes over values. Column K's
   dropdown is BY HAND (DEPLOY.md step 10).

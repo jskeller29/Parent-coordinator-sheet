@@ -82,7 +82,7 @@ page SettingsDialog; **add** the page **EventsSidebar** (new). Every sheet (mast
    (column **CQ**: your fixed choices first, then every Method 2 already typed). Then Contact Log → **Method 2**
    column (K) → Data validation → **Dropdown (from a range)** `='Backend'!$CQ$3:$CQ`, Advanced options →
    **Show a warning** (NOT "Reject the input": a new choice can only join the list after it is typed once).
-   To change the fixed choices (now Call, Email, Text, Parents Square, In School), edit the formula in
+   To change the fixed choices (now Call, Email, Voicemail, Meeting, In School, Parents Square), edit the formula in
    **Backend CQ3** on the sheet: the build keeps a formula there that reads Contact Log K.
    Nothing to do by hand for the **light red Method** color: every build adds that rule when it is missing
    (and the 10 PM run draws it with the others).
