@@ -606,6 +606,8 @@ Deploying (manual paste into the Apps Script editor; master template + owner she
 - The testers' fixes (2026-11-23, later; see THREE TESTERS below): re-paste Core, Build, Menus, Input Data, Contacts
   Sync (scripts) and FindFamily, InputDataSidebar, ManageOverridesDialog, NewStudentDialog, ProgressSidebar,
   YourListsSidebar (pages) on every sheet (master template too). No new files, no new permissions, nothing by hand.
+- Find a Family search like New / Edit Student's (2026-11-24): re-paste the page FindFamily on every sheet (master
+  template too). Nothing else.
 
 THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockups"; tests/test_round4.js):
 - 9 RED METHOD: Contact Log J light red (SHEET_LOOK_.missingMethod #f4cccc) while B has a date and J is blank:
@@ -681,6 +683,14 @@ THE OWNER'S 10 IDEAS (2026-11-23; the doc "PC Tracker Ideas: Thoughts and Mockup
   with the same search + family and remembers the choice (user properties FIND_FAMILY_AS / FIND_FAMILY_KEEP).
   getFindFamilyData reads the built Student List + Parents List; search (client) = names with typos (edit distance),
   OSIS, phone digits (a leading 1 / +1 and an extension are dropped), email; the first 20 matches, then "N more".
+  THE SEARCH BOX (owner 2026-11-24: "doesn't look like the other search", "clicking a name does nothing"): the same
+  look as New / Edit Student's (blue .searchbox with a label, a styled type="text" box: type="search" had no Styles.html
+  rule; the names in a .results list floating over the page, "Name OSIS" + "Parent(s): ... · Class" or the parent /
+  phone that matched, "Nobody found" / "N more" inside it). A pick closes the list, writes "Name (OSIS)" in the box
+  and shows the card right under it (it opened under up to 20 names, out of view, so a click seemed to do nothing);
+  a letter / Backspace in the box starts a new search, a click in it reopens the list, a click elsewhere / Escape
+  closes it. Checked in Chromium (stubbed google.script.run with the fake tracker's data); tests/test_round4.js
+  compares the shared CSS rules with NewStudentDialog's.
   getFindFamilyDetails: Combined notes (dividers stripped), open follow-ups (Contact Log N in
   FIND_FAMILY_OPEN_FOLLOWUPS_), Student Info (ADDL_INFO). findFamilyEditStudent opens New / Edit Student filled in.
   NO "Log a contact" (owner 2026-11-23: the logging-a-contact UI is a future update): the card's Log a contact /

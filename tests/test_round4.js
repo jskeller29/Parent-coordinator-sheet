@@ -820,6 +820,22 @@ function familySheet() {
   assert.strictEqual(typeof g.findFamilyLogContact, "undefined", "no Log a contact endpoint");
   assert(!/Log a contact/.test(fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8')), "no Log a contact button");
 
+  // The search looks like New / Edit Student's (owner 2026-11-24): a styled text box in the blue search box, the
+  // names in a list that floats over the page and closes on a pick, so the family card shows right under the box
+  // (it opened under up to 20 names, out of view: "clicking a name does nothing"; type="search" had no styling)
+  {
+    const ff = fs.readFileSync(path.join(ROOT, 'FindFamily.html'), 'utf8');
+    const ns = fs.readFileSync(path.join(ROOT, 'NewStudentDialog.html'), 'utf8');
+    assert(!/type="search"/.test(ff) && /<div id="searchWrap" class="searchbox">[\s\S]*?<input type="text" id="q"[\s\S]*?<div id="results" class="results hidden"/.test(ff),
+      "text box + floating list inside the search box");
+    const rule = (html, sel) => { const m = html.match(new RegExp('\\n\\s*' + sel.replace(/[.()]/g, '\\$&') + ' \\{([^}]*)\\}')); return m && m[1].trim(); };
+    ['.searchbox', '.searchbox .lab', '.res .os', '.res-empty'].forEach(sel => assert.strictEqual(rule(ff, sel), rule(ns, sel), sel + " as in New / Edit Student"));
+    assert.strictEqual(rule(ff, '.results').replace(/max-height:[^;]*;/, ''), rule(ns, '.results').replace(/max-height:[^;]*;/, ''), ".results as in New / Edit Student (taller)");
+    const pickFn = ff.slice(ff.indexOf('function pick(osis)'), ff.indexOf('function statusTag'));
+    assert(/openList\(false\)/.test(pickFn) && /\$\('q'\)\.value = shownLabel/.test(pickFn) && /\$\('body'\)\.scrollTop = 0/.test(pickFn), "a pick closes the list and shows the card at the top");
+    assert(/document\.addEventListener\('click'[^\n]*searchWrap[^\n]*openList\(false\)/.test(ff), "a click elsewhere closes the list");
+  }
+
   // Edit student: New / Edit Student with the student filled in (not "back to Student Overrides")
   let opened = 0;
   g.openNewStudentDialog = () => { opened++; };

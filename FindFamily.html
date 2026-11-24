@@ -7,20 +7,25 @@
     /* 🔍 Find a Family (owner 2026-11-23): a popup that can become a side panel (Menus.gs FIND A FAMILY) */
     html, body { height: 100%; }
     body { display: flex; flex-direction: column; overflow: hidden; }
-    .ff-top { padding: 10px 14px 8px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
-    .ff-row { display: flex; gap: 6px; align-items: center; }
-    .ff-row input[type=search] { flex: 1; min-width: 0; font-size: 15px; }
+    .ff-top { padding: 12px 14px 6px; flex-shrink: 0; position: relative; z-index: 2; }
     .ff-mode { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 5px; }
     .ff-mode .hint { margin: 0; }
-    .ff-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-    .ff-body > * { flex-shrink: 0; } /* (the results list squeezed to nothing under a long family card) */
-    .res { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-    .res button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--panel); background: #ffffff; padding: 7px 10px; font: 13.5px var(--font); color: var(--ink); cursor: pointer; }
-    .res button:first-child { border-top: 0; }
-    .res button:hover, .res button:focus, .res button.on { background: var(--accent-soft); outline: none; }
-    .res .rn { font-weight: 700; }
-    .res .rs { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; overflow-wrap: anywhere; }
-    .res mark { background: #fde68a; padding: 0 1px; color: inherit; }
+    .ff-body { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .ff-body > * { flex-shrink: 0; }
+    /* The search box and its list: the same look as New / Edit Student's search (owner 2026-11-24). The list
+       floats over the page and closes on a pick, so the family card shows right under the box (it used to open
+       under a list of up to 20 names, out of view: "clicking a name does nothing"). */
+    .searchbox { background: var(--accent-soft); border-radius: var(--radius); padding: 12px 14px; position: relative; }
+    .searchbox .lab { color: var(--accent); }
+    .results { position: absolute; left: 14px; right: 14px; top: calc(100% - 6px); background: #ffffff; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 24px rgba(16,24,40,.16); max-height: min(440px, calc(100vh - 140px)); overflow-y: auto; z-index: 50; }
+    .res { display: block; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--panel); background: #ffffff; padding: 9px 12px; font: inherit; color: var(--ink); cursor: pointer; }
+    .res:last-child { border-bottom: 0; }
+    .res:hover, .res:focus, .res.on { background: var(--accent-soft); outline: none; }
+    .res .nm { display: block; font-weight: 600; }
+    .res .os { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 4px; }
+    .res .meta { display: block; color: var(--muted); font-size: 12px; margin-top: 1px; }
+    .res-empty { padding: 12px; text-align: center; color: var(--muted); font-size: 13px; }
+    .res-more { padding: 8px 12px; color: var(--muted); font-size: 12px; background: var(--panel); }
     .fam { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
     .fam h3 { margin: 0 0 2px; }
     .meta { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
@@ -45,8 +50,10 @@
 </head>
 <body>
   <div class="ff-top">
-    <div class="ff-row">
-      <input type="search" id="q" placeholder="A name, OSIS, phone or email" autocomplete="off" aria-label="Search a family" disabled>
+    <div id="searchWrap" class="searchbox">
+      <label class="lab" for="q">Search a family</label>
+      <input type="text" id="q" placeholder="Loading families…" autocomplete="off" disabled>
+      <div id="results" class="results hidden" role="listbox" aria-label="Families found"></div>
     </div>
     <div class="ff-mode">
       <p class="hint" id="hint">Spelling doesn't have to be exact.</p>
@@ -56,9 +63,7 @@
   <div class="ff-body" id="body">
     <div id="msg" class="notice hidden" role="status"></div>
     <div id="loading" class="state"><div class="spinner"></div>Loading the families…</div>
-    <div id="results" class="res hidden" role="listbox" aria-label="Families found"></div>
-    <div id="none" class="state hidden">Nobody found. Try part of the name, or the last 4 digits of the phone number.</div>
-    <p id="more" class="hint hidden" style="margin:6px 2px 0"></p>
+    <div id="startHint" class="state hidden">Pick a family from the list to see its parents, follow-ups and notes.</div>
     <div id="fam" class="fam hidden"></div>
   </div>
 
@@ -137,7 +142,7 @@
       if (digitsOnly && qd.length === 11 && qd.charAt(0) === '1') qd = qd.slice(1); // +1 / 1- in front: the US country code
       if (digitsOnly) {
         ENTRIES.forEach(function (e) {
-          if (e.kind === 'student' && e.osis.indexOf(qd) !== -1) add(e.osis, e.osis === qd ? 9 : 6, 'OSIS ' + e.osis);
+          if (e.kind === 'student' && e.osis.indexOf(qd) !== -1) add(e.osis, e.osis === qd ? 9 : 6, 'Student');
           if (e.kind === 'parent') e.phones.forEach(function (ph, i) {
             if (ph.indexOf(qd) !== -1) add(e.osis, ph === qd ? 9 : 7, 'Parent: ' + e.p.name + (e.p.rel ? ' · ' + e.p.rel : '') + ' · ' + e.p.phones[i]);
           });
@@ -157,29 +162,43 @@
         .sort(function (a, b) { return b.score - a.score || BY[a.osis].st.name.localeCompare(BY[b.osis].st.name); });
     }
     var SHOW_RESULTS = 20; // the rest: "N more: type more of the name" (it showed 8 and never said there were more)
+    var shownLabel = '';   // the box's text after a pick ("Bart Simpson (123456789)"), like New / Edit Student
+    function openList(on) { show('results', on); }
+    function resultButtons() { return Array.prototype.slice.call(document.querySelectorAll('#results .res')); }
     function renderResults() {
       var q = $('q').value;
-      var all = q.trim() ? search(q) : [];
+      if (!q.trim() || q === shownLabel) { openList(false); return; }
+      var all = search(q);
       var list = all.slice(0, SHOW_RESULTS);
-      show('none', !!q.trim() && !list.length);
-      show('results', list.length > 0);
       var more = all.length - list.length;
-      $('more').textContent = more > 0 ? (more === 1 ? '1 more family' : more + ' more families') + ' match: type more of the name, or part of a phone number.' : '';
-      show('more', more > 0);
-      $('results').innerHTML = list.map(function (r, i) {
-        var s = BY[r.osis].st;
-        var sub = (r.why === 'Student' ? 'OSIS ' + s.osis + (s.cls ? ' · ' + s.cls : '') : r.why);
-        return '<button type="button" role="option" data-osis="' + esc(r.osis) + '" class="' + (r.osis === picked ? 'on' : '') + '" onclick="pick(this.dataset.osis)">' +
-          '<span class="rn">' + esc(s.name) + '</span><span class="rs">' + esc(sub) + '</span></button>';
+      var html = list.map(function (r) {
+        var f = BY[r.osis], s = f.st;
+        var sub = r.why === 'Student'
+          ? 'Parent(s): ' + (f.parents.map(function (p) { return p.name; }).join(', ') || 'none listed') + (s.cls ? ' · Class ' + s.cls : '')
+          : r.why;
+        return '<button type="button" role="option" class="res' + (r.osis === picked ? ' on' : '') + '" data-osis="' + esc(r.osis) + '" onclick="pick(this.dataset.osis)">' +
+          '<span class="nm">' + esc(s.name) + ' <span class="os">' + esc(s.osis) + '</span></span><span class="meta">' + esc(sub) + '</span></button>';
       }).join('');
+      if (!list.length) html = '<div class="res-empty">Nobody found. Try part of the name, or the last 4 digits of the phone number.</div>';
+      if (more > 0) html += '<div class="res-more">' + (more === 1 ? '1 more family' : more + ' more families') + ' match: type more of the name, or part of a phone number.</div>';
+      $('results').innerHTML = html;
+      $('results').scrollTop = 0;
+      openList(true);
     }
 
     // ---------- the family card ----------
     var detailsFor = null;
     function pick(osis) {
+      if (!BY[osis]) return;
       picked = osis;
-      renderResults();
+      var s = BY[osis].st;
+      shownLabel = s.name + ' (' + s.osis + ')';
+      $('q').value = shownLabel;
+      openList(false);
+      show('startHint', false);
       renderFamily(null);
+      $('body').scrollTop = 0;
+      $('q').focus(); // typing starts a new search (the keydown below empties the box first)
       detailsFor = osis;
       google.script.run.withSuccessHandler(function (d) { if (detailsFor === osis) renderFamily(d); })
         .withFailureHandler(function (e) { if (detailsFor === osis) renderFamily({ error: e && e.message ? e.message : String(e) }); })
@@ -247,22 +266,36 @@
       $('modeBtn').disabled = true;
       google.script.run.withSuccessHandler(function () { google.script.host.close(); })
         .withFailureHandler(function (e) { $('modeBtn').disabled = false; onFail(e); })
-        .findFamilySwitch(other, { q: $('q').value, osis: picked || '' });
+        .findFamilySwitch(other, { q: $('q').value === shownLabel ? '' : $('q').value, osis: picked || '' });
     }
 
     // ---------- start ----------
     var timer = null;
     $('q').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(renderResults, 120); });
     $('q').addEventListener('keydown', function (ev) {
-      if (ev.key === 'Enter') { var b = document.querySelector('#results button'); if (b) b.click(); }
-      if (ev.key === 'ArrowDown') { var first = document.querySelector('#results button'); if (first) { ev.preventDefault(); first.focus(); } }
+      var listOpen = !$('results').classList.contains('hidden');
+      // The box shows the family picked: a letter / Backspace starts a new search instead of editing that text
+      if (shownLabel && $('q').value === shownLabel && !ev.ctrlKey && !ev.metaKey && !ev.altKey &&
+          (ev.key.length === 1 || ev.key === 'Backspace' || ev.key === 'Delete')) {
+        $('q').value = ''; shownLabel = '';
+        if (ev.key.length !== 1) { ev.preventDefault(); renderResults(); }
+        return;
+      }
+      if (ev.key === 'Enter') { ev.preventDefault(); var b = resultButtons()[0]; if (listOpen && b) b.click(); }
+      if (ev.key === 'ArrowDown') { var first = resultButtons()[0]; if (listOpen && first) { ev.preventDefault(); first.focus(); } }
+      if (ev.key === 'Escape' && listOpen) { ev.preventDefault(); openList(false); }
     });
+    // Clicking back in the box opens the list again for what is typed there
+    $('q').addEventListener('click', function () { if ($('results').classList.contains('hidden')) renderResults(); });
     $('results').addEventListener('keydown', function (ev) {
-      var b = document.activeElement;
-      if (!b || b.parentNode !== $('results')) return;
-      if (ev.key === 'ArrowDown' && b.nextSibling) { ev.preventDefault(); b.nextSibling.focus(); }
-      if (ev.key === 'ArrowUp') { ev.preventDefault(); (b.previousSibling || $('q')).focus(); }
+      var all = resultButtons(), i = all.indexOf(document.activeElement);
+      if (i === -1) return;
+      if (ev.key === 'ArrowDown' && all[i + 1]) { ev.preventDefault(); all[i + 1].focus(); }
+      if (ev.key === 'ArrowUp') { ev.preventDefault(); (all[i - 1] || $('q')).focus(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); openList(false); $('q').focus(); }
     });
+    // A click anywhere else closes the list (as in New / Edit Student)
+    document.addEventListener('click', function (ev) { if (!$('searchWrap').contains(ev.target)) openList(false); });
     function start() {
       google.script.run.withSuccessHandler(function (data) {
         DATA = data || { students: [], parents: [] };
@@ -272,9 +305,11 @@
         if (DATA.notBuilt) { say('Build your sheets first (🚀 App Menu → 🏗️ Build Sheets Only), then search here.', 'warn'); return; }
         buildIndex();
         $('q').disabled = false;
+        $('q').placeholder = 'Search student, parent, OSIS, phone or email…';
+        if (DATA.keep && DATA.keep.osis && BY[DATA.keep.osis]) { pick(DATA.keep.osis); return; }
+        show('startHint', true);
         if (DATA.keep && DATA.keep.q) $('q').value = DATA.keep.q;
         renderResults();
-        if (DATA.keep && DATA.keep.osis && BY[DATA.keep.osis]) pick(DATA.keep.osis);
         $('q').focus();
       }).withFailureHandler(onFail).getFindFamilyData();
     }
